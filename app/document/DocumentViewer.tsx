@@ -16,7 +16,7 @@ const MAX_ZOOM = 3.0;
 interface DocumentViewerProps {
   documentUrl: string;
   documentId: string;
-  userId: string;
+  signerId: string;
   apiKey: string;
   documentStatus: string;
 }
@@ -134,7 +134,7 @@ function StatusBanner({ config }: { config: BannerConfig }) {
   );
 }
 
-export default function DocumentViewer({ documentUrl, documentId, userId, apiKey, documentStatus }: DocumentViewerProps) {
+export default function DocumentViewer({ documentUrl, documentId, signerId, apiKey, documentStatus }: DocumentViewerProps) {
   const [showModal, setShowModal] = useState(false);
   const [actionType, setActionType] = useState<ActionType>('sign');
   const [code, setCode] = useState('');
@@ -162,7 +162,7 @@ export default function DocumentViewer({ documentUrl, documentId, userId, apiKey
 
   const generateMutation = useMutation({
     mutationFn: (action: ActionType) =>
-      generateVerificationCode({ documentId, signerId: userId, type: toCodeType(action) }),
+      generateVerificationCode({ documentId, signerId: signerId, type: toCodeType(action) }),
     onSuccess: () => {
       setShowModal(true);
       setCode('');
@@ -171,7 +171,7 @@ export default function DocumentViewer({ documentUrl, documentId, userId, apiKey
 
   const validateMutation = useMutation({
     mutationFn: (vars: { code: string; action: ActionType }) =>
-      validateCode({ documentId, signerId: userId, code: vars.code, type: toCodeType(vars.action) }),
+      validateCode({ documentId, signerId: signerId, code: vars.code, type: toCodeType(vars.action) }),
     onSuccess: (_, vars) => {
       setShowModal(false);
       setCode('');

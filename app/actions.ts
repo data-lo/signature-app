@@ -1,15 +1,21 @@
 'use server';
 
+// Acciones del servidor para interactuar con la API de firma de documentos.
+// Todas las funciones se ejecutan en el servidor (Next.js Server Actions) y
+// se comunican con el backend a través de Axios.
+
 import axios, { AxiosError } from 'axios';
 
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
 
+// Estructura genérica de respuesta de la API
 interface ApiResponse<T> {
   success: number;
   message: string;
   data: T;
 }
 
+// Representa un documento asociado a un firmante
 interface SignerDocument {
   id: string;
   fileName: string;
@@ -20,6 +26,7 @@ interface SignerDocument {
   createdAt: string;
 }
 
+// Resultado de la validación de acceso a un documento
 export interface ValidateAccessResult {
   valid: boolean;
   documentUrl?: string;
@@ -28,6 +35,8 @@ export interface ValidateAccessResult {
   statusCode?: number;
 }
 
+// Extrae el mensaje de error y el código HTTP de un error de Axios.
+// Si no hay respuesta del servidor (error de red), retorna 503.
 function extractAxiosError(error: unknown): { message: string; statusCode: number } {
   const axiosError = error as AxiosError<{ message?: string }>;
   if (axiosError.response) {
@@ -39,24 +48,27 @@ function extractAxiosError(error: unknown): { message: string; statusCode: numbe
   return { message: 'Error de conexión con el servidor', statusCode: 503 };
 }
 
+// Valida que un firmante tenga acceso a un documento específico.
+// Verifica: (1) que el documento exista, (2) que el firmante tenga asignado el documento,
+// y (3) obtiene la URL pre-firmada del archivo para mostrarlo en el visor.
 export async function validateAccess({
   apiKey,
-  userId,
+  signerId,
   documentId,
 }: {
   apiKey: string;
-  userId: string;
+  signerId: string;
   documentId: string;
 }): Promise<ValidateAccessResult> {
   const headers = { 'x-api-key': apiKey };
 
   try {
-    // Verify the document exists
+    // Verifica que el documento exista en el sistema
     await axios.get(`${API_BASE_URL}/document/${documentId}`, { headers });
 
-    // Verify userId has access to this document via the signer endpoint
+    // Obtiene todos los documentos asignados al firmante y busca el solicitado
     const signerResponse = await axios.get<SignerDocument[]>(
-      `${API_BASE_URL}/document/signer/${userId}`,
+      `${API_BASE_URL}/document/signer/${signerId}`,
       { headers },
     );
     const signerDocs = signerResponse.data ?? [];
@@ -70,7 +82,7 @@ export async function validateAccess({
       };
     }
 
-    // Get the pre-signed document file URL
+    // Obtiene la URL pre-firmada para acceder al archivo del documento
     const fileResponse = await axios.get<ApiResponse<string>>(
       `${API_BASE_URL}/document/file/${documentId}`,
       { headers },
@@ -84,6 +96,8 @@ export async function validateAccess({
   }
 }
 
+// Solicita la generación de un código de verificación de un solo uso.
+// Se usa antes de que el firmante confirme una acción (firmar, rechazar o cancelar).
 export async function generateVerificationCode({
   documentId,
   signerId,
@@ -105,6 +119,8 @@ export async function generateVerificationCode({
   }
 }
 
+// Obtiene la URL pre-firmada del archivo de un documento dado su ID.
+// Útil para refrescar la URL cuando expira sin volver a validar el acceso completo.
 export async function fetchDocumentUrl({
   apiKey,
   documentId,
@@ -125,6 +141,9 @@ export async function fetchDocumentUrl({
   }
 }
 
+// Valida el código de verificación ingresado por el firmante.
+// Lanza errores específicos para código incorrecto (401) o expirado (404),
+// permitiendo que el UI muestre mensajes diferenciados al usuario.
 export async function validateCode({
   documentId,
   signerId,
@@ -157,6 +176,8 @@ export async function validateCode({
   }
 }
 
+// Envía la solicitud de cancelación de un documento.
+// Cambia el estado del documento a "pendiente de cancelación" en el backend.
 export async function submitForCancellation({
   apiKey,
   documentId,
