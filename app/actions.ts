@@ -23,6 +23,7 @@ interface SignerDocument {
 export interface ValidateAccessResult {
   valid: boolean;
   documentUrl?: string;
+  documentStatus?: string;
   error?: string;
   statusCode?: number;
 }
@@ -59,9 +60,9 @@ export async function validateAccess({
       { headers },
     );
     const signerDocs = signerResponse.data ?? [];
-    const hasAccess = signerDocs.some((doc) => doc.id === documentId);
+    const matchingDoc = signerDocs.find((doc) => doc.id === documentId);
 
-    if (!hasAccess) {
+    if (!matchingDoc) {
       return {
         valid: false,
         error: 'No tienes permisos para acceder a este documento',
@@ -76,7 +77,7 @@ export async function validateAccess({
     );
     const documentUrl = fileResponse.data?.data ?? String(fileResponse.data);
 
-    return { valid: true, documentUrl };
+    return { valid: true, documentUrl, documentStatus: matchingDoc.status };
   } catch (error) {
     const { message, statusCode } = extractAxiosError(error);
     return { valid: false, error: message, statusCode };
@@ -90,7 +91,7 @@ export async function generateVerificationCode({
 }: {
   documentId: string;
   signerId: string;
-  type: 'VERIFICATION' | 'REJECTION';
+  type: 'VERIFICATION' | 'REJECTION' | 'CANCELLATION';
 }): Promise<void> {
   try {
     await axios.post(`${API_BASE_URL}/verification-code/generate`, {
@@ -133,7 +134,7 @@ export async function validateCode({
   documentId: string;
   signerId: string;
   code: string;
-  type: 'VERIFICATION' | 'REJECTION';
+  type: 'VERIFICATION' | 'REJECTION' | 'CANCELLATION';
 }): Promise<void> {
   try {
     console.log('Validating code with params:', { documentId, signerId, code, type });
@@ -151,6 +152,22 @@ export async function validateCode({
     if (axiosError.response?.status === 404) {
       throw new Error('Código expirado');
     }
+    const { message } = extractAxiosError(error);
+    throw new Error(message);
+  }
+}
+
+export async function submitForCancellation({
+  apiKey,
+  documentId,
+}: {
+  apiKey: string;
+  documentId: string;
+}): Promise<void> {
+  const headers = { 'x-api-key': apiKey };
+  try {
+    await axios.patch(`${API_BASE_URL}/document/${documentId}/cancellation/submit`, {}, { headers });
+  } catch (error) {
     const { message } = extractAxiosError(error);
     throw new Error(message);
   }

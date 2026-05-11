@@ -17,6 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Visualizador de documentos",
   description: "Visualizador de documentos con validación de acceso",
+  icons: { icon: [] },
 };
 
 export default function RootLayout({
