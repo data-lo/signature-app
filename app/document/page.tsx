@@ -22,5 +22,5 @@ export default async function DocumentPage({ searchParams }: PageProps) {
     redirect(`/error?code=${validation.statusCode || 500}&message=${encodeURIComponent(validation.error || 'Access denied')}`);
   }
 
-  return <DocumentViewer documentUrl={validation.documentUrl!} documentId={documentId} userId={userId} />;
+  return <DocumentViewer documentUrl={validation.documentUrl!} documentId={documentId} userId={userId} apiKey={apiKey} />;
 }

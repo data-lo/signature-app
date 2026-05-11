@@ -54,11 +54,11 @@ export async function validateAccess({
     await axios.get(`${API_BASE_URL}/document/${documentId}`, { headers });
 
     // Verify userId has access to this document via the signer endpoint
-    const signerResponse = await axios.get<ApiResponse<SignerDocument[]>>(
+    const signerResponse = await axios.get<SignerDocument[]>(
       `${API_BASE_URL}/document/signer/${userId}`,
       { headers },
     );
-    const signerDocs = signerResponse.data?.data ?? [];
+    const signerDocs = signerResponse.data ?? [];
     const hasAccess = signerDocs.some((doc) => doc.id === documentId);
 
     if (!hasAccess) {
@@ -104,6 +104,26 @@ export async function generateVerificationCode({
   }
 }
 
+export async function fetchDocumentUrl({
+  apiKey,
+  documentId,
+}: {
+  apiKey: string;
+  documentId: string;
+}): Promise<string> {
+  const headers = { 'x-api-key': apiKey };
+  try {
+    const res = await axios.get<ApiResponse<string>>(
+      `${API_BASE_URL}/document/file/${documentId}`,
+      { headers },
+    );
+    return res.data?.data ?? String(res.data);
+  } catch (error) {
+    const { message } = extractAxiosError(error);
+    throw new Error(message);
+  }
+}
+
 export async function validateCode({
   documentId,
   signerId,
@@ -116,6 +136,7 @@ export async function validateCode({
   type: 'VERIFICATION' | 'REJECTION';
 }): Promise<void> {
   try {
+    console.log('Validating code with params:', { documentId, signerId, code, type });
     await axios.post(`${API_BASE_URL}/verification-code/validate`, {
       documentId,
       signerId,
