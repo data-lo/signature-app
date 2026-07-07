@@ -14,7 +14,11 @@ const navItems = [
   { label: 'FIRMAR', active: false },
 ];
 
-export default function DashboardNavbar() {
+interface DashboardNavbarProps {
+  documentsCount: number;
+}
+
+export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps) {
   const logoutMutation = useLogout();
 
   return (
@@ -43,7 +47,7 @@ export default function DashboardNavbar() {
           ES
         </span>
 
-        <span>DOCUMENTOS:4</span>
+        <span>DOCUMENTOS:{documentsCount}</span>
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-1 outline-none hover:text-gray-900">

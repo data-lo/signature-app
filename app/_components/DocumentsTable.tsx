@@ -18,25 +18,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-interface DocumentRow {
+export interface DashboardDocument {
   id: string;
   name: string;
-  participant: string;
-  participantStatus: 'en-progreso' | 'firmado';
-  createdAt: string;
-  signedAt: string;
+  file: File | null;
+  participant: string | null;
+  createdAt: Date;
+  signedAt: Date | null;
 }
 
-const documents: DocumentRow[] = [
-  {
-    id: '1',
-    name: '18._NOMENCLATURA_EXPEDIENTES_CONTRATACION',
-    participant: 'isaay.sosa@data-lo.com',
-    participantStatus: 'firmado',
-    createdAt: '04/07/2026',
-    signedAt: '04/07/2026',
-  },
-];
+interface DocumentsTableProps {
+  documents: DashboardDocument[];
+}
+
+function formatDate(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${date.getFullYear()}`;
+}
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -47,7 +46,7 @@ function SortableHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function DocumentsTable() {
+export default function DocumentsTable({ documents }: DocumentsTableProps) {
   return (
     <div className="flex-1 min-w-0">
       <Table>
@@ -71,22 +70,30 @@ export default function DocumentsTable() {
             <TableRow key={doc.id}>
               <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700">
                 <div className="flex items-start gap-1.5">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-emerald-500" />
+                  <span
+                    className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                      doc.signedAt ? 'bg-emerald-500' : 'bg-amber-400'
+                    }`}
+                  />
                   <span className="min-w-0 flex-1 break-words">{doc.name}</span>
                 </div>
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className={`size-1.5 shrink-0 rounded-full ${
-                      doc.participantStatus === 'firmado' ? 'bg-emerald-500' : 'bg-amber-400'
-                    }`}
-                  />
-                  <span>{doc.participant}</span>
-                </div>
+                {doc.participant ? (
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`size-1.5 shrink-0 rounded-full ${
+                        doc.signedAt ? 'bg-emerald-500' : 'bg-amber-400'
+                      }`}
+                    />
+                    <span>{doc.participant}</span>
+                  </div>
+                ) : (
+                  <span className="italic text-gray-400">Sin participantes asignados</span>
+                )}
               </TableCell>
-              <TableCell>{doc.createdAt}</TableCell>
-              <TableCell>{doc.signedAt}</TableCell>
+              <TableCell>{formatDate(doc.createdAt)}</TableCell>
+              <TableCell>{doc.signedAt ? formatDate(doc.signedAt) : '—'}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
                   <Button variant="secondary" size="sm">
