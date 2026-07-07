@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, memo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-// @ts-ignore
 import 'react-pdf/dist/Page/AnnotationLayer.css';
-// @ts-ignore
 import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -16,7 +14,7 @@ interface PdfViewerProps {
   onPageChange: (page: number) => void;
 }
 
-export default function PdfViewer({ url, scale, onLoadSuccess, onPageChange }: PdfViewerProps) {
+function PdfViewer({ url, scale, onLoadSuccess, onPageChange }: PdfViewerProps) {
   const [numPages, setNumPages] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -70,3 +68,5 @@ export default function PdfViewer({ url, scale, onLoadSuccess, onPageChange }: P
     </div>
   );
 }
+
+export default memo(PdfViewer);

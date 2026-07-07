@@ -156,7 +156,6 @@ export async function validateCode({
   type: 'VERIFICATION' | 'REJECTION' | 'CANCELLATION';
 }): Promise<void> {
   try {
-    console.log('Validating code with params:', { documentId, signerId, code, type });
     await axios.post(`${API_BASE_URL}/verification-code/validate`, {
       documentId,
       signerId,
