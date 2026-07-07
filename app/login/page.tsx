@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { FileSignature } from 'lucide-react';
 import LoginForm from './_components/LoginForm';
 
 interface LoginPageProps {
@@ -9,7 +11,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="flex flex-col gap-4 max-w-md w-full">
+      <div className="flex flex-col gap-6 max-w-md w-full">
+        <Link href="/" className="flex items-center justify-center gap-2">
+          <FileSignature className="size-6 text-emerald-500" />
+          <span className="text-lg font-semibold tracking-tight text-gray-900">Signature</span>
+        </Link>
+
         {registered === '1' && (
           <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2 text-sm text-center">
             Cuenta creada correctamente, inicia sesión
