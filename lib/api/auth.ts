@@ -13,6 +13,11 @@ export interface CurrentUser {
     secureUrl: string;
     expiresIn: number;
   } | null;
+  officialFile?: {
+    id: string;
+    secureUrl: string;
+    expiresIn: number;
+  } | null;
 }
 
 export async function getCurrentUserRequest(): Promise<CurrentUser> {
