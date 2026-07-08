@@ -1,6 +1,6 @@
 import { CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import type { CurrentUser } from '../_requests';
+import type { CurrentUser } from '@/lib/api/auth';
 
 interface PersonalDocumentsCompletedProps {
   signature: NonNullable<CurrentUser['signature']>;

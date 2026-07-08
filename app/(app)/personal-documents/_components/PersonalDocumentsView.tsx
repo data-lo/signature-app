@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useCurrentUser } from '../_hooks/useCurrentUser';
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import UserInfoCard from './UserInfoCard';
 import PersonalDocumentsCompleted from './PersonalDocumentsCompleted';
 import PersonalDocumentsForm from './PersonalDocumentsForm';

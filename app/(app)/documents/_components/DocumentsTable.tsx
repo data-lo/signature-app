@@ -18,20 +18,57 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-export interface DashboardDocument {
+export type DocumentListStatus =
+  | 'created'
+  | 'pending'
+  | 'signed'
+  | 'rejected'
+  | 'expired'
+  | 'cancellation_pending'
+  | 'cancelled';
+
+export interface DocumentListItem {
   id: string;
-  name: string;
-  file: File | null;
-  participant: string | null;
-  createdAt: Date;
-  signedAt: Date | null;
+  fileName: string;
+  fileType: string;
+  signer: string;
+  creator: string;
+  totalPages: number;
+  status: DocumentListStatus;
+  createdAt: string;
 }
+
+const STATUS_LABELS: Record<DocumentListStatus, string> = {
+  created: 'Creado',
+  pending: 'En progreso',
+  signed: 'Firmado por todos',
+  rejected: 'Rechazado',
+  expired: 'Expirado',
+  cancellation_pending: 'Cancelación pendiente',
+  cancelled: 'Cancelado',
+};
+
+const STATUS_DOT: Record<DocumentListStatus, string> = {
+  created: 'bg-amber-400',
+  pending: 'bg-amber-400',
+  signed: 'bg-emerald-500',
+  rejected: 'bg-red-400',
+  expired: 'bg-gray-400',
+  cancellation_pending: 'bg-amber-400',
+  cancelled: 'bg-gray-400',
+};
 
 interface DocumentsTableProps {
-  documents: DashboardDocument[];
+  documents: DocumentListItem[];
+  page?: number;
+  totalPages?: number;
+  hasNextPage?: boolean;
+  hasPrevPage?: boolean;
+  onPageChange?: (page: number) => void;
 }
 
-function formatDate(date: Date): string {
+function formatDate(isoDate: string): string {
+  const date = new Date(isoDate);
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   return `${day}/${month}/${date.getFullYear()}`;
@@ -46,7 +83,14 @@ function SortableHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function DocumentsTable({ documents }: DocumentsTableProps) {
+export default function DocumentsTable({
+  documents,
+  page = 1,
+  totalPages = 1,
+  hasNextPage = false,
+  hasPrevPage = false,
+  onPageChange,
+}: DocumentsTableProps) {
   return (
     <div className="flex-1 min-w-0">
       <Table>
@@ -55,13 +99,11 @@ export default function DocumentsTable({ documents }: DocumentsTableProps) {
             <TableHead>
               <SortableHeader>Nombre del documento</SortableHeader>
             </TableHead>
-            <TableHead>Participantes</TableHead>
+            <TableHead>Firmante</TableHead>
             <TableHead>
               <SortableHeader>Creado</SortableHeader>
             </TableHead>
-            <TableHead>
-              <SortableHeader>Firmado</SortableHeader>
-            </TableHead>
+            <TableHead>Estado</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -70,30 +112,24 @@ export default function DocumentsTable({ documents }: DocumentsTableProps) {
             <TableRow key={doc.id}>
               <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700">
                 <div className="flex items-start gap-1.5">
-                  <span
-                    className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
-                      doc.signedAt ? 'bg-emerald-500' : 'bg-amber-400'
-                    }`}
-                  />
-                  <span className="min-w-0 flex-1 break-words">{doc.name}</span>
+                  <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`} />
+                  <span className="min-w-0 flex-1 break-words">{doc.fileName}</span>
                 </div>
               </TableCell>
               <TableCell>
-                {doc.participant ? (
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`size-1.5 shrink-0 rounded-full ${
-                        doc.signedAt ? 'bg-emerald-500' : 'bg-amber-400'
-                      }`}
-                    />
-                    <span>{doc.participant}</span>
-                  </div>
+                {doc.signer ? (
+                  <span>{doc.signer}</span>
                 ) : (
-                  <span className="italic text-gray-400">Sin participantes asignados</span>
+                  <span className="italic text-gray-400">Sin firmante asignado</span>
                 )}
               </TableCell>
               <TableCell>{formatDate(doc.createdAt)}</TableCell>
-              <TableCell>{doc.signedAt ? formatDate(doc.signedAt) : '—'}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5">
+                  <span className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`} />
+                  <span>{STATUS_LABELS[doc.status]}</span>
+                </div>
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
                   <Button variant="secondary" size="sm">
@@ -126,17 +162,37 @@ export default function DocumentsTable({ documents }: DocumentsTableProps) {
         </div>
 
         <div className="flex items-center gap-1 text-gray-500">
-          <Button variant="ghost" size="icon-sm" disabled>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={!onPageChange || !hasPrevPage}
+            onClick={() => onPageChange?.(1)}
+          >
             <ChevronsLeft className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" disabled>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={!onPageChange || !hasPrevPage}
+            onClick={() => onPageChange?.(page - 1)}
+          >
             <ChevronLeft className="size-4" />
           </Button>
-          <span className="px-2 text-sm font-medium text-emerald-600">1</span>
-          <Button variant="ghost" size="icon-sm" disabled>
+          <span className="px-2 text-sm font-medium text-emerald-600">{page}</span>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={!onPageChange || !hasNextPage}
+            onClick={() => onPageChange?.(page + 1)}
+          >
             <ChevronRight className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" disabled>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={!onPageChange || !hasNextPage}
+            onClick={() => onPageChange?.(totalPages)}
+          >
             <ChevronsRight className="size-4" />
           </Button>
         </div>

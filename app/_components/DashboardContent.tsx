@@ -3,19 +3,21 @@
 import { useEffect, useState } from 'react';
 import { Info } from 'lucide-react';
 import DocumentUploadFlow from './DocumentUploadFlow';
-import DocumentsFilterSidebar from './DocumentsFilterSidebar';
-import DocumentsTable, { type DashboardDocument } from './DocumentsTable';
+import DocumentsFilterSidebar from '../(app)/documents/_components/DocumentsFilterSidebar';
+import DocumentsTable, { type DocumentListItem } from '../(app)/documents/_components/DocumentsTable';
 import DocumentPreparationView, { type SignerEntry } from './DocumentPreparationView';
 import { useDocumentsCount } from './DocumentsCountContext';
 
-const initialDocuments: DashboardDocument[] = [
+const initialDocuments: DocumentListItem[] = [
   {
     id: '1',
-    name: '18._NOMENCLATURA_EXPEDIENTES_CONTRATACION',
-    file: null,
-    participant: 'isaay.sosa@data-lo.com',
-    createdAt: new Date(2026, 6, 4),
-    signedAt: new Date(2026, 6, 4),
+    fileName: '18._NOMENCLATURA_EXPEDIENTES_CONTRATACION',
+    fileType: 'application/pdf',
+    signer: 'isaay.sosa@data-lo.com',
+    creator: '—',
+    totalPages: 1,
+    status: 'signed',
+    createdAt: new Date(2026, 6, 4).toISOString(),
   },
 ];
 
@@ -26,7 +28,7 @@ interface PreparingDocument {
 }
 
 export default function DashboardContent() {
-  const [documents, setDocuments] = useState<DashboardDocument[]>(initialDocuments);
+  const [documents, setDocuments] = useState<DocumentListItem[]>(initialDocuments);
   const [preparingDocument, setPreparingDocument] = useState<PreparingDocument | null>(null);
   const { setDocumentsCount } = useDocumentsCount();
 
@@ -36,15 +38,17 @@ export default function DashboardContent() {
 
   function handleRequestSignatures(signers: SignerEntry[]) {
     if (!preparingDocument) return;
-    const participant = signers.map((signer) => signer.email).join(', ') || null;
+    const signer = signers.map((entry) => entry.email).join(', ') || 'Sin firmante';
     setDocuments((prev) => [
       {
         id: crypto.randomUUID(),
-        name: preparingDocument.name,
-        file: preparingDocument.file,
-        participant,
-        createdAt: new Date(),
-        signedAt: null,
+        fileName: preparingDocument.name,
+        fileType: preparingDocument.file.type,
+        signer,
+        creator: '—',
+        totalPages: 1,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
       },
       ...prev,
     ]);

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { CurrentUser } from '../_requests';
+import type { CurrentUser } from '@/lib/api/auth';
 
 interface UserInfoCardProps {
   user: CurrentUser;
