@@ -1,48 +1,55 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import DocumentsFilterSidebar from '../../_components/DocumentsFilterSidebar';
 import DocumentsTable from '../../_components/DocumentsTable';
-import { selectSignerSchema, type SelectSignerFormValues } from '../_schemas';
+import { EMPTY_DOCUMENTS_FILTERS, type DocumentsFilters } from '../../_components/DocumentsFilterPanel';
+import ParticipantPicker from '../../_components/ParticipantPicker';
+import { useUsers } from '../../_hooks/useUsers';
+import { selectParticipantsSchema, type SelectParticipantsFormValues } from '../_schemas';
 import { useMyDocuments } from '../_hooks/useMyDocuments';
-import { useSubmitForAuthorization } from '../_hooks/useSubmitForAuthorization';
-import SignerSelect from './SignerSelect';
-import DocumentUploadCard from './DocumentUploadCard';
+import { useCreateDocument } from '../_hooks/useCreateDocument';
+import DocumentFilePicker from './DocumentFilePicker';
+
+const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), { ssr: false });
 
 export default function CreateDocumentView() {
-  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<DocumentsFilters>(EMPTY_DOCUMENTS_FILTERS);
 
   const {
     watch,
     setValue,
+    handleSubmit,
     formState: { errors },
-  } = useForm<SelectSignerFormValues>({
-    resolver: zodResolver(selectSignerSchema),
+  } = useForm<SelectParticipantsFormValues>({
+    resolver: zodResolver(selectParticipantsSchema),
     mode: 'onChange',
+    defaultValues: { signerIds: [], spectatorIds: [] },
   });
 
-  const signerId = watch('signerId') ?? null;
+  const signerIds = watch('signerIds');
+  const spectatorIds = watch('spectatorIds');
 
+  const { data: users } = useUsers();
   const { data: currentUser } = useCurrentUser();
-  const { data: myDocuments } = useMyDocuments(currentUser?.email, page);
-  const submitMutation = useSubmitForAuthorization();
+  const { data: myDocuments } = useMyDocuments(currentUser?.email, page, filters);
+  const createMutation = useCreateDocument();
 
-  function handleSignerChange(value: string) {
-    setValue('signerId', value, { shouldValidate: true });
-    if (documentId) {
-      setDocumentId(null);
-    }
+  function onSubmit(values: SelectParticipantsFormValues) {
+    if (!file) return;
+    createMutation.mutate({ file, signerIds: values.signerIds, spectatorIds: values.spectatorIds });
   }
 
-  function handleSign() {
-    if (!documentId) return;
-    submitMutation.mutate(documentId);
+  function handleFiltersChange(nextFilters: DocumentsFilters) {
+    setFilters(nextFilters);
+    setPage(1);
   }
 
   return (
@@ -55,39 +62,53 @@ export default function CreateDocumentView() {
           El documento debe estar en formato PDF y pesar menos de 20 MB.
         </p>
 
-        <div className="mt-4 flex flex-col gap-4">
-          <SignerSelect
-            value={signerId ?? undefined}
-            error={errors.signerId?.message}
-            onChange={handleSignerChange}
-          />
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="flex flex-col gap-4">
+            <DocumentFilePicker onFileSelected={setFile} />
 
-          <DocumentUploadCard
-            signerId={signerId}
-            onUploadSuccess={setDocumentId}
-            onUploadReset={() => setDocumentId(null)}
-          />
+            <ParticipantPicker
+              label="Firmantes"
+              placeholder="Agregar firmante"
+              users={(users ?? []).filter((user) => !spectatorIds.includes(user.id))}
+              selectedIds={signerIds}
+              onChange={(ids) => setValue('signerIds', ids, { shouldValidate: true })}
+              showOrder
+              error={errors.signerIds?.message}
+            />
 
-          <Button
-            type="button"
-            className="w-full sm:w-auto"
-            disabled={!documentId || submitMutation.isPending}
-            onClick={handleSign}
-          >
-            {submitMutation.isPending ? 'Enviando a firma...' : 'Firmar'}
-          </Button>
-        </div>
+            <ParticipantPicker
+              label="Espectadores"
+              placeholder="Agregar espectador"
+              users={(users ?? []).filter((user) => !signerIds.includes(user.id))}
+              selectedIds={spectatorIds}
+              onChange={(ids) => setValue('spectatorIds', ids, { shouldValidate: true })}
+              error={errors.spectatorIds?.message}
+            />
+
+            <Button
+              type="submit"
+              className="w-full sm:w-auto"
+              disabled={!file || signerIds.length === 0 || createMutation.isPending}
+            >
+              {createMutation.isPending ? 'Enviando a firma...' : 'Firmar'}
+            </Button>
+          </div>
+
+          <Card className="h-[520px] overflow-hidden p-0">
+            <CardContent className="h-full p-0">
+              {file ? (
+                <PdfPreview file={file} />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                  La previsualización del documento aparecerá aquí
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </form>
       </div>
 
-      <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-4">
-        <span className="flex items-center gap-1 text-xs font-semibold tracking-wide text-gray-500">
-          FILTROS RÁPIDOS
-          <Info className="size-3.5" />
-        </span>
-      </div>
-
-      <div className="mt-6 flex gap-8">
-        <DocumentsFilterSidebar />
+      <div className="mt-8 border-t border-gray-200 pt-6">
         <DocumentsTable
           documents={myDocuments?.documents ?? []}
           page={myDocuments?.meta.page}
@@ -95,6 +116,8 @@ export default function CreateDocumentView() {
           hasNextPage={myDocuments?.meta.hasNextPage}
           hasPrevPage={myDocuments?.meta.hasPrevPage}
           onPageChange={setPage}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
         />
       </div>
     </main>

@@ -32,9 +32,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!login|signup|documents|error|_next/static|_next/image|favicon.ico).*)',
-    '/documents/create',
-    '/documents/create/:path*',
-  ],
+  matcher: ['/((?!login|signup|error|_next/static|_next/image|favicon.ico).*)'],
 };

@@ -1,18 +1,20 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { FileSignature, Globe, ChevronDown } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { FileSignature, Globe, ChevronDown, User } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useLogout } from '@/lib/hooks/useLogout';
 
 const navItems = [
-  { label: 'GESTIONAR', active: true, href: '/dashboard' },
-  { label: 'FIRMAR', active: false, href: null },
+  { label: 'GESTIONAR', href: '/dashboard' },
+  { label: 'FIRMAR', href: '/documents' },
 ];
 
 interface DashboardNavbarProps {
@@ -21,6 +23,7 @@ interface DashboardNavbarProps {
 
 export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const logoutMutation = useLogout();
 
   return (
@@ -34,19 +37,22 @@ export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps
           <FileSignature className="size-6 text-emerald-500" />
         </button>
         <nav className="flex items-center gap-8 h-14">
-          {navItems.map((item) => (
-            <span
-              key={item.label}
-              onClick={() => item.href && router.push(item.href)}
-              className={`flex items-center h-full text-xs font-semibold tracking-wide cursor-pointer border-b-2 ${
-                item.active
-                  ? 'text-gray-900 border-emerald-500'
-                  : 'text-gray-500 border-transparent hover:text-gray-700'
-              }`}
-            >
-              {item.label}
-            </span>
-          ))}
+          {navItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <span
+                key={item.label}
+                onClick={() => router.push(item.href)}
+                className={`flex items-center h-full text-xs font-semibold tracking-wide cursor-pointer border-b-2 ${
+                  isActive
+                    ? 'text-gray-900 border-emerald-500'
+                    : 'text-gray-500 border-transparent hover:text-gray-700'
+                }`}
+              >
+                {item.label}
+              </span>
+            );
+          })}
         </nav>
       </div>
 
@@ -56,18 +62,25 @@ export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps
           ES
         </span>
 
-        {typeof documentsCount === 'number' && <span>DOCUMENTOS:{documentsCount}</span>}
+        {typeof documentsCount === 'number' && (
+          <span className="cursor-pointer hover:text-gray-900" onClick={() => router.push('/documents')}>
+            DOCUMENTOS:{documentsCount}
+          </span>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-1 outline-none hover:text-gray-900">
             CUENTA
             <ChevronDown className="size-3.5" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => router.push('/personal-documents')}>
-              Perfil
-            </DropdownMenuItem>
-            <DropdownMenuItem>Configuración</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Configuraciones</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => router.push('/personal-documents')}>
+                <User className="size-4" />
+                Mi Perfil
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
 

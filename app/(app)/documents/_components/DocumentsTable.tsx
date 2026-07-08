@@ -17,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import DocumentsFilterButton from './DocumentsFilterButton';
+import { EMPTY_DOCUMENTS_FILTERS, type DocumentsFilters } from './DocumentsFilterPanel';
 
 export type DocumentListStatus =
   | 'created'
@@ -31,7 +33,8 @@ export interface DocumentListItem {
   id: string;
   fileName: string;
   fileType: string;
-  signer: string;
+  signers: string[];
+  spectators: string[];
   creator: string;
   totalPages: number;
   status: DocumentListStatus;
@@ -65,6 +68,11 @@ interface DocumentsTableProps {
   hasNextPage?: boolean;
   hasPrevPage?: boolean;
   onPageChange?: (page: number) => void;
+  onSignClick?: (documentId: string) => void;
+  filters?: DocumentsFilters;
+  onFiltersChange?: (filters: DocumentsFilters) => void;
+  showMyTurnFilter?: boolean;
+  showStatusFilter?: boolean;
 }
 
 function formatDate(isoDate: string): string {
@@ -90,16 +98,31 @@ export default function DocumentsTable({
   hasNextPage = false,
   hasPrevPage = false,
   onPageChange,
+  onSignClick,
+  filters,
+  onFiltersChange,
+  showMyTurnFilter,
+  showStatusFilter,
 }: DocumentsTableProps) {
   return (
     <div className="flex-1 min-w-0">
+      {onFiltersChange && (
+        <div className="mb-3 flex items-center justify-end">
+          <DocumentsFilterButton
+            filters={filters ?? EMPTY_DOCUMENTS_FILTERS}
+            onApply={onFiltersChange}
+            showMyTurnFilter={showMyTurnFilter}
+            showStatusFilter={showStatusFilter}
+          />
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>
               <SortableHeader>Nombre del documento</SortableHeader>
             </TableHead>
-            <TableHead>Firmante</TableHead>
+            <TableHead>Participantes</TableHead>
             <TableHead>
               <SortableHeader>Creado</SortableHeader>
             </TableHead>
@@ -117,10 +140,10 @@ export default function DocumentsTable({
                 </div>
               </TableCell>
               <TableCell>
-                {doc.signer ? (
-                  <span>{doc.signer}</span>
+                {doc.signers.length > 0 ? (
+                  <span>{doc.signers.join(', ')}</span>
                 ) : (
-                  <span className="italic text-gray-400">Sin firmante asignado</span>
+                  <span className="italic text-gray-400">Sin firmantes asignados</span>
                 )}
               </TableCell>
               <TableCell>{formatDate(doc.createdAt)}</TableCell>
@@ -132,13 +155,16 @@ export default function DocumentsTable({
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
-                  <Button variant="secondary" size="sm">
-                    DESCARGAR
-                    <ChevronDown className="size-3.5" />
-                  </Button>
-                  <Button variant="outline" size="icon-sm" className="border-emerald-500 text-emerald-600">
-                    <ChevronDown className="size-3.5" />
-                  </Button>
+                  {onSignClick && doc.status === 'pending' ? (
+                    <Button variant="brand" size="sm" onClick={() => onSignClick(doc.id)}>
+                      FIRMAR
+                    </Button>
+                  ) : (
+                    <Button variant="secondary" size="sm">
+                      DESCARGAR
+                      <ChevronDown className="size-3.5" />
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
