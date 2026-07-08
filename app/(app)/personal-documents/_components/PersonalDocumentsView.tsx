@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import UserInfoCard from './UserInfoCard';
 import PersonalDocumentsCompleted from './PersonalDocumentsCompleted';
+import PersonalDocumentsPartial from './PersonalDocumentsPartial';
 import PersonalDocumentsForm from './PersonalDocumentsForm';
 
 export default function PersonalDocumentsView() {
@@ -31,6 +32,11 @@ export default function PersonalDocumentsView() {
       <UserInfoCard user={user} />
       {user.signature && user.officialFile ? (
         <PersonalDocumentsCompleted signature={user.signature} officialFile={user.officialFile} />
+      ) : user.signature || user.officialFile ? (
+        <PersonalDocumentsPartial
+          signature={user.signature ?? null}
+          officialFile={user.officialFile ?? null}
+        />
       ) : (
         <PersonalDocumentsForm />
       )}

@@ -1,21 +1,30 @@
-import { CheckCircle2, FileText } from 'lucide-react';
+'use client';
+
+import { CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { CurrentUser } from '@/lib/api/auth';
+import { useDeletePersonalDocument } from '../_hooks/useDeletePersonalDocument';
+import DocumentPreviewItem from './DocumentPreviewItem';
 
 interface PersonalDocumentsCompletedProps {
   signature: NonNullable<CurrentUser['signature']>;
   officialFile: NonNullable<CurrentUser['officialFile']>;
 }
 
-function isImageUrl(url: string): boolean {
-  const path = url.split('?')[0].toLowerCase();
-  return path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg');
-}
-
 export default function PersonalDocumentsCompleted({
   signature,
   officialFile,
 }: PersonalDocumentsCompletedProps) {
+  const deleteMutation = useDeletePersonalDocument();
+
+  function handleDelete(field: 'ine' | 'signature') {
+    const label = field === 'ine' ? 'tu identificación (INE)' : 'tu firma digital';
+    if (!window.confirm(`¿Seguro que quieres eliminar ${label}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    deleteMutation.mutate({ signatureId: signature.id, field });
+  }
+
   return (
     <Card className="max-w-xl w-full">
       <CardHeader>
@@ -28,37 +37,19 @@ export default function PersonalDocumentsCompleted({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <p className="text-sm font-medium text-muted-foreground">Identificación (INE)</p>
-          {isImageUrl(officialFile.secureUrl) ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={officialFile.secureUrl}
-              alt="Identificación oficial registrada"
-              className="h-24 w-full rounded border border-input bg-white object-contain"
-            />
-          ) : (
-            <a
-              href={officialFile.secureUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded border border-input bg-white p-3 text-sm text-primary hover:underline"
-            >
-              <FileText className="size-5 shrink-0" />
-              Ver identificación (PDF)
-            </a>
-          )}
-        </div>
+        <DocumentPreviewItem
+          label="Identificación (INE)"
+          secureUrl={officialFile.secureUrl}
+          deleting={deleteMutation.isPending}
+          onDelete={() => handleDelete('ine')}
+        />
 
-        <div className="flex flex-col gap-1.5">
-          <p className="text-sm font-medium text-muted-foreground">Firma digital</p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={signature.secureUrl}
-            alt="Firma digital registrada"
-            className="h-24 w-full rounded border border-input bg-white object-contain"
-          />
-        </div>
+        <DocumentPreviewItem
+          label="Firma digital"
+          secureUrl={signature.secureUrl}
+          deleting={deleteMutation.isPending}
+          onDelete={() => handleDelete('signature')}
+        />
       </CardContent>
     </Card>
   );
