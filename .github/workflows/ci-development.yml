@@ -1,9 +1,6 @@
 name: Continuous Integration Development
 
 on:
-  push:
-    branches:
-      - development
   pull_request:
     branches:
       - development
