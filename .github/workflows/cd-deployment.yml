@@ -41,10 +41,10 @@ jobs:
             cd /root/signature-development
 
             echo "Descargando la última versión de la imagen desde Docker Hub"
-            docker compose pull app
+            docker compose pull frontend
 
-            echo "Recreando el contenedor de signature-app (Actualizando versión)..."
-            docker compose up -d --remove-orphans app
+            echo "Recreando el contenedor de signature-frontend-dev (Actualizando versión)"
+            docker compose up -d --remove-orphans frontend
 
             echo "Limpiando imágenes huérfanas en el servidor para liberar espacio"
             docker image prune -f

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { FileSignature } from 'lucide-react';
 
-const navItems = ['SOLUCIONES', 'RECURSOS', 'CLIENTES', 'PRECIOS'];
+const navItems = ['SOLUCIONES', 'RECURSOS', 'CLIENTES', 'VM'];
 
 export default function LandingNavbar() {
   return (
