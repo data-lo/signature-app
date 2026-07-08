@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
@@ -19,11 +19,13 @@ function getErrorMessage(error: unknown): string {
 
 export function useUploadPersonalDocuments() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: uploadPersonalDocumentsRequest,
     onSuccess: () => {
       toast.success('Tus documentos se guardaron correctamente');
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       router.push('/dashboard');
     },
     onError: (error) => {

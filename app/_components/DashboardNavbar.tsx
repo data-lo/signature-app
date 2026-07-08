@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { FileSignature, Globe, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
@@ -10,25 +11,33 @@ import {
 import { useLogout } from '@/lib/hooks/useLogout';
 
 const navItems = [
-  { label: 'GESTIONAR', active: true },
-  { label: 'FIRMAR', active: false },
+  { label: 'GESTIONAR', active: true, href: '/dashboard' },
+  { label: 'FIRMAR', active: false, href: null },
 ];
 
 interface DashboardNavbarProps {
-  documentsCount: number;
+  documentsCount?: number;
 }
 
 export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps) {
+  const router = useRouter();
   const logoutMutation = useLogout();
 
   return (
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-8 h-14">
       <div className="flex items-center gap-10">
-        <FileSignature className="size-6 text-emerald-500" />
+        <button
+          type="button"
+          onClick={() => router.push('/dashboard')}
+          className="outline-none"
+        >
+          <FileSignature className="size-6 text-emerald-500" />
+        </button>
         <nav className="flex items-center gap-8 h-14">
           {navItems.map((item) => (
             <span
               key={item.label}
+              onClick={() => item.href && router.push(item.href)}
               className={`flex items-center h-full text-xs font-semibold tracking-wide cursor-pointer border-b-2 ${
                 item.active
                   ? 'text-gray-900 border-emerald-500'
@@ -47,7 +56,7 @@ export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps
           ES
         </span>
 
-        <span>DOCUMENTOS:{documentsCount}</span>
+        {typeof documentsCount === 'number' && <span>DOCUMENTOS:{documentsCount}</span>}
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-1 outline-none hover:text-gray-900">
@@ -55,7 +64,9 @@ export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps
             <ChevronDown className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Perfil</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/personal-documents')}>
+              Perfil
+            </DropdownMenuItem>
             <DropdownMenuItem>Configuración</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
