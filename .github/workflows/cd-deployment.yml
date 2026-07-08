@@ -37,16 +37,16 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-           echo "Conectado al servidor de desarrollo como root..."
+           echo "Conectado al servidor de desarrollo $(curl -s ifconfig.me)"
             cd /root/signature-development
 
-            echo "Descargando la última versión de la imagen desde Docker Hub..."
-            docker compose pull signature-app
+            echo "Descargando la última versión de la imagen desde Docker Hub"
+            docker compose pull app
 
             echo "Recreando el contenedor de signature-app (Actualizando versión)..."
-            docker compose up -d --remove-orphans signature-app
+            docker compose up -d --remove-orphans app
 
-            echo "Limpiando imágenes huérfanas en el servidor para liberar espacio..."
+            echo "Limpiando imágenes huérfanas en el servidor para liberar espacio"
             docker image prune -f
 
-            echo "¡Despliegue completado con éxito en el servidor! 🎉"
+            echo "¡Despliegue completado con éxito en el servidor!"
