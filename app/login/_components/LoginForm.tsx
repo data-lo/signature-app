@@ -5,9 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AxiosError } from 'axios';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FieldGroup, FieldError } from '@/components/ui/field';
+import { TextField } from '@/components/form/text-field';
 import { loginSchema, type LoginFormValues } from '../_schemas';
 import { useLogin } from '../_hooks/useLogin';
 
@@ -34,58 +34,47 @@ export default function LoginForm() {
         <CardTitle>Iniciar sesión</CardTitle>
       </CardHeader>
       <CardContent>
-        <form
-          onSubmit={handleSubmit((values) => loginMutation.mutate(values))}
-          className="flex flex-col gap-4"
-        >
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="email">Correo electrónico</Label>
-            <Input
+        <form onSubmit={handleSubmit((values) => loginMutation.mutate(values))}>
+          <FieldGroup>
+            <TextField
               id="email"
+              label="Correo electrónico"
               type="email"
               autoComplete="email"
+              error={errors.email}
               {...register('email')}
             />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            )}
-          </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
+            <TextField
               id="password"
+              label="Contraseña"
               type="password"
               autoComplete="current-password"
+              error={errors.password}
               {...register('password')}
             />
-            {errors.password && (
-              <p className="text-sm text-destructive">
-                {errors.password.message}
-              </p>
+
+            {loginMutation.isError && (
+              <FieldError>{getErrorMessage(loginMutation.error)}</FieldError>
             )}
-          </div>
 
-          {loginMutation.isError && (
-            <p className="text-sm text-destructive">
-              {getErrorMessage(loginMutation.error)}
+            <Button
+              type="submit"
+              disabled={loginMutation.isPending}
+              className="w-full"
+            >
+              {loginMutation.isPending
+                ? 'Iniciando sesión...'
+                : 'Iniciar sesión'}
+            </Button>
+
+            <p className="text-sm text-center text-muted-foreground">
+              ¿No tienes una cuenta?{' '}
+              <Link href="/signup" className="text-primary hover:underline">
+                Regístrate
+              </Link>
             </p>
-          )}
-
-          <Button
-            type="submit"
-            disabled={loginMutation.isPending}
-            className="w-full"
-          >
-            {loginMutation.isPending ? 'Iniciando sesión...' : 'Iniciar sesión'}
-          </Button>
-
-          <p className="text-sm text-center text-muted-foreground">
-            ¿No tienes una cuenta?{' '}
-            <Link href="/signup" className="text-primary hover:underline">
-              Regístrate
-            </Link>
-          </p>
+          </FieldGroup>
         </form>
       </CardContent>
     </Card>

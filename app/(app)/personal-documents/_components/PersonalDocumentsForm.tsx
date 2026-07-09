@@ -10,6 +10,7 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
+import { FieldGroup } from '@/components/ui/field';
 import {
   personalDocumentsSchema,
   type PersonalDocumentsFormValues,
@@ -59,37 +60,38 @@ export default function PersonalDocumentsForm() {
       <CardContent>
         <form
           onSubmit={handleSubmit((values) => uploadMutation.mutate(values))}
-          className="flex flex-col gap-6"
         >
-          <DocumentDropzone
-            id="ineFile"
-            label="Identificación (INE)"
-            hint="PDF, JPG o PNG. Máximo 5MB."
-            accept="application/pdf,image/jpeg,image/png"
-            file={ineFile}
-            error={errors.ineFile?.message}
-            onFileChange={handleIneChange}
-          />
+          <FieldGroup>
+            <DocumentDropzone
+              id="ineFile"
+              label="Identificación (INE)"
+              hint="PDF, JPG o PNG. Máximo 5MB."
+              accept="application/pdf,image/jpeg,image/png"
+              file={ineFile}
+              error={errors.ineFile?.message}
+              onFileChange={handleIneChange}
+            />
 
-          <DocumentDropzone
-            id="signatureFile"
-            label="Firma digital"
-            hint="Formato PNG. Máximo 5MB."
-            accept="image/png"
-            file={signatureFile}
-            error={errors.signatureFile?.message}
-            onFileChange={handleSignatureChange}
-          />
+            <DocumentDropzone
+              id="signatureFile"
+              label="Firma digital"
+              hint="Formato PNG. Máximo 5MB."
+              accept="image/png"
+              file={signatureFile}
+              error={errors.signatureFile?.message}
+              onFileChange={handleSignatureChange}
+            />
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={!isValid || uploadMutation.isPending}
-          >
-            {uploadMutation.isPending
-              ? 'Guardando documentos...'
-              : 'Guardar documentos'}
-          </Button>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!isValid || uploadMutation.isPending}
+            >
+              {uploadMutation.isPending
+                ? 'Guardando documentos...'
+                : 'Guardar documentos'}
+            </Button>
+          </FieldGroup>
         </form>
       </CardContent>
     </Card>

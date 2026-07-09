@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Upload, X } from 'lucide-react';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Field, FieldLabel, FieldError } from '@/components/ui/field';
 import { cn } from '@/lib/utils';
 
 interface DocumentDropzoneProps {
@@ -48,8 +48,8 @@ export default function DocumentDropzone({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+    <Field data-invalid={error ? true : undefined}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
 
       <div
         className={cn(
@@ -116,7 +116,7 @@ export default function DocumentDropzone({
         />
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </div>
+      <FieldError errors={error ? [{ message: error }] : undefined} />
+    </Field>
   );
 }
