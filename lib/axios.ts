@@ -4,7 +4,7 @@ import axios from 'axios';
 import { getAuthToken, clearAuthToken } from './cookies';
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000',
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000',
 });
 
 apiClient.interceptors.request.use((config) => {
