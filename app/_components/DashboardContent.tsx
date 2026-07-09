@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import DocumentUploadFlow from './DocumentUploadFlow';
-import DocumentsTable, { type DocumentListItem } from '../(app)/documents/_components/DocumentsTable';
+import DocumentsTable, {
+  type DocumentListItem,
+} from '../(app)/documents/_components/DocumentsTable';
 import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from '../(app)/documents/_components/DocumentsFilterPanel';
-import DocumentPreparationView, { type SignerEntry } from './DocumentPreparationView';
+import DocumentPreparationView, {
+  type SignerEntry,
+} from './DocumentPreparationView';
 import { useDocumentsCount } from './DocumentsCountContext';
 
 const initialDocuments: DocumentListItem[] = [
@@ -31,9 +35,13 @@ interface PreparingDocument {
 }
 
 export default function DashboardContent() {
-  const [documents, setDocuments] = useState<DocumentListItem[]>(initialDocuments);
-  const [filters, setFilters] = useState<DocumentsFilters>(EMPTY_DOCUMENTS_FILTERS);
-  const [preparingDocument, setPreparingDocument] = useState<PreparingDocument | null>(null);
+  const [documents, setDocuments] =
+    useState<DocumentListItem[]>(initialDocuments);
+  const [filters, setFilters] = useState<DocumentsFilters>(
+    EMPTY_DOCUMENTS_FILTERS,
+  );
+  const [preparingDocument, setPreparingDocument] =
+    useState<PreparingDocument | null>(null);
   const { setDocumentsCount } = useDocumentsCount();
 
   useEffect(() => {
@@ -42,12 +50,17 @@ export default function DashboardContent() {
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
-      if (filters.fileName && !doc.fileName.toLowerCase().includes(filters.fileName.toLowerCase())) {
+      if (
+        filters.fileName &&
+        !doc.fileName.toLowerCase().includes(filters.fileName.toLowerCase())
+      ) {
         return false;
       }
       if (
         filters.participantName &&
-        !doc.signers.some((signer) => signer.toLowerCase().includes(filters.participantName.toLowerCase()))
+        !doc.signers.some((signer) =>
+          signer.toLowerCase().includes(filters.participantName.toLowerCase()),
+        )
       ) {
         return false;
       }

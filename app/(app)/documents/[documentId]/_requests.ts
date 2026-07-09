@@ -28,7 +28,9 @@ export interface DocumentDetail {
   canReject: boolean;
 }
 
-export async function getDocumentDetailRequest(documentId: string): Promise<DocumentDetail> {
+export async function getDocumentDetailRequest(
+  documentId: string,
+): Promise<DocumentDetail> {
   const { data } = await apiClient.get<{
     success: boolean;
     message: string;
@@ -42,6 +44,9 @@ export async function signDocumentRequest(documentId: string): Promise<void> {
   await apiClient.patch(`/document/${documentId}/sign`);
 }
 
-export async function rejectDocumentRequest(documentId: string, reason: string): Promise<void> {
+export async function rejectDocumentRequest(
+  documentId: string,
+  reason: string,
+): Promise<void> {
   await apiClient.patch(`/document/${documentId}/reject`, { reason });
 }

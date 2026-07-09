@@ -31,7 +31,9 @@ export async function createDocumentRequest(
   return data.data;
 }
 
-export async function submitForAuthorizationRequest(documentId: string): Promise<void> {
+export async function submitForAuthorizationRequest(
+  documentId: string,
+): Promise<void> {
   await apiClient.patch(`/document/${documentId}/submit-for-authorization`);
 }
 
@@ -60,7 +62,9 @@ export async function getMyDocumentsRequest(
     message: string;
     data: DocumentListItem[];
     meta: MyDocumentsMeta;
-  }>('/document', { params: { email, page, limit, ...buildDocumentsFilterParams(filters) } });
+  }>('/document', {
+    params: { email, page, limit, ...buildDocumentsFilterParams(filters) },
+  });
 
   return { documents: data.data, meta: data.meta };
 }

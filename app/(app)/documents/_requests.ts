@@ -1,6 +1,10 @@
 import apiClient from '@/lib/axios';
 import type { DocumentListItem } from './_components/DocumentsTable';
-import { EMPTY_DOCUMENTS_FILTERS, buildDocumentsFilterParams, type DocumentsFilters } from './_components/DocumentsFilterPanel';
+import {
+  EMPTY_DOCUMENTS_FILTERS,
+  buildDocumentsFilterParams,
+  type DocumentsFilters,
+} from './_components/DocumentsFilterPanel';
 
 export interface SelectableUser {
   id: string;

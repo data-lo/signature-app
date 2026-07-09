@@ -14,7 +14,9 @@ import { useRegister } from '../_hooks/useRegister';
 function getErrorMessage(error: unknown): string | null {
   if (!error) return null;
   const axiosError = error as AxiosError<{ message?: string }>;
-  return axiosError.response?.data?.message ?? 'Error de conexión con el servidor';
+  return (
+    axiosError.response?.data?.message ?? 'Error de conexión con el servidor'
+  );
 }
 
 export default function SignupForm() {
@@ -38,31 +40,52 @@ export default function SignupForm() {
         >
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="firstName">Nombre(s)</Label>
-            <Input id="firstName" autoComplete="given-name" {...register('firstName')} />
+            <Input
+              id="firstName"
+              autoComplete="given-name"
+              {...register('firstName')}
+            />
             {errors.firstName && (
-              <p className="text-sm text-destructive">{errors.firstName.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.firstName.message}
+              </p>
             )}
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="lastName">Apellidos</Label>
-            <Input id="lastName" autoComplete="family-name" {...register('lastName')} />
+            <Input
+              id="lastName"
+              autoComplete="family-name"
+              {...register('lastName')}
+            />
             {errors.lastName && (
-              <p className="text-sm text-destructive">{errors.lastName.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.lastName.message}
+              </p>
             )}
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="email">Correo electrónico</Label>
-            <Input id="email" type="email" autoComplete="email" {...register('email')} />
-            {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              {...register('email')}
+            />
+            {errors.email && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="position">Puesto</Label>
             <Input id="position" {...register('position')} />
             {errors.position && (
-              <p className="text-sm text-destructive">{errors.position.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.position.message}
+              </p>
             )}
           </div>
 
@@ -70,7 +93,9 @@ export default function SignupForm() {
             <Label htmlFor="nationalId">CURP</Label>
             <Input id="nationalId" maxLength={18} {...register('nationalId')} />
             {errors.nationalId && (
-              <p className="text-sm text-destructive">{errors.nationalId.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.nationalId.message}
+              </p>
             )}
           </div>
 
@@ -83,7 +108,9 @@ export default function SignupForm() {
               {...register('password')}
             />
             {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.password.message}
+              </p>
             )}
           </div>
 
@@ -96,15 +123,23 @@ export default function SignupForm() {
               {...register('confirmPassword')}
             />
             {errors.confirmPassword && (
-              <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.confirmPassword.message}
+              </p>
             )}
           </div>
 
           {registerMutation.isError && (
-            <p className="text-sm text-destructive">{getErrorMessage(registerMutation.error)}</p>
+            <p className="text-sm text-destructive">
+              {getErrorMessage(registerMutation.error)}
+            </p>
           )}
 
-          <Button type="submit" disabled={registerMutation.isPending} className="w-full">
+          <Button
+            type="submit"
+            disabled={registerMutation.isPending}
+            className="w-full"
+          >
             {registerMutation.isPending ? 'Creando cuenta...' : 'Crear cuenta'}
           </Button>
 

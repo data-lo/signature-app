@@ -3,8 +3,15 @@
 import { useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import DocumentsFilterPanel, { EMPTY_DOCUMENTS_FILTERS, type DocumentsFilters } from './DocumentsFilterPanel';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import DocumentsFilterPanel, {
+  EMPTY_DOCUMENTS_FILTERS,
+  type DocumentsFilters,
+} from './DocumentsFilterPanel';
 
 interface DocumentsFilterButtonProps {
   filters: DocumentsFilters;
@@ -38,7 +45,12 @@ export default function DocumentsFilterButton({
     >
       <PopoverTrigger
         render={
-          <Button variant="outline" size="icon-sm" aria-label="Filtrar documentos" className="relative">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Filtrar documentos"
+            className="relative"
+          >
             <SlidersHorizontal />
             {activeCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">

@@ -8,7 +8,10 @@ import { rejectDocumentRequest } from '../_requests';
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
-  return axiosError.response?.data?.message ?? 'Ocurrió un error al rechazar el documento. Intenta de nuevo.';
+  return (
+    axiosError.response?.data?.message ??
+    'Ocurrió un error al rechazar el documento. Intenta de nuevo.'
+  );
 }
 
 export function useRejectDocument(documentId: string) {
@@ -19,7 +22,9 @@ export function useRejectDocument(documentId: string) {
     mutationFn: (reason: string) => rejectDocumentRequest(documentId, reason),
     onSuccess: () => {
       toast.success('Documento rechazado correctamente');
-      queryClient.invalidateQueries({ queryKey: ['documentDetail', documentId] });
+      queryClient.invalidateQueries({
+        queryKey: ['documentDetail', documentId],
+      });
       queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
       router.push('/documents');
     },

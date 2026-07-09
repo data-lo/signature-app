@@ -12,7 +12,9 @@ interface DocumentPreviewItemProps {
 
 function isImageUrl(url: string): boolean {
   const path = url.split('?')[0].toLowerCase();
-  return path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg');
+  return (
+    path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg')
+  );
 }
 
 export default function DocumentPreviewItem({

@@ -1,6 +1,13 @@
 'use client';
 
-import { ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import {
+  ArrowUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -18,7 +25,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import DocumentsFilterButton from './DocumentsFilterButton';
-import { EMPTY_DOCUMENTS_FILTERS, type DocumentsFilters } from './DocumentsFilterPanel';
+import {
+  EMPTY_DOCUMENTS_FILTERS,
+  type DocumentsFilters,
+} from './DocumentsFilterPanel';
 
 export type DocumentListStatus =
   | 'created'
@@ -135,28 +145,40 @@ export default function DocumentsTable({
             <TableRow key={doc.id}>
               <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
                 <div className="flex items-start gap-1.5">
-                  <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`} />
-                  <span className="min-w-0 flex-1 break-words">{doc.fileName}</span>
+                  <span
+                    className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                  />
+                  <span className="min-w-0 flex-1 break-words">
+                    {doc.fileName}
+                  </span>
                 </div>
               </TableCell>
               <TableCell>
                 {doc.signers.length > 0 ? (
                   <span>{doc.signers.join(', ')}</span>
                 ) : (
-                  <span className="italic text-muted-foreground">Sin firmantes asignados</span>
+                  <span className="italic text-muted-foreground">
+                    Sin firmantes asignados
+                  </span>
                 )}
               </TableCell>
               <TableCell>{formatDate(doc.createdAt)}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-1.5">
-                  <span className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`} />
+                  <span
+                    className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                  />
                   <span>{STATUS_LABELS[doc.status]}</span>
                 </div>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
                   {onSignClick && doc.status === 'pending' ? (
-                    <Button variant="brand" size="sm" onClick={() => onSignClick(doc.id)}>
+                    <Button
+                      variant="brand"
+                      size="sm"
+                      onClick={() => onSignClick(doc.id)}
+                    >
                       FIRMAR
                     </Button>
                   ) : (
@@ -204,7 +226,9 @@ export default function DocumentsTable({
           >
             <ChevronLeft className="size-4" />
           </Button>
-          <span className="px-2 text-sm font-medium text-emerald-600">{page}</span>
+          <span className="px-2 text-sm font-medium text-emerald-600">
+            {page}
+          </span>
           <Button
             variant="ghost"
             size="icon-sm"

@@ -19,12 +19,25 @@ export default function PdfPreview({ file }: PdfPreviewProps) {
       <Document
         file={file}
         onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-        loading={<p className="mt-20 text-sm text-muted-foreground">Cargando documento...</p>}
-        error={<p className="mt-20 text-sm text-destructive">Error al cargar el documento.</p>}
+        loading={
+          <p className="mt-20 text-sm text-muted-foreground">
+            Cargando documento...
+          </p>
+        }
+        error={
+          <p className="mt-20 text-sm text-destructive">
+            Error al cargar el documento.
+          </p>
+        }
       >
         {Array.from({ length: numPages }, (_, i) => (
           <div key={i} className="shadow-xl">
-            <Page pageNumber={i + 1} width={520} renderTextLayer renderAnnotationLayer />
+            <Page
+              pageNumber={i + 1}
+              width={520}
+              renderTextLayer
+              renderAnnotationLayer
+            />
           </div>
         ))}
       </Document>

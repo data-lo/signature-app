@@ -48,7 +48,11 @@ export default function ParticipantPicker({
   return (
     <div className="flex flex-col gap-1.5">
       <Label>{label}</Label>
-      <Select value={null} onValueChange={handleAdd} disabled={availableUsers.length === 0}>
+      <Select
+        value={null}
+        onValueChange={handleAdd}
+        disabled={availableUsers.length === 0}
+      >
         <SelectTrigger className="w-full" aria-invalid={Boolean(error)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
@@ -69,10 +73,19 @@ export default function ParticipantPicker({
               className="flex items-center justify-between rounded border border-input bg-background px-3 py-1.5 text-sm"
             >
               <span>
-                {showOrder && <span className="mr-2 font-semibold text-emerald-600">{index + 1}.</span>}
+                {showOrder && (
+                  <span className="mr-2 font-semibold text-emerald-600">
+                    {index + 1}.
+                  </span>
+                )}
                 {user.firstName} {user.lastName} ({user.email})
               </span>
-              <Button type="button" variant="ghost" size="icon-xs" onClick={() => handleRemove(user.id)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => handleRemove(user.id)}
+              >
                 <X className="size-3.5" />
               </Button>
             </li>

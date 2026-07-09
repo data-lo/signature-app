@@ -46,7 +46,9 @@ const STATUS_OPTIONS: { value: DocumentListStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelado' },
 ];
 
-export function buildDocumentsFilterParams(filters: DocumentsFilters): Record<string, string | boolean> {
+export function buildDocumentsFilterParams(
+  filters: DocumentsFilters,
+): Record<string, string | boolean> {
   const params: Record<string, string | boolean> = {};
 
   if (filters.fileName) params.fileName = filters.fileName;
@@ -62,7 +64,11 @@ export function buildDocumentsFilterParams(filters: DocumentsFilters): Record<st
 }
 
 function FilterLabel({ children }: { children: React.ReactNode }) {
-  return <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground">{children}</p>;
+  return (
+    <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground">
+      {children}
+    </p>
+  );
 }
 
 interface DocumentsFilterPanelProps {
@@ -80,18 +86,26 @@ export default function DocumentsFilterPanel({
 }: DocumentsFilterPanelProps) {
   const [draft, setDraft] = useState<DocumentsFilters>(initialFilters);
 
-  function update<K extends keyof DocumentsFilters>(key: K, value: DocumentsFilters[K]) {
+  function update<K extends keyof DocumentsFilters>(
+    key: K,
+    value: DocumentsFilters[K],
+  ) {
     setDraft((prev) => ({ ...prev, [key]: value }));
   }
 
   return (
     <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
-      <h3 className="text-sm font-semibold text-foreground">Filtrar documentos</h3>
+      <h3 className="text-sm font-semibold text-foreground">
+        Filtrar documentos
+      </h3>
 
       {showMyTurnFilter && (
         <div className="flex items-center justify-between gap-2">
           <FilterLabel>Requiere mi firma o revisión</FilterLabel>
-          <Switch checked={draft.myTurnOnly} onCheckedChange={(checked) => update('myTurnOnly', checked)} />
+          <Switch
+            checked={draft.myTurnOnly}
+            onCheckedChange={(checked) => update('myTurnOnly', checked)}
+          />
         </div>
       )}
 
@@ -126,7 +140,9 @@ export default function DocumentsFilterPanel({
           <FilterLabel>Estado del documento</FilterLabel>
           <Select
             value={draft.status || null}
-            onValueChange={(value) => update('status', (value ?? '') as DocumentListStatus | '')}
+            onValueChange={(value) =>
+              update('status', (value ?? '') as DocumentListStatus | '')
+            }
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Selecciona uno" />
@@ -145,23 +161,44 @@ export default function DocumentsFilterPanel({
       <div>
         <FilterLabel>Fecha de firma</FilterLabel>
         <div className="flex items-center gap-2">
-          <Input type="date" value={draft.signedFrom} onChange={(event) => update('signedFrom', event.target.value)} />
+          <Input
+            type="date"
+            value={draft.signedFrom}
+            onChange={(event) => update('signedFrom', event.target.value)}
+          />
           <span className="text-muted-foreground">→</span>
-          <Input type="date" value={draft.signedTo} onChange={(event) => update('signedTo', event.target.value)} />
+          <Input
+            type="date"
+            value={draft.signedTo}
+            onChange={(event) => update('signedTo', event.target.value)}
+          />
         </div>
       </div>
 
       <div>
         <FilterLabel>Fecha de creación</FilterLabel>
         <div className="flex items-center gap-2">
-          <Input type="date" value={draft.createdFrom} onChange={(event) => update('createdFrom', event.target.value)} />
+          <Input
+            type="date"
+            value={draft.createdFrom}
+            onChange={(event) => update('createdFrom', event.target.value)}
+          />
           <span className="text-muted-foreground">→</span>
-          <Input type="date" value={draft.createdTo} onChange={(event) => update('createdTo', event.target.value)} />
+          <Input
+            type="date"
+            value={draft.createdTo}
+            onChange={(event) => update('createdTo', event.target.value)}
+          />
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
-        <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(EMPTY_DOCUMENTS_FILTERS)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setDraft(EMPTY_DOCUMENTS_FILTERS)}
+        >
           Limpiar
         </Button>
         <Button type="button" size="sm" onClick={() => onApply(draft)}>

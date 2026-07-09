@@ -65,9 +65,15 @@ export default function DocumentDropzone({
             className="h-16 w-16 rounded object-contain bg-muted"
           />
         ) : file ? (
-          <FileText className="h-10 w-10 shrink-0 text-muted-foreground" aria-hidden />
+          <FileText
+            className="h-10 w-10 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
         ) : (
-          <Upload className="h-10 w-10 shrink-0 text-muted-foreground" aria-hidden />
+          <Upload
+            className="h-10 w-10 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
         )}
 
         <div className="flex flex-1 flex-col gap-1 min-w-0">
@@ -78,11 +84,21 @@ export default function DocumentDropzone({
           )}
 
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+            >
               {file ? 'Cambiar archivo' : 'Seleccionar archivo'}
             </Button>
             {file && (
-              <Button type="button" variant="ghost" size="sm" onClick={handleRemove}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleRemove}
+              >
                 <X className="h-4 w-4" />
                 Quitar
               </Button>

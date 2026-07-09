@@ -3,7 +3,12 @@ import { z } from 'zod';
 const MAX_INE_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_SIGNATURE_SIZE_BYTES = 5 * 1024 * 1024;
 
-const INE_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+const INE_ALLOWED_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+];
 
 export const ineFileSchema = z
   .instanceof(File, { message: 'La identificación (INE) es obligatoria' })
@@ -28,4 +33,6 @@ export const personalDocumentsSchema = z.object({
   signatureFile: signatureFileSchema,
 });
 
-export type PersonalDocumentsFormValues = z.infer<typeof personalDocumentsSchema>;
+export type PersonalDocumentsFormValues = z.infer<
+  typeof personalDocumentsSchema
+>;

@@ -31,7 +31,10 @@ export default function PersonalDocumentsView() {
     <div className="flex w-full flex-col items-center gap-6">
       <UserInfoCard user={user} />
       {user.signature && user.officialFile ? (
-        <PersonalDocumentsCompleted signature={user.signature} officialFile={user.officialFile} />
+        <PersonalDocumentsCompleted
+          signature={user.signature}
+          officialFile={user.officialFile}
+        />
       ) : user.signature || user.officialFile ? (
         <PersonalDocumentsPartial
           signature={user.signature ?? null}

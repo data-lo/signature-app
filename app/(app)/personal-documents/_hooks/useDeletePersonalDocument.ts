@@ -26,10 +26,14 @@ export function useDeletePersonalDocument() {
 
   return useMutation({
     mutationFn: ({ signatureId, field }: DeletePersonalDocumentParams) =>
-      field === 'ine' ? deleteIneFileRequest(signatureId) : deleteSignatureFileRequest(signatureId),
+      field === 'ine'
+        ? deleteIneFileRequest(signatureId)
+        : deleteSignatureFileRequest(signatureId),
     onSuccess: (_data, { field }) => {
       toast.success(
-        field === 'ine' ? 'Identificación eliminada correctamente' : 'Firma eliminada correctamente',
+        field === 'ine'
+          ? 'Identificación eliminada correctamente'
+          : 'Firma eliminada correctamente',
       );
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     },

@@ -1,7 +1,13 @@
 'use client';
 
 import { CheckCircle2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import type { CurrentUser } from '@/lib/api/auth';
 import { useDeletePersonalDocument } from '../_hooks/useDeletePersonalDocument';
 import DocumentPreviewItem from './DocumentPreviewItem';
@@ -18,8 +24,13 @@ export default function PersonalDocumentsCompleted({
   const deleteMutation = useDeletePersonalDocument();
 
   function handleDelete(field: 'ine' | 'signature') {
-    const label = field === 'ine' ? 'tu identificación (INE)' : 'tu firma digital';
-    if (!window.confirm(`¿Seguro que quieres eliminar ${label}? Esta acción no se puede deshacer.`)) {
+    const label =
+      field === 'ine' ? 'tu identificación (INE)' : 'tu firma digital';
+    if (
+      !window.confirm(
+        `¿Seguro que quieres eliminar ${label}? Esta acción no se puede deshacer.`,
+      )
+    ) {
       return;
     }
     deleteMutation.mutate({ signatureId: signature.id, field });

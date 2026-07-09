@@ -22,7 +22,9 @@ interface DashboardNavbarProps {
   documentsCount?: number;
 }
 
-export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps) {
+export default function DashboardNavbar({
+  documentsCount,
+}: DashboardNavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const logoutMutation = useLogout();
@@ -61,7 +63,10 @@ export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps
         <ThemeToggle className="flex items-center gap-1 cursor-pointer hover:text-foreground" />
 
         {typeof documentsCount === 'number' && (
-          <span className="cursor-pointer hover:text-foreground" onClick={() => router.push('/documents')}>
+          <span
+            className="cursor-pointer hover:text-foreground"
+            onClick={() => router.push('/documents')}
+          >
             DOCUMENTOS:{documentsCount}
           </span>
         )}
@@ -74,7 +79,9 @@ export default function DashboardNavbar({ documentsCount }: DashboardNavbarProps
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Configuraciones</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => router.push('/personal-documents')}>
+              <DropdownMenuItem
+                onClick={() => router.push('/personal-documents')}
+              >
                 <User className="size-4" />
                 Mi Perfil
               </DropdownMenuItem>

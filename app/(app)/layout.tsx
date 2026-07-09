@@ -1,7 +1,10 @@
 'use client';
 
 import DashboardNavbar from '../_components/DashboardNavbar';
-import { DocumentsCountProvider, useDocumentsCount } from '../_components/DocumentsCountContext';
+import {
+  DocumentsCountProvider,
+  useDocumentsCount,
+} from '../_components/DocumentsCountContext';
 
 function AppNavbar() {
   const { documentsCount } = useDocumentsCount();

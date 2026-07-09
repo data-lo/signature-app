@@ -2,7 +2,13 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import type { CurrentUser } from '@/lib/api/auth';
 import { ineFileSchema, signatureFileSchema } from '../_schemas';
 import { useDeletePersonalDocument } from '../_hooks/useDeletePersonalDocument';
@@ -50,8 +56,13 @@ export default function PersonalDocumentsPartial({
   }
 
   function handleDelete(field: 'ine' | 'signature') {
-    const label = field === 'ine' ? 'tu identificación (INE)' : 'tu firma digital';
-    if (!window.confirm(`¿Seguro que quieres eliminar ${label}? Esta acción no se puede deshacer.`)) {
+    const label =
+      field === 'ine' ? 'tu identificación (INE)' : 'tu firma digital';
+    if (
+      !window.confirm(
+        `¿Seguro que quieres eliminar ${label}? Esta acción no se puede deshacer.`,
+      )
+    ) {
       return;
     }
     deleteMutation.mutate({ signatureId, field });
@@ -62,8 +73,11 @@ export default function PersonalDocumentsPartial({
       <CardHeader>
         <CardTitle>Documentos personales incompletos</CardTitle>
         <CardDescription>
-          Falta {missingField === 'ine' ? 'tu identificación (INE)' : 'tu firma digital'} para completar tu
-          perfil.
+          Falta{' '}
+          {missingField === 'ine'
+            ? 'tu identificación (INE)'
+            : 'tu firma digital'}{' '}
+          para completar tu perfil.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -87,9 +101,19 @@ export default function PersonalDocumentsPartial({
 
         <DocumentDropzone
           id={missingField === 'ine' ? 'ineFile' : 'signatureFile'}
-          label={missingField === 'ine' ? 'Identificación (INE)' : 'Firma digital'}
-          hint={missingField === 'ine' ? 'PDF, JPG o PNG. Máximo 5MB.' : 'Formato PNG. Máximo 5MB.'}
-          accept={missingField === 'ine' ? 'application/pdf,image/jpeg,image/png' : 'image/png'}
+          label={
+            missingField === 'ine' ? 'Identificación (INE)' : 'Firma digital'
+          }
+          hint={
+            missingField === 'ine'
+              ? 'PDF, JPG o PNG. Máximo 5MB.'
+              : 'Formato PNG. Máximo 5MB.'
+          }
+          accept={
+            missingField === 'ine'
+              ? 'application/pdf,image/jpeg,image/png'
+              : 'image/png'
+          }
           file={pendingFile}
           error={fileError}
           onFileChange={handleFileChange}
@@ -98,7 +122,9 @@ export default function PersonalDocumentsPartial({
         <Button
           type="button"
           className="w-full"
-          disabled={!pendingFile || Boolean(fileError) || updateMutation.isPending}
+          disabled={
+            !pendingFile || Boolean(fileError) || updateMutation.isPending
+          }
           onClick={handleSave}
         >
           {updateMutation.isPending ? 'Guardando...' : 'Guardar'}

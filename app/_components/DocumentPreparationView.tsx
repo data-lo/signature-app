@@ -14,10 +14,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import SignerFormCard, { type SignerFieldErrors } from './SignerFormCard';
-import SpectatorFormCard, { type SpectatorFieldErrors } from './SpectatorFormCard';
+import SpectatorFormCard, {
+  type SpectatorFieldErrors,
+} from './SpectatorFormCard';
 import DocumentSentSuccess from './DocumentSentSuccess';
 
-const DocumentPreviewPane = dynamic(() => import('./DocumentPreviewPane'), { ssr: false });
+const DocumentPreviewPane = dynamic(() => import('./DocumentPreviewPane'), {
+  ssr: false,
+});
 
 export interface SignerEntry {
   id: string;
@@ -76,7 +80,14 @@ function validateSpectator(spectator: SpectatorEntry): SpectatorFieldErrors {
 }
 
 function createEmptySigner(): SignerEntry {
-  return { id: crypto.randomUUID(), email: '', name: '', allowAdvanced: true, allowSimple: false, rfc: '' };
+  return {
+    id: crypto.randomUUID(),
+    email: '',
+    name: '',
+    allowAdvanced: true,
+    allowSimple: false,
+    rfc: '',
+  };
 }
 
 function createEmptySpectator(): SpectatorEntry {
@@ -89,13 +100,20 @@ export default function DocumentPreparationView({
   onCancel,
   onRequestSignatures,
 }: DocumentPreparationViewProps) {
-  const [activeTab, setActiveTab] = useState<'preparacion' | 'documento'>('preparacion');
+  const [activeTab, setActiveTab] = useState<'preparacion' | 'documento'>(
+    'preparacion',
+  );
   const [signers, setSigners] = useState<SignerEntry[]>([]);
   const [spectators, setSpectators] = useState<SpectatorEntry[]>([]);
-  const [signerErrors, setSignerErrors] = useState<Record<string, SignerFieldErrors>>({});
-  const [spectatorErrors, setSpectatorErrors] = useState<Record<string, SpectatorFieldErrors>>({});
+  const [signerErrors, setSignerErrors] = useState<
+    Record<string, SignerFieldErrors>
+  >({});
+  const [spectatorErrors, setSpectatorErrors] = useState<
+    Record<string, SpectatorFieldErrors>
+  >({});
   const [generalError, setGeneralError] = useState<string | null>(null);
-  const [participantMessageEnabled, setParticipantMessageEnabled] = useState(false);
+  const [participantMessageEnabled, setParticipantMessageEnabled] =
+    useState(false);
   const [participantMessage, setParticipantMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
@@ -122,7 +140,9 @@ export default function DocumentPreparationView({
   }
 
   function handleChangeSpectator(updated: SpectatorEntry) {
-    setSpectators((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    setSpectators((prev) =>
+      prev.map((s) => (s.id === updated.id ? updated : s)),
+    );
   }
 
   function handleRemoveSpectator(id: string) {
@@ -149,13 +169,17 @@ export default function DocumentPreparationView({
     const nextSpectatorErrors: Record<string, SpectatorFieldErrors> = {};
     spectators.forEach((spectator) => {
       const errors = validateSpectator(spectator);
-      if (Object.keys(errors).length > 0) nextSpectatorErrors[spectator.id] = errors;
+      if (Object.keys(errors).length > 0)
+        nextSpectatorErrors[spectator.id] = errors;
     });
 
     setSignerErrors(nextSignerErrors);
     setSpectatorErrors(nextSpectatorErrors);
 
-    if (Object.keys(nextSignerErrors).length > 0 || Object.keys(nextSpectatorErrors).length > 0) {
+    if (
+      Object.keys(nextSignerErrors).length > 0 ||
+      Object.keys(nextSpectatorErrors).length > 0
+    ) {
       setGeneralError('Revisa los campos marcados antes de continuar.');
       return;
     }
@@ -176,13 +200,17 @@ export default function DocumentPreparationView({
   return (
     <main className="mx-auto max-w-7xl px-8 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-foreground">Preparación del documento</h1>
+        <h1 className="text-lg font-semibold text-foreground">
+          Preparación del documento
+        </h1>
         <div className="flex overflow-hidden rounded-md">
           <button
             type="button"
             onClick={() => setActiveTab('preparacion')}
             className={`px-4 py-1.5 text-xs font-semibold tracking-wide ${
-              activeTab === 'preparacion' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
+              activeTab === 'preparacion'
+                ? 'bg-foreground text-background'
+                : 'bg-muted text-muted-foreground'
             }`}
           >
             PREPARACIÓN
@@ -191,7 +219,9 @@ export default function DocumentPreparationView({
             type="button"
             onClick={() => setActiveTab('documento')}
             className={`px-4 py-1.5 text-xs font-semibold tracking-wide ${
-              activeTab === 'documento' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
+              activeTab === 'documento'
+                ? 'bg-foreground text-background'
+                : 'bg-muted text-muted-foreground'
             }`}
           >
             DOCUMENTO
@@ -208,9 +238,14 @@ export default function DocumentPreparationView({
           ) : (
             <>
               <section>
-                <h2 className="text-base font-semibold text-foreground">Añadir participantes</h2>
+                <h2 className="text-base font-semibold text-foreground">
+                  Añadir participantes
+                </h2>
                 <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <span>Añadir revisores: ¿Se necesita un visto bueno para este documento?</span>
+                  <span>
+                    Añadir revisores: ¿Se necesita un visto bueno para este
+                    documento?
+                  </span>
                   <CircleHelp className="size-3.5" />
                   <span className="ml-auto shrink-0 cursor-pointer text-sm font-medium text-emerald-600 hover:underline">
                     Obtener
@@ -226,8 +261,8 @@ export default function DocumentPreparationView({
                     <div className="mt-3 flex flex-col items-center justify-center gap-3 rounded-md bg-background py-10 text-center">
                       <UserPlus className="size-8 text-muted-foreground" />
                       <p className="max-w-xs text-sm text-muted-foreground">
-                        Da clic en &quot;Añadir firmante&quot; para agregar a cada persona que deba firmar este
-                        documento.
+                        Da clic en &quot;Añadir firmante&quot; para agregar a
+                        cada persona que deba firmar este documento.
                       </p>
                     </div>
                   ) : (
@@ -255,10 +290,13 @@ export default function DocumentPreparationView({
               </section>
 
               <section className="mt-8">
-                <h2 className="text-base font-semibold text-foreground">Añadir espectadores</h2>
+                <h2 className="text-base font-semibold text-foreground">
+                  Añadir espectadores
+                </h2>
                 <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-                  Los espectadores son notificados cada vez que alguien firma el documento y también reciben
-                  una copia del documento firmado en su correo.
+                  Los espectadores son notificados cada vez que alguien firma el
+                  documento y también reciben una copia del documento firmado en
+                  su correo.
                 </p>
 
                 {spectators.length > 0 && (
@@ -288,7 +326,9 @@ export default function DocumentPreparationView({
         </div>
 
         <aside className="w-80 shrink-0 rounded-lg border border-border bg-background p-6">
-          <h2 className="mb-4 text-base font-semibold text-foreground">Documento</h2>
+          <h2 className="mb-4 text-base font-semibold text-foreground">
+            Documento
+          </h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <FileText className="size-5 text-muted-foreground" />
             {documentName}.pdf
@@ -312,7 +352,9 @@ export default function DocumentPreparationView({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="3d">Cada tres días (predeterminado)</SelectItem>
+                <SelectItem value="3d">
+                  Cada tres días (predeterminado)
+                </SelectItem>
                 <SelectItem value="7d">Cada semana</SelectItem>
                 <SelectItem value="never">Nunca</SelectItem>
               </SelectContent>
@@ -324,30 +366,44 @@ export default function DocumentPreparationView({
               Mensaje para participantes
               <CircleHelp className="size-3.5 text-muted-foreground" />
             </span>
-            <Switch checked={participantMessageEnabled} onCheckedChange={setParticipantMessageEnabled} />
+            <Switch
+              checked={participantMessageEnabled}
+              onCheckedChange={setParticipantMessageEnabled}
+            />
           </div>
 
           {participantMessageEnabled && (
             <div className="mt-3">
               <Textarea
                 value={participantMessage}
-                onChange={(e) => setParticipantMessage(e.target.value.slice(0, 500))}
+                onChange={(e) =>
+                  setParticipantMessage(e.target.value.slice(0, 500))
+                }
                 maxLength={500}
                 placeholder="Hola, fírmalo por favor."
                 className="min-h-20"
               />
-              <p className="mt-1 text-xs text-muted-foreground">Límite de 500 caracteres</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Límite de 500 caracteres
+              </p>
             </div>
           )}
 
           <p className="mt-6 text-xs text-muted-foreground">
-            Por favor, revisa el documento que estás preparando y los correos de los firmantes. Cuando estés
-            listo para solicitar las firmas, da clic en el botón de &quot;Solicitar firmas&quot;.
+            Por favor, revisa el documento que estás preparando y los correos de
+            los firmantes. Cuando estés listo para solicitar las firmas, da clic
+            en el botón de &quot;Solicitar firmas&quot;.
           </p>
 
-          {generalError && <p className="mt-3 text-xs text-destructive">{generalError}</p>}
+          {generalError && (
+            <p className="mt-3 text-xs text-destructive">{generalError}</p>
+          )}
 
-          <Button variant="brand" onClick={handleRequestSignaturesClick} className="mt-6 w-full">
+          <Button
+            variant="brand"
+            onClick={handleRequestSignaturesClick}
+            className="mt-6 w-full"
+          >
             SOLICITAR FIRMAS
           </Button>
           <button

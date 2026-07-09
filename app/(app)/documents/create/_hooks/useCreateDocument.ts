@@ -4,7 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
-import { createDocumentRequest, submitForAuthorizationRequest } from '../_requests';
+import {
+  createDocumentRequest,
+  submitForAuthorizationRequest,
+} from '../_requests';
 
 interface CreateDocumentParams {
   file: File;
@@ -25,7 +28,11 @@ export function useCreateDocument() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ file, signerIds, spectatorIds }: CreateDocumentParams) => {
+    mutationFn: async ({
+      file,
+      signerIds,
+      spectatorIds,
+    }: CreateDocumentParams) => {
       const { id } = await createDocumentRequest(file, signerIds, spectatorIds);
       await submitForAuthorizationRequest(id);
       return id;

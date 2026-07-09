@@ -9,7 +9,9 @@ interface DocumentUploadZoneProps {
   onFileSelected: (file: File) => void;
 }
 
-export default function DocumentUploadZone({ onFileSelected }: DocumentUploadZoneProps) {
+export default function DocumentUploadZone({
+  onFileSelected,
+}: DocumentUploadZoneProps) {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,7 +76,9 @@ export default function DocumentUploadZone({ onFileSelected }: DocumentUploadZon
         <CloudUpload className="size-5 text-muted-foreground" />
         <span>
           Arrastra tu documento en la página o{' '}
-          <span className="text-emerald-600 hover:underline">da clic aquí para seleccionar uno</span>
+          <span className="text-emerald-600 hover:underline">
+            da clic aquí para seleccionar uno
+          </span>
         </span>
       </label>
 

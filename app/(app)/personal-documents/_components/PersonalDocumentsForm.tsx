@@ -3,8 +3,17 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { personalDocumentsSchema, type PersonalDocumentsFormValues } from '../_schemas';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  personalDocumentsSchema,
+  type PersonalDocumentsFormValues,
+} from '../_schemas';
 import { useUploadPersonalDocuments } from '../_hooks/useUploadPersonalDocuments';
 import DocumentDropzone from './DocumentDropzone';
 
@@ -25,11 +34,17 @@ export default function PersonalDocumentsForm() {
   const signatureFile = watch('signatureFile') ?? null;
 
   function handleIneChange(file: File | null) {
-    setValue('ineFile', (file ?? undefined) as File, { shouldValidate: true, shouldDirty: true });
+    setValue('ineFile', (file ?? undefined) as File, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
   }
 
   function handleSignatureChange(file: File | null) {
-    setValue('signatureFile', (file ?? undefined) as File, { shouldValidate: true, shouldDirty: true });
+    setValue('signatureFile', (file ?? undefined) as File, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
   }
 
   return (
@@ -37,7 +52,8 @@ export default function PersonalDocumentsForm() {
       <CardHeader>
         <CardTitle>Documentos personales</CardTitle>
         <CardDescription>
-          Sube tu identificación oficial (INE) y tu firma digital para completar tu perfil.
+          Sube tu identificación oficial (INE) y tu firma digital para completar
+          tu perfil.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -70,7 +86,9 @@ export default function PersonalDocumentsForm() {
             className="w-full"
             disabled={!isValid || uploadMutation.isPending}
           >
-            {uploadMutation.isPending ? 'Guardando documentos...' : 'Guardar documentos'}
+            {uploadMutation.isPending
+              ? 'Guardando documentos...'
+              : 'Guardar documentos'}
           </Button>
         </form>
       </CardContent>

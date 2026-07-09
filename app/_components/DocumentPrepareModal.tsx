@@ -6,7 +6,9 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
-const DocumentPreviewPane = dynamic(() => import('./DocumentPreviewPane'), { ssr: false });
+const DocumentPreviewPane = dynamic(() => import('./DocumentPreviewPane'), {
+  ssr: false,
+});
 
 interface DocumentPrepareModalProps {
   file: File | null;
@@ -19,7 +21,12 @@ function stripPdfExtension(fileName: string): string {
   return fileName.replace(/\.pdf$/i, '');
 }
 
-export default function DocumentPrepareModal({ file, open, onOpenChange, onContinue }: DocumentPrepareModalProps) {
+export default function DocumentPrepareModal({
+  file,
+  open,
+  onOpenChange,
+  onContinue,
+}: DocumentPrepareModalProps) {
   const [documentName, setDocumentName] = useState('');
   const [willSign, setWillSign] = useState(false);
 
@@ -42,7 +49,9 @@ export default function DocumentPrepareModal({ file, open, onOpenChange, onConti
 
           <div className="flex w-80 shrink-0 flex-col border-l border-border">
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              <h2 className="mb-6 text-lg font-semibold text-foreground">Configuración del documento</h2>
+              <h2 className="mb-6 text-lg font-semibold text-foreground">
+                Configuración del documento
+              </h2>
 
               <div className="mb-6">
                 <label className="mb-1.5 block text-xs font-semibold tracking-wide text-muted-foreground">
@@ -61,7 +70,9 @@ export default function DocumentPrepareModal({ file, open, onOpenChange, onConti
               </div>
 
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">¿Vas a firmar este documento?</span>
+                <span className="text-sm text-muted-foreground">
+                  ¿Vas a firmar este documento?
+                </span>
                 <Switch checked={willSign} onCheckedChange={setWillSign} />
               </div>
             </div>

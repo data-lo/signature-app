@@ -14,7 +14,9 @@ import { useLogin } from '../_hooks/useLogin';
 function getErrorMessage(error: unknown): string | null {
   if (!error) return null;
   const axiosError = error as AxiosError<{ message?: string }>;
-  return axiosError.response?.data?.message ?? 'Error de conexión con el servidor';
+  return (
+    axiosError.response?.data?.message ?? 'Error de conexión con el servidor'
+  );
 }
 
 export default function LoginForm() {
@@ -38,8 +40,15 @@ export default function LoginForm() {
         >
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="email">Correo electrónico</Label>
-            <Input id="email" type="email" autoComplete="email" {...register('email')} />
-            {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              {...register('email')}
+            />
+            {errors.email && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -51,15 +60,23 @@ export default function LoginForm() {
               {...register('password')}
             />
             {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.password.message}
+              </p>
             )}
           </div>
 
           {loginMutation.isError && (
-            <p className="text-sm text-destructive">{getErrorMessage(loginMutation.error)}</p>
+            <p className="text-sm text-destructive">
+              {getErrorMessage(loginMutation.error)}
+            </p>
           )}
 
-          <Button type="submit" disabled={loginMutation.isPending} className="w-full">
+          <Button
+            type="submit"
+            disabled={loginMutation.isPending}
+            className="w-full"
+          >
             {loginMutation.isPending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </Button>
 

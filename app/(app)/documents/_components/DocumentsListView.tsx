@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
 import DocumentsTable from './DocumentsTable';
-import { EMPTY_DOCUMENTS_FILTERS, type DocumentsFilters } from './DocumentsFilterPanel';
+import {
+  EMPTY_DOCUMENTS_FILTERS,
+  type DocumentsFilters,
+} from './DocumentsFilterPanel';
 import { useParticipantDocuments } from '../_hooks/useParticipantDocuments';
 
 type Tab = 'pending' | 'signed';
@@ -13,11 +16,18 @@ type Tab = 'pending' | 'signed';
 export default function DocumentsListView() {
   const [tab, setTab] = useState<Tab>('pending');
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<DocumentsFilters>(EMPTY_DOCUMENTS_FILTERS);
+  const [filters, setFilters] = useState<DocumentsFilters>(
+    EMPTY_DOCUMENTS_FILTERS,
+  );
   const router = useRouter();
 
   const { data: currentUser } = useCurrentUser();
-  const { data: documentsResult } = useParticipantDocuments(currentUser?.email, tab, page, filters);
+  const { data: documentsResult } = useParticipantDocuments(
+    currentUser?.email,
+    tab,
+    page,
+    filters,
+  );
 
   function handleTabChange(nextTab: Tab) {
     setTab(nextTab);
@@ -59,7 +69,9 @@ export default function DocumentsListView() {
       </div>
 
       <h1 className="mb-4 text-lg font-semibold text-foreground">
-        {tab === 'pending' ? 'Tus documentos pendientes' : 'Tus documentos firmados'}
+        {tab === 'pending'
+          ? 'Tus documentos pendientes'
+          : 'Tus documentos firmados'}
       </h1>
 
       <DocumentsTable
@@ -69,7 +81,11 @@ export default function DocumentsListView() {
         hasNextPage={documentsResult?.meta.hasNextPage}
         hasPrevPage={documentsResult?.meta.hasPrevPage}
         onPageChange={setPage}
-        onSignClick={tab === 'pending' ? (id) => router.push(`/documents/${id}`) : undefined}
+        onSignClick={
+          tab === 'pending'
+            ? (id) => router.push(`/documents/${id}`)
+            : undefined
+        }
         filters={filters}
         onFiltersChange={handleFiltersChange}
         showMyTurnFilter

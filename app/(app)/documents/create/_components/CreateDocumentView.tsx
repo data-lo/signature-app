@@ -8,20 +8,30 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import DocumentsTable from '../../_components/DocumentsTable';
-import { EMPTY_DOCUMENTS_FILTERS, type DocumentsFilters } from '../../_components/DocumentsFilterPanel';
+import {
+  EMPTY_DOCUMENTS_FILTERS,
+  type DocumentsFilters,
+} from '../../_components/DocumentsFilterPanel';
 import ParticipantPicker from '../../_components/ParticipantPicker';
 import { useUsers } from '../../_hooks/useUsers';
-import { selectParticipantsSchema, type SelectParticipantsFormValues } from '../_schemas';
+import {
+  selectParticipantsSchema,
+  type SelectParticipantsFormValues,
+} from '../_schemas';
 import { useMyDocuments } from '../_hooks/useMyDocuments';
 import { useCreateDocument } from '../_hooks/useCreateDocument';
 import DocumentFilePicker from './DocumentFilePicker';
 
-const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), { ssr: false });
+const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
+  ssr: false,
+});
 
 export default function CreateDocumentView() {
   const [file, setFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<DocumentsFilters>(EMPTY_DOCUMENTS_FILTERS);
+  const [filters, setFilters] = useState<DocumentsFilters>(
+    EMPTY_DOCUMENTS_FILTERS,
+  );
 
   const {
     watch,
@@ -39,12 +49,20 @@ export default function CreateDocumentView() {
 
   const { data: users } = useUsers();
   const { data: currentUser } = useCurrentUser();
-  const { data: myDocuments } = useMyDocuments(currentUser?.email, page, filters);
+  const { data: myDocuments } = useMyDocuments(
+    currentUser?.email,
+    page,
+    filters,
+  );
   const createMutation = useCreateDocument();
 
   function onSubmit(values: SelectParticipantsFormValues) {
     if (!file) return;
-    createMutation.mutate({ file, signerIds: values.signerIds, spectatorIds: values.spectatorIds });
+    createMutation.mutate({
+      file,
+      signerIds: values.signerIds,
+      spectatorIds: values.spectatorIds,
+    });
   }
 
   function handleFiltersChange(nextFilters: DocumentsFilters) {
@@ -62,16 +80,23 @@ export default function CreateDocumentView() {
           El documento debe estar en formato PDF y pesar menos de 20 MB.
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2"
+        >
           <div className="flex flex-col gap-4">
             <DocumentFilePicker onFileSelected={setFile} />
 
             <ParticipantPicker
               label="Firmantes"
               placeholder="Agregar firmante"
-              users={(users ?? []).filter((user) => !spectatorIds.includes(user.id))}
+              users={(users ?? []).filter(
+                (user) => !spectatorIds.includes(user.id),
+              )}
               selectedIds={signerIds}
-              onChange={(ids) => setValue('signerIds', ids, { shouldValidate: true })}
+              onChange={(ids) =>
+                setValue('signerIds', ids, { shouldValidate: true })
+              }
               showOrder
               error={errors.signerIds?.message}
             />
@@ -79,16 +104,22 @@ export default function CreateDocumentView() {
             <ParticipantPicker
               label="Espectadores"
               placeholder="Agregar espectador"
-              users={(users ?? []).filter((user) => !signerIds.includes(user.id))}
+              users={(users ?? []).filter(
+                (user) => !signerIds.includes(user.id),
+              )}
               selectedIds={spectatorIds}
-              onChange={(ids) => setValue('spectatorIds', ids, { shouldValidate: true })}
+              onChange={(ids) =>
+                setValue('spectatorIds', ids, { shouldValidate: true })
+              }
               error={errors.spectatorIds?.message}
             />
 
             <Button
               type="submit"
               className="w-full sm:w-auto"
-              disabled={!file || signerIds.length === 0 || createMutation.isPending}
+              disabled={
+                !file || signerIds.length === 0 || createMutation.isPending
+              }
             >
               {createMutation.isPending ? 'Enviando a firma...' : 'Firmar'}
             </Button>

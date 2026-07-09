@@ -27,10 +27,14 @@ export function useUpdatePersonalDocument() {
 
   return useMutation({
     mutationFn: ({ signatureId, field, file }: UpdatePersonalDocumentParams) =>
-      field === 'ine' ? updateIneFileRequest(signatureId, file) : updateSignatureFileRequest(signatureId, file),
+      field === 'ine'
+        ? updateIneFileRequest(signatureId, file)
+        : updateSignatureFileRequest(signatureId, file),
     onSuccess: (_data, { field }) => {
       toast.success(
-        field === 'ine' ? 'Identificación guardada correctamente' : 'Firma guardada correctamente',
+        field === 'ine'
+          ? 'Identificación guardada correctamente'
+          : 'Firma guardada correctamente',
       );
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     },

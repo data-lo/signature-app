@@ -11,7 +11,9 @@ interface DocumentFilePickerProps {
   onFileSelected: (file: File | null) => void;
 }
 
-export default function DocumentFilePicker({ onFileSelected }: DocumentFilePickerProps) {
+export default function DocumentFilePicker({
+  onFileSelected,
+}: DocumentFilePickerProps) {
   return (
     <FilePond
       onupdatefiles={(fileItems) => {

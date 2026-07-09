@@ -19,9 +19,16 @@ export function ThemeToggle({ className }: { className?: string }) {
       type="button"
       aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className={className ?? 'flex items-center gap-1 cursor-pointer hover:text-foreground'}
+      className={
+        className ??
+        'flex items-center gap-1 cursor-pointer hover:text-foreground'
+      }
     >
-      {mounted && isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      {mounted && isDark ? (
+        <Sun className="size-4" />
+      ) : (
+        <Moon className="size-4" />
+      )}
     </button>
   );
 }
