@@ -41,14 +41,14 @@ export default function DocumentPreviewItem({
         <img
           src={secureUrl}
           alt={`${label} registrada`}
-          className="h-24 w-full rounded border border-input bg-white object-contain"
+          className="h-24 w-full rounded border border-input bg-muted object-contain"
         />
       ) : (
         <a
           href={secureUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded border border-input bg-white p-3 text-sm text-primary hover:underline"
+          className="flex items-center gap-2 rounded border border-input bg-muted p-3 text-sm text-primary hover:underline"
         >
           <FileText className="size-5 shrink-0" />
           Ver documento (PDF)

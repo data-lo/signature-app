@@ -28,11 +28,11 @@ export default async function ErrorPage({ searchParams }: ErrorPageProps) {
   const isClientError = statusCode >= 400 && statusCode < 500;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-        <div className={`mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center ${isClientError ? 'bg-orange-100' : 'bg-red-100'}`}>
+    <div className="min-h-screen bg-muted flex items-center justify-center p-4">
+      <div className="bg-card p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+        <div className={`mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center ${isClientError ? 'bg-orange-100 dark:bg-orange-500/10' : 'bg-red-100 dark:bg-red-500/10'}`}>
           <svg
-            className={`w-8 h-8 ${isClientError ? 'text-orange-600' : 'text-red-600'}`}
+            className={`w-8 h-8 ${isClientError ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400'}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -45,9 +45,9 @@ export default async function ErrorPage({ searchParams }: ErrorPageProps) {
             />
           </svg>
         </div>
-        <p className="text-sm font-medium text-gray-400 mb-1">Error {statusCode}</p>
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">{statusDescription}</h1>
-        <p className="text-gray-500 text-sm">{errorMessage}</p>
+        <p className="text-sm font-medium text-muted-foreground mb-1">Error {statusCode}</p>
+        <h1 className="text-2xl font-bold text-foreground mb-3">{statusDescription}</h1>
+        <p className="text-muted-foreground text-sm">{errorMessage}</p>
       </div>
     </div>
   );

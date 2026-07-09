@@ -62,7 +62,7 @@ export default function DocumentDropzone({
           <img
             src={previewUrl}
             alt={`Vista previa de ${label}`}
-            className="h-16 w-16 rounded object-contain bg-white"
+            className="h-16 w-16 rounded object-contain bg-muted"
           />
         ) : file ? (
           <FileText className="h-10 w-10 shrink-0 text-muted-foreground" aria-hidden />

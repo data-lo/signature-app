@@ -15,8 +15,8 @@ export default function LandingFeatureSection({
     <section className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-10 px-8 py-16 md:grid-cols-2">
       <div className={reverse ? 'md:order-2' : undefined}>{visual}</div>
       <div className={reverse ? 'md:order-1' : undefined}>
-        <h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
-        <p className="mt-4 text-sm text-gray-500">{description}</p>
+        <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
+        <p className="mt-4 text-sm text-muted-foreground">{description}</p>
       </div>
     </section>
   );

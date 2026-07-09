@@ -15,12 +15,12 @@ export default function PdfPreview({ file }: PdfPreviewProps) {
   const [numPages, setNumPages] = useState(0);
 
   return (
-    <div className="flex h-full flex-col items-center gap-4 overflow-y-auto bg-gray-100 py-6">
+    <div className="flex h-full flex-col items-center gap-4 overflow-y-auto bg-muted py-6">
       <Document
         file={file}
         onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-        loading={<p className="mt-20 text-sm text-gray-500">Cargando documento...</p>}
-        error={<p className="mt-20 text-sm text-red-500">Error al cargar el documento.</p>}
+        loading={<p className="mt-20 text-sm text-muted-foreground">Cargando documento...</p>}
+        error={<p className="mt-20 text-sm text-destructive">Error al cargar el documento.</p>}
       >
         {Array.from({ length: numPages }, (_, i) => (
           <div key={i} className="shadow-xl">

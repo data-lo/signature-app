@@ -62,7 +62,7 @@ export function buildDocumentsFilterParams(filters: DocumentsFilters): Record<st
 }
 
 function FilterLabel({ children }: { children: React.ReactNode }) {
-  return <p className="mb-1.5 text-xs font-semibold tracking-wide text-gray-700">{children}</p>;
+  return <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground">{children}</p>;
 }
 
 interface DocumentsFilterPanelProps {
@@ -86,7 +86,7 @@ export default function DocumentsFilterPanel({
 
   return (
     <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
-      <h3 className="text-sm font-semibold text-gray-900">Filtrar documentos</h3>
+      <h3 className="text-sm font-semibold text-foreground">Filtrar documentos</h3>
 
       {showMyTurnFilter && (
         <div className="flex items-center justify-between gap-2">
@@ -98,7 +98,7 @@ export default function DocumentsFilterPanel({
       <div>
         <FilterLabel>Nombre del documento</FilterLabel>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Ingresa una palabra o frase"
             className="pl-8"
@@ -111,7 +111,7 @@ export default function DocumentsFilterPanel({
       <div>
         <FilterLabel>Firmantes y revisores</FilterLabel>
         <div className="relative">
-          <Users className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+          <Users className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar"
             className="pl-8"
@@ -146,7 +146,7 @@ export default function DocumentsFilterPanel({
         <FilterLabel>Fecha de firma</FilterLabel>
         <div className="flex items-center gap-2">
           <Input type="date" value={draft.signedFrom} onChange={(event) => update('signedFrom', event.target.value)} />
-          <span className="text-gray-400">→</span>
+          <span className="text-muted-foreground">→</span>
           <Input type="date" value={draft.signedTo} onChange={(event) => update('signedTo', event.target.value)} />
         </div>
       </div>
@@ -155,12 +155,12 @@ export default function DocumentsFilterPanel({
         <FilterLabel>Fecha de creación</FilterLabel>
         <div className="flex items-center gap-2">
           <Input type="date" value={draft.createdFrom} onChange={(event) => update('createdFrom', event.target.value)} />
-          <span className="text-gray-400">→</span>
+          <span className="text-muted-foreground">→</span>
           <Input type="date" value={draft.createdTo} onChange={(event) => update('createdTo', event.target.value)} />
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-4">
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
         <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(EMPTY_DOCUMENTS_FILTERS)}>
           Limpiar
         </Button>

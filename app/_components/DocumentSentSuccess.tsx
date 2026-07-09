@@ -17,8 +17,8 @@ export default function DocumentSentSuccess({ onGoToDocuments }: DocumentSentSuc
         </div>
       </div>
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">¡Has enviado el documento exitosamente!</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
+        <h2 className="text-lg font-semibold text-foreground">¡Has enviado el documento exitosamente!</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           Los firmantes recibirán por correo una invitación para firmar. Puedes ver quién ya ha firmado desde
           el listado de documentos en la sección &quot;Mis documentos&quot;.
         </p>

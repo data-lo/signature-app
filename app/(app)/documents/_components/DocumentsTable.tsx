@@ -86,7 +86,7 @@ function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1 cursor-pointer select-none">
       {children}
-      <ArrowUp className="size-3.5 text-gray-400" />
+      <ArrowUp className="size-3.5 text-muted-foreground" />
     </span>
   );
 }
@@ -133,7 +133,7 @@ export default function DocumentsTable({
         <TableBody>
           {documents.map((doc) => (
             <TableRow key={doc.id}>
-              <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700">
+              <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
                 <div className="flex items-start gap-1.5">
                   <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`} />
                   <span className="min-w-0 flex-1 break-words">{doc.fileName}</span>
@@ -143,7 +143,7 @@ export default function DocumentsTable({
                 {doc.signers.length > 0 ? (
                   <span>{doc.signers.join(', ')}</span>
                 ) : (
-                  <span className="italic text-gray-400">Sin firmantes asignados</span>
+                  <span className="italic text-muted-foreground">Sin firmantes asignados</span>
                 )}
               </TableCell>
               <TableCell>{formatDate(doc.createdAt)}</TableCell>
@@ -173,7 +173,7 @@ export default function DocumentsTable({
       </Table>
 
       <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>Documentos por página</span>
           <Select defaultValue="25">
             <SelectTrigger size="sm" className="w-16">
@@ -187,7 +187,7 @@ export default function DocumentsTable({
           </Select>
         </div>
 
-        <div className="flex items-center gap-1 text-gray-500">
+        <div className="flex items-center gap-1 text-muted-foreground">
           <Button
             variant="ghost"
             size="icon-sm"

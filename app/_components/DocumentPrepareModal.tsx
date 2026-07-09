@@ -40,33 +40,33 @@ export default function DocumentPrepareModal({ file, open, onOpenChange, onConti
             <DocumentPreviewPane file={file} />
           </div>
 
-          <div className="flex w-80 shrink-0 flex-col border-l border-gray-200">
+          <div className="flex w-80 shrink-0 flex-col border-l border-border">
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              <h2 className="mb-6 text-lg font-semibold text-gray-900">Configuración del documento</h2>
+              <h2 className="mb-6 text-lg font-semibold text-foreground">Configuración del documento</h2>
 
               <div className="mb-6">
-                <label className="mb-1.5 block text-xs font-semibold tracking-wide text-gray-700">
+                <label className="mb-1.5 block text-xs font-semibold tracking-wide text-muted-foreground">
                   Nombre del documento
                 </label>
                 <div className="relative">
                   <input
                     value={documentName}
                     onChange={(e) => setDocumentName(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 py-2 pl-2.5 pr-12 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    className="w-full rounded-md border border-input py-2 pl-2.5 pr-12 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   />
-                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                     .PDF
                   </span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-gray-700">¿Vas a firmar este documento?</span>
+                <span className="text-sm text-muted-foreground">¿Vas a firmar este documento?</span>
                 <Switch checked={willSign} onCheckedChange={setWillSign} />
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-4 border-t border-gray-200 p-6">
+            <div className="flex shrink-0 items-center gap-4 border-t border-border p-6">
               <Button
                 variant="brand"
                 onClick={() => {
@@ -79,7 +79,7 @@ export default function DocumentPrepareModal({ file, open, onOpenChange, onConti
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="text-sm font-semibold text-gray-500 hover:text-gray-700"
+                className="text-sm font-semibold text-muted-foreground hover:text-foreground"
               >
                 CANCELAR
               </button>

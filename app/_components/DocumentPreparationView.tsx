@@ -176,13 +176,13 @@ export default function DocumentPreparationView({
   return (
     <main className="mx-auto max-w-7xl px-8 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Preparación del documento</h1>
+        <h1 className="text-lg font-semibold text-foreground">Preparación del documento</h1>
         <div className="flex overflow-hidden rounded-md">
           <button
             type="button"
             onClick={() => setActiveTab('preparacion')}
             className={`px-4 py-1.5 text-xs font-semibold tracking-wide ${
-              activeTab === 'preparacion' ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-600'
+              activeTab === 'preparacion' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
             }`}
           >
             PREPARACIÓN
@@ -191,7 +191,7 @@ export default function DocumentPreparationView({
             type="button"
             onClick={() => setActiveTab('documento')}
             className={`px-4 py-1.5 text-xs font-semibold tracking-wide ${
-              activeTab === 'documento' ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-600'
+              activeTab === 'documento' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
             }`}
           >
             DOCUMENTO
@@ -202,14 +202,14 @@ export default function DocumentPreparationView({
       <div className="mt-6 flex gap-8">
         <div className="min-w-0 flex-1">
           {activeTab === 'documento' ? (
-            <div className="h-[70vh] overflow-hidden rounded-md border border-gray-200">
+            <div className="h-[70vh] overflow-hidden rounded-md border border-border">
               <DocumentPreviewPane file={file} />
             </div>
           ) : (
             <>
               <section>
-                <h2 className="text-base font-semibold text-gray-900">Añadir participantes</h2>
-                <div className="mt-2 flex items-center gap-1.5 text-sm text-gray-400">
+                <h2 className="text-base font-semibold text-foreground">Añadir participantes</h2>
+                <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
                   <span>Añadir revisores: ¿Se necesita un visto bueno para este documento?</span>
                   <CircleHelp className="size-3.5" />
                   <span className="ml-auto shrink-0 cursor-pointer text-sm font-medium text-emerald-600 hover:underline">
@@ -217,15 +217,15 @@ export default function DocumentPreparationView({
                   </span>
                 </div>
 
-                <div className="mt-4 rounded-md bg-gray-100 p-4">
-                  <span className="inline-block rounded-md bg-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-700">
+                <div className="mt-4 rounded-md bg-muted p-4">
+                  <span className="inline-block rounded-md bg-background px-4 py-1.5 text-xs font-semibold text-muted-foreground">
                     Firmantes
                   </span>
 
                   {signers.length === 0 ? (
-                    <div className="mt-3 flex flex-col items-center justify-center gap-3 rounded-md bg-white py-10 text-center">
-                      <UserPlus className="size-8 text-gray-300" />
-                      <p className="max-w-xs text-sm text-gray-500">
+                    <div className="mt-3 flex flex-col items-center justify-center gap-3 rounded-md bg-background py-10 text-center">
+                      <UserPlus className="size-8 text-muted-foreground" />
+                      <p className="max-w-xs text-sm text-muted-foreground">
                         Da clic en &quot;Añadir firmante&quot; para agregar a cada persona que deba firmar este
                         documento.
                       </p>
@@ -255,8 +255,8 @@ export default function DocumentPreparationView({
               </section>
 
               <section className="mt-8">
-                <h2 className="text-base font-semibold text-gray-900">Añadir espectadores</h2>
-                <p className="mt-2 max-w-xl text-sm text-gray-500">
+                <h2 className="text-base font-semibold text-foreground">Añadir espectadores</h2>
+                <p className="mt-2 max-w-xl text-sm text-muted-foreground">
                   Los espectadores son notificados cada vez que alguien firma el documento y también reciben
                   una copia del documento firmado en su correo.
                 </p>
@@ -287,14 +287,14 @@ export default function DocumentPreparationView({
           )}
         </div>
 
-        <aside className="w-80 shrink-0 rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">Documento</h2>
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <FileText className="size-5 text-gray-400" />
+        <aside className="w-80 shrink-0 rounded-lg border border-border bg-background p-6">
+          <h2 className="mb-4 text-base font-semibold text-foreground">Documento</h2>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <FileText className="size-5 text-muted-foreground" />
             {documentName}.pdf
           </div>
 
-          <div className="mt-6 flex items-center gap-1.5 text-sm text-gray-400">
+          <div className="mt-6 flex items-center gap-1.5 text-sm text-muted-foreground">
             <span>Fecha de expiración</span>
             <CircleHelp className="size-3.5" />
             <span className="ml-auto shrink-0 cursor-pointer text-sm font-medium text-emerald-600 hover:underline">
@@ -303,9 +303,9 @@ export default function DocumentPreparationView({
           </div>
 
           <div className="mt-6">
-            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground">
               Recordatorios
-              <Bell className="size-3.5 text-gray-400" />
+              <Bell className="size-3.5 text-muted-foreground" />
             </label>
             <Select defaultValue="3d">
               <SelectTrigger className="w-full">
@@ -320,9 +320,9 @@ export default function DocumentPreparationView({
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-sm text-gray-700">
+            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
               Mensaje para participantes
-              <CircleHelp className="size-3.5 text-gray-400" />
+              <CircleHelp className="size-3.5 text-muted-foreground" />
             </span>
             <Switch checked={participantMessageEnabled} onCheckedChange={setParticipantMessageEnabled} />
           </div>
@@ -336,11 +336,11 @@ export default function DocumentPreparationView({
                 placeholder="Hola, fírmalo por favor."
                 className="min-h-20"
               />
-              <p className="mt-1 text-xs text-gray-400">Límite de 500 caracteres</p>
+              <p className="mt-1 text-xs text-muted-foreground">Límite de 500 caracteres</p>
             </div>
           )}
 
-          <p className="mt-6 text-xs text-gray-500">
+          <p className="mt-6 text-xs text-muted-foreground">
             Por favor, revisa el documento que estás preparando y los correos de los firmantes. Cuando estés
             listo para solicitar las firmas, da clic en el botón de &quot;Solicitar firmas&quot;.
           </p>
@@ -353,7 +353,7 @@ export default function DocumentPreparationView({
           <button
             type="button"
             onClick={onCancel}
-            className="mt-3 w-full text-sm font-semibold text-gray-500 hover:text-gray-700"
+            className="mt-3 w-full text-sm font-semibold text-muted-foreground hover:text-muted-foreground"
           >
             CANCELAR
           </button>

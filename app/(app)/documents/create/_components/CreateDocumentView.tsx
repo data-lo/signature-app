@@ -54,11 +54,11 @@ export default function CreateDocumentView() {
 
   return (
     <main className="mx-auto max-w-7xl px-8 py-8">
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h1 className="text-base font-semibold text-gray-900">
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h1 className="text-base font-semibold text-foreground">
           Prepara un documento para solicitar que sea firmado
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           El documento debe estar en formato PDF y pesar menos de 20 MB.
         </p>
 
@@ -99,7 +99,7 @@ export default function CreateDocumentView() {
               {file ? (
                 <PdfPreview file={file} />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   La previsualización del documento aparecerá aquí
                 </div>
               )}
@@ -108,7 +108,7 @@ export default function CreateDocumentView() {
         </form>
       </div>
 
-      <div className="mt-8 border-t border-gray-200 pt-6">
+      <div className="mt-8 border-t border-border pt-6">
         <DocumentsTable
           documents={myDocuments?.documents ?? []}
           page={myDocuments?.meta.page}

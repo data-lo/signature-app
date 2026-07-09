@@ -70,7 +70,7 @@ export default function SignDocumentView({ documentId }: SignDocumentViewProps) 
           </CardHeader>
           <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
             <p>
-              Solicitado por <span className="font-medium text-gray-900">{document.creator}</span>
+              Solicitado por <span className="font-medium text-foreground">{document.creator}</span>
             </p>
           </CardContent>
         </Card>
@@ -81,9 +81,9 @@ export default function SignDocumentView({ documentId }: SignDocumentViewProps) 
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {document.participants.map((participant) => (
-              <div key={participant.userId} className="flex flex-col gap-0.5 border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+              <div key={participant.userId} className="flex flex-col gap-0.5 border-b border-border pb-2 last:border-0 last:pb-0">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-gray-900">{participant.name}</span>
+                  <span className="font-medium text-foreground">{participant.name}</span>
                   <span
                     className={
                       participant.status === 'signed'
@@ -100,7 +100,9 @@ export default function SignDocumentView({ documentId }: SignDocumentViewProps) 
                   {participant.role === 'signer' ? 'Firmante' : 'Espectador'}
                 </span>
                 {participant.rejectionReason && (
-                  <p className="mt-1 rounded bg-red-50 p-2 text-xs text-red-700">{participant.rejectionReason}</p>
+                  <p className="mt-1 rounded bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">
+                    {participant.rejectionReason}
+                  </p>
                 )}
               </div>
             ))}
@@ -124,8 +126,8 @@ export default function SignDocumentView({ documentId }: SignDocumentViewProps) 
         )}
 
         {document.canReject && showRejectForm && (
-          <form onSubmit={handleSubmit(onReject)} className="flex flex-col gap-2 rounded-lg border border-gray-200 p-4">
-            <p className="text-sm font-medium text-gray-900">¿Cuál es el problema con el documento?</p>
+          <form onSubmit={handleSubmit(onReject)} className="flex flex-col gap-2 rounded-lg border border-border p-4">
+            <p className="text-sm font-medium text-foreground">¿Cuál es el problema con el documento?</p>
             <Textarea
               placeholder="Explica detalladamente por qué rechazas este documento."
               {...register('reason')}

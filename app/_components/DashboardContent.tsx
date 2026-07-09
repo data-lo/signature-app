@@ -98,7 +98,7 @@ export default function DashboardContent() {
     <main className="mx-auto max-w-7xl px-8 py-8">
       <DocumentUploadFlow onContinueToPreparation={setPreparingDocument} />
 
-      <div className="mt-8 flex items-center justify-end gap-4 border-t border-gray-200 pt-4 text-xs text-gray-600">
+      <div className="mt-8 flex items-center justify-end gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-amber-400" />
           En progreso

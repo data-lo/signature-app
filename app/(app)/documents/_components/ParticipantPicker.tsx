@@ -66,7 +66,7 @@ export default function ParticipantPicker({
           {selectedUsers.map((user, index) => (
             <li
               key={user.id}
-              className="flex items-center justify-between rounded border border-input bg-white px-3 py-1.5 text-sm"
+              className="flex items-center justify-between rounded border border-input bg-background px-3 py-1.5 text-sm"
             >
               <span>
                 {showOrder && <span className="mr-2 font-semibold text-emerald-600">{index + 1}.</span>}

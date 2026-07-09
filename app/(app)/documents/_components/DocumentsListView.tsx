@@ -31,15 +31,15 @@ export default function DocumentsListView() {
 
   return (
     <main className="mx-auto max-w-7xl px-8 py-8">
-      <div className="mb-6 flex items-center gap-2 border-b border-gray-200">
+      <div className="mb-6 flex items-center gap-2 border-b border-border">
         <button
           type="button"
           onClick={() => handleTabChange('pending')}
           className={cn(
             'border-b-2 px-4 py-2 text-sm font-semibold tracking-wide',
             tab === 'pending'
-              ? 'border-emerald-500 text-gray-900'
-              : 'border-transparent text-gray-500 hover:text-gray-700',
+              ? 'border-emerald-500 text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
           )}
         >
           PENDIENTES
@@ -50,15 +50,15 @@ export default function DocumentsListView() {
           className={cn(
             'border-b-2 px-4 py-2 text-sm font-semibold tracking-wide',
             tab === 'signed'
-              ? 'border-emerald-500 text-gray-900'
-              : 'border-transparent text-gray-500 hover:text-gray-700',
+              ? 'border-emerald-500 text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
           )}
         >
           FIRMADOS
         </button>
       </div>
 
-      <h1 className="mb-4 text-lg font-semibold text-gray-900">
+      <h1 className="mb-4 text-lg font-semibold text-foreground">
         {tab === 'pending' ? 'Tus documentos pendientes' : 'Tus documentos firmados'}
       </h1>
 

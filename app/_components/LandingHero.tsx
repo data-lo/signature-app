@@ -4,10 +4,10 @@ import { FileText } from 'lucide-react';
 export default function LandingHero() {
   return (
     <section className="px-8 py-16 text-center">
-      <h1 className="mx-auto max-w-3xl text-3xl font-semibold leading-tight text-gray-900 sm:text-4xl">
+      <h1 className="mx-auto max-w-3xl text-3xl font-semibold leading-tight text-foreground sm:text-4xl">
         Todo lo que necesitas para firmar y gestionar documentos digitalmente en un solo lugar
       </h1>
-      <p className="mx-auto mt-4 max-w-xl text-sm text-gray-500">
+      <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground">
         Diseñado cuidadosamente para ofrecer la mejor experiencia a tus firmantes y a tu equipo.
       </p>
 
@@ -20,7 +20,7 @@ export default function LandingHero() {
         </Link>
         <Link
           href="/login"
-          className="rounded-md border border-gray-300 px-6 py-2.5 text-sm font-semibold tracking-wide text-gray-700 hover:bg-gray-50"
+          className="rounded-md border border-border px-6 py-2.5 text-sm font-semibold tracking-wide text-muted-foreground hover:bg-muted"
         >
           INICIAR SESIÓN
         </Link>
