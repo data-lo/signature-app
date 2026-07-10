@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   ArrowUp,
   ChevronDown,
@@ -7,6 +8,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import DocumentsFilterButton from './DocumentsFilterButton';
+import DocumentPreviewDialog from './DocumentPreviewDialog';
 import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
@@ -114,6 +117,8 @@ export default function DocumentsTable({
   showMyTurnFilter,
   showStatusFilter,
 }: DocumentsTableProps) {
+  const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
+
   return (
     <div className="flex-1 min-w-0">
       {onFiltersChange && (
@@ -187,6 +192,16 @@ export default function DocumentsTable({
                       <ChevronDown className="size-3.5" />
                     </Button>
                   )}
+                  {doc.status === 'signed' && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Previsualizar documento firmado"
+                      onClick={() => setPreviewDoc(doc)}
+                    >
+                      <Eye className="size-4" />
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -247,6 +262,12 @@ export default function DocumentsTable({
           </Button>
         </div>
       </div>
+
+      <DocumentPreviewDialog
+        documentId={previewDoc?.id ?? null}
+        fileName={previewDoc?.fileName}
+        onOpenChange={(open) => !open && setPreviewDoc(null)}
+      />
     </div>
   );
 }
