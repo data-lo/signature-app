@@ -1,4 +1,5 @@
 import apiClient from '@/lib/axios';
+import axios from 'axios'; // 🟩 Importante importar axios para validar el tipo de error
 import type { LoginFormValues } from './_schemas';
 
 interface LoginResponseData {
