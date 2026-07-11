@@ -11,10 +11,13 @@ interface RegisterResponseData {
   nationalId: string;
 }
 
-export async function registerRequest(values: RegisterFormValues): Promise<RegisterResponseData> {
-  const { data } = await apiClient.post<{ success: boolean; message: string; data: RegisterResponseData }>(
-    '/auth/register',
-    values,
-  );
+export async function registerRequest(
+  values: RegisterFormValues,
+): Promise<RegisterResponseData> {
+  const { data } = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: RegisterResponseData;
+  }>('/auth/register', values);
   return data.data;
 }

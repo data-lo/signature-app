@@ -9,7 +9,9 @@ interface DocumentUploadZoneProps {
   onFileSelected: (file: File) => void;
 }
 
-export default function DocumentUploadZone({ onFileSelected }: DocumentUploadZoneProps) {
+export default function DocumentUploadZone({
+  onFileSelected,
+}: DocumentUploadZoneProps) {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,10 +45,10 @@ export default function DocumentUploadZone({ onFileSelected }: DocumentUploadZon
   return (
     <section>
       <div className="flex items-baseline justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">
+        <h1 className="text-lg font-semibold text-foreground">
           Prepara un documento para solicitar que sea firmado
         </h1>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           El documento debe estar en formato PDF y pesar menos de 20 MB
         </p>
       </div>
@@ -58,10 +60,10 @@ export default function DocumentUploadZone({ onFileSelected }: DocumentUploadZon
         }}
         onDragLeave={() => setIsDraggingOver(false)}
         onDrop={handleDrop}
-        className={`mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed py-8 text-sm text-gray-500 ${
+        className={`mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed py-8 text-sm text-muted-foreground ${
           isDraggingOver
-            ? 'border-emerald-400 bg-emerald-50/30'
-            : 'border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50/30'
+            ? 'border-emerald-400 bg-emerald-50/30 dark:bg-emerald-500/10'
+            : 'border-gray-300 bg-background hover:border-emerald-400 hover:bg-emerald-50/30 dark:border-gray-700 dark:hover:bg-emerald-500/10'
         }`}
       >
         <input
@@ -71,10 +73,12 @@ export default function DocumentUploadZone({ onFileSelected }: DocumentUploadZon
           className="hidden"
           onChange={handleInputChange}
         />
-        <CloudUpload className="size-5 text-gray-400" />
+        <CloudUpload className="size-5 text-muted-foreground" />
         <span>
           Arrastra tu documento en la página o{' '}
-          <span className="text-emerald-600 hover:underline">da clic aquí para seleccionar uno</span>
+          <span className="text-emerald-600 hover:underline">
+            da clic aquí para seleccionar uno
+          </span>
         </span>
       </label>
 

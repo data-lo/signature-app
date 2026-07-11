@@ -10,15 +10,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { registered } = await searchParams;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <div className="flex flex-col gap-6 max-w-md w-full">
         <Link href="/" className="flex items-center justify-center gap-2">
           <FileSignature className="size-6 text-emerald-500" />
-          <span className="text-lg font-semibold tracking-tight text-gray-900">Signature</span>
+          <span className="text-lg font-semibold tracking-tight text-foreground">
+            Signature
+          </span>
         </Link>
 
         {registered === '1' && (
-          <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2 text-sm text-center">
+          <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2 text-sm text-center dark:bg-green-950 dark:text-green-300 dark:border-green-900">
             Cuenta creada correctamente, inicia sesión
           </div>
         )}

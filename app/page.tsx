@@ -24,15 +24,21 @@ function ParticipantsVisual() {
         </span>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[10px] font-semibold tracking-wide text-gray-500">CORREO ELECTRÓNICO</p>
+            <p className="text-[10px] font-semibold tracking-wide text-gray-500">
+              CORREO ELECTRÓNICO
+            </p>
             <div className="mt-1 h-6 rounded-md border border-gray-200" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold tracking-wide text-gray-500">NOMBRE</p>
+            <p className="text-[10px] font-semibold tracking-wide text-gray-500">
+              NOMBRE
+            </p>
             <div className="mt-1 h-6 rounded-md border border-gray-200" />
           </div>
         </div>
-        <p className="mt-3 text-xs font-semibold text-emerald-600">+ Añadir firmante</p>
+        <p className="mt-3 text-xs font-semibold text-emerald-600">
+          + Añadir firmante
+        </p>
       </div>
 
       <div className="mt-4 rounded-lg bg-white p-4 shadow-sm">
@@ -41,11 +47,15 @@ function ParticipantsVisual() {
         </span>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[10px] font-semibold tracking-wide text-gray-500">CORREO ELECTRÓNICO</p>
+            <p className="text-[10px] font-semibold tracking-wide text-gray-500">
+              CORREO ELECTRÓNICO
+            </p>
             <div className="mt-1 h-6 rounded-md border border-gray-200" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold tracking-wide text-gray-500">NOMBRE</p>
+            <p className="text-[10px] font-semibold tracking-wide text-gray-500">
+              NOMBRE
+            </p>
             <div className="mt-1 h-6 rounded-md border border-gray-200" />
           </div>
         </div>
@@ -56,7 +66,7 @@ function ParticipantsVisual() {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <LandingNavbar />
       <LandingHero />
       <LandingTrustBar />

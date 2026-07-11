@@ -4,11 +4,13 @@ import { FileText } from 'lucide-react';
 export default function LandingHero() {
   return (
     <section className="px-8 py-16 text-center">
-      <h1 className="mx-auto max-w-3xl text-3xl font-semibold leading-tight text-gray-900 sm:text-4xl">
-        Todo lo que necesitas para firmar y gestionar documentos digitalmente en un solo lugar
+      <h1 className="mx-auto max-w-3xl text-3xl font-semibold leading-tight text-foreground sm:text-4xl">
+        Todo lo que necesitas para firmar y gestionar documentos digitalmente en
+        un solo lugar
       </h1>
-      <p className="mx-auto mt-4 max-w-xl text-sm text-gray-500">
-        Diseñado cuidadosamente para ofrecer la mejor experiencia a tus firmantes y a tu equipo.
+      <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground">
+        Diseñado cuidadosamente para ofrecer la mejor experiencia a tus
+        firmantes y a tu equipo.
       </p>
 
       <div className="mt-8 flex items-center justify-center gap-4">
@@ -20,7 +22,7 @@ export default function LandingHero() {
         </Link>
         <Link
           href="/login"
-          className="rounded-md border border-gray-300 px-6 py-2.5 text-sm font-semibold tracking-wide text-gray-700 hover:bg-gray-50"
+          className="rounded-md border border-border px-6 py-2.5 text-sm font-semibold tracking-wide text-muted-foreground hover:bg-muted"
         >
           INICIAR SESIÓN
         </Link>
@@ -44,14 +46,18 @@ export default function LandingHero() {
           </div>
 
           <div className="rounded-lg bg-white p-4 text-left shadow-sm">
-            <p className="text-sm font-semibold text-gray-900">Ingresa la información del firmante</p>
+            <p className="text-sm font-semibold text-gray-900">
+              Ingresa la información del firmante
+            </p>
             <label className="mt-3 block text-[10px] font-semibold tracking-wide text-gray-500">
               CORREO ELECTRÓNICO
             </label>
             <div className="mt-1 rounded-md border border-emerald-400 px-2 py-1.5 text-xs text-gray-700">
               luis@correo.com
             </div>
-            <p className="mt-3 text-[10px] font-semibold tracking-wide text-gray-500">MÉTODO DE FIRMA PERMITIDO</p>
+            <p className="mt-3 text-[10px] font-semibold tracking-wide text-gray-500">
+              MÉTODO DE FIRMA PERMITIDO
+            </p>
             <div className="mt-1.5 flex flex-col gap-1.5 text-xs text-gray-600">
               <span className="flex items-center gap-1.5">
                 <span className="flex size-3.5 items-center justify-center rounded-[3px] bg-emerald-500 text-[9px] text-white">
