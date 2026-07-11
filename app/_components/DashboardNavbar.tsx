@@ -16,6 +16,7 @@ import { useLogout } from '@/lib/hooks/useLogout';
 const navItems = [
   { label: 'GESTIONAR', href: '/dashboard' },
   { label: 'FIRMAR', href: '/documents' },
+  { label: 'PLANES', href: '/plans' },
 ];
 
 interface DashboardNavbarProps {
