@@ -1,32 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import DocumentUploadFlow from './DocumentUploadFlow';
-import DocumentsTable, {
-  type DocumentListItem,
-} from '../(app)/documents/_components/DocumentsTable';
+import DocumentsTable from '../(app)/documents/_components/DocumentsTable';
 import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from '../(app)/documents/_components/DocumentsFilterPanel';
-import DocumentPreparationView, {
-  type SignerEntry,
-} from './DocumentPreparationView';
+import DocumentPreparationView from './DocumentPreparationView';
 import { useDocumentsCount } from './DocumentsCountContext';
-
-const initialDocuments: DocumentListItem[] = [
-  {
-    id: '1',
-    fileName: '18._NOMENCLATURA_EXPEDIENTES_CONTRATACION',
-    fileType: 'application/pdf',
-    signers: ['isaay.sosa@data-lo.com'],
-    spectators: [],
-    creator: '—',
-    totalPages: 1,
-    status: 'signed',
-    createdAt: new Date(2026, 6, 4).toISOString(),
-  },
-];
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { useMyDocuments } from '../(app)/documents/create/_hooks/useMyDocuments';
 
 interface PreparingDocument {
   name: string;
@@ -35,65 +20,33 @@ interface PreparingDocument {
 }
 
 export default function DashboardContent() {
-  const [documents, setDocuments] =
-    useState<DocumentListItem[]>(initialDocuments);
+  const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DocumentsFilters>(
     EMPTY_DOCUMENTS_FILTERS,
   );
   const [preparingDocument, setPreparingDocument] =
     useState<PreparingDocument | null>(null);
   const { setDocumentsCount } = useDocumentsCount();
+  const queryClient = useQueryClient();
+
+  const { data: currentUser } = useCurrentUser();
+  const { data: documentsResult } = useMyDocuments(
+    currentUser?.email,
+    page,
+    filters,
+  );
 
   useEffect(() => {
-    setDocumentsCount(documents.length);
-  }, [documents.length, setDocumentsCount]);
+    if (documentsResult) setDocumentsCount(documentsResult.meta.total);
+  }, [documentsResult, setDocumentsCount]);
 
-  const filteredDocuments = useMemo(() => {
-    return documents.filter((doc) => {
-      if (
-        filters.fileName &&
-        !doc.fileName.toLowerCase().includes(filters.fileName.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.participantName &&
-        !doc.signers.some((signer) =>
-          signer.toLowerCase().includes(filters.participantName.toLowerCase()),
-        )
-      ) {
-        return false;
-      }
-      if (filters.status && doc.status !== filters.status) {
-        return false;
-      }
-      const createdAt = new Date(doc.createdAt);
-      if (filters.createdFrom && createdAt < new Date(filters.createdFrom)) {
-        return false;
-      }
-      if (filters.createdTo && createdAt > new Date(filters.createdTo)) {
-        return false;
-      }
-      return true;
-    });
-  }, [documents, filters]);
+  function handleFiltersChange(nextFilters: DocumentsFilters) {
+    setFilters(nextFilters);
+    setPage(1);
+  }
 
-  function handleRequestSignatures(signers: SignerEntry[]) {
-    if (!preparingDocument) return;
-    setDocuments((prev) => [
-      {
-        id: crypto.randomUUID(),
-        fileName: preparingDocument.name,
-        fileType: preparingDocument.file.type,
-        signers: signers.map((entry) => entry.email),
-        spectators: [],
-        creator: '—',
-        totalPages: 1,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  function handleRequestSignatures() {
+    queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
   }
 
   if (preparingDocument) {
@@ -124,9 +77,14 @@ export default function DashboardContent() {
 
       <div className="mt-6">
         <DocumentsTable
-          documents={filteredDocuments}
+          documents={documentsResult?.documents ?? []}
+          page={documentsResult?.meta.page}
+          totalPages={documentsResult?.meta.totalPages}
+          hasNextPage={documentsResult?.meta.hasNextPage}
+          hasPrevPage={documentsResult?.meta.hasPrevPage}
+          onPageChange={setPage}
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={handleFiltersChange}
         />
       </div>
     </main>
