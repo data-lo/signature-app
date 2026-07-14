@@ -70,6 +70,14 @@ export default function SignupForm() {
             />
 
             <TextField
+              id="rfc"
+              label="RFC"
+              maxLength={13}
+              error={errors.rfc}
+              {...register('rfc')}
+            />
+
+            <TextField
               id="password"
               label="Contraseña"
               type="password"
