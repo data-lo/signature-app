@@ -36,3 +36,24 @@ export const personalDocumentsSchema = z.object({
 export type PersonalDocumentsFormValues = z.infer<
   typeof personalDocumentsSchema
 >;
+
+export const updatePersonalInfoSchema = z.object({
+  phoneNumber: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{7,15}$/, {
+      message: 'El teléfono debe tener entre 7 y 15 dígitos',
+    })
+    .optional()
+    .or(z.literal('')),
+  secondaryEmail: z
+    .string()
+    .trim()
+    .email({ message: 'Correo electrónico inválido' })
+    .optional()
+    .or(z.literal('')),
+});
+
+export type UpdatePersonalInfoFormValues = z.infer<
+  typeof updatePersonalInfoSchema
+>;

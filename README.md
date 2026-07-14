@@ -56,7 +56,7 @@ Antes de poder firmar cualquier documento, el usuario debe subir su rúbrica (PN
 
 `DocumentsListView`: pestañas "Pendientes"/"Firmados", lista documentos donde el usuario es participante (`GET /document?participantEmail=...`) con filtros por nombre, participante, estado y fechas, y un toggle "solo mi turno". Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final.
 
-> ⚠️ Ver la sección de **Pendientes** más abajo: existe un segundo flujo de "subir documento" en `/dashboard` que **no está conectado al backend** — es un prototipo en memoria, no el flujo real descrito arriba.
+> `/dashboard` (primer punto de entrada tras login) renderiza el mismo componente `CreateDocumentView` que `/documents/create` — ya no existe un flujo mock/en memoria separado.
 
 ---
 
@@ -72,7 +72,7 @@ app/
 ├── _components/               → compartidos entre landing y el flujo mock del dashboard
 └── (app)/                    → route group protegido por middleware
     ├── layout.tsx             → DashboardNavbar + DocumentsCountProvider
-    ├── dashboard/             → "/dashboard" — prototipo mock, NO conectado al backend (ver Pendientes)
+    ├── dashboard/             → "/dashboard" — renderiza el mismo flujo real que "/documents/create" (ver Pendientes)
     ├── documents/
     │   ├── page.tsx           → "/documents" — listado real (GET /document)
     │   ├── create/            → "/documents/create" — flujo real de creación ⭐
@@ -98,7 +98,7 @@ Solo `auth` y `plans` tienen su capa de API centralizada en `lib/api/`; el resto
 
 ### Cliente HTTP (`lib/axios.ts`)
 
-- `baseURL`: `process.env.NEXT_PUBLIC_API_BASE_URL` (fallback hardcodeado `http://localhost:4000` — ⚠️ ver Pendientes, revisar consistencia con `.env.local`).
+- `baseURL`: `process.env.NEXT_PUBLIC_API_BASE_URL` (fallback hardcodeado `http://localhost:3000`, consistente con `.env.local` y el puerto real del backend).
 - Interceptor de request: agrega `Authorization: Bearer <token>` leyendo la cookie.
 - Interceptor de response: si `401`, limpia la cookie y fuerza redirección a `/login`. No hay refresh token.
 
@@ -191,20 +191,20 @@ Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) co
 
 ## 8. Pendientes / trabajo futuro
 
-### Flujo de documentos duplicado
-`/dashboard` (primer punto de entrada tras login) contiene un flujo completo de "subir documento y agregar firmantes" (`DocumentUploadFlow`/`DocumentPrepareModal`/`SignerFormCard`/`SpectatorFormCard`) que es un **prototipo puramente en memoria**: no llama a `lib/api`, valida con regex manuales (duplicando lo que ya hace Zod en `documents/create`), y permite capturar campos que no existen en el backend real (RFC del firmante, elegir "firma avanzada e.firma" vs "firma simple"). Al confirmar, solo agrega el documento a un `useState` que se pierde al recargar. **Pendiente**: decidir si el dashboard debe redirigir/reusar el flujo real de `/documents/create`, o eliminarse / marcarse explícitamente como demo.
+### Resuelto recientemente
+- **Flujo de documentos duplicado**: el prototipo en memoria de `/dashboard` (`DocumentUploadFlow`/`DocumentPrepareModal`/`SignerFormCard`/`SpectatorFormCard`/`DocumentPreviewPane`) fue eliminado. `/dashboard` ahora renderiza el mismo `CreateDocumentView` real que `/documents/create` (mismos hooks, mismo `lib/api`, misma validación Zod de `documents/create/_schemas.ts`).
+- **Duplicados en la creación de documentos**: el backend ahora rechaza (`400`) seleccionar al mismo usuario dos veces entre firmantes/espectadores, y rechaza crear un documento con el mismo nombre de archivo que otro documento propio en estatus `CREATED`/`PENDING` (`DocumentService.create`).
+- **Edición de información personal**: `/personal-documents` (`UserInfoCard`) permite editar `phoneNumber` y `secondaryEmail` vía `PATCH /user/personal-information`. `name`, `lastName`, `curp` y `rfc` son campos de identidad y **no son editables por diseño**: el backend los quitó de `UpdatePersonalInformationDto` (no solo el frontend deja de mandarlos, el endpoint los rechaza si algún otro cliente los envía). El CURP tampoco es editable vía `PATCH /user/:id` (se quitó de `UpdateUserDto`) — se fija una sola vez al crear/registrar el usuario.
+- **Firma electrónica avanzada vs simple**: se eliminó del proyecto (landing y cualquier mención de "e.firma"/firma avanzada). El producto solo ofrece firma electrónica simple, resuelta por la credencial (rúbrica + INE) registrada en `/personal-documents`.
+- **Previews unificados**: se eliminó `DocumentPreviewPane` (duplicado); todo el proyecto usa `PdfPreview` (`documents/_components/`), que ya soporta ancho responsivo y `File | string`.
+- **`useSubmitForAuthorization`**: confirmado como código muerto (la lógica real vive en `useCreateDocument`) y eliminado.
+- **Puerto por defecto**: el fallback de `lib/axios.ts` ahora es `http://localhost:3000`, consistente con `.env.local` y con el backend.
+- **`console.log` de depuración**: eliminado de `app/login/_requests.ts`.
+- **Seguridad del JWT en `middleware.ts`**: se confirmó que el backend valida la firma del JWT en cada request (`JwtAuthGuard` usa `jwtService.verifyAsync`, no solo decodifica) salvo en rutas `@Public()`/`@SkipJwtAuth()`. El decode sin verificar en el frontend sigue siendo solo una optimización de UX (evitar flashes de contenido protegido) — no es ni pretende ser una capa de seguridad real.
+- **Nombre de documento duplicado**: `useCreateDocument` ya mostraba un toast de error con el mensaje del backend; se agregó además un mensaje inline debajo del botón "Firmar" en `CreateDocumentView` para que el error de nombre duplicado (o de participante repetido) quede visible junto al formulario, no solo en el toast.
+- **Usuario duplicado (CURP/email)**: el backend ya rechazaba emails duplicados; ahora también rechaza (`409`) un CURP ya registrado por otro usuario activo, tanto en `POST /auth/register` como en `POST /user`. Como el CURP ya no es editable después de crear el usuario (ver punto anterior), esta validación solo aplica al crear/registrar, no a ninguna actualización. El **nombre y apellido sí pueden repetirse entre usuarios distintos** — solo CURP y correo son campos de unicidad. `useRegister` ahora muestra tanto el mensaje inline (ya existía) como un toast de error con el mensaje del backend.
+- **Modal de confirmación al eliminar INE/firma**: se reemplazó el `window.confirm` nativo en `PersonalDocumentsCompleted` y `PersonalDocumentsPartial` por un componente `DeleteConfirmDialog` (basado en `components/ui/dialog`), consistente con el resto de la UI.
+- **Toasts de éxito**: se auditaron todos los `useMutation` del proyecto. Solo faltaba en `useRegister` (creación de cuenta) — se agregó `toast.success('Cuenta creada correctamente')`. El resto de flujos de creación/actualización (`useCreateDocument`, `useSignDocument`, `useRejectDocument`, `useUploadPersonalDocuments`, `useUpdatePersonalDocument`, `useUpdatePersonalInformation`) ya tenían su toast de éxito. `useLogin`/`useLogout` (no son creación/actualización) y `useCreateCheckoutSession` (redirige de inmediato a Stripe) se dejaron sin toast a propósito.
 
-### Backend nuevo sin consumir en el frontend
-El backend expone ahora `PATCH /user/personal-information` para editar `name`, `lastName`, `curp`, `rfc`, `phoneNumber`, `secondaryEmail` (entidad `PersonalInformation`, separada de la credencial de firma). El frontend **todavía no tiene ninguna pantalla que consuma este endpoint** — `/personal-documents` solo maneja `signature`/`officialFile`. Pendiente agregar un formulario de información personal (probablemente en `/personal-documents` o una nueva sección) que use `useCurrentUser` para leer los datos actuales y llame a este endpoint para actualizarlos.
-
-### Firma electrónica avanzada vs simple
-El landing y el flujo mock del dashboard mencionan "firma electrónica avanzada (e.firma)" vs "firma simple", pero el flujo real de firma (`/documents/[documentId]`) no distingue entre tipos de firma ni pide ningún dato adicional (OTP, e.firma) antes de llamar a `PATCH /document/:id/sign`. Confirmar con el equipo si esto es intencional (la "firma" ya está resuelta por la credencial subida en `/personal-documents`) antes de documentarlo como definitivo, o si falta ese paso.
-
-### Limpieza técnica
-- `PdfPreview` (`documents/_components/`) y `DocumentPreviewPane` (`_components/` raíz) son casi idénticos — candidatos a unificar en un solo componente.
-- `useSubmitForAuthorization` (`documents/create/_hooks/`) parece código muerto: la lógica de "enviar a firma" ya vive dentro de `useCreateDocument`, que llama a `submitForAuthorizationRequest` directamente. Confirmar y eliminar si no se usa en ningún otro flujo.
-- Inconsistencia de puerto por defecto: `.env.local` apunta a `http://localhost:3000`, pero el fallback hardcodeado en `lib/axios.ts` es `http://localhost:4000`. Confirmar el puerto real del backend y dejarlo documentado para evitar errores al levantar el entorno local.
-- `console.log` de depuración olvidado en `app/login/_requests.ts` (imprime `NEXT_PUBLIC_API_BASE_URL` en cada login).
-
-### Seguridad (nota, no necesariamente pendiente)
-`middleware.ts` decodifica el JWT sin verificar su firma (solo revisa `exp`). Es aceptable como optimización de UX siempre que el backend siga validando la firma en cada request — dejar claro en el código/documentación que no es una capa de seguridad real, para que nadie confíe en ella como tal.
+### Ideas descartadas junto con el prototipo del dashboard
+El prototipo mock incluía UI para "recordatorios" (frecuencia de reenvío), "mensaje para participantes" y "fecha de expiración" del documento. Ninguna tiene respaldo en el backend actual (no hay campos ni jobs para esto), así que se descartaron junto con el resto del mock. Si el producto las requiere, hay que diseñarlas end-to-end (entidad/DTO en `signature-server`, job de recordatorios, UI) desde cero — no es simplemente "reconectar" código existente.

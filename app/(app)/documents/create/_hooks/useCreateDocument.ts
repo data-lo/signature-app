@@ -15,7 +15,7 @@ interface CreateDocumentParams {
   spectatorIds: string[];
 }
 
-function getErrorMessage(error: unknown): string {
+export function getCreateDocumentErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
   return (
     axiosError.response?.data?.message ??
@@ -43,7 +43,7 @@ export function useCreateDocument() {
       router.push('/documents');
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error));
+      toast.error(getCreateDocumentErrorMessage(error));
     },
   });
 }

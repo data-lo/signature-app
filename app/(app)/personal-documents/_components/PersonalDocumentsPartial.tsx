@@ -15,6 +15,7 @@ import { useDeletePersonalDocument } from '../_hooks/useDeletePersonalDocument';
 import { useUpdatePersonalDocument } from '../_hooks/useUpdatePersonalDocument';
 import DocumentDropzone from './DocumentDropzone';
 import DocumentPreviewItem from './DocumentPreviewItem';
+import DeleteConfirmDialog from './DeleteConfirmDialog';
 
 interface PersonalDocumentsPartialProps {
   signature: NonNullable<CurrentUser['signature']> | null;
@@ -27,6 +28,9 @@ export default function PersonalDocumentsPartial({
 }: PersonalDocumentsPartialProps) {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | undefined>();
+  const [pendingDelete, setPendingDelete] = useState<
+    'ine' | 'signature' | null
+  >(null);
 
   const deleteMutation = useDeletePersonalDocument();
   const updateMutation = useUpdatePersonalDocument();
@@ -55,17 +59,12 @@ export default function PersonalDocumentsPartial({
     );
   }
 
-  function handleDelete(field: 'ine' | 'signature') {
-    const label =
-      field === 'ine' ? 'tu identificación (INE)' : 'tu firma digital';
-    if (
-      !window.confirm(
-        `¿Seguro que quieres eliminar ${label}? Esta acción no se puede deshacer.`,
-      )
-    ) {
-      return;
-    }
-    deleteMutation.mutate({ signatureId, field });
+  function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    deleteMutation.mutate(
+      { signatureId, field: pendingDelete },
+      { onSuccess: () => setPendingDelete(null) },
+    );
   }
 
   return (
@@ -86,7 +85,7 @@ export default function PersonalDocumentsPartial({
             label="Identificación (INE)"
             secureUrl={officialFile.secureUrl}
             deleting={deleteMutation.isPending}
-            onDelete={() => handleDelete('ine')}
+            onDelete={() => setPendingDelete('ine')}
           />
         )}
 
@@ -95,7 +94,7 @@ export default function PersonalDocumentsPartial({
             label="Firma digital"
             secureUrl={signature.secureUrl}
             deleting={deleteMutation.isPending}
-            onDelete={() => handleDelete('signature')}
+            onDelete={() => setPendingDelete('signature')}
           />
         )}
 
@@ -130,6 +129,16 @@ export default function PersonalDocumentsPartial({
           {updateMutation.isPending ? 'Guardando...' : 'Guardar'}
         </Button>
       </CardContent>
+
+      <DeleteConfirmDialog
+        open={pendingDelete !== null}
+        label={
+          pendingDelete === 'ine' ? 'tu identificación (INE)' : 'tu firma digital'
+        }
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        onConfirm={handleConfirmDelete}
+        confirming={deleteMutation.isPending}
+      />
     </Card>
   );
 }

@@ -8,6 +8,8 @@ export interface CurrentUser {
   position: string | null;
   roles: string[];
   nationalId: string;
+  phoneNumber: string | null;
+  secondaryEmail: string | null;
   signature?: {
     id: string;
     secureUrl: string;

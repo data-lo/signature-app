@@ -1,5 +1,4 @@
 import apiClient from '@/lib/axios';
-import axios from 'axios'; // 🟩 Importante importar axios para validar el tipo de error
 import type { LoginFormValues } from './_schemas';
 
 interface LoginResponseData {
@@ -17,7 +16,6 @@ interface LoginResponseData {
 export async function loginRequest(
   values: LoginFormValues,
 ): Promise<LoginResponseData> {
-  console.log(process.env.NEXT_PUBLIC_API_BASE_URL);
   const { data } = await apiClient.post<{
     success: boolean;
     message: string;

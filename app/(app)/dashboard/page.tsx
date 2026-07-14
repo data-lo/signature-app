@@ -1,5 +1,5 @@
-import DashboardContent from '../../_components/DashboardContent';
+import CreateDocumentView from '../documents/create/_components/CreateDocumentView';
 
 export default function DashboardPage() {
-  return <DashboardContent />;
+  return <CreateDocumentView />;
 }

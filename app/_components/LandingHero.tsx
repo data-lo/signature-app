@@ -56,17 +56,13 @@ export default function LandingHero() {
               luis@correo.com
             </div>
             <p className="mt-3 text-[10px] font-semibold tracking-wide text-gray-500">
-              MÉTODO DE FIRMA PERMITIDO
+              MÉTODO DE FIRMA
             </p>
             <div className="mt-1.5 flex flex-col gap-1.5 text-xs text-gray-600">
               <span className="flex items-center gap-1.5">
                 <span className="flex size-3.5 items-center justify-center rounded-[3px] bg-emerald-500 text-[9px] text-white">
                   ✓
                 </span>
-                Firma electrónica avanzada (e.firma)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-3.5 rounded-[3px] border border-gray-300" />
                 Firma electrónica simple
               </span>
             </div>

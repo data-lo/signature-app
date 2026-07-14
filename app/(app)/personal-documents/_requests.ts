@@ -1,5 +1,8 @@
 import apiClient from '@/lib/axios';
-import type { PersonalDocumentsFormValues } from './_schemas';
+import type {
+  PersonalDocumentsFormValues,
+  UpdatePersonalInfoFormValues,
+} from './_schemas';
 
 interface UploadPersonalDocumentsResponseData {
   id: string;
@@ -47,4 +50,13 @@ export async function deleteSignatureFileRequest(
   signatureId: string,
 ): Promise<void> {
   await apiClient.delete(`/signature/${signatureId}/signature-image`);
+}
+
+export async function updatePersonalInformationRequest(
+  values: UpdatePersonalInfoFormValues,
+): Promise<void> {
+  await apiClient.patch('/user/personal-information', {
+    phoneNumber: values.phoneNumber || undefined,
+    secondaryEmail: values.secondaryEmail || undefined,
+  });
 }

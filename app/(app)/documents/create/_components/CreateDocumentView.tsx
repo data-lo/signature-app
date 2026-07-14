@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 import DocumentsTable from '../../_components/DocumentsTable';
 import {
   EMPTY_DOCUMENTS_FILTERS,
@@ -19,7 +20,10 @@ import {
   type SelectParticipantsFormValues,
 } from '../_schemas';
 import { useMyDocuments } from '../_hooks/useMyDocuments';
-import { useCreateDocument } from '../_hooks/useCreateDocument';
+import {
+  useCreateDocument,
+  getCreateDocumentErrorMessage,
+} from '../_hooks/useCreateDocument';
 import DocumentFilePicker from './DocumentFilePicker';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
@@ -55,6 +59,11 @@ export default function CreateDocumentView() {
     filters,
   );
   const createMutation = useCreateDocument();
+  const { setDocumentsCount } = useDocumentsCount();
+
+  useEffect(() => {
+    if (myDocuments) setDocumentsCount(myDocuments.meta.total);
+  }, [myDocuments, setDocumentsCount]);
 
   function onSubmit(values: SelectParticipantsFormValues) {
     if (!file) return;
@@ -123,6 +132,12 @@ export default function CreateDocumentView() {
             >
               {createMutation.isPending ? 'Enviando a firma...' : 'Firmar'}
             </Button>
+
+            {createMutation.isError && (
+              <p className="text-sm text-destructive">
+                {getCreateDocumentErrorMessage(createMutation.error)}
+              </p>
+            )}
           </div>
 
           <Card className="h-[520px] overflow-hidden p-0">
