@@ -86,6 +86,7 @@ export default function DocumentsListView() {
             ? (id) => router.push(`/documents/${id}`)
             : undefined
         }
+        onViewDetail={(id) => router.push(`/documents/${id}`)}
         filters={filters}
         onFiltersChange={handleFiltersChange}
         showMyTurnFilter

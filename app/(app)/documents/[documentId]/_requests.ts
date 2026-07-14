@@ -26,6 +26,8 @@ export interface DocumentDetail {
   myStatus: ParticipantStatus | null;
   canSign: boolean;
   canReject: boolean;
+  canRequestCancellation: boolean;
+  canConfirmCancellation: boolean;
 }
 
 export async function getDocumentDetailRequest(
@@ -49,4 +51,16 @@ export async function rejectDocumentRequest(
   reason: string,
 ): Promise<void> {
   await apiClient.patch(`/document/${documentId}/reject`, { reason });
+}
+
+export async function requestCancellationRequest(
+  documentId: string,
+): Promise<void> {
+  await apiClient.patch(`/document/${documentId}/submit-for-cancellation`);
+}
+
+export async function confirmCancellationRequest(
+  documentId: string,
+): Promise<void> {
+  await apiClient.patch(`/document/${documentId}/confirm-cancellation`);
 }

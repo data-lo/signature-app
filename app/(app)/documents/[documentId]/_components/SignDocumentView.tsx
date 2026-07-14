@@ -11,11 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
+import { useRequestCancellation } from '../_hooks/useRequestCancellation';
+import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
 import {
   rejectDocumentSchema,
   type RejectDocumentFormValues,
 } from '../_schemas';
 import type { ParticipantStatus } from '../_requests';
+import CancellationConfirmDialog from './CancellationConfirmDialog';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
   ssr: false,
@@ -35,9 +38,14 @@ export default function SignDocumentView({
   documentId,
 }: SignDocumentViewProps) {
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showCancellationDialog, setShowCancellationDialog] = useState(false);
+  const [showConfirmCancellationDialog, setShowConfirmCancellationDialog] =
+    useState(false);
   const { data: document, isLoading, isError } = useDocumentDetail(documentId);
   const signMutation = useSignDocument(documentId);
   const rejectMutation = useRejectDocument(documentId);
+  const requestCancellationMutation = useRequestCancellation(documentId);
+  const confirmCancellationMutation = useConfirmCancellation(documentId);
 
   const {
     register,
@@ -191,6 +199,40 @@ export default function SignDocumentView({
                 : 'Aún no es tu turno para firmar este documento.'}
           </p>
         )}
+
+        {document.canRequestCancellation && (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setShowCancellationDialog(true)}
+          >
+            Solicitar cancelación
+          </Button>
+        )}
+
+        {document.canConfirmCancellation && (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setShowConfirmCancellationDialog(true)}
+          >
+            Confirmar cancelación
+          </Button>
+        )}
+
+        {document.status === 'cancellation_pending' &&
+          !document.canConfirmCancellation && (
+            <p className="text-sm text-muted-foreground">
+              Se solicitó la cancelación de este documento. Está pendiente de
+              confirmación por los firmantes.
+            </p>
+          )}
+
+        {document.status === 'cancelled' && (
+          <p className="text-sm text-muted-foreground">
+            Este documento fue cancelado.
+          </p>
+        )}
       </div>
 
       <Card className="h-[75vh] overflow-hidden p-0">
@@ -198,6 +240,34 @@ export default function SignDocumentView({
           <PdfPreview file={document.secureUrl} />
         </CardContent>
       </Card>
+
+      <CancellationConfirmDialog
+        open={showCancellationDialog}
+        title="¿Solicitar cancelación del documento?"
+        description="Se notificará a todos los firmantes. El documento quedará pendiente de su confirmación."
+        confirmLabel="Solicitar cancelación"
+        onOpenChange={setShowCancellationDialog}
+        onConfirm={() =>
+          requestCancellationMutation.mutate(undefined, {
+            onSuccess: () => setShowCancellationDialog(false),
+          })
+        }
+        confirming={requestCancellationMutation.isPending}
+      />
+
+      <CancellationConfirmDialog
+        open={showConfirmCancellationDialog}
+        title="¿Confirmar la cancelación del documento?"
+        description="Esta acción no se puede deshacer. El documento se marcará como cancelado para todos los participantes."
+        confirmLabel="Confirmar cancelación"
+        onOpenChange={setShowConfirmCancellationDialog}
+        onConfirm={() =>
+          confirmCancellationMutation.mutate(undefined, {
+            onSuccess: () => setShowConfirmCancellationDialog(false),
+          })
+        }
+        confirming={confirmCancellationMutation.isPending}
+      />
     </main>
   );
 }

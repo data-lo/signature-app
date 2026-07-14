@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,6 +32,7 @@ const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
 });
 
 export default function CreateDocumentView() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DocumentsFilters>(
@@ -162,6 +164,7 @@ export default function CreateDocumentView() {
           hasNextPage={myDocuments?.meta.hasNextPage}
           hasPrevPage={myDocuments?.meta.hasPrevPage}
           onPageChange={setPage}
+          onViewDetail={(id) => router.push(`/documents/${id}`)}
           filters={filters}
           onFiltersChange={handleFiltersChange}
         />

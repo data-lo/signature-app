@@ -46,15 +46,16 @@ Antes de poder firmar cualquier documento, el usuario debe subir su rúbrica (PN
 
 ### Paso 3 — Firmar o rechazar (`/documents/[documentId]`)
 
-1. `SignDocumentView` carga el detalle (`GET /document/:id`): PDF (`secureUrl`), lista de participantes con su estado, y los flags `canSign`/`canReject`/`myRole`/`myStatus` que calcula el backend según el turno del usuario.
+1. `SignDocumentView` carga el detalle (`GET /document/:id`): PDF (`secureUrl`), lista de participantes con su estado, y los flags `canSign`/`canReject`/`canRequestCancellation`/`canConfirmCancellation`/`myRole`/`myStatus` que calcula el backend según el turno y rol del usuario.
 2. El PDF se muestra con `PdfPreview`. Los participantes se listan con su estado (verde=firmado, rojo=rechazado, ámbar=pendiente).
 3. Si `canSign` es `true`, el botón **"Continuar a firmar"** llama directamente `PATCH /document/:id/sign` — no hay ningún paso intermedio de captura de firma en el frontend (la firma visual se compone en el backend a partir de la credencial ya guardada en el paso 1).
 4. "Rechazar documento" abre un textarea de motivo (mínimo 5 caracteres) y llama `PATCH /document/:id/reject`.
 5. Si no es el turno del usuario, o ya actuó, se muestra un mensaje contextual en vez de los botones de acción.
+6. **Cancelación** (misma pantalla): si `canRequestCancellation` (el creador, con el documento ya `SIGNED`), un botón "Solicitar cancelación" abre `CancellationConfirmDialog` y llama `PATCH /document/:id/submit-for-cancellation`. Si `canConfirmCancellation` (cualquier firmante, con el documento en `CANCELLATION_PENDING`), un botón "Confirmar cancelación" llama `PATCH /document/:id/confirm-cancellation`. Ambos usan el mismo diálogo de confirmación (no `window.confirm`).
 
 ### Paso 4 — Consultar documentos (`/documents`)
 
-`DocumentsListView`: pestañas "Pendientes"/"Firmados", lista documentos donde el usuario es participante (`GET /document?participantEmail=...`) con filtros por nombre, participante, estado y fechas, y un toggle "solo mi turno". Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final.
+`DocumentsListView`: pestañas "Pendientes"/"Firmados", lista documentos donde el usuario es participante (`GET /document?participantEmail=...`) con filtros por nombre, participante, estado y fechas, y un toggle "solo mi turno". Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final. Para documentos firmados, en cancelación pendiente o cancelados, un botón "Ver detalle" (`onViewDetail`) navega a `/documents/:id`, donde `SignDocumentView` decide qué mostrar según los flags de arriba.
 
 > `/dashboard` (primer punto de entrada tras login) renderiza el mismo componente `CreateDocumentView` que `/documents/create` — ya no existe un flujo mock/en memoria separado.
 
@@ -191,6 +192,11 @@ Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) co
 
 ## 8. Pendientes / trabajo futuro
 
+### Pendientes reales (lo que queda abierto hoy)
+- **Cero tests automatizados**: no hay `jest`/`vitest` configurado, ni un solo archivo `*.spec.ts`/`*.test.ts` en el proyecto (ni unitarios ni e2e). Toda la verificación hoy es manual + `tsc`/`eslint`. Pendiente decidir framework (Jest + React Testing Library es lo más común con Next.js) y al menos cubrir los flujos críticos: login/registro, crear documento, firmar/rechazar, cancelación.
+- **Dependencia futura de la migración RBAC/multi-cuenta del backend**: `signature-server` tiene planeada (fase aparte, no iniciada) una migración grande que mueve `email`/`password` de `Users` a `Account` y agrega permisos granulares (`role`/`permission`/`resource`/`action`). El día que eso avance, este frontend va a necesitar cambios en `middleware.ts` (hoy decodifica un JWT con `sub`/`email`/`roles` planos), en `lib/auth.ts`/`lib/cookies.ts`, y probablemente en la navegación si un usuario puede tener varias cuentas. No hay trabajo que hacer todavía — es una dependencia a vigilar cuando esa migración se planee en `signature-server`.
+- **Reminders / mensaje para participantes / fecha de expiración**: ver "Ideas descartadas" más abajo — si el producto los pide, hay que diseñarlos end-to-end (no es reconectar código existente).
+
 ### Resuelto recientemente
 - **Flujo de documentos duplicado**: el prototipo en memoria de `/dashboard` (`DocumentUploadFlow`/`DocumentPrepareModal`/`SignerFormCard`/`SpectatorFormCard`/`DocumentPreviewPane`) fue eliminado. `/dashboard` ahora renderiza el mismo `CreateDocumentView` real que `/documents/create` (mismos hooks, mismo `lib/api`, misma validación Zod de `documents/create/_schemas.ts`).
 - **Duplicados en la creación de documentos**: el backend ahora rechaza (`400`) seleccionar al mismo usuario dos veces entre firmantes/espectadores, y rechaza crear un documento con el mismo nombre de archivo que otro documento propio en estatus `CREATED`/`PENDING` (`DocumentService.create`).
@@ -205,6 +211,7 @@ Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) co
 - **Usuario duplicado (CURP/email)**: el backend ya rechazaba emails duplicados; ahora también rechaza (`409`) un CURP ya registrado por otro usuario activo, tanto en `POST /auth/register` como en `POST /user`. Como el CURP ya no es editable después de crear el usuario (ver punto anterior), esta validación solo aplica al crear/registrar, no a ninguna actualización. El **nombre y apellido sí pueden repetirse entre usuarios distintos** — solo CURP y correo son campos de unicidad. `useRegister` ahora muestra tanto el mensaje inline (ya existía) como un toast de error con el mensaje del backend.
 - **Modal de confirmación al eliminar INE/firma**: se reemplazó el `window.confirm` nativo en `PersonalDocumentsCompleted` y `PersonalDocumentsPartial` por un componente `DeleteConfirmDialog` (basado en `components/ui/dialog`), consistente con el resto de la UI.
 - **Toasts de éxito**: se auditaron todos los `useMutation` del proyecto. Solo faltaba en `useRegister` (creación de cuenta) — se agregó `toast.success('Cuenta creada correctamente')`. El resto de flujos de creación/actualización (`useCreateDocument`, `useSignDocument`, `useRejectDocument`, `useUploadPersonalDocuments`, `useUpdatePersonalDocument`, `useUpdatePersonalInformation`) ya tenían su toast de éxito. `useLogin`/`useLogout` (no son creación/actualización) y `useCreateCheckoutSession` (redirige de inmediato a Stripe) se dejaron sin toast a propósito.
+- **Flujo de cancelación de documentos**: `SignDocumentView` ahora expone "Solicitar cancelación" (creador, documento `SIGNED`) y "Confirmar cancelación" (cualquier firmante, documento `CANCELLATION_PENDING`) usando los nuevos flags `canRequestCancellation`/`canConfirmCancellation` del backend, con `CancellationConfirmDialog` en vez de `window.confirm`. `DocumentsTable` gana un botón "Ver detalle" (`onViewDetail`) para navegar a `/documents/:id` desde cualquier tab cuando el documento está firmado, en cancelación pendiente o cancelado — antes no había forma de llegar a esa pantalla salvo para documentos pendientes de firma.
 
 ### Ideas descartadas junto con el prototipo del dashboard
 El prototipo mock incluía UI para "recordatorios" (frecuencia de reenvío), "mensaje para participantes" y "fecha de expiración" del documento. Ninguna tiene respaldo en el backend actual (no hay campos ni jobs para esto), así que se descartaron junto con el resto del mock. Si el producto las requiere, hay que diseñarlas end-to-end (entidad/DTO en `signature-server`, job de recordatorios, UI) desde cero — no es simplemente "reconectar" código existente.
