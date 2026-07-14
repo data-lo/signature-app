@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useLogout } from '@/lib/hooks/useLogout';
+import AccountSwitcher from './AccountSwitcher';
 
 const navItems = [
   { label: 'GESTIONAR', href: '/home' },
@@ -62,6 +63,8 @@ export default function DashboardNavbar({
 
       <div className="flex items-center gap-6 text-xs font-semibold tracking-wide text-muted-foreground">
         <ThemeToggle className="flex items-center gap-1 cursor-pointer hover:text-foreground" />
+
+        <AccountSwitcher />
 
         {typeof documentsCount === 'number' && (
           <span
