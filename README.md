@@ -188,16 +188,26 @@ npm run dev     # levanta en modo desarrollo (Turbopack)
 
 Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) corriendo.
 
+### Tests
+
+```bash
+npm run test        # corre toda la suite con Jest
+npm run test:watch  # modo watch
+```
+
+Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `eslint.config.mjs`/`postcss.config.mjs`) + React Testing Library + `jest-dom`. `test-utils.tsx` en la raíz expone `renderWithProviders()`, que envuelve en un `QueryClientProvider` de prueba (retries desactivados) para componentes que usan React Query. Los specs están co-localizados junto a su componente/schema (`*.spec.ts`/`*.spec.tsx`), igual que en `signature-server`.
+
 ---
 
 ## 8. Pendientes / trabajo futuro
 
 ### Pendientes reales (lo que queda abierto hoy)
-- **Cero tests automatizados**: no hay `jest`/`vitest` configurado, ni un solo archivo `*.spec.ts`/`*.test.ts` en el proyecto (ni unitarios ni e2e). Toda la verificación hoy es manual + `tsc`/`eslint`. Pendiente decidir framework (Jest + React Testing Library es lo más común con Next.js) y al menos cubrir los flujos críticos: login/registro, crear documento, firmar/rechazar, cancelación.
-- **Dependencia futura de la migración RBAC/multi-cuenta del backend**: `signature-server` tiene planeada (fase aparte, no iniciada) una migración grande que mueve `email`/`password` de `Users` a `Account` y agrega permisos granulares (`role`/`permission`/`resource`/`action`). El día que eso avance, este frontend va a necesitar cambios en `middleware.ts` (hoy decodifica un JWT con `sub`/`email`/`roles` planos), en `lib/auth.ts`/`lib/cookies.ts`, y probablemente en la navegación si un usuario puede tener varias cuentas. No hay trabajo que hacer todavía — es una dependencia a vigilar cuando esa migración se planee en `signature-server`.
-- **Reminders / mensaje para participantes / fecha de expiración**: ver "Ideas descartadas" más abajo — si el producto los pide, hay que diseñarlos end-to-end (no es reconectar código existente).
+- **Dependencia futura de la migración RBAC/multi-cuenta del backend**: **verificado de nuevo — todavía no se ha hecho** en `signature-server` (`UserEntity` sigue con `email`/`password` propios, `AccountEntity` sigue sin `role`/`permission`/`resource`/`action`). Sigue siendo una fase aparte, no iniciada. Cuando avance, este frontend va a necesitar cambios en `middleware.ts` (hoy decodifica un JWT con `sub`/`email`/`roles` planos), en `lib/auth.ts`/`lib/cookies.ts`, y probablemente en la navegación si un usuario puede tener varias cuentas. Por ahora no hay nada que tocar.
+- **Reminders / mensaje para participantes / fecha de expiración**: sigue **deliberadamente pendiente** (decisión del equipo) — ver "Ideas descartadas" más abajo. Si el producto los pide más adelante, hay que diseñarlos end-to-end (no es reconectar código existente).
+- **Cobertura de tests parcial**: hay 27 tests cubriendo schemas Zod y los flujos críticos (login, registro, crear documento, firmar/rechazar, cancelación — ver abajo), pero no todo el árbol de componentes tiene tests (p. ej. `PersonalDocumentsView`/`UserInfoCard`, `DocumentsListView`, flujos de `plans`/Stripe). Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
 
 ### Resuelto en esta ronda
+- **Tests automatizados con Jest + React Testing Library**: configurado vía `next/jest` (`jest.config.mjs`) + `jest-dom` + `@testing-library/user-event`. `test-utils.tsx` centraliza un `renderWithProviders()` con `QueryClientProvider` de prueba. 27 tests en 8 suites cubriendo: schemas Zod (`loginSchema`, `registerSchema` incluyendo el RFC nuevo, `selectParticipantsSchema`, `rejectDocumentSchema`), `LoginForm` (validación, envío, estado de carga), `SignupForm` (validación del RFC, envío completo), `SignDocumentView` (firmar, rechazar con motivo, mensaje de "no es tu turno", solicitar y confirmar cancelación) y `CreateDocumentView` (botón deshabilitado sin archivo/firmante, envío con archivo + firmante seleccionado, mensaje de error del backend). Los hooks de datos (`useLogin`, `useRegister`, `useSignDocument`, etc.) se mockean en los tests de componente — no se prueban por separado los mismos hooks todavía.
 - **RFC en el registro**: `SignupForm` (`/signup`) agrega el campo "RFC" (12-13 caracteres alfanuméricos, mismo patrón que el mock viejo usaba para validar el campo homónimo). `registerSchema` lo valida y `useRegister` lo envía tal cual al `POST /auth/register`, que ahora lo exige. El backend rechaza (`409`) un RFC duplicado igual que ya hacía con el CURP — el manejo de error en `SignupForm` no cambió (ya mostraba el mensaje genérico del backend vía toast + inline).
 - **CURP ahora también es constraint de base de datos** en el backend (antes solo se validaba a nivel de aplicación) — no requirió ningún cambio en este proyecto, el contrato de la API (`409` en duplicado) sigue siendo el mismo.
 
