@@ -12,7 +12,9 @@ export async function uploadPersonalDocumentsRequest(
   values: PersonalDocumentsFormValues,
 ): Promise<UploadPersonalDocumentsResponseData> {
   const formData = new FormData();
-  formData.append('officialFile', values.ineFile);
+  if (values.ineFile) {
+    formData.append('officialFile', values.ineFile);
+  }
   formData.append('signatureImage', values.signatureFile);
 
   const { data } = await apiClient.post<{

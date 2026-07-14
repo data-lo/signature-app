@@ -53,8 +53,8 @@ export default function PersonalDocumentsForm() {
       <CardHeader>
         <CardTitle>Documentos personales</CardTitle>
         <CardDescription>
-          Sube tu identificación oficial (INE) y tu firma digital para completar
-          tu perfil.
+          Sube tu firma digital para completar tu perfil. La identificación
+          oficial (INE) es opcional y puedes agregarla después.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -64,7 +64,7 @@ export default function PersonalDocumentsForm() {
           <FieldGroup>
             <DocumentDropzone
               id="ineFile"
-              label="Identificación (INE)"
+              label="Identificación (INE) (opcional)"
               hint="PDF, JPG o PNG. Máximo 5MB."
               accept="application/pdf,image/jpeg,image/png"
               file={ineFile}

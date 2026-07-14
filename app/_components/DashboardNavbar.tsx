@@ -14,7 +14,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useLogout } from '@/lib/hooks/useLogout';
 
 const navItems = [
-  { label: 'GESTIONAR', href: '/dashboard' },
+  { label: 'GESTIONAR', href: '/home' },
   { label: 'FIRMAR', href: '/documents' },
   { label: 'PLANES', href: '/plans' },
 ];
@@ -35,7 +35,7 @@ export default function DashboardNavbar({
       <div className="flex items-center gap-10">
         <button
           type="button"
-          onClick={() => router.push('/dashboard')}
+          onClick={() => router.push('/home')}
           className="outline-none"
         >
           <FileSignature className="size-6 text-emerald-500" />

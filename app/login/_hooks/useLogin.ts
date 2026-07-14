@@ -12,7 +12,7 @@ export function useLogin() {
     mutationFn: (values: LoginFormValues) => loginRequest(values),
     onSuccess: (data) => {
       setAuthToken(data.token);
-      router.push('/dashboard');
+      router.push('/home');
     },
   });
 }

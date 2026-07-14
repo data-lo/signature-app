@@ -29,7 +29,7 @@ export const signatureFileSchema = z
   });
 
 export const personalDocumentsSchema = z.object({
-  ineFile: ineFileSchema,
+  ineFile: ineFileSchema.optional(),
   signatureFile: signatureFileSchema,
 });
 

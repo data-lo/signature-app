@@ -10,6 +10,9 @@ export interface CurrentUser {
   nationalId: string;
   phoneNumber: string | null;
   secondaryEmail: string | null;
+  rfc: string | null;
+  signatureId: string | null;
+  isConfigured: boolean;
   signature?: {
     id: string;
     secureUrl: string;

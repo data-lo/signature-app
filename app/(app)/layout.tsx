@@ -5,6 +5,7 @@ import {
   DocumentsCountProvider,
   useDocumentsCount,
 } from '../_components/DocumentsCountContext';
+import OnboardingProvider from './_components/OnboardingProvider';
 
 function AppNavbar() {
   const { documentsCount } = useDocumentsCount();
@@ -14,10 +15,12 @@ function AppNavbar() {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <DocumentsCountProvider>
-      <div className="min-h-screen bg-muted">
-        <AppNavbar />
-        {children}
-      </div>
+      <OnboardingProvider>
+        <div className="min-h-screen bg-muted">
+          <AppNavbar />
+          {children}
+        </div>
+      </OnboardingProvider>
     </DocumentsCountProvider>
   );
 }

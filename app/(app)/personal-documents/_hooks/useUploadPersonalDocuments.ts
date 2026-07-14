@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { uploadPersonalDocumentsRequest } from '../_requests';
+import { useOnboardingStore } from '@/lib/store/useOnboardingStore';
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
@@ -26,7 +27,9 @@ export function useUploadPersonalDocuments() {
     onSuccess: () => {
       toast.success('Tus documentos se guardaron correctamente');
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      router.push('/dashboard');
+      if (!useOnboardingStore.getState().isConfigured) {
+        router.push('/home');
+      }
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
