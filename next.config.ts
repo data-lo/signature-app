@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    const backendUrl = process.env.BACKEND_API_URL;
+    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:4000';
 
     return [
       {
