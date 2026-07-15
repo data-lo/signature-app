@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { useOnboardingProfile } from '@/lib/hooks/useOnboardingProfile';
 import { usePatchUserStatus } from '@/lib/hooks/usePatchUserStatus';
 import { useOnboardingStore } from '@/lib/store/useOnboardingStore';
 
@@ -11,7 +11,7 @@ export default function OnboardingProvider({
 }: {
   children: ReactNode;
 }) {
-  const { data: user } = useCurrentUser();
+  const { data: user } = useOnboardingProfile();
   const hydrate = useOnboardingStore((state) => state.hydrate);
   const patchStatusMutation = usePatchUserStatus();
   const queryClient = useQueryClient();
@@ -36,6 +36,7 @@ export default function OnboardingProvider({
         mutationRef.current.mutate(undefined, {
           onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+            queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
             useOnboardingStore.getState().clear();
           },
           onError: () => {

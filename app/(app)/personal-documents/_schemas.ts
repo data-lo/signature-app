@@ -43,15 +43,11 @@ export const updatePersonalInfoSchema = z.object({
     .trim()
     .regex(/^[0-9]{7,15}$/, {
       message: 'El teléfono debe tener entre 7 y 15 dígitos',
-    })
-    .optional()
-    .or(z.literal('')),
+    }),
   secondaryEmail: z
     .string()
     .trim()
-    .email({ message: 'Correo electrónico inválido' })
-    .optional()
-    .or(z.literal('')),
+    .email({ message: 'Correo electrónico inválido' }),
 });
 
 export type UpdatePersonalInfoFormValues = z.infer<

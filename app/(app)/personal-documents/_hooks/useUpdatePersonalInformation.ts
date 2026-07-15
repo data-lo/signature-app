@@ -24,6 +24,8 @@ export function useUpdatePersonalInformation() {
     onSuccess: () => {
       toast.success('Información de contacto actualizada correctamente');
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
+      useOnboardingStore.getState().setPersonalConfigured(true);
       if (!useOnboardingStore.getState().isConfigured) {
         router.push('/home');
       }

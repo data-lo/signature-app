@@ -18,6 +18,8 @@ interface OnboardingState {
   isConfigured: boolean;
   consolidationInFlight: boolean;
   hydrate: (user: CurrentUser) => void;
+  setPersonalConfigured: (value: boolean) => void;
+  setSignatureConfigured: (value: boolean) => void;
   markConsolidating: (value: boolean) => void;
   clear: () => void;
 }
@@ -39,6 +41,8 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       signatureConfigured: deriveSignatureConfigured(user),
       isConfigured: user.isConfigured,
     }),
+  setPersonalConfigured: (value) => set({ personalConfigured: value }),
+  setSignatureConfigured: (value) => set({ signatureConfigured: value }),
   markConsolidating: (value) => set({ consolidationInFlight: value }),
   clear: () => set({ isConfigured: true, consolidationInFlight: false }),
 }));

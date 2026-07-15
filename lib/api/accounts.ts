@@ -20,7 +20,7 @@ export async function getAccountsCatalogRequest(): Promise<AccountData[]> {
     success: boolean;
     message: string;
     data: AccountData[];
-  }>('/account/me');
+  }>('/api/v1/accounts/me');
 
   return data.data;
 }
@@ -32,7 +32,7 @@ export async function createOrganizationRequest(
     success: boolean;
     message: string;
     data: AccountData;
-  }>('/account/organization', values);
+  }>('/api/v1/organizations', values);
 
   return data.data;
 }

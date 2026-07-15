@@ -27,9 +27,10 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<UpdatePersonalInfoFormValues>({
     resolver: zodResolver(updatePersonalInfoSchema),
+    mode: 'onChange',
     values: {
       phoneNumber: user.phoneNumber ?? '',
       secondaryEmail: user.secondaryEmail ?? '',
@@ -113,7 +114,7 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={updateMutation.isPending}
+                  disabled={!isValid || updateMutation.isPending}
                 >
                   {updateMutation.isPending ? 'Guardando...' : 'Guardar'}
                 </Button>

@@ -33,7 +33,7 @@ Protege todas las rutas excepto `/`, `/login`, `/signup`, `/error` y assets est�
 ### Paso 1 — Registrar la credencial de firma (`/personal-documents`)
 
 Antes de poder firmar cualquier documento, el usuario debe subir su rúbrica (PNG) e identificación oficial (PDF/JPG/PNG). La pantalla se adapta según el estado actual:
-- **Sin nada subido** → formulario que sube ambos archivos juntos (`POST /signature`).
+- **Sin nada subido** → formulario que sube ambos archivos juntos (`PUT /api/v1/users/me/signature`).
 - **Falta uno de los dos** → formulario para completar el que falta (`PATCH /signature/:id`) + opción de eliminar el existente.
 - **Ambos completos** → solo visualización + opción de eliminar cada archivo (`DELETE /signature/:id/official-file` o `/signature-image`).
 
@@ -113,7 +113,8 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 
 | Función | Endpoint |
 |---|---|
-| `getCurrentUserRequest` | `GET /auth/me` |
+| `getCurrentUserRequest` | `GET /auth/me` (perfil completo, incluye URLs prefirmadas de firma/INE; usado por `/personal-documents`) |
+| `getOnboardingProfileRequest` | `GET /api/v1/users/me` (snapshot cacheado en Redis por CURP; usado por `OnboardingProvider` para hidratar el store de onboarding) |
 
 *(`loginRequest` y `registerRequest` viven en `app/login/_requests.ts` y `app/signup/_requests.ts` respectivamente, no en `lib/api/` — inconsistencia menor de ubicación.)*
 
@@ -152,7 +153,7 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 
 | Función | Endpoint |
 |---|---|
-| `uploadPersonalDocumentsRequest` | `POST /signature` (multipart: officialFile + signatureImage) |
+| `uploadPersonalDocumentsRequest` | `PUT /api/v1/users/me/signature` (multipart: officialFile + signatureImage) |
 | `updateIneFileRequest` / `updateSignatureFileRequest` | `PATCH /signature/:id` |
 | `deleteIneFileRequest` / `deleteSignatureFileRequest` | `DELETE /signature/:id/official-file` \| `/signature-image` |
 
@@ -214,7 +215,7 @@ Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `e
 ### Resuelto recientemente
 - **Flujo de documentos duplicado**: el prototipo en memoria de `/dashboard` (`DocumentUploadFlow`/`DocumentPrepareModal`/`SignerFormCard`/`SpectatorFormCard`/`DocumentPreviewPane`) fue eliminado. `/dashboard` ahora renderiza el mismo `CreateDocumentView` real que `/documents/create` (mismos hooks, mismo `lib/api`, misma validación Zod de `documents/create/_schemas.ts`).
 - **Duplicados en la creación de documentos**: el backend ahora rechaza (`400`) seleccionar al mismo usuario dos veces entre firmantes/espectadores, y rechaza crear un documento con el mismo nombre de archivo que otro documento propio en estatus `CREATED`/`PENDING` (`DocumentService.create`).
-- **Edición de información personal**: `/personal-documents` (`UserInfoCard`) permite editar `phoneNumber` y `secondaryEmail` vía `PATCH /user/personal-information`. `name`, `lastName`, `curp` y `rfc` son campos de identidad y **no son editables por diseño**: el backend los quitó de `UpdatePersonalInformationDto` (no solo el frontend deja de mandarlos, el endpoint los rechaza si algún otro cliente los envía). El CURP tampoco es editable vía `PATCH /user/:id` (se quitó de `UpdateUserDto`) — se fija una sola vez al crear/registrar el usuario.
+- **Edición de información personal**: `/personal-documents` (`UserInfoCard`) permite editar `phoneNumber` y `secondaryEmail` vía `PUT /api/v1/users/me/personal-information`. `name`, `lastName`, `curp` y `rfc` son campos de identidad y **no son editables por diseño**: el backend los quitó de `UpdatePersonalInformationDto` (no solo el frontend deja de mandarlos, el endpoint los rechaza si algún otro cliente los envía). El CURP tampoco es editable vía `PATCH /user/:id` (se quitó de `UpdateUserDto`) — se fija una sola vez al crear/registrar el usuario.
 - **Firma electrónica avanzada vs simple**: se eliminó del proyecto (landing y cualquier mención de "e.firma"/firma avanzada). El producto solo ofrece firma electrónica simple, resuelta por la credencial (rúbrica + INE) registrada en `/personal-documents`.
 - **Previews unificados**: se eliminó `DocumentPreviewPane` (duplicado); todo el proyecto usa `PdfPreview` (`documents/_components/`), que ya soporta ancho responsivo y `File | string`.
 - **`useSubmitForAuthorization`**: confirmado como código muerto (la lógica real vive en `useCreateDocument`) y eliminado.

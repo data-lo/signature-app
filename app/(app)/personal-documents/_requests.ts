@@ -17,11 +17,11 @@ export async function uploadPersonalDocumentsRequest(
   }
   formData.append('signatureImage', values.signatureFile);
 
-  const { data } = await apiClient.post<{
+  const { data } = await apiClient.put<{
     success: boolean;
     message: string;
     data: UploadPersonalDocumentsResponseData;
-  }>('/signature', formData);
+  }>('/api/v1/users/me/signature', formData);
 
   return data.data;
 }
@@ -57,7 +57,7 @@ export async function deleteSignatureFileRequest(
 export async function updatePersonalInformationRequest(
   values: UpdatePersonalInfoFormValues,
 ): Promise<void> {
-  await apiClient.patch('/user/personal-information', {
+  await apiClient.put('/api/v1/users/me/personal-information', {
     phoneNumber: values.phoneNumber || undefined,
     secondaryEmail: values.secondaryEmail || undefined,
   });

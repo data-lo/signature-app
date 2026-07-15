@@ -27,6 +27,8 @@ export function useUploadPersonalDocuments() {
     onSuccess: () => {
       toast.success('Tus documentos se guardaron correctamente');
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
+      useOnboardingStore.getState().setSignatureConfigured(true);
       if (!useOnboardingStore.getState().isConfigured) {
         router.push('/home');
       }

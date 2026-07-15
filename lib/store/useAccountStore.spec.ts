@@ -22,6 +22,7 @@ function buildAccount(overrides: Partial<AccountData> = {}): AccountData {
 describe('useAccountStore', () => {
   beforeEach(() => {
     mockedGetAuthToken.mockReset();
+    localStorage.clear();
     useAccountStore.setState({ authToken: null, activeAccount: null });
   });
 
@@ -58,5 +59,25 @@ describe('useAccountStore', () => {
 
     expect(useAccountStore.getState().authToken).toBeNull();
     expect(useAccountStore.getState().activeAccount).toBeNull();
+  });
+
+  it('setActiveAccount persiste activeAccount en localStorage (no authToken)', () => {
+    useAccountStore.getState().setActiveAccount(buildAccount());
+
+    const persisted = JSON.parse(localStorage.getItem('account-storage')!);
+
+    expect(persisted.state.activeAccount).toEqual(buildAccount());
+    expect(persisted.state.authToken).toBeUndefined();
+  });
+
+  it('persist.rehydrate restaura activeAccount desde localStorage tras un refresh', async () => {
+    localStorage.setItem(
+      'account-storage',
+      JSON.stringify({ state: { activeAccount: buildAccount() }, version: 0 }),
+    );
+
+    await useAccountStore.persist.rehydrate();
+
+    expect(useAccountStore.getState().activeAccount).toEqual(buildAccount());
   });
 });

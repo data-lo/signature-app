@@ -1,6 +1,7 @@
 import {
   derivePersonalConfigured,
   deriveSignatureConfigured,
+  useOnboardingStore,
 } from './useOnboardingStore';
 import type { CurrentUser } from '@/lib/api/auth';
 
@@ -66,5 +67,44 @@ describe('deriveSignatureConfigured', () => {
     expect(
       deriveSignatureConfigured(buildUser({ signatureId: 'sig-1' })),
     ).toBe(true);
+  });
+});
+
+describe('useOnboardingStore', () => {
+  beforeEach(() => {
+    useOnboardingStore.setState({
+      personalConfigured: false,
+      signatureConfigured: false,
+      isConfigured: false,
+      consolidationInFlight: false,
+    });
+  });
+
+  it('setPersonalConfigured muta únicamente personalConfigured', () => {
+    useOnboardingStore.getState().setPersonalConfigured(true);
+
+    expect(useOnboardingStore.getState().personalConfigured).toBe(true);
+    expect(useOnboardingStore.getState().signatureConfigured).toBe(false);
+  });
+
+  it('setSignatureConfigured muta únicamente signatureConfigured', () => {
+    useOnboardingStore.getState().setSignatureConfigured(true);
+
+    expect(useOnboardingStore.getState().signatureConfigured).toBe(true);
+    expect(useOnboardingStore.getState().personalConfigured).toBe(false);
+  });
+
+  it('dispara una notificación de suscriptor cuando ambas banderas quedan en true', () => {
+    const listener = jest.fn();
+    const unsubscribe = useOnboardingStore.subscribe(listener);
+
+    useOnboardingStore.getState().setPersonalConfigured(true);
+    useOnboardingStore.getState().setSignatureConfigured(true);
+
+    const lastCallState = listener.mock.calls.at(-1)?.[0];
+    expect(lastCallState.personalConfigured).toBe(true);
+    expect(lastCallState.signatureConfigured).toBe(true);
+
+    unsubscribe();
   });
 });
