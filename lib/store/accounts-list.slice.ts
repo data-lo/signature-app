@@ -1,0 +1,41 @@
+import type { StateCreator } from 'zustand';
+import type { AccountData } from '@/lib/api/accounts';
+import type {
+  AccountListEntry,
+  AccountsListSlice,
+  AuthState,
+} from './types/auth-store.types';
+
+/**
+ * Normaliza una Account cruda del backend (GET /api/v1/accounts/me,
+ * POST /api/v1/organizations) al shape que consume el store.
+ * roleId/status quedan con su valor por defecto: el catálogo cacheado en
+ * Redis todavía no expone el rol de la membresía ni su estatus por cuenta.
+ */
+export function toAccountListEntry(raw: AccountData): AccountListEntry {
+  return {
+    id: raw.id,
+    accountType: raw.type,
+    organizationId: raw.type === 'ORGANIZATION' ? raw.id : null,
+    organizationName: raw.organizationDetail?.name ?? null,
+    roleId: null,
+    status: 'ACTIVE',
+  };
+}
+
+export const createAccountsListSlice: StateCreator<
+  AuthState,
+  [],
+  [],
+  AccountsListSlice
+> = (set) => ({
+  accountsList: [],
+
+  setAccountsList: (accounts) =>
+    set({ accountsList: accounts.map(toAccountListEntry) }),
+
+  addAccount: (account) =>
+    set((state) => ({
+      accountsList: [...state.accountsList, toAccountListEntry(account)],
+    })),
+});

@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
-import { useOnboardingStore } from '@/lib/store/useOnboardingStore';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 
 export default function OnboardingBanner() {
-  const { isConfigured, personalConfigured, signatureConfigured } =
-    useOnboardingStore();
+  const user = useAuthStore((state) => state.user);
 
-  if (isConfigured || (personalConfigured && signatureConfigured)) {
+  if (!user || user.isConfigured || (user.personalConfigured && user.signatureConfigured)) {
     return null;
   }
 
@@ -19,7 +18,7 @@ export default function OnboardingBanner() {
         Es requerido configurar tu usuario
       </div>
       <div className="flex flex-wrap gap-3 text-sm">
-        {!personalConfigured && (
+        {!user.personalConfigured && (
           <Link
             href="/personal-documents"
             className="underline underline-offset-2 hover:opacity-80"
@@ -27,7 +26,7 @@ export default function OnboardingBanner() {
             Completa tu información personal
           </Link>
         )}
-        {!signatureConfigured && (
+        {!user.signatureConfigured && (
           <Link
             href="/personal-documents"
             className="underline underline-offset-2 hover:opacity-80"

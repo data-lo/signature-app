@@ -1,11 +1,12 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { createOrganizationRequest } from '@/lib/api/accounts';
-import { useAccountStore } from '@/lib/store/useAccountStore';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import { toAccountListEntry } from '@/lib/store/accounts-list.slice';
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
@@ -17,14 +18,16 @@ function getErrorMessage(error: unknown): string {
 
 export function useCreateOrganization() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const setActiveAccount = useAccountStore((state) => state.setActiveAccount);
+  const addAccount = useAuthStore((state) => state.addAccount);
+  const setActiveAccount = useAuthStore((state) => state.setActiveAccount);
 
   return useMutation({
     mutationFn: createOrganizationRequest,
     onSuccess: (account) => {
-      setActiveAccount(account);
-      queryClient.invalidateQueries({ queryKey: ['accountsCatalog'] });
+      // Regla B: se inserta en accountsList y se activa el nuevo tenant sin
+      // invocar una petición extra a la red (nada de invalidateQueries aquí).
+      addAccount(account);
+      setActiveAccount(toAccountListEntry(account));
       toast.success(
         'Puedes alternar entre tu cuenta personal y la de la organización',
       );

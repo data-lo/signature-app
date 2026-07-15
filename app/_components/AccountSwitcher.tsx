@@ -11,36 +11,45 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAccountsCatalog } from '@/lib/hooks/useAccountsCatalog';
-import { useAccountStore } from '@/lib/store/useAccountStore';
-import type { AccountData } from '@/lib/api/accounts';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import type { AccountListEntry } from '@/lib/store/types/auth-store.types';
+
+function labelFor(account: AccountListEntry): string {
+  return account.accountType === 'ORGANIZATION'
+    ? (account.organizationName ?? 'Organización')
+    : 'Cuenta personal';
+}
 
 export default function AccountSwitcher() {
   const router = useRouter();
-  const { data: accounts } = useAccountsCatalog();
-  const activeAccount = useAccountStore((state) => state.activeAccount);
-  const setActiveAccount = useAccountStore((state) => state.setActiveAccount);
+  const accountsList = useAuthStore((state) => state.accountsList);
+  const activeAccount = useAuthStore((state) => state.activeAccount);
+  const setActiveAccount = useAuthStore((state) => state.setActiveAccount);
 
-  function handleSelect(account: AccountData) {
+  function handleSelect(account: AccountListEntry) {
     setActiveAccount(account);
   }
+
+  const activeEntry = accountsList.find(
+    (account) => account.id === activeAccount?.id,
+  );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-1 outline-none hover:text-foreground">
         <Building2 className="size-3.5" />
-        {activeAccount?.name ?? 'Cuenta'}
+        {activeEntry ? labelFor(activeEntry) : 'Cuenta'}
         <ChevronDown className="size-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Tus cuentas</DropdownMenuLabel>
-          {accounts?.map((account) => (
+          {accountsList.map((account) => (
             <DropdownMenuItem
               key={account.id}
               onClick={() => handleSelect(account)}
             >
-              {account.name}
+              {labelFor(account)}
               {account.id === activeAccount?.id && (
                 <span className="ml-auto text-xs text-muted-foreground">
                   Activa

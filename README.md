@@ -114,7 +114,7 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 | Función | Endpoint |
 |---|---|
 | `getCurrentUserRequest` | `GET /auth/me` (perfil completo, incluye URLs prefirmadas de firma/INE; usado por `/personal-documents`) |
-| `getOnboardingProfileRequest` | `GET /api/v1/users/me` (snapshot cacheado en Redis por CURP; usado por `OnboardingProvider` para hidratar el store de onboarding) |
+| `getOnboardingProfileRequest` | `GET /api/v1/users/me` (snapshot cacheado en Redis por CURP; usado por `AuthProvider` para hidratar `useAuthStore`) |
 
 *(`loginRequest` y `registerRequest` viven en `app/login/_requests.ts` y `app/signup/_requests.ts` respectivamente, no en `lib/api/` — inconsistencia menor de ubicación.)*
 

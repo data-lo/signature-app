@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { updatePersonalInformationRequest } from '../_requests';
-import { useOnboardingStore } from '@/lib/store/useOnboardingStore';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
@@ -25,8 +25,8 @@ export function useUpdatePersonalInformation() {
       toast.success('Información de contacto actualizada correctamente');
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
-      useOnboardingStore.getState().setPersonalConfigured(true);
-      if (!useOnboardingStore.getState().isConfigured) {
+      useAuthStore.getState().updateOnboardingStatus('personal', true);
+      if (!useAuthStore.getState().user?.isConfigured) {
         router.push('/home');
       }
     },
