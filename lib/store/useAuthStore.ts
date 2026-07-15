@@ -5,6 +5,20 @@ import { createAccountsListSlice } from './accounts-list.slice';
 import { createActiveAccountSlice } from './active-account.slice';
 import type { AuthState } from './types/auth-store.types';
 
+// createJSONStorage invoca su getter de inmediato (no de forma perezosa) al
+// crear el store. En Node (SSR/prerendering de Next.js) no existe la global
+// `localStorage`, así que referenciarla directamente lanza un ReferenceError
+// que el propio zustand atrapa devolviendo storage=undefined — y sin storage,
+// el middleware de persist nunca asigna `api.persist`, rompiendo cualquier
+// componente que llame a useAuthStore.persist.* durante el build. Un storage
+// no-op en el servidor evita el throw sin afectar el comportamiento en
+// cliente (skipHydration ya impide que se lea de él antes de tiempo).
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
 // authToken y user se recargan en cada sesión desde la cookie + GET /users/me
 // (fuentes de verdad); solo activeAccount se persiste en localStorage para
 // recordar el tenant operativo elegido entre refrescos de página, sin
@@ -18,7 +32,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() =>
+        typeof window !== 'undefined' ? localStorage : noopStorage,
+      ),
       partialize: (state) => ({ activeAccount: state.activeAccount }),
       // Next.js renderiza este store en el servidor, donde no existe
       // localStorage; se rehidrata manualmente en el cliente (AuthProvider)
