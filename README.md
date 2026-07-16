@@ -9,7 +9,8 @@ Frontend en Next.js (App Router) para la plataforma de firma electrónica de doc
 | Framework | Next.js 15 (App Router, Turbopack) + React 19 | Base del proyecto |
 | Componentes | `@base-ui/react` + `shadcn` (estilo `base-nova`) + `lucide-react` | `components/ui/*`, iconografía |
 | Estilos | Tailwind CSS v4, `class-variance-authority`, `tailwind-merge` | Utilidades y variantes de componentes |
-| Data fetching | `@tanstack/react-query` v5 | Todo el fetching (queries y mutations); no hay Redux/Zustand |
+| Data fetching | `@tanstack/react-query` v5 | Todo el fetching (queries y mutations) |
+| Estado global | `zustand` v5 (Slices Pattern) | `useAuthStore` — sesión, perfil de onboarding y tenant activo multi-cuenta (ver sección 3) |
 | HTTP client | `axios` | Cliente centralizado en `lib/axios.ts` |
 | Formularios | `react-hook-form` + `zod` v4 | Todos los formularios reales |
 | Subida de archivos | FilePond / `react-filepond` | Picker de PDF en `documents/create` |
@@ -61,7 +62,49 @@ Antes de poder firmar cualquier documento, el usuario debe subir su rúbrica (PN
 
 ---
 
-## 3. Estructura de rutas (App Router)
+## 3. Autenticación, onboarding y multi-tenancy (Zustand)
+
+### 3.1 Login, registro y aterrizaje en `/home`
+
+`POST /auth/login` guarda el JWT en cookie (`setAuthToken`) y redirige a `/home`. El store (`useAuthStore`) **no** se llena en ese momento — `AuthProvider` (envuelve todo el route group `(app)`, ver `app/(app)/layout.tsx`) es quien lo hidrata al montar, leyendo `GET /api/v1/users/me` (perfil cacheado en Redis por CURP) y `GET /api/v1/accounts/me` (catálogo de cuentas). Si es la primera vez que el usuario entra (no hay `activeAccount` persistido), `AuthProvider` cae automáticamente a la cuenta de tipo `PERSONAL` del catálogo.
+
+### 3.2 Onboarding (`personalConfigured` / `signatureConfigured`)
+
+`OnboardingBanner` (en `/home`) lee `user.personalConfigured`/`user.signatureConfigured` del store y bloquea con **"Es requerido configurar tu usuario"** mientras cualquiera de las dos sea `false`, con accesos independientes a `/personal-documents` para completar cada una.
+
+Cada mini-flujo muta **solo su propia bandera**, sin esperar a un refetch:
+- `useUpdatePersonalInformation` (`PUT /api/v1/users/me/personal-information`) → al éxito, `updateOnboardingStatus('personal', true)`.
+- `useUploadPersonalDocuments` (`PUT /api/v1/users/me/signature`) → al éxito, `updateOnboardingStatus('signature', true)`.
+
+`AuthProvider` se suscribe (`useAuthStore.subscribe`) y, en cuanto ambas banderas quedan en `true` (y el usuario aún no está `isConfigured`), dispara automáticamente `PATCH /api/v1/users/me/status` (`usePatchUserStatus`) y al éxito llama `markConsolidated()` — el banner desaparece de inmediato porque ya se cumplió la condición local, sin esperar la respuesta del PATCH.
+
+### 3.3 Organizaciones y el switcher de cuentas (multi-tenant)
+
+`/organization/create` (`CreateOrganizationForm` + `useCreateOrganization`) llama `POST /api/v1/organizations`. Al éxito, **sin ninguna petición extra a la red**: `addAccount(account)` inserta la cuenta nueva en `accountsList` y `setActiveAccount(...)` la vuelve el tenant activo de inmediato; luego toast de éxito y redirección a `/home`.
+
+`AccountSwitcher` (en el header, `app/_components/AccountSwitcher.tsx`) lee `accountsList`/`activeAccount` **directamente del store** — no vuelve a pedir el catálogo por su cuenta; `AuthProvider` ya lo carga una sola vez para toda la app autenticada.
+
+`lib/axios.ts` inyecta en cada request `X-Account-Id` (si hay `activeAccount`) y `X-Organization-Id` (solo si `activeAccount.accountType === 'ORGANIZATION'`) — es plomería lista del lado del cliente; el backend todavía no lee estos headers para nada (ver Pendientes).
+
+### 3.4 Store global (`useAuthStore`) — Slices Pattern
+
+El store vive en `lib/store/` partido en 3 slices + un archivo de tipos, unidos en un solo hook:
+
+| Archivo | Responsabilidad |
+|---|---|
+| `types/auth-store.types.ts` | Tipos centrales: `AuthUser` (con `personalConfigured`/`signatureConfigured` anidados), `AccountListEntry`, `ActiveAccount`, `AuthState = AuthSlice & AccountsListSlice & ActiveAccountSlice` |
+| `auth.slice.ts` | `authToken`, `user`, `setAuth(token, profile)`, `updateOnboardingStatus(step, value)`, `logout()`, más `consolidationInFlight`/`markConsolidating`/`markConsolidated` (guard interno para el disparador automático, no forma parte del contrato "de negocio" del store) |
+| `accounts-list.slice.ts` | `accountsList`, `setAccountsList(accounts)` (reemplaza todo el catálogo), `addAccount(account)` (inserta una sola cuenta sin refetch), y el mapper `toAccountListEntry` que normaliza la `Account` cruda del backend (`type`→`accountType`, deriva `organizationId`, `organizationName` desde `organizationDetail.name`) |
+| `active-account.slice.ts` | `activeAccount`, `setActiveAccount(account)` — se queda solo con `{id, accountType, organizationId, roleId}`, ignorando cualquier campo extra del objeto que reciba |
+| `useAuthStore.ts` | Une los 3 slices con `create()(persist(...))`. Solo `activeAccount` se persiste en `localStorage` (el JWT sigue viviendo únicamente en la cookie, para no duplicarlo en un storage más expuesto a XSS; `user` se recarga siempre fresco desde `/users/me`) |
+
+Dos detalles de implementación no obvios, ambos ya resueltos (ver Pendientes por si generan dudas al tocar el store):
+- **SSR**: Next.js evalúa este store también en el servidor, donde no existe `localStorage`. `createJSONStorage` usa un storage no-op cuando `typeof window === 'undefined'`, y el store se crea con `skipHydration: true` — la rehidratación real ocurre en un efecto de `AuthProvider` (`useAuthStore.persist.rehydrate()`), gateada por `useAuthStore.persist.hasHydrated()` para no pisar una cuenta activa persistida con el fallback a la cuenta personal.
+- **`roleId`/`status` en `accountsList`**: el tipo los declara (`roleId: string | null`, `status: 'ACTIVE' | 'INACTIVE'`), pero el backend todavía no expone el rol/vigencia de la membresía en el catálogo cacheado — `toAccountListEntry` los rellena con `null`/`'ACTIVE'` por defecto. Ver Pendientes.
+
+---
+
+## 4. Estructura de rutas (App Router)
 
 ```
 app/
@@ -72,13 +115,15 @@ app/
 ├── signup/                   → "/signup" (SignupForm, useRegister → POST /auth/register)
 ├── _components/               → compartidos entre landing y el flujo mock del dashboard
 └── (app)/                    → route group protegido por middleware
-    ├── layout.tsx             → DashboardNavbar + DocumentsCountProvider
+    ├── layout.tsx             → AuthProvider (hidrata useAuthStore) + DocumentsCountProvider + DashboardNavbar (con AccountSwitcher)
+    ├── home/                  → "/home" — aterrizaje post-login: OnboardingBanner + acceso a las demás secciones
+    ├── organization/create/   → "/organization/create" — CreateOrganizationForm → POST /api/v1/organizations
     ├── dashboard/             → "/dashboard" — renderiza el mismo flujo real que "/documents/create" (ver Pendientes)
     ├── documents/
     │   ├── page.tsx           → "/documents" — listado real (GET /document)
     │   ├── create/            → "/documents/create" — flujo real de creación ⭐
     │   └── [documentId]/      → "/documents/:id" — pantalla de firma real ⭐
-    ├── personal-documents/    → "/personal-documents" — credencial de firma (signature/INE)
+    ├── personal-documents/    → "/personal-documents" — credencial de firma (signature/INE) + datos de contacto del onboarding
     └── plans/                 → "/plans", "/plans/success", "/plans/cancel" — suscripciones Stripe
 ```
 
@@ -95,7 +140,7 @@ Solo `auth` y `plans` tienen su capa de API centralizada en `lib/api/`; el resto
 
 ---
 
-## 4. Integración con el backend
+## 5. Integración con el backend
 
 ### Cliente HTTP (`lib/axios.ts`)
 
@@ -117,6 +162,13 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 | `getOnboardingProfileRequest` | `GET /api/v1/users/me` (snapshot cacheado en Redis por CURP; usado por `AuthProvider` para hidratar `useAuthStore`) |
 
 *(`loginRequest` y `registerRequest` viven en `app/login/_requests.ts` y `app/signup/_requests.ts` respectivamente, no en `lib/api/` — inconsistencia menor de ubicación.)*
+
+**`lib/api/accounts.ts`**
+
+| Función | Endpoint |
+|---|---|
+| `getAccountsCatalogRequest` | `GET /api/v1/accounts/me` (catálogo cacheado en Redis; usado por `AuthProvider` para poblar `accountsList`, no por `AccountSwitcher` directamente) |
+| `createOrganizationRequest` | `POST /api/v1/organizations` |
 
 **`lib/api/plans/`**
 
@@ -161,7 +213,7 @@ Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y
 
 ---
 
-## 5. Componentes reutilizables
+## 6. Componentes reutilizables
 
 - **`components/ui/`** — librería base tipo shadcn sobre `@base-ui/react`: `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `label`, `popover`, `select`, `switch`, `table`, `textarea`, `field`, `separator`. `button.tsx` define las variantes propias (`default`, `brand` — CTA principal verde esmeralda, `outline`, `secondary`, `ghost`, `destructive`, `link`).
 - **`components/form/text-field.tsx`** — único helper de formulario reutilizable: envuelve `Field` + `FieldLabel` + `Input` + `FieldError` para usarse directamente con `register()` de react-hook-form. Usado en `LoginForm`/`SignupForm`; el resto de formularios (documentos, personal-documents) construyen sus campos ad-hoc.
@@ -169,7 +221,7 @@ Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y
 
 ---
 
-## 6. Convenciones de estructura
+## 7. Convenciones de estructura
 
 - **Co-locación por ruta**: cada ruta trae su propia lógica en `_components/`, `_hooks/`, `_requests.ts`, `_schemas.ts` — evita un `lib/` monolítico.
 - **Rutas anidadas reutilizan tipos/componentes del padre**: p. ej. `documents/create/_components` importa desde `documents/_components/`.
@@ -180,7 +232,7 @@ Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y
 
 ---
 
-## 7. Levantar el proyecto
+## 8. Levantar el proyecto
 
 ```bash
 npm install
@@ -200,12 +252,26 @@ Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `e
 
 ---
 
-## 8. Pendientes / trabajo futuro
+## 9. Pendientes / trabajo futuro
 
 ### Pendientes reales (lo que queda abierto hoy)
-- **Dependencia futura de la migración RBAC/multi-cuenta del backend**: **verificado de nuevo — todavía no se ha hecho** en `signature-server` (`UserEntity` sigue con `email`/`password` propios, `AccountEntity` sigue sin `role`/`permission`/`resource`/`action`). Sigue siendo una fase aparte, no iniciada. Cuando avance, este frontend va a necesitar cambios en `middleware.ts` (hoy decodifica un JWT con `sub`/`email`/`roles` planos), en `lib/auth.ts`/`lib/cookies.ts`, y probablemente en la navegación si un usuario puede tener varias cuentas. Por ahora no hay nada que tocar.
+- **`roleId`/`status` de `accountsList` siempre vienen con valor por defecto**: `toAccountListEntry` (`lib/store/accounts-list.slice.ts`) rellena `roleId: null` y `status: 'ACTIVE'` porque `GET /api/v1/accounts/me` todavía no expone el rol/vigencia real de la membresía — ver README de `signature-server`. El switcher funciona, pero no puede (todavía) diferenciar visualmente roles ni ocultar cuentas con acceso revocado.
+- **`X-Account-Id`/`X-Organization-Id` no tienen efecto real todavía**: `lib/axios.ts` los manda en cada request, pero el backend no los lee ni los usa para nada — es solo la plomería del lado del cliente. No hay aislamiento de datos por tenant activo todavía; cambiar de cuenta en el switcher hoy solo actualiza la UI local, no filtra ninguna respuesta del backend.
+- **`activeAccount` persistido nunca se revalida contra el catálogo fresco**: si el usuario pierde acceso a la cuenta que tenía activa (o la organización se elimina), `AuthProvider` no lo detecta — solo cae a la cuenta personal cuando `activeAccount` es `null`, nunca cuando apunta a una cuenta que ya no aparece en `accountsList`.
+- **Sin UI para asignar el `roleId` de una organización recién creada**: `POST /api/v1/organizations` deja el rol del creador en `NULL` a propósito (ver historia de creación de organización); el backend tiene `PATCH /account-member/:id` para asignarlo después, pero ningún flujo del frontend lo llama todavía.
+- **Cobertura de tests desigual**: 46 tests en 10 suites, pero casi toda la cobertura nueva de esta ronda es a nivel de store (`useAuthStore.spec.ts`, 12 tests de las acciones de los 3 slices) — **no hay tests de componente** para `AuthProvider` (la orquestación entre slices: hidratación, fallback a cuenta personal, disparador automático de `/me/status`), `AccountSwitcher`, `OnboardingBanner`, `CreateOrganizationForm`/`useCreateOrganization`, ni para los hooks de `personal-documents` que mutan el onboarding. Tampoco hay tests para `PersonalDocumentsView`/`UserInfoCard`, `DocumentsListView`, ni los flujos de `plans`/Stripe. Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
 - **Reminders / mensaje para participantes / fecha de expiración**: sigue **deliberadamente pendiente** (decisión del equipo) — ver "Ideas descartadas" más abajo. Si el producto los pide más adelante, hay que diseñarlos end-to-end (no es reconectar código existente).
-- **Cobertura de tests parcial**: hay 27 tests cubriendo schemas Zod y los flujos críticos (login, registro, crear documento, firmar/rechazar, cancelación — ver abajo), pero no todo el árbol de componentes tiene tests (p. ej. `PersonalDocumentsView`/`UserInfoCard`, `DocumentsListView`, flujos de `plans`/Stripe). Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
+
+### Resuelto en esta ronda (invalidación del cache de Redis del onboarding)
+- **Ya no hay ventana de regresión visual al refrescar a medias del onboarding**: `PUT /api/v1/users/me/personal-information` y `PUT /api/v1/users/me/signature` ahora refrescan el cache de Redis por CURP en el backend (antes solo lo hacía `PATCH /me/status`) — ver README de `signature-server` para el detalle del fix. `GET /api/v1/users/me` ya no puede devolver un snapshot viejo tras completar un solo paso del onboarding.
+- **`ParticipantPicker` (`/documents/create`) confirmado visualmente**: los dos fixes de estilo del popup (ancho fijo cortando texto largo, `alignItemWithTrigger` dejando el popup pegado al trigger) ya se verificaron en navegador real.
+
+### Resuelto en esta ronda (organizaciones, onboarding con Zustand, switcher multi-tenant)
+- **Store global consolidado con Slices Pattern**: los dos stores independientes que existían antes (uno para `authToken`/`activeAccount`, otro para el perfil de onboarding) se unificaron en `useAuthStore` (`lib/store/`), partido en `auth.slice.ts`/`accounts-list.slice.ts`/`active-account.slice.ts` + `types/auth-store.types.ts` — ver sección 3.4 arriba.
+- **`AuthProvider` reemplaza a los dos providers viejos** (`AccountProvider`+`OnboardingProvider`): hidrata el store completo (perfil + catálogo de cuentas) al entrar a `/home`, resuelve el fallback a la cuenta personal, y contiene el disparador automático de consolidación del onboarding.
+- **Creación de organización y switcher multi-tenant**: `/organization/create` + `AccountSwitcher` en el header, con inserción local (`addAccount`/`setActiveAccount`) sin refetch extra al crear una organización — ver sección 3.3.
+- **Onboarding con `isConfigured`/`personalConfigured`/`signatureConfigured`**: banner bloqueante en `/home`, mutación aislada por mini-flujo, disparador automático de `PATCH /me/status` — ver sección 3.2.
+- **Fix de build en producción**: `next build` fallaba prerenderizando cualquier página (`TypeError: Cannot read properties of undefined (reading 'hasHydrated')`) porque `createJSONStorage(() => localStorage)` se evalúa de forma inmediata al crear el store, y `localStorage` no existe en el entorno de build de Next.js (Node). Se corrigió con un storage no-op condicional a `typeof window !== 'undefined'` — este bug ya existía en el store viejo, simplemente nadie había corrido `next build` hasta que apareció en CI.
 
 ### Resuelto en esta ronda
 - **Tests automatizados con Jest + React Testing Library**: configurado vía `next/jest` (`jest.config.mjs`) + `jest-dom` + `@testing-library/user-event`. `test-utils.tsx` centraliza un `renderWithProviders()` con `QueryClientProvider` de prueba. 27 tests en 8 suites cubriendo: schemas Zod (`loginSchema`, `registerSchema` incluyendo el RFC nuevo, `selectParticipantsSchema`, `rejectDocumentSchema`), `LoginForm` (validación, envío, estado de carga), `SignupForm` (validación del RFC, envío completo), `SignDocumentView` (firmar, rechazar con motivo, mensaje de "no es tu turno", solicitar y confirmar cancelación) y `CreateDocumentView` (botón deshabilitado sin archivo/firmante, envío con archivo + firmante seleccionado, mensaje de error del backend). Los hooks de datos (`useLogin`, `useRegister`, `useSignDocument`, etc.) se mockean en los tests de componente — no se prueban por separado los mismos hooks todavía.
