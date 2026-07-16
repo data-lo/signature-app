@@ -86,6 +86,8 @@ Cada mini-flujo muta **solo su propia bandera**, sin esperar a un refetch:
 
 `lib/axios.ts` inyecta en cada request `X-Account-Id` (si hay `activeAccount`) y `X-Organization-Id` (solo si `activeAccount.accountType === 'ORGANIZATION'`). El backend ya lee y valida `X-Account-Id` para `POST /document`/`GET /document` (documentos scopeados por la cuenta activa, ver README de `signature-server`) — ningún cambio de este lado, ya se mandaba desde que se agregó el interceptor. El resto de los endpoints (detalle de documento, firma/rechazo/cancelación, `GET /user`) todavía no lo leen (ver Pendientes).
 
+**Invitar miembros a la organización activa** (`/home`, `InviteMemberModal` — solo se renderiza si `activeAccount.accountType === 'ORGANIZATION'`): al abrir el modal, `useSystemRoles()` consulta `GET /api/v1/roles` (deshabilitada hasta que el modal está abierto — `useQuery({..., enabled: open})`) para poblar el `Select` de rol. Al enviar, `useInviteMember()` llama `POST /api/v1/organizations/invite` (`{email, roleId}`, `X-Account-Id` inyectado igual que cualquier otro request) y cierra el modal al éxito. **Alcance delimitado a propósito** (misma historia que implementó el endpoint): el backend solo valida y confirma, no crea ninguna membresía todavía — el modal se cierra y muestra el toast de éxito, pero el usuario invitado no aparece en ningún listado real hasta que se conecte la lógica de persistencia (ver README de `signature-server`, sección Pendientes).
+
 ### 3.4 Store global (`useAuthStore`) — Slices Pattern
 
 El store vive en `lib/store/` partido en 3 slices + un archivo de tipos, unidos en un solo hook:
@@ -117,7 +119,7 @@ app/
 ├── _components/               → compartidos entre landing y el flujo mock del dashboard
 └── (app)/                    → route group protegido por middleware
     ├── layout.tsx             → AuthProvider (hidrata useAuthStore) + DocumentsCountProvider + DashboardNavbar (con AccountSwitcher)
-    ├── home/                  → "/home" — aterrizaje post-login: OnboardingBanner + acceso a las demás secciones
+    ├── home/                  → "/home" — aterrizaje post-login: OnboardingBanner + InviteMemberModal (solo con Org activa) + acceso a las demás secciones
     ├── organization/create/   → "/organization/create" — CreateOrganizationForm → POST /api/v1/organizations
     ├── dashboard/             → "/dashboard" — renderiza el mismo flujo real que "/documents/create" (ver Pendientes)
     ├── documents/
@@ -170,6 +172,13 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 |---|---|
 | `getAccountsCatalogRequest` | `GET /api/v1/accounts/me` (catálogo cacheado en Redis; usado por `AuthProvider` para poblar `accountsList`, no por `AccountSwitcher` directamente) |
 | `createOrganizationRequest` | `POST /api/v1/organizations` |
+| `inviteMemberRequest` | `POST /api/v1/organizations/invite` (alcance delimitado — ver sección 3.3) |
+
+**`lib/api/roles.ts`**
+
+| Función | Endpoint |
+|---|---|
+| `getSystemRolesRequest` | `GET /api/v1/roles` — usado por `useSystemRoles` para poblar el `Select` de `InviteMemberModal` |
 
 **`lib/api/plans/`**
 
@@ -251,14 +260,30 @@ npm run test:watch  # modo watch
 
 Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `eslint.config.mjs`/`postcss.config.mjs`) + React Testing Library + `jest-dom`. `test-utils.tsx` en la raíz expone `renderWithProviders()`, que envuelve en un `QueryClientProvider` de prueba (retries desactivados) para componentes que usan React Query. Los specs están co-localizados junto a su componente/schema (`*.spec.ts`/`*.spec.tsx`), igual que en `signature-server`.
 
+**`jest.setup.ts` polyfills para popups de `@base-ui/react`**: jsdom no implementa `ResizeObserver` ni `PointerEvent` (ni `hasPointerCapture`/`setPointerCapture`/`scrollIntoView` en `Element`), y `Select`/`Popover`/`dropdown-menu` los usan para posicionarse y para abrir con click. Sin estos stubs, un popup se queda montado con `hidden`/`data-closed` sin importar cuántas veces se le haga `userEvent.click()` al trigger — no es un bug del componente, es la ausencia de estas APIs en jsdom. Con el polyfill, `click` sigue sin abrir el popup de forma confiable (aparentemente porque base-ui espera una secuencia de eventos de puntero más específica que la que dispara `userEvent` incluso con el polyfill) — el camino confiable que sí funciona es teclado: `trigger.focus()` + `userEvent.keyboard('{Enter}')` para abrir, luego `userEvent.click()` sobre la opción (`role="option"`) para seleccionar y cerrar (ver `InviteMemberModal.spec.tsx` para el patrón completo).
+
 ---
 
 ## 9. Pendientes / trabajo futuro
 
+### Resuelto en esta ronda (bug crítico: el frontend no llegaba al backend en ningún escenario real)
+- **`lib/axios.ts` tenía `baseURL: '/api'`** (no `NEXT_PUBLIC_API_BASE_URL`, a pesar de que este README y `.env.local` ya documentaban/configuraban lo correcto) **y `next.config.ts` tenía un `rewrites()` que reenviaba `/api/:path*` a `process.env.BACKEND_API_URL` — variable que nunca se definió en ningún lado**, así que cada request cruzaba a su fallback hardcodeado `http://localhost:4000`, un puerto donde no corre nada. Encima, aunque se hubiera apuntado al puerto correcto, el `rewrites()` reenviaba con el prefijo `/api` intacto (`${backendUrl}/api/:path*`), que no calza con la mitad de las rutas reales del backend (`/document`, `/auth/*`, `/signature/*`, `/account*` no llevan ese prefijo) ni con la otra mitad (`/api/v1/*` ya lo trae en el path, duplicándolo). El resultado: **ninguna llamada real de la app llegaba al backend** — ni login, ni el catálogo de cuentas, ni crear documentos, nada — aunque toda la suite de Jest siguiera en verde, porque los tests mockean la capa de red y nunca ejercitan `apiClient` de verdad.
+- **Por qué nadie lo había notado**: cada verificación de este proyecto hasta ahora fue típecheck/lint/tests (mockeados) + build, nunca una llamada de red real desde el navegador. Se detectó al hacer un chequeo end-to-end real (registro→login→crear organización→invitar→crear documento vía `curl`, simulando exactamente lo que haría `apiClient` desde el navegador) pedido explícitamente para buscar errores en el proyecto completo.
+- **Fix**: `lib/axios.ts` vuelve a usar `NEXT_PUBLIC_API_BASE_URL` (con el fallback documentado `http://localhost:3000`) para llamar al backend directamente, cruzando orígenes — el backend ya tiene `app.enableCors({ origin: process.env.FRONTEND_URL ?? 'http://localhost:3001' })` en `main.ts`, confirmando que ese es el diseño real, no el proxy same-origin. Se eliminó el `rewrites()` de `next.config.ts` (dead code irrecuperable dado el desajuste de prefijos). Verificado con una llamada cross-origin real (preflight `OPTIONS` + `GET` con header `Origin`) contra el backend vivo: 200 con los datos reales.
+- **Tests**: sin cambios — el bug era invisible a Jest por diseño (mockea la red), así que no hay manera de que un test unitario lo hubiera atrapado; solo una llamada de red real (o un e2e futuro) lo detecta. Esto refuerza el pendiente de abajo sobre la falta de tests end-to-end.
+
 ### Pendientes reales (lo que queda abierto hoy)
-- **De los dos headers que manda `lib/axios.ts`, solo `X-Account-Id` tiene efecto, y solo en documentos (crear + listar)**: cambiar de cuenta en el switcher ya filtra `/document` de verdad — ver README de `signature-server`. `X-Organization-Id` se manda igual en cada request (cuando la cuenta activa es una organización) pero **ningún endpoint del backend lo lee todavía**, ni siquiera esos dos. El resto de recursos (detalle de documento, firma/rechazo/cancelación, `GET /user` para elegir firmantes/espectadores) tampoco distinguen cuenta activa; cambiar de cuenta ahí sigue sin efecto en el backend.
-- **Cobertura de tests desigual**: 68 tests en 15 suites. `AuthProvider`, `AccountSwitcher`, `OnboardingBanner` y `CreateOrganizationForm`/`useCreateOrganization` ya tienen tests de componente (ver "Resuelto" abajo). **Siguen sin cobertura** los hooks de `personal-documents` que mutan el onboarding (`useUpdatePersonalInformation`, `useUploadPersonalDocuments`), `PersonalDocumentsView`/`UserInfoCard`, `DocumentsListView`, y los flujos de `plans`/Stripe. Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
+- **`InviteMemberModal` no invita a nadie todavía — alcance delimitado a propósito**: al enviar el formulario, el backend valida y responde éxito, pero no crea ninguna membresía real. El modal se cierra y muestra el toast, pero no hay ningún listado de "invitaciones pendientes" en la UI porque el backend tampoco las persiste todavía — ver README de `signature-server` para lo que falta decidir (modelo de invitación pendiente, aceptación, expiración, correo).
+- **De los dos headers que manda `lib/axios.ts`, solo `X-Account-Id` tiene efecto, y solo en documentos (crear + listar) y ahora en la invitación de miembros**: cambiar de cuenta en el switcher ya filtra `/document` de verdad, y `POST /api/v1/organizations/invite` ya valida contra la cuenta activa — ver README de `signature-server`. `X-Organization-Id` se manda igual en cada request (cuando la cuenta activa es una organización) pero **ningún endpoint del backend lo lee todavía**. El resto de recursos (detalle de documento, firma/rechazo/cancelación, `GET /user` para elegir firmantes/espectadores) tampoco distinguen cuenta activa; cambiar de cuenta ahí sigue sin efecto en el backend.
+- **Cobertura de tests desigual**: 75 tests en 17 suites. `AuthProvider`, `AccountSwitcher`, `OnboardingBanner`, `CreateOrganizationForm`/`useCreateOrganization` e `InviteMemberModal`/`useInviteMember` ya tienen tests de componente (ver "Resuelto" abajo). **Siguen sin cobertura** los hooks de `personal-documents` que mutan el onboarding (`useUpdatePersonalInformation`, `useUploadPersonalDocuments`), `PersonalDocumentsView`/`UserInfoCard`, `DocumentsListView`, y los flujos de `plans`/Stripe. Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
 - **Reminders / mensaje para participantes / fecha de expiración**: sigue **deliberadamente pendiente** (decisión del equipo) — ver "Ideas descartadas" más abajo. Si el producto los pide más adelante, hay que diseñarlos end-to-end (no es reconectar código existente).
+
+### Resuelto en esta ronda (Módulo de Invitación de Miembros — alcance delimitado)
+- **`InviteMemberModal` nuevo** (`app/(app)/home/_components/`, montado en `/home`, solo visible si `activeAccount.accountType === 'ORGANIZATION'`): formulario con `react-hook-form` + `zod` (`_schemas.ts`), correo (`TextField`) y rol (`Select`, poblado por `useSystemRoles()` → `GET /api/v1/roles`, solo mientras el modal está abierto). Al enviar, `useInviteMember()` llama `POST /api/v1/organizations/invite` y cierra el modal + toast al éxito, igual que el patrón ya establecido por `useCreateOrganization`.
+- **`lib/api/roles.ts` nuevo**: primera función de API para el catálogo RBAC del backend (`getSystemRolesRequest`). `lib/api/accounts.ts` gana `inviteMemberRequest`.
+- **Polyfills nuevos en `jest.setup.ts`** (`ResizeObserver`, `PointerEvent`, `hasPointerCapture`/`setPointerCapture`/`scrollIntoView`): necesarios para poder probar de verdad la interacción con el `Select` de este modal — sin ellos, el popup se queda "cerrado" en jsdom sin importar los clics que se le hagan al trigger. Benefician a cualquier test futuro que use `Select`/`Popover`/`dropdown-menu` (ver sección 8, Tests).
+- **Tests nuevos**: `useInviteMember.spec.tsx` (éxito, error con mensaje del backend, error genérico) e `InviteMemberModal.spec.tsx` (no renderiza sin cuenta de organización activa, botón deshabilitado hasta llenar correo+rol, consulta `GET /api/v1/roles` al abrir, envía `{email, roleId}`, estado de carga). 75 tests en total (antes 68).
+- **Explícitamente fuera de esta ronda**: el backend no persiste la invitación (ver su README) — el modal solo confirma que el request se envió y fue aceptado por el servidor, no que alguien fue invitado de verdad todavía.
 
 ### Resuelto en esta ronda (X-Account-Id con efecto real en documentos)
 - **Sin cambios de código de este lado**: `lib/axios.ts` ya mandaba `X-Account-Id`/`X-Organization-Id` desde que se construyó el interceptor (parte del trabajo de Zustand). Lo que cambió fue el backend: ahora valida el header contra una membresía real y filtra `GET /document` por la cuenta activa — ver README de `signature-server` para el detalle (nueva columna `accountId` en documentos, con backfill a la cuenta personal del creador para los documentos existentes).

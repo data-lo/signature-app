@@ -19,6 +19,11 @@ export interface CreateOrganizationValues {
   organizationName: string;
 }
 
+export interface InviteMemberValues {
+  email: string;
+  roleId: string;
+}
+
 export async function getAccountsCatalogRequest(): Promise<AccountData[]> {
   const { data } = await apiClient.get<{
     success: boolean;
@@ -39,4 +44,15 @@ export async function createOrganizationRequest(
   }>('/api/v1/organizations', values);
 
   return data.data;
+}
+
+/**
+ * Invita a un nuevo miembro a la organización activa (X-Account-Id, inyectado
+ * por el interceptor de `apiClient`). Alcance delimitado: el backend solo
+ * confirma la recepción — no envía correo ni crea la membresía todavía.
+ */
+export async function inviteMemberRequest(
+  values: InviteMemberValues,
+): Promise<void> {
+  await apiClient.post('/api/v1/organizations/invite', values);
 }
