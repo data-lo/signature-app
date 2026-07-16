@@ -29,10 +29,27 @@ export const signatureFileSchema = z
   });
 
 export const personalDocumentsSchema = z.object({
-  ineFile: ineFileSchema,
+  ineFile: ineFileSchema.optional(),
   signatureFile: signatureFileSchema,
 });
 
 export type PersonalDocumentsFormValues = z.infer<
   typeof personalDocumentsSchema
+>;
+
+export const updatePersonalInfoSchema = z.object({
+  phoneNumber: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{7,15}$/, {
+      message: 'El teléfono debe tener entre 7 y 15 dígitos',
+    }),
+  secondaryEmail: z
+    .string()
+    .trim()
+    .email({ message: 'Correo electrónico inválido' }),
+});
+
+export type UpdatePersonalInfoFormValues = z.infer<
+  typeof updatePersonalInfoSchema
 >;

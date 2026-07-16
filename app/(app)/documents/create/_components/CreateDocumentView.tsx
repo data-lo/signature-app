@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 import DocumentsTable from '../../_components/DocumentsTable';
 import {
   EMPTY_DOCUMENTS_FILTERS,
@@ -19,7 +21,10 @@ import {
   type SelectParticipantsFormValues,
 } from '../_schemas';
 import { useMyDocuments } from '../_hooks/useMyDocuments';
-import { useCreateDocument } from '../_hooks/useCreateDocument';
+import {
+  useCreateDocument,
+  getCreateDocumentErrorMessage,
+} from '../_hooks/useCreateDocument';
 import DocumentFilePicker from './DocumentFilePicker';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
@@ -27,6 +32,7 @@ const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
 });
 
 export default function CreateDocumentView() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DocumentsFilters>(
@@ -55,6 +61,11 @@ export default function CreateDocumentView() {
     filters,
   );
   const createMutation = useCreateDocument();
+  const { setDocumentsCount } = useDocumentsCount();
+
+  useEffect(() => {
+    if (myDocuments) setDocumentsCount(myDocuments.meta.total);
+  }, [myDocuments, setDocumentsCount]);
 
   function onSubmit(values: SelectParticipantsFormValues) {
     if (!file) return;
@@ -123,6 +134,12 @@ export default function CreateDocumentView() {
             >
               {createMutation.isPending ? 'Enviando a firma...' : 'Firmar'}
             </Button>
+
+            {createMutation.isError && (
+              <p className="text-sm text-destructive">
+                {getCreateDocumentErrorMessage(createMutation.error)}
+              </p>
+            )}
           </div>
 
           <Card className="h-[520px] overflow-hidden p-0">
@@ -147,6 +164,7 @@ export default function CreateDocumentView() {
           hasNextPage={myDocuments?.meta.hasNextPage}
           hasPrevPage={myDocuments?.meta.hasPrevPage}
           onPageChange={setPage}
+          onViewDetail={(id) => router.push(`/documents/${id}`)}
           filters={filters}
           onFiltersChange={handleFiltersChange}
         />

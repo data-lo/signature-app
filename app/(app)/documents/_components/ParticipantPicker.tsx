@@ -56,10 +56,21 @@ export default function ParticipantPicker({
         <SelectTrigger className="w-full" aria-invalid={Boolean(error)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        {/* alignItemWithTrigger=false: por defecto Base UI superpone el popup
+            sobre el trigger sin animación, imitando un <select> nativo que
+            reabre en el valor ya elegido. Este picker nunca tiene un valor
+            real (value siempre null, es de "agregar"), así que ese modo lo
+            deja pegado al trigger; con side="bottom" se despliega como un
+            dropdown normal. */}
+        <SelectContent
+          className="w-max max-w-[min(26rem,90vw)]"
+          alignItemWithTrigger={false}
+        >
           {availableUsers.map((user) => (
             <SelectItem key={user.id} value={user.id}>
-              {user.firstName} {user.lastName} ({user.email})
+              <span className="whitespace-normal break-words">
+                {user.firstName} {user.lastName} ({user.email})
+              </span>
             </SelectItem>
           ))}
         </SelectContent>

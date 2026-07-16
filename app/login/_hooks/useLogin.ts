@@ -12,7 +12,9 @@ export function useLogin() {
     mutationFn: (values: LoginFormValues) => loginRequest(values),
     onSuccess: (data) => {
       setAuthToken(data.token);
-      router.push('/dashboard');
+      // El perfil completo (para setAuth) se carga en /home vía AuthProvider,
+      // que lee /api/v1/users/me una vez montado.
+      router.push('/home');
     },
   });
 }

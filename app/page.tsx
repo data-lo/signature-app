@@ -72,8 +72,8 @@ export default function LandingPage() {
       <LandingTrustBar />
 
       <LandingFeatureSection
-        title="Elige el tipo de firma que mejor se adapte a tus necesidades"
-        description="Ya sea que necesites firmas electrónicas avanzadas hechas con e.firma, firmas electrónicas simples con verificación por correo, o ambas, Signature se adapta a lo que necesites."
+        title="Firma electrónica simple, verificada con tu credencial"
+        description="Cada usuario registra una sola vez su rúbrica y su identificación oficial. A partir de ahí, firmar cualquier documento es tan simple como confirmar tu turno."
         visual={<SignatureMethodVisual />}
       />
 

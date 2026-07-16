@@ -82,6 +82,7 @@ interface DocumentsTableProps {
   hasPrevPage?: boolean;
   onPageChange?: (page: number) => void;
   onSignClick?: (documentId: string) => void;
+  onViewDetail?: (documentId: string) => void;
   filters?: DocumentsFilters;
   onFiltersChange?: (filters: DocumentsFilters) => void;
   showMyTurnFilter?: boolean;
@@ -112,6 +113,7 @@ export default function DocumentsTable({
   hasPrevPage = false,
   onPageChange,
   onSignClick,
+  onViewDetail,
   filters,
   onFiltersChange,
   showMyTurnFilter,
@@ -202,6 +204,18 @@ export default function DocumentsTable({
                       <Eye className="size-4" />
                     </Button>
                   )}
+                  {onViewDetail &&
+                    (doc.status === 'signed' ||
+                      doc.status === 'cancellation_pending' ||
+                      doc.status === 'cancelled') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onViewDetail(doc.id)}
+                      >
+                        Ver detalle
+                      </Button>
+                    )}
                 </div>
               </TableCell>
             </TableRow>

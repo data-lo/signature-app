@@ -10,6 +10,11 @@ export const registerSchema = z
       .email('Correo electrónico inválido'),
     position: z.string().min(1, 'El puesto es obligatorio'),
     nationalId: z.string().length(18, 'El CURP debe tener 18 caracteres'),
+    rfc: z
+      .string()
+      .min(12, 'El RFC debe tener 12 o 13 caracteres')
+      .max(13, 'El RFC debe tener 12 o 13 caracteres')
+      .regex(/^[A-Za-z0-9]+$/, 'El RFC solo debe contener letras y números'),
     password: z
       .string()
       .min(8, 'La contraseña debe tener al menos 8 caracteres'),

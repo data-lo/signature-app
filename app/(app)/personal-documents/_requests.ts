@@ -1,5 +1,8 @@
 import apiClient from '@/lib/axios';
-import type { PersonalDocumentsFormValues } from './_schemas';
+import type {
+  PersonalDocumentsFormValues,
+  UpdatePersonalInfoFormValues,
+} from './_schemas';
 
 interface UploadPersonalDocumentsResponseData {
   id: string;
@@ -9,14 +12,16 @@ export async function uploadPersonalDocumentsRequest(
   values: PersonalDocumentsFormValues,
 ): Promise<UploadPersonalDocumentsResponseData> {
   const formData = new FormData();
-  formData.append('officialFile', values.ineFile);
+  if (values.ineFile) {
+    formData.append('officialFile', values.ineFile);
+  }
   formData.append('signatureImage', values.signatureFile);
 
-  const { data } = await apiClient.post<{
+  const { data } = await apiClient.put<{
     success: boolean;
     message: string;
     data: UploadPersonalDocumentsResponseData;
-  }>('/signature', formData);
+  }>('/api/v1/users/me/signature', formData);
 
   return data.data;
 }
@@ -47,4 +52,13 @@ export async function deleteSignatureFileRequest(
   signatureId: string,
 ): Promise<void> {
   await apiClient.delete(`/signature/${signatureId}/signature-image`);
+}
+
+export async function updatePersonalInformationRequest(
+  values: UpdatePersonalInfoFormValues,
+): Promise<void> {
+  await apiClient.put('/api/v1/users/me/personal-information', {
+    phoneNumber: values.phoneNumber || undefined,
+    secondaryEmail: values.secondaryEmail || undefined,
+  });
 }

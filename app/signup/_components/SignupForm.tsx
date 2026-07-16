@@ -2,22 +2,13 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AxiosError } from 'axios';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
-import { useRegister } from '../_hooks/useRegister';
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ?? 'Error de conexión con el servidor'
-  );
-}
+import { useRegister, getRegisterErrorMessage } from '../_hooks/useRegister';
 
 export default function SignupForm() {
   const {
@@ -79,6 +70,14 @@ export default function SignupForm() {
             />
 
             <TextField
+              id="rfc"
+              label="RFC"
+              maxLength={13}
+              error={errors.rfc}
+              {...register('rfc')}
+            />
+
+            <TextField
               id="password"
               label="Contraseña"
               type="password"
@@ -97,7 +96,9 @@ export default function SignupForm() {
             />
 
             {registerMutation.isError && (
-              <FieldError>{getErrorMessage(registerMutation.error)}</FieldError>
+              <FieldError>
+                {getRegisterErrorMessage(registerMutation.error)}
+              </FieldError>
             )}
 
             <Button

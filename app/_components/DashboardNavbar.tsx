@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useLogout } from '@/lib/hooks/useLogout';
+import AccountSwitcher from './AccountSwitcher';
 
 const navItems = [
-  { label: 'GESTIONAR', href: '/dashboard' },
+  { label: 'GESTIONAR', href: '/home' },
   { label: 'FIRMAR', href: '/documents' },
   { label: 'PLANES', href: '/plans' },
 ];
@@ -35,7 +36,7 @@ export default function DashboardNavbar({
       <div className="flex items-center gap-10">
         <button
           type="button"
-          onClick={() => router.push('/dashboard')}
+          onClick={() => router.push('/home')}
           className="outline-none"
         >
           <FileSignature className="size-6 text-emerald-500" />
@@ -62,6 +63,8 @@ export default function DashboardNavbar({
 
       <div className="flex items-center gap-6 text-xs font-semibold tracking-wide text-muted-foreground">
         <ThemeToggle className="flex items-center gap-1 cursor-pointer hover:text-foreground" />
+
+        <AccountSwitcher />
 
         {typeof documentsCount === 'number' && (
           <span
