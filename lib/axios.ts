@@ -5,7 +5,7 @@ import { getAuthToken, clearAuthToken } from './cookies';
 import { useAuthStore } from './store/useAuthStore';
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000',
+  baseURL: '/api',
 });
 
 apiClient.interceptors.request.use((config) => {
