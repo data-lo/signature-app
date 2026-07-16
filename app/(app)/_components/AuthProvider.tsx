@@ -7,13 +7,13 @@ import { useAccountsCatalog } from '@/lib/hooks/useAccountsCatalog';
 import { usePatchUserStatus } from '@/lib/hooks/usePatchUserStatus';
 import { getAuthToken } from '@/lib/cookies';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { toAccountListEntry } from '@/lib/store/accounts-list.slice';
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
-  const { data: profile } = useOnboardingProfile();
   const { data: accounts } = useAccountsCatalog();
+  const { data: profile } = useOnboardingProfile();
   const setAuth = useAuthStore((state) => state.setAuth);
   const setAccountsList = useAuthStore((state) => state.setAccountsList);
+  const accountsList = useAuthStore((state) => state.accountsList);
   const activeAccount = useAuthStore((state) => state.activeAccount);
   const setActiveAccount = useAuthStore((state) => state.setActiveAccount);
   const patchStatusMutation = usePatchUserStatus();
@@ -46,20 +46,31 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  // Regla A.2: primera sesión (sin tenant persistido) → cae a la cuenta PERSONAL.
+  // Regla A.2: primera sesión (sin tenant persistido) → cae a la cuenta
+  // PERSONAL. También revalida un activeAccount persistido que ya no exista
+  // en el catálogo fresco (acceso revocado, organización eliminada) y hace
+  // el mismo fallback. Se compara contra accountsList (el store, ya
+  // actualizado por addAccount al crear una organización) y no contra
+  // `accounts` de React Query directamente: ese caché queda a propósito sin
+  // invalidar tras crear una organización (ver useCreateOrganization), así
+  // que compararlo aquí habría regresado al usuario a su cuenta personal
+  // justo después de crear la organización nueva.
   useEffect(() => {
-    if (
-      hasHydratedActiveAccount &&
-      !activeAccount &&
-      accounts &&
-      accounts.length > 0
-    ) {
-      const personalAccount =
-        accounts.find((account) => account.type === 'PERSONAL') ??
-        accounts[0];
-      setActiveAccount(toAccountListEntry(personalAccount));
+    if (!hasHydratedActiveAccount || accountsList.length === 0) {
+      return;
     }
-  }, [hasHydratedActiveAccount, accounts, activeAccount, setActiveAccount]);
+
+    const activeAccountStillValid =
+      activeAccount != null &&
+      accountsList.some((account) => account.id === activeAccount.id);
+
+    if (!activeAccountStillValid) {
+      const personalAccount =
+        accountsList.find((account) => account.accountType === 'PERSONAL') ??
+        accountsList[0];
+      setActiveAccount(personalAccount);
+    }
+  }, [hasHydratedActiveAccount, accountsList, activeAccount, setActiveAccount]);
 
   // Disparador automático de cierre: cuando ambas sub-banderas quedan en
   // true, consolida el onboarding con PATCH /me/status.

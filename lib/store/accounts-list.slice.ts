@@ -8,9 +8,11 @@ import type {
 
 /**
  * Normaliza una Account cruda del backend (GET /api/v1/accounts/me,
- * POST /api/v1/organizations) al shape que consume el store.
- * roleId/status quedan con su valor por defecto: el catálogo cacheado en
- * Redis todavía no expone el rol de la membresía ni su estatus por cuenta.
+ * POST /api/v1/organizations) al shape que consume el store. `roleId` toma
+ * el primer rol de la membresía (el backend lo modela como enum-array, no
+ * como una FK real a una entidad Role — ver README de signature-server);
+ * hoy el backend siempre asigna OWNER de inmediato al crear una cuenta, así
+ * que `null` solo ocurriría ante una membresía sin rol vigente (revocada).
  */
 export function toAccountListEntry(raw: AccountData): AccountListEntry {
   return {
@@ -18,8 +20,8 @@ export function toAccountListEntry(raw: AccountData): AccountListEntry {
     accountType: raw.type,
     organizationId: raw.type === 'ORGANIZATION' ? raw.id : null,
     organizationName: raw.organizationDetail?.name ?? null,
-    roleId: null,
-    status: 'ACTIVE',
+    roleId: raw.role?.[0] ?? null,
+    status: raw.isActive ? 'ACTIVE' : 'INACTIVE',
   };
 }
 

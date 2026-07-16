@@ -8,6 +8,10 @@ export interface AccountData {
   type: AccountType;
   createdAt: string;
   organizationDetail?: { name: string } | null;
+  /** Rol(es) del usuario autenticado en esta cuenta; null solo si la membresía no tiene rol vigente. */
+  role: string[] | null;
+  /** Vigencia de la membresía del usuario autenticado en esta cuenta. */
+  isActive: boolean;
 }
 
 export interface CreateOrganizationValues {
