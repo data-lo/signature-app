@@ -1,7 +1,5 @@
 import type { NextConfig } from 'next';
 
-console.log('[next.config.ts] BACKEND_API_URL:', process.env.BACKEND_API_URL);
-
 const nextConfig: NextConfig = {
   output: 'standalone',
   webpack: (config) => {
