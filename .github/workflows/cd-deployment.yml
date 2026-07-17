@@ -20,14 +20,22 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Debug - verificar secret
+        run: |
+          if [ -z "${{ secrets.BACKEND_API_URL }}" ]; then
+            echo "BACKEND_API_URL está vacío o no existe como secret"
+          else
+            echo "BACKEND_API_URL tiene un valor definido"
+          fi
+
       - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          no-cache: true
+          no-cache: false
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+            BACKEND_API_URL=${{ secrets.BACKEND_API_URL }}
           tags: |
             dataloplatforms/signature-app:latest
             dataloplatforms/signature-app:${{ github.sha }}
