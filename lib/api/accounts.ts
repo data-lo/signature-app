@@ -8,8 +8,8 @@ export interface AccountData {
   type: AccountType;
   createdAt: string;
   organizationDetail?: { name: string } | null;
-  /** Rol(es) del usuario autenticado en esta cuenta; null solo si la membresía no tiene rol vigente. */
-  role: string[] | null;
+  /** UUID del rol (ver GET /api/v1/roles) del usuario autenticado en esta cuenta; null solo si la membresía no tiene rol vigente. */
+  roleId: string | null;
   /** Vigencia de la membresía del usuario autenticado en esta cuenta. */
   isActive: boolean;
 }
@@ -17,6 +17,11 @@ export interface AccountData {
 export interface CreateOrganizationValues {
   name: string;
   organizationName: string;
+}
+
+export interface InviteMemberValues {
+  email: string;
+  roleId: string;
 }
 
 export async function getAccountsCatalogRequest(): Promise<AccountData[]> {
@@ -39,4 +44,15 @@ export async function createOrganizationRequest(
   }>('/api/v1/organizations', values);
 
   return data.data;
+}
+
+/**
+ * Invita a un nuevo miembro a la organización activa (X-Account-Id, inyectado
+ * por el interceptor de `apiClient`). Alcance delimitado: el backend solo
+ * confirma la recepción — no envía correo ni crea la membresía todavía.
+ */
+export async function inviteMemberRequest(
+  values: InviteMemberValues,
+): Promise<void> {
+  await apiClient.post('/api/v1/organizations/invite', values);
 }

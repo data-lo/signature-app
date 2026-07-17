@@ -8,11 +8,11 @@ import type {
 
 /**
  * Normaliza una Account cruda del backend (GET /api/v1/accounts/me,
- * POST /api/v1/organizations) al shape que consume el store. `roleId` toma
- * el primer rol de la membresía (el backend lo modela como enum-array, no
- * como una FK real a una entidad Role — ver README de signature-server);
- * hoy el backend siempre asigna OWNER de inmediato al crear una cuenta, así
- * que `null` solo ocurriría ante una membresía sin rol vigente (revocada).
+ * POST /api/v1/organizations) al shape que consume el store. `roleId` es el
+ * UUID real de la membresía en el catálogo RBAC (ver GET /api/v1/roles en
+ * signature-server); hoy el backend siempre asigna el rol ADMIN de inmediato
+ * al crear una cuenta, así que `null` solo ocurriría ante una membresía sin
+ * rol vigente (revocada).
  */
 export function toAccountListEntry(raw: AccountData): AccountListEntry {
   return {
@@ -20,7 +20,7 @@ export function toAccountListEntry(raw: AccountData): AccountListEntry {
     accountType: raw.type,
     organizationId: raw.type === 'ORGANIZATION' ? raw.id : null,
     organizationName: raw.organizationDetail?.name ?? null,
-    roleId: raw.role?.[0] ?? null,
+    roleId: raw.roleId,
     status: raw.isActive ? 'ACTIVE' : 'INACTIVE',
   };
 }
