@@ -28,7 +28,7 @@ function buildAccount(overrides: Partial<AccountData> = {}): AccountData {
     type: 'ORGANIZATION',
     createdAt: '2026-01-01T00:00:00.000Z',
     organizationDetail: { name: 'Acme Corp S.A. de C.V.' },
-    role: ['OWNER'],
+    roleId: 'admin-role-1',
     isActive: true,
     ...overrides,
   };
@@ -159,7 +159,7 @@ describe('useAuthStore', () => {
           accountType: 'ORGANIZATION',
           organizationId: 'org-1',
           organizationName: 'Acme Corp S.A. de C.V.',
-          roleId: 'OWNER',
+          roleId: 'admin-role-1',
           status: 'ACTIVE',
         },
         {
@@ -167,7 +167,7 @@ describe('useAuthStore', () => {
           accountType: 'PERSONAL',
           organizationId: null,
           organizationName: null,
-          roleId: 'OWNER',
+          roleId: 'admin-role-1',
           status: 'ACTIVE',
         },
       ]);
@@ -175,14 +175,14 @@ describe('useAuthStore', () => {
 
     it('mapea roleId=null y status=INACTIVE cuando el backend los manda así', () => {
       useAuthStore.getState().setAccountsList([
-        buildAccount({ id: 'org-1', type: 'ORGANIZATION', role: null }),
+        buildAccount({ id: 'org-1', type: 'ORGANIZATION', roleId: null }),
         buildAccount({ id: 'org-2', type: 'ORGANIZATION', isActive: false }),
       ]);
 
       const [withoutRole, revoked] = useAuthStore.getState().accountsList;
       expect(withoutRole.roleId).toBeNull();
       expect(withoutRole.status).toBe('ACTIVE');
-      expect(revoked.roleId).toBe('OWNER');
+      expect(revoked.roleId).toBe('admin-role-1');
       expect(revoked.status).toBe('INACTIVE');
     });
 

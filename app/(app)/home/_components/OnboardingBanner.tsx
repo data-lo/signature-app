@@ -20,7 +20,7 @@ export default function OnboardingBanner() {
       <div className="flex flex-wrap gap-3 text-sm">
         {!user.personalConfigured && (
           <Link
-            href="/personal-documents"
+            href="/personal-documents#personal-info"
             className="underline underline-offset-2 hover:opacity-80"
           >
             Completa tu información personal
@@ -28,7 +28,7 @@ export default function OnboardingBanner() {
         )}
         {!user.signatureConfigured && (
           <Link
-            href="/personal-documents"
+            href="/personal-documents#signature-documents"
             className="underline underline-offset-2 hover:opacity-80"
           >
             Configura tu firma

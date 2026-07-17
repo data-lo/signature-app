@@ -47,7 +47,7 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
   }
 
   return (
-    <Card className="max-w-xl w-full">
+    <Card id="personal-info" className="max-w-xl w-full scroll-mt-6">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Mi información</CardTitle>
         {!isEditing && (

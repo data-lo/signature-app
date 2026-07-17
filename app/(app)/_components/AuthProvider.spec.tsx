@@ -23,7 +23,7 @@ const ACCOUNTS: AccountData[] = [
     type: 'PERSONAL',
     createdAt: '2026-01-01T00:00:00.000Z',
     organizationDetail: null,
-    role: ['OWNER'],
+    roleId: 'admin-role-1',
     isActive: true,
   },
   {
@@ -32,7 +32,7 @@ const ACCOUNTS: AccountData[] = [
     type: 'ORGANIZATION',
     createdAt: '2026-01-01T00:00:00.000Z',
     organizationDetail: { name: 'Acme Corp S.A. de C.V.' },
-    role: ['OWNER'],
+    roleId: 'admin-role-1',
     isActive: true,
   },
 ];
@@ -42,7 +42,7 @@ function buildActiveAccount(overrides: Partial<ActiveAccount>): ActiveAccount {
     id: 'org-1',
     accountType: 'ORGANIZATION',
     organizationId: 'org-1',
-    roleId: 'OWNER',
+    roleId: 'admin-role-1',
     ...overrides,
   };
 }
