@@ -16,6 +16,7 @@ interface LoginResponseData {
 export async function loginRequest(
   values: LoginFormValues,
 ): Promise<LoginResponseData> {
+
   console.log('[loginRequest] Iniciando petición de autenticación', {
     email: values.email,
     hasPassword: !!values.password,
