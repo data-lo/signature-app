@@ -25,9 +25,9 @@ jobs:
         with:
           context: .
           push: true
-          no-cache: true
+          no-cache: false
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+            BACKEND_API_URL=${{ secrets.BACKEND_API_URL }}
           tags: |
             dataloplatforms/signature-app:latest
             dataloplatforms/signature-app:${{ github.sha }}
