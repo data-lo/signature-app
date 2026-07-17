@@ -10,10 +10,12 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
+    console.log('[next.config.ts] BACKEND_API_URL:', backendUrl);
+
     return [
       {
         source: '/api/:path*',
-        destination: `${backendUrl}/:path*`, 
+        destination: `${backendUrl}/:path*`,
       },
     ];
   },
