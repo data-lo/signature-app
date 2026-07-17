@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
+    const backendUrl = process.env.BACKEND_API_URL || 'http://backend:3000';
 
     return [
       {
