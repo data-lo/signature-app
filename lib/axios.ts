@@ -14,8 +14,6 @@ apiClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  // Multi-tenancy: el backend resuelve el contexto operativo (cuenta y,
-  // si aplica, organización) a partir de estos headers globales.
   const activeAccount = useAuthStore.getState().activeAccount;
   if (activeAccount) {
     config.headers['X-Account-Id'] = activeAccount.id;
