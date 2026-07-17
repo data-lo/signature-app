@@ -20,6 +20,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Debug - verificar secret
+        run: |
+          if [ -z "${{ secrets.BACKEND_API_URL }}" ]; then
+            echo "BACKEND_API_URL está vacío o no existe como secret"
+          else
+            echo "BACKEND_API_URL tiene un valor definido"
+          fi
+
       - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
