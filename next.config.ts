@@ -8,12 +8,12 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:4000';
+    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
     return [
       {
         source: '/api/:path*',
-        destination: `${backendUrl}/api/:path*`, 
+        destination: `${backendUrl}/:path*`, 
       },
     ];
   },
