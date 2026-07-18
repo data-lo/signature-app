@@ -16,8 +16,11 @@ interface LoginResponseData {
 export async function loginRequest(
   values: LoginFormValues,
 ): Promise<LoginResponseData> {
-  const { data } = await apiClient.post<{ // Validar la estructura de la respuesta aqui o en el interceptor en axios.ts
-    success: boolean; // Tambien validar el estatus de la peticion antes de retornar la data
+  // axios ya rechaza cualquier status fuera de 2xx (ver validateStatus por
+  // defecto), y el interceptor de axios.ts loguea ese caso centralizadamente
+  // — aquí solo queda extraer el payload del caso 2xx.
+  const { data } = await apiClient.post<{
+    success: boolean;
     message: string;
     data: LoginResponseData;
   }>('/auth/login', values);

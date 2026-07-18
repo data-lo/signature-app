@@ -7,7 +7,14 @@ function isTokenExpired(token: string): boolean {
 
   try {
     const base64 = payloadSegment.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(base64)) as { exp?: number };
+    // atob() en algunos runtimes rechaza base64 sin el padding '=' que
+    // JWT (base64url) omite por diseño — se restaura antes de decodificar
+    // para no marcar un token válido como expirado por esto.
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      '=',
+    );
+    const payload = JSON.parse(atob(padded)) as { exp?: number };
     if (typeof payload.exp !== 'number') return true;
     return Date.now() >= payload.exp * 1000;
   } catch {

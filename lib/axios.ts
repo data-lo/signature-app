@@ -28,6 +28,13 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Logueado en un único lugar (en vez de en cada _requests.ts/hook por
+    // separado) para poder identificar cualquier falla de red/API desde un
+    // solo punto: método, URL y status de la petición que falló.
+    console.error(
+      `[axios] ${error.config?.method?.toUpperCase() ?? '?'} ${error.config?.url ?? '?'} → ${error.response?.status ?? 'sin respuesta'}: ${error.response?.data?.message ?? error.message}`,
+    );
+
     if (error.response?.status === 401) {
       clearAuthToken();
       if (

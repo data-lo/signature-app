@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { registerRequest } from '../_requests';
 import type { RegisterFormValues } from '../_schemas';
 
-export function getRegisterErrorMessage(error: unknown): string { // 
+export function getRegisterErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
   return (
     axiosError.response?.data?.message ??
@@ -24,7 +24,8 @@ export function useRegister() {
       router.push('/login?registered=1');
     },
     onError: (error) => {
-      toast.error(getRegisterErrorMessage(error)); // Manejarlo desde el login desde el register para no llegar hasta este punto, validar la request en axios para mejor lectura de errores.
+      console.error('[register] falló la creación de cuenta:', error);
+      toast.error(getRegisterErrorMessage(error));
     },
   });
 }
