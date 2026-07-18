@@ -105,8 +105,8 @@ export default function PersonalDocumentsPartial({
           }
           hint={
             missingField === 'ine'
-              ? 'PDF, JPG o PNG. Máximo 5MB.'
-              : 'Formato PNG. Máximo 5MB.'
+              ? 'PDF, JPG o PNG. Máximo 20MB.'
+              : 'Formato PNG. Máximo 10MB.'
           }
           accept={
             missingField === 'ine'
@@ -116,6 +116,7 @@ export default function PersonalDocumentsPartial({
           file={pendingFile}
           error={fileError}
           onFileChange={handleFileChange}
+          maxFileSizeMB={missingField === 'ine' ? 20 : 10}
         />
 
         <Button

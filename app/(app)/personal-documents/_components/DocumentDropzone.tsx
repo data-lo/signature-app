@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { FileText, Upload, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { FilePond, registerPlugin } from 'react-filepond';
+import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type';
+import FilePondPluginFileValidateSize from 'filepond-plugin-file-validate-size';
+import 'filepond/dist/filepond.min.css';
 import { Field, FieldLabel, FieldError } from '@/components/ui/field';
-import { cn } from '@/lib/utils';
+
+registerPlugin(FilePondPluginFileValidateType, FilePondPluginFileValidateSize);
 
 interface DocumentDropzoneProps {
   id: string;
@@ -14,6 +16,8 @@ interface DocumentDropzoneProps {
   file: File | null;
   error?: string;
   onFileChange: (file: File | null) => void;
+  /** Espeja el límite real del backend para este campo (ver src/shared/constants/file-upload.constants.ts en signature-server). */
+  maxFileSizeMB: number;
 }
 
 export default function DocumentDropzone({
@@ -24,97 +28,28 @@ export default function DocumentDropzone({
   file,
   error,
   onFileChange,
+  maxFileSizeMB,
 }: DocumentDropzoneProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!file || !file.type.startsWith('image/')) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-
-  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    onFileChange(event.target.files?.[0] ?? null);
-  }
-
-  function handleRemove() {
-    onFileChange(null);
-    if (inputRef.current) inputRef.current.value = '';
-  }
-
   return (
     <Field data-invalid={error ? true : undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <p className="text-xs text-muted-foreground">{hint}</p>
 
-      <div
-        className={cn(
-          'flex items-center gap-4 rounded-md border border-dashed p-4',
-          error ? 'border-destructive' : 'border-input',
-        )}
-      >
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt={`Vista previa de ${label}`}
-            className="h-16 w-16 rounded object-contain bg-muted"
-          />
-        ) : file ? (
-          <FileText
-            className="h-10 w-10 shrink-0 text-muted-foreground"
-            aria-hidden
-          />
-        ) : (
-          <Upload
-            className="h-10 w-10 shrink-0 text-muted-foreground"
-            aria-hidden
-          />
-        )}
-
-        <div className="flex flex-1 flex-col gap-1 min-w-0">
-          {file ? (
-            <p className="text-sm font-medium truncate">{file.name}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">{hint}</p>
-          )}
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => inputRef.current?.click()}
-            >
-              {file ? 'Cambiar archivo' : 'Seleccionar archivo'}
-            </Button>
-            {file && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleRemove}
-              >
-                <X className="h-4 w-4" />
-                Quitar
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <input
-          ref={inputRef}
-          id={id}
-          type="file"
-          accept={accept}
-          className="hidden"
-          onChange={handleChange}
-        />
-      </div>
+      <FilePond
+        id={id}
+        files={file ? [file] : []}
+        onupdatefiles={(fileItems) => {
+          const nextFile = fileItems[0]?.file as File | undefined;
+          onFileChange(nextFile ?? null);
+        }}
+        allowMultiple={false}
+        acceptedFileTypes={accept.split(',').map((type) => type.trim())}
+        labelFileTypeNotAllowed="Formato de archivo no permitido"
+        maxFileSize={`${maxFileSizeMB}MB`}
+        labelMaxFileSizeExceeded={`El archivo debe pesar menos de ${maxFileSizeMB}MB`}
+        labelIdle='Arrastra tu archivo aquí o <span class="filepond--label-action">da clic para seleccionar uno</span>'
+        credits={false}
+      />
 
       <FieldError errors={error ? [{ message: error }] : undefined} />
     </Field>
