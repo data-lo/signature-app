@@ -13,6 +13,6 @@ export function useLogin() {
     onSuccess: (data) => {
       setAuthToken(data.token);
       router.push('/home');
-    },
+    },// Agregar un OnError handler para mostrar un mensaje de error al usuario en caso de que la petición falle, por ejemplo, usando un toast o un modal.
   });
 }

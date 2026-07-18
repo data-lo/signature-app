@@ -17,7 +17,7 @@ import {
   rejectDocumentSchema,
   type RejectDocumentFormValues,
 } from '../_schemas';
-import type { ParticipantStatus } from '../_requests';
+import type { ParticipantRole, ParticipantStatus } from '../_requests';
 import CancellationConfirmDialog from './CancellationConfirmDialog';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
@@ -28,6 +28,13 @@ const STATUS_LABELS: Record<ParticipantStatus, string> = {
   pending: 'Pendiente',
   signed: 'Firmado',
   rejected: 'Rechazado',
+};
+
+const ROLE_LABELS: Record<ParticipantRole, string> = {
+  signer: 'Firmante',
+  reviewer: 'Revisor',
+  watcher: 'Espectador',
+  creator: 'Creador',
 };
 
 interface SignDocumentViewProps {
@@ -102,7 +109,7 @@ export default function SignDocumentView({
           <CardContent className="flex flex-col gap-2">
             {document.participants.map((participant) => (
               <div
-                key={participant.userId}
+                key={participant.id}
                 className="flex flex-col gap-0.5 border-b border-border pb-2 last:border-0 last:pb-0"
               >
                 <div className="flex items-center justify-between text-sm">
@@ -122,11 +129,11 @@ export default function SignDocumentView({
                   </span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {participant.role === 'signer' ? 'Firmante' : 'Espectador'}
+                  {ROLE_LABELS[participant.role]}
                 </span>
-                {participant.rejectionReason && (
+                {participant.cancellationReason && (
                   <p className="mt-1 rounded bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">
-                    {participant.rejectionReason}
+                    {participant.cancellationReason}
                   </p>
                 )}
               </div>

@@ -5,14 +5,13 @@ export const selectParticipantsSchema = z
     signerIds: z
       .array(z.string().uuid())
       .min(1, { message: 'Selecciona al menos un firmante' }),
-    spectatorIds: z.array(z.string().uuid()),
+    watcherIds: z.array(z.string().uuid()),
   })
   .refine(
-    (values) =>
-      !values.signerIds.some((id) => values.spectatorIds.includes(id)),
+    (values) => !values.signerIds.some((id) => values.watcherIds.includes(id)),
     {
       message: 'Un participante no puede ser firmante y espectador a la vez',
-      path: ['spectatorIds'],
+      path: ['watcherIds'],
     },
   );
 

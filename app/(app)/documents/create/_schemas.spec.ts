@@ -7,7 +7,7 @@ describe('selectParticipantsSchema', () => {
   it('acepta al menos un firmante y espectadores distintos', () => {
     const result = selectParticipantsSchema.safeParse({
       signerIds: [SIGNER_ID],
-      spectatorIds: [SPECTATOR_ID],
+      watcherIds: [SPECTATOR_ID],
     });
 
     expect(result.success).toBe(true);
@@ -16,7 +16,7 @@ describe('selectParticipantsSchema', () => {
   it('rechaza si no hay ningún firmante', () => {
     const result = selectParticipantsSchema.safeParse({
       signerIds: [],
-      spectatorIds: [],
+      watcherIds: [],
     });
 
     expect(result.success).toBe(false);
@@ -25,7 +25,7 @@ describe('selectParticipantsSchema', () => {
   it('rechaza si el mismo usuario es firmante y espectador a la vez', () => {
     const result = selectParticipantsSchema.safeParse({
       signerIds: [SIGNER_ID],
-      spectatorIds: [SIGNER_ID],
+      watcherIds: [SIGNER_ID],
     });
 
     expect(result.success).toBe(false);

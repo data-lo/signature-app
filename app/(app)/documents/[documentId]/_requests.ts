@@ -1,15 +1,18 @@
 import apiClient from '@/lib/axios';
 import type { DocumentListStatus } from '../_components/DocumentsTable';
 
-export type ParticipantRole = 'signer' | 'spectator' | 'creator';
+export type ParticipantRole = 'signer' | 'reviewer' | 'watcher' | 'creator';
 export type ParticipantStatus = 'pending' | 'signed' | 'rejected';
 
 export interface DocumentParticipant {
-  userId: string;
+  id: string;
+  /** null cuando el colaborador fue invitado solo por email (sin cuenta de plataforma). */
+  userId: string | null;
+  email: string;
   name: string;
   role: ParticipantRole;
   status: ParticipantStatus;
-  rejectionReason: string | null;
+  cancellationReason: string | null;
 }
 
 export interface DocumentDetail {

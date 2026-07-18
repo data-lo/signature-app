@@ -12,7 +12,7 @@ import {
 interface CreateDocumentParams {
   file: File;
   signerIds: string[];
-  spectatorIds: string[];
+  watcherIds: string[];
 }
 
 export function getCreateDocumentErrorMessage(error: unknown): string {
@@ -31,9 +31,9 @@ export function useCreateDocument() {
     mutationFn: async ({
       file,
       signerIds,
-      spectatorIds,
+      watcherIds,
     }: CreateDocumentParams) => {
-      const { id } = await createDocumentRequest(file, signerIds, spectatorIds);
+      const { id } = await createDocumentRequest(file, signerIds, watcherIds);
       await submitForAuthorizationRequest(id);
       return id;
     },

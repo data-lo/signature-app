@@ -13,13 +13,13 @@ interface CreateDocumentResponseData {
 export async function createDocumentRequest(
   file: File,
   signerIds: string[],
-  spectatorIds: string[],
+  watcherIds: string[],
 ): Promise<CreateDocumentResponseData> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('signerIds', JSON.stringify(signerIds));
-  if (spectatorIds.length > 0) {
-    formData.append('spectatorIds', JSON.stringify(spectatorIds));
+  if (watcherIds.length > 0) {
+    formData.append('watcherIds', JSON.stringify(watcherIds));
   }
 
   const { data } = await apiClient.post<{

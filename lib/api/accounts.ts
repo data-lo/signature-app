@@ -3,10 +3,12 @@ import apiClient from '@/lib/axios';
 export type AccountType = 'PERSONAL' | 'ORGANIZATION';
 
 export interface AccountData {
+  /** UUID de esta membresía/contexto — una fila por usuario × cuenta desde la fusión Account/AccountMember del backend (ver plan de migración ER-V2, Fase 5). */
   id: string;
-  name: string;
   type: AccountType;
   createdAt: string;
+  /** UUID de la organización (tabla organizations); null para cuentas PERSONAL. Varias filas de Account (una por miembro) comparten el mismo organizationId. */
+  organizationId: string | null;
   organizationDetail?: { name: string } | null;
   /** UUID del rol (ver GET /api/v1/roles) del usuario autenticado en esta cuenta; null solo si la membresía no tiene rol vigente. */
   roleId: string | null;

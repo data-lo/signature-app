@@ -19,18 +19,18 @@ const mockedUsePatchUserStatus = usePatchUserStatus as jest.Mock;
 const ACCOUNTS: AccountData[] = [
   {
     id: 'personal-1',
-    name: 'Juan Pérez',
     type: 'PERSONAL',
     createdAt: '2026-01-01T00:00:00.000Z',
+    organizationId: null,
     organizationDetail: null,
     roleId: 'admin-role-1',
     isActive: true,
   },
   {
     id: 'org-1',
-    name: 'Acme',
     type: 'ORGANIZATION',
     createdAt: '2026-01-01T00:00:00.000Z',
+    organizationId: 'org-1',
     organizationDetail: { name: 'Acme Corp S.A. de C.V.' },
     roleId: 'admin-role-1',
     isActive: true,
