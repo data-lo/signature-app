@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { FileSignature, ChevronDown, User } from 'lucide-react';
+import { FileSignature, ChevronDown, User, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useLogout } from '@/lib/hooks/useLogout';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import AccountSwitcher from './AccountSwitcher';
 
 const navItems = [
@@ -30,6 +31,7 @@ export default function DashboardNavbar({
   const router = useRouter();
   const pathname = usePathname();
   const logoutMutation = useLogout();
+  const activeAccount = useAuthStore((state) => state.activeAccount);
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-background px-8 h-14">
@@ -89,6 +91,14 @@ export default function DashboardNavbar({
                 <User className="size-4" />
                 Mi Perfil
               </DropdownMenuItem>
+              {activeAccount?.accountType === 'ORGANIZATION' && (
+                <DropdownMenuItem
+                  onClick={() => router.push('/organization/settings/members')}
+                >
+                  <Users className="size-4" />
+                  Miembros
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
