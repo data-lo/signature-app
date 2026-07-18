@@ -64,4 +64,36 @@ describe('SignupForm', () => {
       }),
     );
   });
+
+  it('prellena el RFC cuando viene de /join (defaultRfc)', () => {
+    renderWithProviders(<SignupForm defaultRfc="XAXX010101000" />);
+
+    expect(screen.getByLabelText(/^rfc$/i)).toHaveValue('XAXX010101000');
+  });
+
+  it('incluye invitationToken en el envío cuando viene de /join', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <SignupForm defaultRfc="PELJ850101ABC" invitationToken="invite-token-1" />,
+    );
+
+    await user.type(screen.getByLabelText(/nombre\(s\)/i), 'Juan');
+    await user.type(screen.getByLabelText(/apellidos/i), 'Pérez');
+    await user.type(
+      screen.getByLabelText(/correo electrónico/i),
+      'juan.perez@empresa.com',
+    );
+    await user.type(screen.getByLabelText(/puesto/i), 'Gerente');
+    await user.type(screen.getByLabelText(/curp/i), 'PELJ850101HDFRNN08');
+    await user.type(screen.getByLabelText(/^contraseña$/i), 'supersecret123');
+    await user.type(
+      screen.getByLabelText(/confirmar contraseña/i),
+      'supersecret123',
+    );
+    await user.click(screen.getByRole('button', { name: /crear cuenta/i }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ invitationToken: 'invite-token-1' }),
+    );
+  });
 });

@@ -4,8 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
-import { registerRequest } from '../_requests';
-import type { RegisterFormValues } from '../_schemas';
+import { registerRequest, type RegisterRequestValues } from '../_requests';
 
 export function getRegisterErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string }>;
@@ -18,7 +17,7 @@ export function getRegisterErrorMessage(error: unknown): string {
 export function useRegister() {
   const router = useRouter();
   return useMutation({
-    mutationFn: (values: RegisterFormValues) => registerRequest(values),
+    mutationFn: (values: RegisterRequestValues) => registerRequest(values),
     onSuccess: () => {
       toast.success('Cuenta creada correctamente');
       router.push('/login?registered=1');

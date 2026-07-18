@@ -10,9 +10,20 @@ import { TextField } from '@/components/form/text-field';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
 import { useRegister, getRegisterErrorMessage } from '../_hooks/useRegister';
 
-export default function SignupForm() {
+interface SignupFormProps {
+  /** Prellenado cuando se llega desde /join con un RFC nuevo (ver Escenario 4 de la historia). */
+  defaultRfc?: string;
+  /** Presente cuando se llega desde /join — une automáticamente al registrarse. */
+  invitationToken?: string;
+}
+
+export default function SignupForm({
+  defaultRfc,
+  invitationToken,
+}: SignupFormProps) {
   const useFormInstance = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
+    defaultValues: { rfc: defaultRfc ?? '' },
   });
   const {
     register: registerField,
@@ -29,7 +40,9 @@ export default function SignupForm() {
       </CardHeader>
       <CardContent>
         <form
-          onSubmit={handleSubmit((values) => registerMutation.mutate(values))}
+          onSubmit={handleSubmit((values) =>
+            registerMutation.mutate({ ...values, invitationToken }),
+          )}
         >
           <FieldGroup>
             <TextField
