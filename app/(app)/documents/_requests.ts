@@ -6,23 +6,6 @@ import {
   type DocumentsFilters,
 } from './_components/DocumentsFilterPanel';
 
-export interface SelectableUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-}
-
-export async function getUsersRequest(): Promise<SelectableUser[]> {
-  const { data } = await apiClient.get<{
-    success: boolean;
-    message: string;
-    data: SelectableUser[];
-  }>('/user');
-
-  return data.data;
-}
-
 export interface DocumentsMeta {
   total: number;
   page: number;

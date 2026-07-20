@@ -14,66 +14,97 @@ import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from '../../_components/DocumentsFilterPanel';
-import ParticipantPicker from '../../_components/ParticipantPicker';
-import { useUsers } from '../../_hooks/useUsers';
 import {
-  selectParticipantsSchema,
-  type SelectParticipantsFormValues,
+  createDocumentSignaturesSchema,
+  type CreateDocumentSignaturesFormValues,
+  type SignerFormValues,
 } from '../_schemas';
 import { useMyDocuments } from '../_hooks/useMyDocuments';
 import {
-  useCreateDocument,
-  getCreateDocumentErrorMessage,
-} from '../_hooks/useCreateDocument';
+  useCreateDocumentSignatures,
+  getCreateDocumentSignaturesErrorMessage,
+} from '../_hooks/useCreateDocumentSignatures';
 import DocumentFilePicker from './DocumentFilePicker';
+import CollaboratorsFieldArray from './CollaboratorsFieldArray';
+import RequiresApprovalField from './RequiresApprovalField';
+import IncludeMeAsSignerField from './IncludeMeAsSignerField';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
   ssr: false,
 });
 
+const DEFAULT_VALUES: CreateDocumentSignaturesFormValues = {
+  requiresApproval: false,
+  includeMeAsSigner: false,
+  collaborators: [],
+};
+
 export default function CreateDocumentView() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [filePondKey, setFilePondKey] = useState(0);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DocumentsFilters>(
     EMPTY_DOCUMENTS_FILTERS,
   );
 
   const {
-    watch,
-    setValue,
+    control,
     handleSubmit,
+    reset,
     formState: { errors },
-  } = useForm<SelectParticipantsFormValues>({
-    resolver: zodResolver(selectParticipantsSchema),
+  } = useForm<CreateDocumentSignaturesFormValues>({
+    resolver: zodResolver(createDocumentSignaturesSchema),
     mode: 'onChange',
-    defaultValues: { signerIds: [], watcherIds: [] },
+    defaultValues: DEFAULT_VALUES,
   });
 
-  const signerIds = watch('signerIds');
-  const watcherIds = watch('watcherIds');
-
-  const { data: users } = useUsers();
   const { data: currentUser } = useCurrentUser();
   const { data: myDocuments } = useMyDocuments(
     currentUser?.email,
     page,
     filters,
   );
-  const createMutation = useCreateDocument();
+  const createMutation = useCreateDocumentSignatures();
   const { setDocumentsCount } = useDocumentsCount();
 
   useEffect(() => {
     if (myDocuments) setDocumentsCount(myDocuments.meta.total);
   }, [myDocuments, setDocumentsCount]);
 
-  function onSubmit(values: SelectParticipantsFormValues) {
+  function onSubmit(values: CreateDocumentSignaturesFormValues) {
     if (!file) return;
-    createMutation.mutate({
-      file,
-      signerIds: values.signerIds,
-      watcherIds: values.watcherIds,
-    });
+
+    const collaborators = [...values.collaborators];
+    if (values.includeMeAsSigner && currentUser) {
+      const self: SignerFormValues = {
+        collaboratorType: 'SIGNER',
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        email: currentUser.email,
+        signatureType: 'SIMPLE',
+        rfc: currentUser.rfc,
+        requiresTwoFactorAuth: true,
+      };
+      collaborators.push(self);
+    }
+
+    createMutation.mutate(
+      {
+        file,
+        fileName: file.name,
+        requiresApproval: values.requiresApproval,
+        collaborators,
+      },
+      {
+        onSuccess: () => {
+          // Escenario 4: limpia el formulario y el componente FilePond tras un envío exitoso.
+          reset(DEFAULT_VALUES);
+          setFile(null);
+          setFilePondKey((key) => key + 1);
+        },
+      },
+    );
   }
 
   function handleFiltersChange(nextFilters: DocumentsFilters) {
@@ -96,48 +127,27 @@ export default function CreateDocumentView() {
           className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2"
         >
           <div className="flex flex-col gap-4">
-            <DocumentFilePicker onFileSelected={setFile} />
+            <DocumentFilePicker key={filePondKey} onFileSelected={setFile} />
 
-            <ParticipantPicker
-              label="Firmantes"
-              placeholder="Agregar firmante"
-              users={(users ?? []).filter(
-                (user) => !watcherIds.includes(user.id),
-              )}
-              selectedIds={signerIds}
-              onChange={(ids) =>
-                setValue('signerIds', ids, { shouldValidate: true })
-              }
-              showOrder
-              error={errors.signerIds?.message}
-            />
+            <RequiresApprovalField control={control} />
 
-            <ParticipantPicker
-              label="Espectadores"
-              placeholder="Agregar espectador"
-              users={(users ?? []).filter(
-                (user) => !signerIds.includes(user.id),
-              )}
-              selectedIds={watcherIds}
-              onChange={(ids) =>
-                setValue('watcherIds', ids, { shouldValidate: true })
-              }
-              error={errors.watcherIds?.message}
-            />
+            <CollaboratorsFieldArray control={control} errors={errors} />
+
+            <IncludeMeAsSignerField control={control} />
 
             <Button
               type="submit"
               className="w-full sm:w-auto"
-              disabled={
-                !file || signerIds.length === 0 || createMutation.isPending
-              }
+              disabled={!file || createMutation.isPending}
             >
               {createMutation.isPending ? 'Enviando a firma...' : 'Firmar'}
             </Button>
 
             {createMutation.isError && (
               <p className="text-sm text-destructive">
-                {getCreateDocumentErrorMessage(createMutation.error)}
+                {getCreateDocumentSignaturesErrorMessage(
+                  createMutation.error,
+                )}
               </p>
             )}
           </div>
