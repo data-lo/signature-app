@@ -16,12 +16,12 @@ export function getLoginErrorMessage(error: unknown): string {
 }
 
 export function useLogin() {
-  const router = useRouter();
   return useMutation({
     mutationFn: (values: LoginFormValues) => loginRequest(values),
     onSuccess: (data) => {
       setAuthToken(data.token);
-      router.push('/home');
+      
+      window.location.href = '/home';
     },
     onError: (error) => {
       console.error('[login] falló el inicio de sesión:', error);
