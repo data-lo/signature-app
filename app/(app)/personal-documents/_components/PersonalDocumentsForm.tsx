@@ -65,21 +65,23 @@ export default function PersonalDocumentsForm() {
             <DocumentDropzone
               id="ineFile"
               label="Identificación (INE) (opcional)"
-              hint="PDF, JPG o PNG. Máximo 5MB."
+              hint="PDF, JPG o PNG. Máximo 20MB."
               accept="application/pdf,image/jpeg,image/png"
               file={ineFile}
               error={errors.ineFile?.message}
               onFileChange={handleIneChange}
+              maxFileSizeMB={20}
             />
 
             <DocumentDropzone
               id="signatureFile"
               label="Firma digital"
-              hint="Formato PNG. Máximo 5MB."
+              hint="Formato PNG. Máximo 10MB."
               accept="image/png"
               file={signatureFile}
               error={errors.signatureFile?.message}
               onFileChange={handleSignatureChange}
+              maxFileSizeMB={10}
             />
 
             <Button

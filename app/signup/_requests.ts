@@ -11,8 +11,13 @@ interface RegisterResponseData {
   nationalId: string;
 }
 
+export interface RegisterRequestValues extends RegisterFormValues {
+  /** Presente cuando el registro viene de /join (RFC nuevo) — une automáticamente al usuario recién creado a esa organización (ver signature-server AuthService.register). */
+  invitationToken?: string;
+}
+
 export async function registerRequest(
-  values: RegisterFormValues,
+  values: RegisterRequestValues,
 ): Promise<RegisterResponseData> {
   const { data } = await apiClient.post<{
     success: boolean;

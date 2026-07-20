@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { FileSignature } from 'lucide-react';
-import SignupForm from './_components/SignupForm';
+import JoinView from './_components/JoinView';
 
-interface SignupPageProps {
-  searchParams: Promise<{ rfc?: string; token?: string }>;
+interface JoinPageProps {
+  searchParams: Promise<{ token?: string; orgId?: string }>;
 }
 
-export default async function SignupPage({ searchParams }: SignupPageProps) {
-  const { rfc, token } = await searchParams;
+export default async function JoinPage({ searchParams }: JoinPageProps) {
+  const { token, orgId } = await searchParams;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
@@ -18,7 +18,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
             Signature
           </span>
         </Link>
-        <SignupForm defaultRfc={rfc} invitationToken={token} />
+        <JoinView token={token ?? null} orgId={orgId ?? null} />
       </div>
     </div>
   );

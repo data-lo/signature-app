@@ -47,11 +47,11 @@ export default function CreateDocumentView() {
   } = useForm<SelectParticipantsFormValues>({
     resolver: zodResolver(selectParticipantsSchema),
     mode: 'onChange',
-    defaultValues: { signerIds: [], spectatorIds: [] },
+    defaultValues: { signerIds: [], watcherIds: [] },
   });
 
   const signerIds = watch('signerIds');
-  const spectatorIds = watch('spectatorIds');
+  const watcherIds = watch('watcherIds');
 
   const { data: users } = useUsers();
   const { data: currentUser } = useCurrentUser();
@@ -72,7 +72,7 @@ export default function CreateDocumentView() {
     createMutation.mutate({
       file,
       signerIds: values.signerIds,
-      spectatorIds: values.spectatorIds,
+      watcherIds: values.watcherIds,
     });
   }
 
@@ -102,7 +102,7 @@ export default function CreateDocumentView() {
               label="Firmantes"
               placeholder="Agregar firmante"
               users={(users ?? []).filter(
-                (user) => !spectatorIds.includes(user.id),
+                (user) => !watcherIds.includes(user.id),
               )}
               selectedIds={signerIds}
               onChange={(ids) =>
@@ -118,11 +118,11 @@ export default function CreateDocumentView() {
               users={(users ?? []).filter(
                 (user) => !signerIds.includes(user.id),
               )}
-              selectedIds={spectatorIds}
+              selectedIds={watcherIds}
               onChange={(ids) =>
-                setValue('spectatorIds', ids, { shouldValidate: true })
+                setValue('watcherIds', ids, { shouldValidate: true })
               }
-              error={errors.spectatorIds?.message}
+              error={errors.watcherIds?.message}
             />
 
             <Button

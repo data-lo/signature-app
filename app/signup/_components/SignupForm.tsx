@@ -10,12 +10,26 @@ import { TextField } from '@/components/form/text-field';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
 import { useRegister, getRegisterErrorMessage } from '../_hooks/useRegister';
 
-export default function SignupForm() {
+interface SignupFormProps {
+  /** Prellenado cuando se llega desde /join con un RFC nuevo (ver Escenario 4 de la historia). */
+  defaultRfc?: string;
+  /** Presente cuando se llega desde /join — une automáticamente al registrarse. */
+  invitationToken?: string;
+}
+
+export default function SignupForm({
+  defaultRfc,
+  invitationToken,
+}: SignupFormProps) {
+  const useFormInstance = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { rfc: defaultRfc ?? '' },
+  });
   const {
-    register,
+    register: registerField,
     handleSubmit,
     formState: { errors },
-  } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) });
+  } = useFormInstance;
 
   const registerMutation = useRegister();
 
@@ -26,7 +40,9 @@ export default function SignupForm() {
       </CardHeader>
       <CardContent>
         <form
-          onSubmit={handleSubmit((values) => registerMutation.mutate(values))}
+          onSubmit={handleSubmit((values) =>
+            registerMutation.mutate({ ...values, invitationToken }),
+          )}
         >
           <FieldGroup>
             <TextField
@@ -34,7 +50,7 @@ export default function SignupForm() {
               label="Nombre(s)"
               autoComplete="given-name"
               error={errors.firstName}
-              {...register('firstName')}
+              {...registerField('firstName')}
             />
 
             <TextField
@@ -42,7 +58,7 @@ export default function SignupForm() {
               label="Apellidos"
               autoComplete="family-name"
               error={errors.lastName}
-              {...register('lastName')}
+              {...registerField('lastName')}
             />
 
             <TextField
@@ -51,14 +67,14 @@ export default function SignupForm() {
               type="email"
               autoComplete="email"
               error={errors.email}
-              {...register('email')}
+              {...registerField('email')}
             />
 
             <TextField
               id="position"
               label="Puesto"
               error={errors.position}
-              {...register('position')}
+              {...registerField('position')}
             />
 
             <TextField
@@ -66,7 +82,7 @@ export default function SignupForm() {
               label="CURP"
               maxLength={18}
               error={errors.nationalId}
-              {...register('nationalId')}
+              {...registerField('nationalId')}
             />
 
             <TextField
@@ -74,7 +90,7 @@ export default function SignupForm() {
               label="RFC"
               maxLength={13}
               error={errors.rfc}
-              {...register('rfc')}
+              {...registerField('rfc')}
             />
 
             <TextField
@@ -83,7 +99,7 @@ export default function SignupForm() {
               type="password"
               autoComplete="new-password"
               error={errors.password}
-              {...register('password')}
+              {...registerField('password')}
             />
 
             <TextField
@@ -92,7 +108,7 @@ export default function SignupForm() {
               type="password"
               autoComplete="new-password"
               error={errors.confirmPassword}
-              {...register('confirmPassword')}
+              {...registerField('confirmPassword')}
             />
 
             {registerMutation.isError && (

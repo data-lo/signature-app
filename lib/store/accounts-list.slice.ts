@@ -13,12 +13,17 @@ import type {
  * signature-server); hoy el backend siempre asigna el rol ADMIN de inmediato
  * al crear una cuenta, así que `null` solo ocurriría ante una membresía sin
  * rol vigente (revocada).
+ *
+ * `organizationId` viene directo del backend (ya no se deriva de `raw.id`): desde la fusión
+ * Account/AccountMember (ver plan de migración ER-V2, Fase 5), `raw.id` identifica la
+ * membresía de ESTE usuario, no la organización — varios miembros de una misma organización
+ * tienen `raw.id` distintos pero el mismo `raw.organizationId`.
  */
 export function toAccountListEntry(raw: AccountData): AccountListEntry {
   return {
     id: raw.id,
     accountType: raw.type,
-    organizationId: raw.type === 'ORGANIZATION' ? raw.id : null,
+    organizationId: raw.organizationId,
     organizationName: raw.organizationDetail?.name ?? null,
     roleId: raw.roleId,
     status: raw.isActive ? 'ACTIVE' : 'INACTIVE',
