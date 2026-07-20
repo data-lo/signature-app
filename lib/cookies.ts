@@ -26,10 +26,11 @@ function getTokenExpiry(token: string): Date | null {
 }
 
 export function setAuthToken(token: string): void {
+  const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
   Cookies.set(TOKEN_COOKIE_NAME, token, {
     expires: getTokenExpiry(token) ?? 1,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
   });
 }
 

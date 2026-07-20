@@ -5,7 +5,7 @@ import { getAuthToken, clearAuthToken } from './cookies';
 import { useAuthStore } from './store/useAuthStore';
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
+  baseURL: '/api',
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -26,16 +26,27 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('[API Success]', {
+      method: response.config.method?.toUpperCase(),
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
+    
+    return response;
+  },
   (error) => {
-    // Logueado en un único lugar (en vez de en cada _requests.ts/hook por
-    // separado) para poder identificar cualquier falla de red/API desde un
-    // solo punto: método, URL y status de la petición que falló.
-    console.error(
-      `[axios] ${error.config?.method?.toUpperCase() ?? '?'} ${error.config?.url ?? '?'} → ${error.response?.status ?? 'sin respuesta'}: ${error.response?.data?.message ?? error.message}`,
-    );
+    console.error('[API Error]', {
+      method: error.config?.method?.toUpperCase(),
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
 
     if (error.response?.status === 401) {
+      console.warn('[API Auth] Redirigiendo a /login por error 401 Unauthenticated');
       clearAuthToken();
       if (
         typeof window !== 'undefined' &&
