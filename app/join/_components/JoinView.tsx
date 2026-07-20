@@ -104,6 +104,8 @@ export default function JoinView({ token, orgId }: JoinViewProps) {
   }
 
   function handleRfcSubmit(enteredRfc: string) {
+    if (!token || !orgId) return;
+
     setRfc(enteredRfc);
     checkRfcMutation.mutate(enteredRfc, {
       onSuccess: (exists) => {
