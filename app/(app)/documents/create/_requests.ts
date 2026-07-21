@@ -5,36 +5,35 @@ import {
   buildDocumentsFilterParams,
   type DocumentsFilters,
 } from '../_components/DocumentsFilterPanel';
+import type { BackendCollaboratorPayload } from './_schemas';
 
-interface CreateDocumentResponseData {
+interface CreateDocumentSignaturesResponseData {
   id: string;
+  status: string;
+  collaboratorsCount: number;
+  notificationsCount: number;
+  verificationCodesCount: number;
 }
 
-export async function createDocumentRequest(
+export async function createDocumentSignaturesRequest(
   file: File,
-  signerIds: string[],
-  watcherIds: string[],
-): Promise<CreateDocumentResponseData> {
+  documentData: { fileName: string; requiresApproval: boolean },
+  collaborators: BackendCollaboratorPayload[],
+  requiresDifferentSignatures: 'SIMPLE' | 'FIEL' | 'MIX',
+): Promise<CreateDocumentSignaturesResponseData> {
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('signerIds', JSON.stringify(signerIds));
-  if (watcherIds.length > 0) {
-    formData.append('watcherIds', JSON.stringify(watcherIds));
-  }
+  formData.append('documentData', JSON.stringify(documentData));
+  formData.append('collaborators', JSON.stringify(collaborators));
+  formData.append('requiresDifferentSignatures', requiresDifferentSignatures);
 
   const { data } = await apiClient.post<{
     success: boolean;
     message: string;
-    data: CreateDocumentResponseData;
-  }>('/document', formData);
+    data: CreateDocumentSignaturesResponseData;
+  }>('/api/v1/documents/signatures', formData);
 
   return data.data;
-}
-
-export async function submitForAuthorizationRequest(
-  documentId: string,
-): Promise<void> {
-  await apiClient.patch(`/document/${documentId}/submit-for-authorization`);
 }
 
 export interface MyDocumentsMeta {
