@@ -5,7 +5,7 @@ import { getAuthToken, clearAuthToken } from './cookies';
 import { useAuthStore } from './store/useAuthStore';
 
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -26,9 +26,27 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('[API Success]', {
+      method: response.config.method?.toUpperCase(),
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
+    
+    return response;
+  },
   (error) => {
+    console.error('[API Error]', {
+      method: error.config?.method?.toUpperCase(),
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
+
     if (error.response?.status === 401) {
+      console.warn('[API Auth] Redirigiendo a /login por error 401 Unauthenticated');
       clearAuthToken();
       if (
         typeof window !== 'undefined' &&

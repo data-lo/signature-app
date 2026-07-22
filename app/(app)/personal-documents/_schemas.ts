@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
-const MAX_INE_SIZE_BYTES = 5 * 1024 * 1024;
-const MAX_SIGNATURE_SIZE_BYTES = 5 * 1024 * 1024;
+// Espeja los límites reales del backend (src/shared/constants/file-upload.constants.ts en
+// signature-server): 10MB para imágenes de buena calidad, 20MB para PDFs de buena calidad —
+// la INE acepta ambos formatos, así que usa el límite más generoso de los dos.
+const MAX_INE_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_SIGNATURE_SIZE_BYTES = 10 * 1024 * 1024;
 
 const INE_ALLOWED_TYPES = [
   'application/pdf',
@@ -16,7 +19,7 @@ export const ineFileSchema = z
     message: 'La identificación debe estar en formato PDF, JPG o PNG',
   })
   .refine((file) => file.size <= MAX_INE_SIZE_BYTES, {
-    message: 'La identificación debe pesar menos de 5MB',
+    message: 'La identificación debe pesar menos de 20MB',
   });
 
 export const signatureFileSchema = z
@@ -25,7 +28,7 @@ export const signatureFileSchema = z
     message: 'La firma debe estar en formato PNG',
   })
   .refine((file) => file.size <= MAX_SIGNATURE_SIZE_BYTES, {
-    message: 'La firma debe pesar menos de 5MB',
+    message: 'La firma debe pesar menos de 10MB',
   });
 
 export const personalDocumentsSchema = z.object({

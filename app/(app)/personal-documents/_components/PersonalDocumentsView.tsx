@@ -30,19 +30,21 @@ export default function PersonalDocumentsView() {
   return (
     <div className="flex w-full flex-col items-center gap-6">
       <UserInfoCard user={user} />
-      {user.signature && user.officialFile ? (
-        <PersonalDocumentsCompleted
-          signature={user.signature}
-          officialFile={user.officialFile}
-        />
-      ) : user.signature || user.officialFile ? (
-        <PersonalDocumentsPartial
-          signature={user.signature ?? null}
-          officialFile={user.officialFile ?? null}
-        />
-      ) : (
-        <PersonalDocumentsForm />
-      )}
+      <div id="signature-documents" className="scroll-mt-6 w-full flex justify-center">
+        {user.signature && user.officialFile ? (
+          <PersonalDocumentsCompleted
+            signature={user.signature}
+            officialFile={user.officialFile}
+          />
+        ) : user.signature || user.officialFile ? (
+          <PersonalDocumentsPartial
+            signature={user.signature ?? null}
+            officialFile={user.officialFile ?? null}
+          />
+        ) : (
+          <PersonalDocumentsForm />
+        )}
+      </div>
     </div>
   );
 }

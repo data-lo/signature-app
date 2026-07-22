@@ -2,7 +2,13 @@ import Link from 'next/link';
 import { FileSignature } from 'lucide-react';
 import SignupForm from './_components/SignupForm';
 
-export default function SignupPage() {
+interface SignupPageProps {
+  searchParams: Promise<{ rfc?: string; token?: string }>;
+}
+
+export default async function SignupPage({ searchParams }: SignupPageProps) {
+  const { rfc, token } = await searchParams;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <div className="flex flex-col gap-6 max-w-md w-full">
@@ -12,7 +18,7 @@ export default function SignupPage() {
             Signature
           </span>
         </Link>
-        <SignupForm />
+        <SignupForm defaultRfc={rfc} invitationToken={token} />
       </div>
     </div>
   );

@@ -91,4 +91,22 @@ describe('OnboardingBanner', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Configura tu firma')).toBeInTheDocument();
   });
+
+  it('los links de cada mini-flujo apuntan a anclas independientes', () => {
+    useAuthStore.setState({
+      user: buildUser({
+        personalConfigured: false,
+        signatureConfigured: false,
+      }),
+    });
+    render(<OnboardingBanner />);
+
+    expect(
+      screen.getByText('Completa tu información personal'),
+    ).toHaveAttribute('href', '/personal-documents#personal-info');
+    expect(screen.getByText('Configura tu firma')).toHaveAttribute(
+      'href',
+      '/personal-documents#signature-documents',
+    );
+  });
 });

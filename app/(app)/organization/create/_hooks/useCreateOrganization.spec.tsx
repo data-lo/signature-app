@@ -22,11 +22,11 @@ const mockedCreateOrganizationRequest =
 
 const NEW_ORG: AccountData = {
   id: 'org-1',
-  name: 'Acme',
   type: 'ORGANIZATION',
   createdAt: '2026-01-01T00:00:00.000Z',
+  organizationId: 'org-1',
   organizationDetail: { name: 'Acme Corp S.A. de C.V.' },
-  role: ['OWNER'],
+  roleId: 'admin-role-1',
   isActive: true,
 };
 
@@ -65,7 +65,7 @@ describe('useCreateOrganization', () => {
       id: 'org-1',
       accountType: 'ORGANIZATION',
       organizationId: 'org-1',
-      roleId: 'OWNER',
+      roleId: 'admin-role-1',
     });
     expect(toast.success).toHaveBeenCalledWith(
       'Puedes alternar entre tu cuenta personal y la de la organización',

@@ -2,22 +2,13 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AxiosError } from 'axios';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { loginSchema, type LoginFormValues } from '../_schemas';
-import { useLogin } from '../_hooks/useLogin';
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ?? 'Error de conexión con el servidor'
-  );
-}
+import { useLogin, getLoginErrorMessage } from '../_hooks/useLogin';
 
 export default function LoginForm() {
   const {
@@ -55,7 +46,7 @@ export default function LoginForm() {
             />
 
             {loginMutation.isError && (
-              <FieldError>{getErrorMessage(loginMutation.error)}</FieldError>
+              <FieldError>{getLoginErrorMessage(loginMutation.error)}</FieldError>
             )}
 
             <Button

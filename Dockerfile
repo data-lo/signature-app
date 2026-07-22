@@ -17,7 +17,6 @@ ENV BACKEND_API_URL=$BACKEND_API_URL
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Aquí es donde Next.js va a atrapar las variables y las dejará grabadas en el build
 RUN npm run build
 
 # Stage 3: Production runner
