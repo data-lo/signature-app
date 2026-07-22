@@ -39,13 +39,9 @@ jobs:
           tags: |
             dataloplatforms/signature-app:latest
             dataloplatforms/signature-app:${{ github.sha }}
-
-      - name: Actualizar contenedor en el Servidor
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          script: |
+      - name: Disparar despliegue en Dokploy
+        run: |
             echo "Enviando solicitud de despliegue a Dokploy..."
             RESPONSE=$(curl -s -X POST "https://dokploy.data-lo.online/api/deploy/compose/LfalPhwe9vfvstQuQ8y5n")
             echo "Respuesta del servidor: $RESPONSE"
             echo "¡Despliegue solicitado con éxito!"
-
