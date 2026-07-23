@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
+import { getPendingSignatureContext } from '@/lib/pending-signature-context';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
 import { useRegister, getRegisterErrorMessage } from '../_hooks/useRegister';
 
@@ -21,6 +23,8 @@ export default function SignupForm({
   defaultRfc,
   invitationToken,
 }: SignupFormProps) {
+  const [hasPendingSignature, setHasPendingSignature] = useState(false);
+
   const useFormInstance = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: { rfc: defaultRfc ?? '' },
@@ -29,7 +33,19 @@ export default function SignupForm({
     register: registerField,
     handleSubmit,
     formState: { errors },
+    setValue,
   } = useFormInstance;
+
+  // Ver historia "Notificación por Email para Firma Simple y Vinculación de Cuenta" (Caso B):
+  // localStorage solo existe en el cliente, así que el prellenado ocurre tras el montaje en vez
+  // de en defaultValues (evita un mismatch de hidratación entre servidor y cliente).
+  useEffect(() => {
+    const context = getPendingSignatureContext();
+    if (context?.email) {
+      setValue('email', context.email);
+      setHasPendingSignature(true);
+    }
+  }, [setValue]);
 
   const registerMutation = useRegister();
 
@@ -39,6 +55,12 @@ export default function SignupForm({
         <CardTitle>Crear cuenta</CardTitle>
       </CardHeader>
       <CardContent>
+        {hasPendingSignature && (
+          <div className="mb-4 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-4 py-2 text-sm dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900">
+            Por favor, cree una cuenta si aún no la tiene para proceder con la
+            firma del documento.
+          </div>
+        )}
         <form
           onSubmit={handleSubmit((values) =>
             registerMutation.mutate({ ...values, invitationToken }),
