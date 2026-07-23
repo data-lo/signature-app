@@ -49,6 +49,18 @@ export async function signDocumentRequest(documentId: string): Promise<void> {
   await apiClient.patch(`/document/${documentId}/sign`);
 }
 
+export async function linkCollaboratorRequest(
+  documentId: string,
+): Promise<{ linked: boolean }> {
+  const { data } = await apiClient.patch<{
+    success: boolean;
+    message: string;
+    data: { linked: boolean };
+  }>(`/document/${documentId}/link-collaborator`);
+
+  return data.data;
+}
+
 export async function rejectDocumentRequest(
   documentId: string,
   reason: string,
