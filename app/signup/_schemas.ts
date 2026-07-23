@@ -8,7 +8,6 @@ export const registerSchema = z
       .string()
       .min(1, 'El correo es obligatorio')
       .email('Correo electrónico inválido'),
-    position: z.string().min(1, 'El puesto es obligatorio'),
     nationalId: z.string().length(18, 'El CURP debe tener 18 caracteres'),
     rfc: z
       .string()

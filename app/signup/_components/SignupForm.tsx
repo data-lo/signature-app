@@ -93,13 +93,6 @@ export default function SignupForm({
             />
 
             <TextField
-              id="position"
-              label="Puesto"
-              error={errors.position}
-              {...registerField('position')}
-            />
-
-            <TextField
               id="nationalId"
               label="CURP"
               maxLength={18}

@@ -5,7 +5,6 @@ export interface CurrentUser {
   firstName: string;
   lastName: string;
   email: string;
-  position: string | null;
   roles: string[];
   nationalId: string;
   phoneNumber: string | null;
@@ -40,7 +39,6 @@ interface CachedUserProfile {
   firstName: string;
   lastName: string;
   email: string;
-  position: string | null;
   roles: string[];
   nationalId: string;
   isConfigured: boolean;
@@ -70,7 +68,6 @@ export async function getOnboardingProfileRequest(): Promise<CurrentUser> {
     firstName: cached.firstName,
     lastName: cached.lastName,
     email: cached.email,
-    position: cached.position,
     roles: cached.roles,
     nationalId: cached.nationalId,
     phoneNumber: cached.personalInformation.phoneNumber,

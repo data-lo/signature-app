@@ -43,7 +43,6 @@ describe('SignupForm', () => {
       screen.getByLabelText(/correo electrónico/i),
       'juan.perez@empresa.com',
     );
-    await user.type(screen.getByLabelText(/puesto/i), 'Gerente');
     await user.type(screen.getByLabelText(/curp/i), 'PELJ850101HDFRNN08');
     await user.type(screen.getByLabelText(/^rfc$/i), 'PELJ850101ABC');
     await user.type(screen.getByLabelText(/^contraseña$/i), 'supersecret123');
@@ -58,7 +57,6 @@ describe('SignupForm', () => {
         firstName: 'Juan',
         lastName: 'Pérez',
         email: 'juan.perez@empresa.com',
-        position: 'Gerente',
         nationalId: 'PELJ850101HDFRNN08',
         rfc: 'PELJ850101ABC',
       }),
@@ -83,7 +81,6 @@ describe('SignupForm', () => {
       screen.getByLabelText(/correo electrónico/i),
       'juan.perez@empresa.com',
     );
-    await user.type(screen.getByLabelText(/puesto/i), 'Gerente');
     await user.type(screen.getByLabelText(/curp/i), 'PELJ850101HDFRNN08');
     await user.type(screen.getByLabelText(/^contraseña$/i), 'supersecret123');
     await user.type(
