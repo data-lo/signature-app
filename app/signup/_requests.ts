@@ -6,7 +6,6 @@ interface RegisterResponseData {
   firstName: string;
   lastName: string;
   email: string;
-  position: string;
   roles: string[];
   nationalId: string;
 }

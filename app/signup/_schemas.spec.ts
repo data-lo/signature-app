@@ -4,7 +4,6 @@ const validData = {
   firstName: 'Juan',
   lastName: 'Pérez',
   email: 'juan.perez@empresa.com',
-  position: 'Gerente',
   nationalId: 'PELJ850101HDFRNN08',
   rfc: 'PELJ850101ABC',
   password: 'supersecret123',
