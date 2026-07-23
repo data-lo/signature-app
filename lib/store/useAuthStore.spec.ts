@@ -9,7 +9,6 @@ function buildProfile(overrides: Partial<CurrentUser> = {}): CurrentUser {
     firstName: 'Juan',
     lastName: 'Pérez',
     email: 'juan@empresa.com',
-    position: 'Gerente',
     roles: ['signer'],
     nationalId: 'PELJ850101HDFRNN08',
     phoneNumber: null,

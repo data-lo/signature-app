@@ -72,9 +72,6 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
           <dt className="text-muted-foreground">Correo</dt>
           <dd className="font-medium">{user.email}</dd>
 
-          <dt className="text-muted-foreground">Puesto</dt>
-          <dd className="font-medium">{user.position ?? '—'}</dd>
-
           <dt className="text-muted-foreground">CURP</dt>
           <dd className="font-medium">{user.nationalId}</dd>
 
