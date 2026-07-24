@@ -6,7 +6,7 @@ export default function LandingFooter() {
     <>
       <section className="bg-amber-50 px-8 py-16 text-center">
         <div className="mx-auto flex size-20 items-center justify-center rounded-2xl bg-white shadow-sm">
-          <FileSignature className="size-9 text-emerald-500" />
+          <FileSignature className="size-9 text-blue-500" />
         </div>
         <h2 className="mt-6 text-2xl font-semibold text-foreground">
           Estamos aquí para ayudarte a empezar
@@ -17,7 +17,7 @@ export default function LandingFooter() {
         </p>
         <Link
           href="/signup"
-          className="mt-6 inline-block rounded-md bg-emerald-500 px-6 py-2.5 text-sm font-semibold tracking-wide text-white hover:bg-emerald-600"
+          className="mt-6 inline-block rounded-md bg-firmalo px-6 py-2.5 text-sm font-semibold tracking-wide text-white hover:bg-firmalo-fiel"
         >
           CREAR CUENTA
         </Link>
@@ -31,7 +31,7 @@ export default function LandingFooter() {
           </span>
           <span className="cursor-pointer hover:text-foreground">Blog</span>
         </div>
-        <span>© {new Date().getFullYear()} Signature</span>
+        <span>© {new Date().getFullYear()} Firmalo</span>
       </footer>
     </>
   );
