@@ -24,17 +24,30 @@ export default function PdfPreview({ file }: PdfPreviewProps) {
     const container = containerRef.current;
     if (!container) return;
 
+    // Bug corregido: el contenedor observado tiene scroll propio (overflow-y-auto), así que
+    // cambiar el ancho de la página puede hacer aparecer/desaparecer su scrollbar — lo que vuelve
+    // a disparar el ResizeObserver y crea un ciclo (parpadeo del PDF en blanco, escalando a
+    // "Maximum update depth exceeded"). El umbral de 2px absorbe esa oscilación sin afectar el
+    // ajuste real ante un resize genuino; requestAnimationFrame colapsa los resizes continuos
+    // (arrastrar el borde de la ventana/devtools) a una actualización por frame en vez de una
+    // por evento.
+    let frame = 0;
     const updateWidth = () => {
-      const available = container.clientWidth - CONTAINER_PADDING;
-      setPageWidth(
-        Math.min(MAX_PAGE_WIDTH, Math.max(MIN_PAGE_WIDTH, available)),
-      );
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const available = container.clientWidth - CONTAINER_PADDING;
+        const next = Math.min(MAX_PAGE_WIDTH, Math.max(MIN_PAGE_WIDTH, available));
+        setPageWidth((prev) => (Math.abs(prev - next) < 2 ? prev : next));
+      });
     };
 
     updateWidth();
     const observer = new ResizeObserver(updateWidth);
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, []);
 
   return (
