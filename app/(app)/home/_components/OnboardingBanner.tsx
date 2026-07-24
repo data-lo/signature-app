@@ -12,7 +12,7 @@ export default function OnboardingBanner() {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+    <div className="flex flex-col gap-3 rounded-md border border-amber-300 bg-amber-50 p-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
       <div className="flex items-center gap-2 font-semibold">
         <AlertTriangle className="size-4" />
         Es requerido configurar tu usuario

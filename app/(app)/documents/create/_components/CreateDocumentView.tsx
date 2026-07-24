@@ -39,7 +39,22 @@ const DEFAULT_VALUES: CreateDocumentSignaturesFormValues = {
   collaborators: [],
 };
 
-export default function CreateDocumentView() {
+interface CreateDocumentViewProps {
+  /**
+   * Bug corregido: cuando se renderiza dentro de la sección "visible pero deshabilitada" de
+   * HomeContent (onboarding incompleto), este componente igual se monta y hace fetch (para
+   * mostrar contenido real, no un placeholder vacío) — pero sin esto, ese fetch también
+   * publicaba el conteo en DocumentsCountContext, lo que hacía aparecer el badge "DOCUMENTOS:N"
+   * clickeable en DashboardNavbar (fuera del wrapper `inert`) para un usuario que la home
+   * todavía está bloqueando. `false` solo suprime esa publicación al contexto global; la
+   * consulta y la tabla dentro de esta vista siguen funcionando igual.
+   */
+  trackDocumentsCount?: boolean;
+}
+
+export default function CreateDocumentView({
+  trackDocumentsCount = true,
+}: CreateDocumentViewProps = {}) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [filePondKey, setFilePondKey] = useState(0);
@@ -69,8 +84,10 @@ export default function CreateDocumentView() {
   const { setDocumentsCount } = useDocumentsCount();
 
   useEffect(() => {
-    if (myDocuments) setDocumentsCount(myDocuments.meta.total);
-  }, [myDocuments, setDocumentsCount]);
+    if (myDocuments && trackDocumentsCount) {
+      setDocumentsCount(myDocuments.meta.total);
+    }
+  }, [myDocuments, trackDocumentsCount, setDocumentsCount]);
 
   function onSubmit(values: CreateDocumentSignaturesFormValues) {
     if (!file) return;
