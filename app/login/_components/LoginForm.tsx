@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
@@ -7,10 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
+import { getPendingSignatureContext } from '@/lib/pending-signature-context';
 import { loginSchema, type LoginFormValues } from '../_schemas';
 import { useLogin, getLoginErrorMessage } from '../_hooks/useLogin';
 
 export default function LoginForm() {
+  const [hasPendingSignature, setHasPendingSignature] = useState(false);
+
+  // localStorage solo existe en el cliente (ver historia "Notificación por Email para Firma
+  // Simple y Vinculación de Cuenta", Caso C) — se lee tras el montaje para no generar un
+  // mismatch de hidratación entre servidor y cliente.
+  useEffect(() => {
+    setHasPendingSignature(Boolean(getPendingSignatureContext()));
+  }, []);
+
   const {
     register,
     handleSubmit,
@@ -25,6 +36,12 @@ export default function LoginForm() {
         <CardTitle>Iniciar sesión</CardTitle>
       </CardHeader>
       <CardContent>
+        {hasPendingSignature && (
+          <div className="mb-4 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-4 py-2 text-sm dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900">
+            Inicie sesión para firmar este documento con firma digital
+            simple.
+          </div>
+        )}
         <form onSubmit={handleSubmit((values) => loginMutation.mutate(values))}>
           <FieldGroup>
             <TextField
