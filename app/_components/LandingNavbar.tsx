@@ -10,7 +10,7 @@ export default function LandingNavbar() {
         <div className="flex items-center gap-2">
           <FileSignature className="size-6 text-emerald-500" />
           <span className="text-lg font-semibold tracking-tight text-foreground">
-            Signature
+            Firmalo
           </span>
         </div>
         <nav className="hidden items-center gap-8 md:flex">

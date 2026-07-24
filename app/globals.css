@@ -46,6 +46,9 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-firmalo: #3d5a99;
+  --color-firmalo-grafo: #7b93c7;
+  --color-firmalo-fiel: #2a407a;
 }
 
 :root {

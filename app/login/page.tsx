@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <Link href="/" className="flex items-center justify-center gap-2">
           <FileSignature className="size-6 text-emerald-500" />
           <span className="text-lg font-semibold tracking-tight text-foreground">
-            Signature
+            Firmalo
           </span>
         </Link>
 
