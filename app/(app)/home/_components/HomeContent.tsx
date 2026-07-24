@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuthStore } from '@/lib/store/useAuthStore';
+import { useOnboardingReady } from '@/lib/hooks/useOnboardingReady';
 import CreateDocumentView from '../../documents/create/_components/CreateDocumentView';
 import InviteMemberModal from './InviteMemberModal';
 
@@ -23,17 +23,16 @@ import InviteMemberModal from './InviteMemberModal';
  * este wrapper, siempre interactivo) que dejaría al usuario navegar a /documents saltándose el
  * bloqueo visual de aquí. `trackDocumentsCount={isReady}` corta esa fuga puntual sin afectar la
  * consulta ni la tabla dentro de la vista.
+ *
+ * El cálculo de "¿está listo?" vive en useOnboardingReady (ver CreateDocumentGuard, que usa el
+ * mismo hook para bloquear /documents/create a nivel de ruta con el mismo criterio exacto).
  */
 export default function HomeContent() {
-  const user = useAuthStore((state) => state.user);
+  const { isLoading, isReady } = useOnboardingReady();
 
-  if (!user) {
+  if (isLoading) {
     return null;
   }
-
-  const isReady =
-    user.isConfigured ||
-    (user.personalConfigured && user.signatureConfigured);
 
   return (
     <div

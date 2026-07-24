@@ -1,5 +1,5 @@
-import CreateDocumentView from './_components/CreateDocumentView';
+import CreateDocumentGuard from './_components/CreateDocumentGuard';
 
 export default function CreateDocumentPage() {
-  return <CreateDocumentView />;
+  return <CreateDocumentGuard />;
 }
