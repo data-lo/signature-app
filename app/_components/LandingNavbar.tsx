@@ -8,7 +8,7 @@ export default function LandingNavbar() {
     <header className="flex items-center justify-between border-b border-border bg-background px-8 h-16">
       <div className="flex items-center gap-10">
         <div className="flex items-center gap-2">
-          <FileSignature className="size-6 text-emerald-500" />
+          <FileSignature className="size-6 text-blue-400" />
           <span className="text-lg font-semibold tracking-tight text-foreground">
             Firmalo
           </span>
@@ -34,7 +34,7 @@ export default function LandingNavbar() {
         </Link>
         <Link
           href="/signup"
-          className="rounded-md bg-emerald-500 px-4 py-2 text-xs font-semibold tracking-wide text-white hover:bg-emerald-600"
+          className="rounded-md bg-firmalo px-4 py-2 text-xs font-semibold tracking-wide text-white hover:bg-firmalo-fiel"
         >
           CREAR CUENTA
         </Link>

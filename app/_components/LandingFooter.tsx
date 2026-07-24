@@ -17,7 +17,7 @@ export default function LandingFooter() {
         </p>
         <Link
           href="/signup"
-          className="mt-6 inline-block rounded-md bg-emerald-500 px-6 py-2.5 text-sm font-semibold tracking-wide text-white hover:bg-emerald-600"
+          className="mt-6 inline-block rounded-md bg-firmalo px-6 py-2.5 text-sm font-semibold tracking-wide text-white hover:bg-firmalo-fiel"
         >
           CREAR CUENTA
         </Link>
