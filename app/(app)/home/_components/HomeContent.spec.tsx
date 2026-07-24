@@ -5,7 +5,9 @@ import type { AuthUser } from '@/lib/store/types/auth-store.types';
 
 jest.mock('../../documents/create/_components/CreateDocumentView', () => ({
   __esModule: true,
-  default: () => <div>CreateDocumentView</div>,
+  default: ({ trackDocumentsCount }: { trackDocumentsCount?: boolean }) => (
+    <div>CreateDocumentView (trackDocumentsCount={String(trackDocumentsCount)})</div>
+  ),
 }));
 jest.mock('./InviteMemberModal', () => ({
   __esModule: true,
@@ -37,7 +39,7 @@ describe('HomeContent', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('bug corregido: bloquea la sección operativa si el onboarding está incompleto', () => {
+  it('con onboarding incompleto: la sección se renderiza visible pero deshabilitada/opaca (ya no se oculta)', () => {
     useAuthStore.setState({
       user: buildUser({
         isConfigured: false,
@@ -47,33 +49,58 @@ describe('HomeContent', () => {
     });
     render(<HomeContent />);
 
-    expect(
-      screen.getByText('Completa tu configuración para acceder a esta sección.'),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('CreateDocumentView')).not.toBeInTheDocument();
-    expect(screen.queryByText('InviteMemberModal')).not.toBeInTheDocument();
+    // Sigue visible (a diferencia del comportamiento anterior, que la ocultaba por completo).
+    const createDocumentView = screen.getByText(/CreateDocumentView/);
+    const inviteMemberModal = screen.getByText('InviteMemberModal');
+    expect(createDocumentView).toBeInTheDocument();
+    expect(inviteMemberModal).toBeInTheDocument();
+
+    const wrapper = createDocumentView.parentElement;
+    expect(wrapper).toHaveAttribute('inert');
+    expect(wrapper).toHaveAttribute('aria-disabled', 'true');
+    expect(wrapper?.className).toContain('opacity-50');
+    expect(wrapper?.className).toContain('pointer-events-none');
   });
 
-  it('bloquea la sección operativa si falta solo una de las dos sub-banderas', () => {
+  it('bug corregido: con onboarding incompleto, pasa trackDocumentsCount={false} para no publicar el conteo en el badge del navbar (fuera del wrapper inert)', () => {
+    useAuthStore.setState({
+      user: buildUser({ personalConfigured: false, signatureConfigured: false }),
+    });
+    render(<HomeContent />);
+
+    expect(
+      screen.getByText('CreateDocumentView (trackDocumentsCount=false)'),
+    ).toBeInTheDocument();
+  });
+
+  it('bloquea (inert + opacidad) la sección operativa si falta solo una de las dos sub-banderas', () => {
     useAuthStore.setState({
       user: buildUser({ personalConfigured: true, signatureConfigured: false }),
     });
     render(<HomeContent />);
 
-    expect(screen.queryByText('CreateDocumentView')).not.toBeInTheDocument();
+    const wrapper = screen.getByText(/CreateDocumentView/).parentElement;
+    expect(wrapper).toHaveAttribute('inert');
   });
 
-  it('muestra la sección operativa cuando ambas sub-banderas están en true', () => {
+  it('muestra la sección operativa habilitada (sin inert ni opacidad) cuando ambas sub-banderas están en true', () => {
     useAuthStore.setState({
       user: buildUser({ personalConfigured: true, signatureConfigured: true }),
     });
     render(<HomeContent />);
 
-    expect(screen.getByText('CreateDocumentView')).toBeInTheDocument();
+    const wrapper = screen.getByText(/CreateDocumentView/).parentElement;
+    expect(screen.getByText(/CreateDocumentView/)).toBeInTheDocument();
     expect(screen.getByText('InviteMemberModal')).toBeInTheDocument();
+    expect(wrapper).not.toHaveAttribute('inert');
+    expect(wrapper).toHaveAttribute('aria-disabled', 'false');
+    expect(wrapper?.className).toBe('');
+    expect(
+      screen.getByText('CreateDocumentView (trackDocumentsCount=true)'),
+    ).toBeInTheDocument();
   });
 
-  it('muestra la sección operativa cuando isConfigured ya es true (aunque las sub-banderas locales no se hayan recalculado)', () => {
+  it('muestra la sección operativa habilitada cuando isConfigured ya es true (aunque las sub-banderas locales no se hayan recalculado)', () => {
     useAuthStore.setState({
       user: buildUser({
         isConfigured: true,
@@ -83,6 +110,8 @@ describe('HomeContent', () => {
     });
     render(<HomeContent />);
 
-    expect(screen.getByText('CreateDocumentView')).toBeInTheDocument();
+    const wrapper = screen.getByText(/CreateDocumentView/).parentElement;
+    expect(screen.getByText(/CreateDocumentView/)).toBeInTheDocument();
+    expect(wrapper).not.toHaveAttribute('inert');
   });
 });

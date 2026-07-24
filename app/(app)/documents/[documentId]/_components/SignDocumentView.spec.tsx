@@ -6,6 +6,8 @@ import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
 import { useRequestCancellation } from '../_hooks/useRequestCancellation';
 import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
+import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
+import { useVerifyCode } from '../_hooks/useVerifyCode';
 import type { DocumentDetail } from '../_requests';
 
 jest.mock('../_hooks/useDocumentDetail');
@@ -13,6 +15,8 @@ jest.mock('../_hooks/useSignDocument');
 jest.mock('../_hooks/useRejectDocument');
 jest.mock('../_hooks/useRequestCancellation');
 jest.mock('../_hooks/useConfirmCancellation');
+jest.mock('../_hooks/useRequestVerificationCode');
+jest.mock('../_hooks/useVerifyCode');
 jest.mock('../../_components/PdfPreview', () => ({
   __esModule: true,
   default: () => <div>PDF preview</div>,
@@ -23,6 +27,9 @@ const mockedUseSignDocument = useSignDocument as jest.Mock;
 const mockedUseRejectDocument = useRejectDocument as jest.Mock;
 const mockedUseRequestCancellation = useRequestCancellation as jest.Mock;
 const mockedUseConfirmCancellation = useConfirmCancellation as jest.Mock;
+const mockedUseRequestVerificationCode =
+  useRequestVerificationCode as jest.Mock;
+const mockedUseVerifyCode = useVerifyCode as jest.Mock;
 
 function baseDocument(
   overrides: Partial<DocumentDetail> = {},
@@ -43,6 +50,8 @@ function baseDocument(
     canReject: false,
     canRequestCancellation: false,
     canConfirmCancellation: false,
+    requiresVerification: false,
+    verificationConfirmed: false,
     ...overrides,
   };
 }
@@ -75,6 +84,14 @@ describe('SignDocumentView', () => {
       mutate: confirmCancellationMutate,
       isPending: false,
     });
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseVerifyCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
   });
 
   it('muestra el botón de firmar cuando es el turno del usuario', async () => {
@@ -91,6 +108,69 @@ describe('SignDocumentView', () => {
     );
 
     expect(signMutate).toHaveBeenCalled();
+  });
+
+  it('bug corregido: si el documento requiere verificación y aún no se confirma, oculta "Continuar a firmar" y muestra el flujo de código en su lugar', async () => {
+    const requestCodeMutate = jest.fn((_vars, opts) => opts?.onSuccess?.());
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: requestCodeMutate,
+      isPending: false,
+    });
+    const verifyCodeMutate = jest.fn();
+    mockedUseVerifyCode.mockReturnValue({
+      mutate: verifyCodeMutate,
+      isPending: false,
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.queryByRole('button', { name: /continuar a firmar/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: /solicitar código de verificación/i }),
+    );
+    expect(requestCodeMutate).toHaveBeenCalled();
+
+    await user.type(
+      screen.getByPlaceholderText(/código de verificación/i),
+      '123456',
+    );
+    await user.click(screen.getByRole('button', { name: /verificar código/i }));
+
+    expect(verifyCodeMutate).toHaveBeenCalledWith(
+      '123456',
+      expect.anything(),
+    );
+  });
+
+  it('muestra "Continuar a firmar" directamente cuando la verificación ya fue confirmada', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: true,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    ).toBeInTheDocument();
   });
 
   it('permite rechazar con un motivo', async () => {

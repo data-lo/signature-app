@@ -80,6 +80,30 @@ describe('CreateDocumentView', () => {
     expect(screen.getByRole('button', { name: /^firmar$/i })).toBeDisabled();
   });
 
+  it('por defecto (trackDocumentsCount omitido), publica el conteo de documentos en el contexto global', () => {
+    const setDocumentsCount = jest.fn();
+    mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
+    mockedUseMyDocuments.mockReturnValue({
+      data: { documents: [], meta: { total: 3 } },
+    });
+
+    renderWithProviders(<CreateDocumentView />);
+
+    expect(setDocumentsCount).toHaveBeenCalledWith(3);
+  });
+
+  it('bug corregido: con trackDocumentsCount={false} (sección deshabilitada en HomeContent), no publica el conteo — evita que el badge "DOCUMENTOS:N" del navbar quede clickeable mientras el onboarding está incompleto', () => {
+    const setDocumentsCount = jest.fn();
+    mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
+    mockedUseMyDocuments.mockReturnValue({
+      data: { documents: [], meta: { total: 3 } },
+    });
+
+    renderWithProviders(<CreateDocumentView trackDocumentsCount={false} />);
+
+    expect(setDocumentsCount).not.toHaveBeenCalled();
+  });
+
   it('agrega un firmante SIMPLE y envía el payload con los datos correctos', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CreateDocumentView />);

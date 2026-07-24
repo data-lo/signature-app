@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
@@ -39,9 +40,25 @@ const DEFAULT_VALUES: CreateDocumentSignaturesFormValues = {
   collaborators: [],
 };
 
-export default function CreateDocumentView() {
+interface CreateDocumentViewProps {
+  /**
+   * Bug corregido: cuando se renderiza dentro de la sección "visible pero deshabilitada" de
+   * HomeContent (onboarding incompleto), este componente igual se monta y hace fetch (para
+   * mostrar contenido real, no un placeholder vacío) — pero sin esto, ese fetch también
+   * publicaba el conteo en DocumentsCountContext, lo que hacía aparecer el badge "DOCUMENTOS:N"
+   * clickeable en DashboardNavbar (fuera del wrapper `inert`) para un usuario que la home
+   * todavía está bloqueando. `false` solo suprime esa publicación al contexto global; la
+   * consulta y la tabla dentro de esta vista siguen funcionando igual.
+   */
+  trackDocumentsCount?: boolean;
+}
+
+export default function CreateDocumentView({
+  trackDocumentsCount = true,
+}: CreateDocumentViewProps = {}) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [isFileLoading, setIsFileLoading] = useState(false);
   const [filePondKey, setFilePondKey] = useState(0);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DocumentsFilters>(
@@ -69,8 +86,10 @@ export default function CreateDocumentView() {
   const { setDocumentsCount } = useDocumentsCount();
 
   useEffect(() => {
-    if (myDocuments) setDocumentsCount(myDocuments.meta.total);
-  }, [myDocuments, setDocumentsCount]);
+    if (myDocuments && trackDocumentsCount) {
+      setDocumentsCount(myDocuments.meta.total);
+    }
+  }, [myDocuments, trackDocumentsCount, setDocumentsCount]);
 
   function onSubmit(values: CreateDocumentSignaturesFormValues) {
     if (!file) return;
@@ -127,7 +146,11 @@ export default function CreateDocumentView() {
           className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2"
         >
           <div className="flex flex-col gap-4">
-            <DocumentFilePicker key={filePondKey} onFileSelected={setFile} />
+            <DocumentFilePicker
+              key={filePondKey}
+              onFileSelected={setFile}
+              onLoadingChange={setIsFileLoading}
+            />
 
             <RequiresApprovalField control={control} />
 
@@ -154,7 +177,12 @@ export default function CreateDocumentView() {
 
           <Card className="h-[520px] overflow-hidden p-0">
             <CardContent className="h-full p-0">
-              {file ? (
+              {isFileLoading ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Cargando documento...
+                </div>
+              ) : file ? (
                 <PdfPreview file={file} />
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
