@@ -9,7 +9,7 @@ function SignatureMethodVisual() {
   return (
     <div className="flex items-center justify-center rounded-xl bg-amber-50 p-12">
       <div className="flex size-28 items-center justify-center rounded-2xl bg-white shadow-sm">
-        <ShieldCheck className="size-12 text-emerald-500" />
+        <ShieldCheck className="size-12 text-blue-400" />
       </div>
     </div>
   );
@@ -36,7 +36,7 @@ function ParticipantsVisual() {
             <div className="mt-1 h-6 rounded-md border border-gray-200" />
           </div>
         </div>
-        <p className="mt-3 text-xs font-semibold text-emerald-600">
+        <p className="mt-3 text-xs font-semibold text-blue-400">
           + Añadir firmante
         </p>
       </div>
