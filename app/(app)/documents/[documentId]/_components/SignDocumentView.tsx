@@ -8,11 +8,14 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
 import { useRequestCancellation } from '../_hooks/useRequestCancellation';
 import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
+import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
+import { useVerifyCode } from '../_hooks/useVerifyCode';
 import {
   rejectDocumentSchema,
   type RejectDocumentFormValues,
@@ -48,11 +51,16 @@ export default function SignDocumentView({
   const [showCancellationDialog, setShowCancellationDialog] = useState(false);
   const [showConfirmCancellationDialog, setShowConfirmCancellationDialog] =
     useState(false);
+  const [verificationCodeInput, setVerificationCodeInput] = useState('');
+  const [codeRequested, setCodeRequested] = useState(false);
   const { data: document, isLoading, isError } = useDocumentDetail(documentId);
   const signMutation = useSignDocument(documentId);
   const rejectMutation = useRejectDocument(documentId);
   const requestCancellationMutation = useRequestCancellation(documentId);
   const confirmCancellationMutation = useConfirmCancellation(documentId);
+  const requestVerificationCodeMutation =
+    useRequestVerificationCode(documentId);
+  const verifyCodeMutation = useVerifyCode(documentId);
 
   const {
     register,
@@ -141,25 +149,91 @@ export default function SignDocumentView({
           </CardContent>
         </Card>
 
-        {document.canSign && !showRejectForm && (
-          <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              className="w-full"
-              disabled={signMutation.isPending}
-              onClick={() => signMutation.mutate()}
-            >
-              {signMutation.isPending ? 'Firmando...' : 'Continuar a firmar'}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowRejectForm(true)}
-            >
-              Rechazar documento
-            </Button>
-          </div>
-        )}
+        {document.canSign &&
+          !showRejectForm &&
+          document.requiresVerification &&
+          !document.verificationConfirmed && (
+            <div className="flex flex-col gap-2 rounded-lg border border-border p-4">
+              <p className="text-sm font-medium text-foreground">
+                Este documento requiere verificación
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Solicita y valida tu código antes de firmar.
+              </p>
+              {!codeRequested ? (
+                <Button
+                  type="button"
+                  className="w-full"
+                  disabled={requestVerificationCodeMutation.isPending}
+                  onClick={() =>
+                    requestVerificationCodeMutation.mutate(undefined, {
+                      onSuccess: () => setCodeRequested(true),
+                    })
+                  }
+                >
+                  {requestVerificationCodeMutation.isPending
+                    ? 'Enviando código...'
+                    : 'Solicitar código de verificación'}
+                </Button>
+              ) : (
+                <>
+                  <Input
+                    inputMode="numeric"
+                    placeholder="Código de verificación"
+                    value={verificationCodeInput}
+                    onChange={(e) => setVerificationCodeInput(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    className="w-full"
+                    disabled={
+                      verifyCodeMutation.isPending || !verificationCodeInput
+                    }
+                    onClick={() =>
+                      verifyCodeMutation.mutate(verificationCodeInput, {
+                        onSuccess: () => setVerificationCodeInput(''),
+                      })
+                    }
+                  >
+                    {verifyCodeMutation.isPending
+                      ? 'Verificando...'
+                      : 'Verificar código'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={requestVerificationCodeMutation.isPending}
+                    onClick={() => requestVerificationCodeMutation.mutate()}
+                  >
+                    Reenviar código
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
+        {document.canSign &&
+          !showRejectForm &&
+          (!document.requiresVerification ||
+            document.verificationConfirmed) && (
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                className="w-full"
+                disabled={signMutation.isPending}
+                onClick={() => signMutation.mutate()}
+              >
+                {signMutation.isPending ? 'Firmando...' : 'Continuar a firmar'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowRejectForm(true)}
+              >
+                Rechazar documento
+              </Button>
+            </div>
+          )}
 
         {document.canReject && showRejectForm && (
           <form

@@ -31,6 +31,8 @@ export interface DocumentDetail {
   canReject: boolean;
   canRequestCancellation: boolean;
   canConfirmCancellation: boolean;
+  requiresVerification: boolean;
+  verificationConfirmed: boolean;
 }
 
 export async function getDocumentDetailRequest(
@@ -47,6 +49,21 @@ export async function getDocumentDetailRequest(
 
 export async function signDocumentRequest(documentId: string): Promise<void> {
   await apiClient.patch(`/document/${documentId}/sign`);
+}
+
+export async function requestVerificationCodeRequest(
+  documentId: string,
+): Promise<void> {
+  await apiClient.post(`/document/${documentId}/verification-codes`);
+}
+
+export async function verifyCodeRequest(
+  documentId: string,
+  code: string,
+): Promise<void> {
+  await apiClient.post(`/document/${documentId}/verification-codes/verify`, {
+    code,
+  });
 }
 
 export async function linkCollaboratorRequest(
