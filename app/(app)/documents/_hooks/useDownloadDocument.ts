@@ -1,17 +1,9 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { getDocumentFileUrlRequest } from '../_requests';
-
-function getErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ??
-    'Ocurrió un error al descargar el documento. Intenta de nuevo.'
-  );
-}
 
 export function useDownloadDocument() {
   return useMutation({
@@ -20,7 +12,12 @@ export function useDownloadDocument() {
       window.open(secureUrl, '_blank', 'noopener,noreferrer');
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        getErrorMessage(
+          error,
+          'Ocurrió un error al descargar el documento. Intenta de nuevo.',
+        ),
+      );
     },
   });
 }

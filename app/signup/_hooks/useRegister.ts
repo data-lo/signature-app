@@ -2,16 +2,12 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { registerRequest, type RegisterRequestValues } from '../_requests';
 
 export function getRegisterErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ??
-    'Ocurrió un error al crear tu cuenta. Intenta de nuevo.'
-  );
+  return getErrorMessage(error, 'Ocurrió un error al crear tu cuenta. Intenta de nuevo.');
 }
 
 export function useRegister() {

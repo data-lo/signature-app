@@ -1,8 +1,8 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { updateIneFileRequest, updateSignatureFileRequest } from '../_requests';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 
@@ -14,13 +14,10 @@ interface UpdatePersonalDocumentParams {
   file: File;
 }
 
-function getErrorMessage(error: unknown, field: UpdatableField): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  const fallback =
-    field === 'ine'
-      ? 'Ocurrió un error al guardar la identificación (INE). Intenta de nuevo.'
-      : 'Ocurrió un error al guardar la firma digital. Intenta de nuevo.';
-  return axiosError.response?.data?.message ?? fallback;
+function getUpdateFallbackMessage(field: UpdatableField): string {
+  return field === 'ine'
+    ? 'Ocurrió un error al guardar la identificación (INE). Intenta de nuevo.'
+    : 'Ocurrió un error al guardar la firma digital. Intenta de nuevo.';
 }
 
 export function useUpdatePersonalDocument() {
@@ -44,7 +41,7 @@ export function useUpdatePersonalDocument() {
       }
     },
     onError: (error, { field }) => {
-      toast.error(getErrorMessage(error, field));
+      toast.error(getErrorMessage(error, getUpdateFallbackMessage(field)));
     },
   });
 }

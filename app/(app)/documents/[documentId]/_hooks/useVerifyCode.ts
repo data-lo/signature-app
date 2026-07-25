@@ -1,17 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { verifyCodeRequest } from '../_requests';
-
-function getErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ??
-    'Código de verificación inválido. Intenta de nuevo.'
-  );
-}
 
 export function useVerifyCode(documentId: string) {
   const queryClient = useQueryClient();
@@ -25,7 +17,9 @@ export function useVerifyCode(documentId: string) {
       });
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        getErrorMessage(error, 'Código de verificación inválido. Intenta de nuevo.'),
+      );
     },
   });
 }
