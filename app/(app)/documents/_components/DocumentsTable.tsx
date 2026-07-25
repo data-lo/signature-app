@@ -33,15 +33,7 @@ import {
   type DocumentsFilters,
 } from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-
-export type DocumentListStatus =
-  | 'created'
-  | 'pending'
-  | 'signed'
-  | 'rejected'
-  | 'expired'
-  | 'cancellation_pending'
-  | 'cancelled';
+import { DocumentStatus } from '@/lib/enums/document';
 
 export interface DocumentListItem {
   id: string;
@@ -51,28 +43,28 @@ export interface DocumentListItem {
   spectators: string[];
   creator: string;
   totalPages: number;
-  status: DocumentListStatus;
+  status: DocumentStatus;
   createdAt: string;
 }
 
-const STATUS_LABELS: Record<DocumentListStatus, string> = {
-  created: 'Creado',
-  pending: 'En progreso',
-  signed: 'Firmado por todos',
-  rejected: 'Rechazado',
-  expired: 'Expirado',
-  cancellation_pending: 'Cancelación pendiente',
-  cancelled: 'Cancelado',
+const STATUS_LABELS: Record<DocumentStatus, string> = {
+  [DocumentStatus.Created]: 'Creado',
+  [DocumentStatus.Pending]: 'En progreso',
+  [DocumentStatus.Signed]: 'Firmado por todos',
+  [DocumentStatus.Rejected]: 'Rechazado',
+  [DocumentStatus.Expired]: 'Expirado',
+  [DocumentStatus.CancellationPending]: 'Cancelación pendiente',
+  [DocumentStatus.Cancelled]: 'Cancelado',
 };
 
-const STATUS_DOT: Record<DocumentListStatus, string> = {
-  created: 'bg-amber-400',
-  pending: 'bg-amber-400',
-  signed: 'bg-emerald-500',
-  rejected: 'bg-red-400',
-  expired: 'bg-gray-400',
-  cancellation_pending: 'bg-amber-400',
-  cancelled: 'bg-gray-400',
+const STATUS_DOT: Record<DocumentStatus, string> = {
+  [DocumentStatus.Created]: 'bg-amber-400',
+  [DocumentStatus.Pending]: 'bg-amber-400',
+  [DocumentStatus.Signed]: 'bg-emerald-500',
+  [DocumentStatus.Rejected]: 'bg-red-400',
+  [DocumentStatus.Expired]: 'bg-gray-400',
+  [DocumentStatus.CancellationPending]: 'bg-amber-400',
+  [DocumentStatus.Cancelled]: 'bg-gray-400',
 };
 
 interface DocumentsTableProps {
@@ -182,7 +174,7 @@ export default function DocumentsTable({
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
-                  {onSignClick && doc.status === 'pending' ? (
+                  {onSignClick && doc.status === DocumentStatus.Pending ? (
                     <Button
                       variant="brand"
                       size="sm"
@@ -207,7 +199,7 @@ export default function DocumentsTable({
                       <ChevronDown className="size-3.5" />
                     </Button>
                   )}
-                  {doc.status === 'signed' && (
+                  {doc.status === DocumentStatus.Signed && (
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -218,9 +210,9 @@ export default function DocumentsTable({
                     </Button>
                   )}
                   {onViewDetail &&
-                    (doc.status === 'signed' ||
-                      doc.status === 'cancellation_pending' ||
-                      doc.status === 'cancelled') && (
+                    (doc.status === DocumentStatus.Signed ||
+                      doc.status === DocumentStatus.CancellationPending ||
+                      doc.status === DocumentStatus.Cancelled) && (
                       <Button
                         variant="ghost"
                         size="sm"

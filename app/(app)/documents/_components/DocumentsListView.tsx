@@ -10,11 +10,12 @@ import {
   type DocumentsFilters,
 } from './DocumentsFilterPanel';
 import { useParticipantDocuments } from '../_hooks/useParticipantDocuments';
+import { ParticipantStatus } from '@/lib/enums/document';
 
-type Tab = 'pending' | 'signed';
+type Tab = ParticipantStatus.Pending | ParticipantStatus.Signed;
 
 export default function DocumentsListView() {
-  const [tab, setTab] = useState<Tab>('pending');
+  const [tab, setTab] = useState<Tab>(ParticipantStatus.Pending);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DocumentsFilters>(
     EMPTY_DOCUMENTS_FILTERS,
@@ -44,10 +45,10 @@ export default function DocumentsListView() {
       <div className="mb-6 flex items-center gap-2 border-b border-border">
         <button
           type="button"
-          onClick={() => handleTabChange('pending')}
+          onClick={() => handleTabChange(ParticipantStatus.Pending)}
           className={cn(
             'border-b-2 px-4 py-2 text-sm font-semibold tracking-wide',
-            tab === 'pending'
+            tab === ParticipantStatus.Pending
               ? 'border-emerald-500 text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',
           )}
@@ -56,10 +57,10 @@ export default function DocumentsListView() {
         </button>
         <button
           type="button"
-          onClick={() => handleTabChange('signed')}
+          onClick={() => handleTabChange(ParticipantStatus.Signed)}
           className={cn(
             'border-b-2 px-4 py-2 text-sm font-semibold tracking-wide',
-            tab === 'signed'
+            tab === ParticipantStatus.Signed
               ? 'border-emerald-500 text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',
           )}
@@ -69,7 +70,7 @@ export default function DocumentsListView() {
       </div>
 
       <h1 className="mb-4 text-lg font-semibold text-foreground">
-        {tab === 'pending'
+        {tab === ParticipantStatus.Pending
           ? 'Tus documentos pendientes'
           : 'Tus documentos firmados'}
       </h1>
@@ -82,7 +83,7 @@ export default function DocumentsListView() {
         hasPrevPage={documentsResult?.meta.hasPrevPage}
         onPageChange={setPage}
         onSignClick={
-          tab === 'pending'
+          tab === ParticipantStatus.Pending
             ? (id) => router.push(`/documents/${id}`)
             : undefined
         }

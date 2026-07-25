@@ -6,10 +6,11 @@ import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from '../_components/DocumentsFilterPanel';
+import type { ParticipantStatus } from '@/lib/enums/document';
 
 export function useParticipantDocuments(
   email: string | undefined,
-  status: 'pending' | 'signed',
+  status: ParticipantStatus.Pending | ParticipantStatus.Signed,
   page: number,
   filters: DocumentsFilters = EMPTY_DOCUMENTS_FILTERS,
 ) {

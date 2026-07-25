@@ -5,6 +5,7 @@ import {
   buildDocumentsFilterParams,
   type DocumentsFilters,
 } from './_components/DocumentsFilterPanel';
+import type { ParticipantStatus } from '@/lib/enums/document';
 
 export interface DocumentsMeta {
   total: number;
@@ -38,7 +39,7 @@ export async function getDocumentFileUrlRequest(
 
 export async function getParticipantDocumentsRequest(
   email: string,
-  status: 'pending' | 'signed',
+  status: ParticipantStatus.Pending | ParticipantStatus.Signed,
   page = 1,
   limit = 25,
   filters: DocumentsFilters = EMPTY_DOCUMENTS_FILTERS,
