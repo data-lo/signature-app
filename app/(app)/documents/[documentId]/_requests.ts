@@ -3,6 +3,7 @@ import type { DocumentListStatus } from '../_components/DocumentsTable';
 
 export type ParticipantRole = 'signer' | 'reviewer' | 'watcher' | 'creator';
 export type ParticipantStatus = 'pending' | 'signed' | 'rejected';
+export type SignatureType = 'simple' | 'fiel';
 
 export interface DocumentParticipant {
   id: string;
@@ -27,6 +28,7 @@ export interface DocumentDetail {
   participants: DocumentParticipant[];
   myRole: ParticipantRole | null;
   myStatus: ParticipantStatus | null;
+  mySignatureType: SignatureType | null;
   canSign: boolean;
   canReject: boolean;
   canRequestCancellation: boolean;

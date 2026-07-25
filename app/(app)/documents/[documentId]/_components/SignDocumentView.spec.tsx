@@ -8,6 +8,8 @@ import { useRequestCancellation } from '../_hooks/useRequestCancellation';
 import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
 import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
 import { useVerifyCode } from '../_hooks/useVerifyCode';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import type { AuthUser } from '@/lib/store/types/auth-store.types';
 import type { DocumentDetail } from '../_requests';
 
 jest.mock('../_hooks/useDocumentDetail');
@@ -46,12 +48,27 @@ function baseDocument(
     participants: [],
     myRole: 'signer',
     myStatus: 'pending',
+    mySignatureType: null,
     canSign: false,
     canReject: false,
     canRequestCancellation: false,
     canConfirmCancellation: false,
     requiresVerification: false,
     verificationConfirmed: false,
+    ...overrides,
+  };
+}
+
+function buildUser(overrides: Partial<AuthUser> = {}): AuthUser {
+  return {
+    id: 'user-1',
+    email: 'juan@empresa.com',
+    identificationNumber: 'PELJ850101HDFRNN08',
+    name: 'Juan',
+    lastName: 'Pérez',
+    isConfigured: false,
+    personalConfigured: false,
+    signatureConfigured: false,
     ...overrides,
   };
 }
@@ -67,6 +84,7 @@ describe('SignDocumentView', () => {
     rejectMutate.mockReset();
     requestCancellationMutate.mockReset();
     confirmCancellationMutate.mockReset();
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
 
     mockedUseSignDocument.mockReturnValue({
       mutate: signMutate,
@@ -192,6 +210,104 @@ describe('SignDocumentView', () => {
     await user.click(screen.getByRole('button', { name: /^rechazar$/i }));
 
     expect(rejectMutate).toHaveBeenCalledWith('El documento tiene un error');
+  });
+
+  it('bug corregido: si el documento requiere firma simple y el usuario no la tiene configurada, deshabilita/atenúa la firma y muestra la leyenda explicativa', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: 'simple',
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.getByText(
+        /para firmar documentos con tu firma digital simple, esta debe estar configurada/i,
+      ),
+    ).toBeInTheDocument();
+
+    const signButton = screen.getByRole('button', {
+      name: /continuar a firmar/i,
+      hidden: true,
+    });
+    const wrapper = signButton.parentElement?.parentElement;
+    expect(wrapper).toHaveAttribute('inert');
+    expect(wrapper).toHaveAttribute('aria-disabled', 'true');
+    expect(wrapper?.className).toContain('opacity-50');
+    expect(wrapper?.className).toContain('pointer-events-none');
+  });
+
+  it('bug corregido: al acceder por ruta directa sin firma simple configurada, bloquea el documento con un overlay y despliega un modal de alerta', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: 'simple',
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.getAllByText(
+        /tu firma no ha sido configurada\. por favor confígurala para continuar/i,
+      ).length,
+    ).toBeGreaterThan(0);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /configurar firma/i }),
+    ).toHaveAttribute('href', '/personal-documents#signature-documents');
+  });
+
+  it('no bloquea el documento ni abre el modal de firma cuando el documento no requiere firma simple', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: 'fiel',
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/tu firma no ha sido configurada/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('no muestra la leyenda de firma simple cuando el usuario ya la tiene configurada', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: 'simple',
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.queryByText(/esta debe estar configurada/i),
+    ).not.toBeInTheDocument();
+    const signButton = screen.getByRole('button', {
+      name: /continuar a firmar/i,
+    });
+    expect(signButton.parentElement?.parentElement).not.toHaveAttribute(
+      'inert',
+    );
   });
 
   it('muestra un mensaje cuando no es el turno del usuario', () => {

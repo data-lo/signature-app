@@ -1,14 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
@@ -53,6 +63,9 @@ export default function SignDocumentView({
     useState(false);
   const [verificationCodeInput, setVerificationCodeInput] = useState('');
   const [codeRequested, setCodeRequested] = useState(false);
+  const [showSignatureRequiredDialog, setShowSignatureRequiredDialog] =
+    useState(false);
+  const user = useAuthStore((state) => state.user);
   const { data: document, isLoading, isError } = useDocumentDetail(documentId);
   const signMutation = useSignDocument(documentId);
   const rejectMutation = useRejectDocument(documentId);
@@ -73,6 +86,18 @@ export default function SignDocumentView({
   function onReject(values: RejectDocumentFormValues) {
     rejectMutation.mutate(values.reason);
   }
+
+  const needsSimpleSignatureSetup =
+    document?.mySignatureType === 'simple' && !user?.signatureConfigured;
+
+  // Alcance: solo firma simple. Bloquea también la lectura del documento (no solo
+  // los botones de firma) porque el usuario puede llegar por URL directa (ej.
+  // /documents/:id) sin haber pasado antes por una pantalla que ya lo avisara.
+  useEffect(() => {
+    if (needsSimpleSignatureSetup) {
+      setShowSignatureRequiredDialog(true);
+    }
+  }, [needsSimpleSignatureSetup]);
 
   if (isLoading) {
     return (
@@ -149,91 +174,115 @@ export default function SignDocumentView({
           </CardContent>
         </Card>
 
-        {document.canSign &&
-          !showRejectForm &&
-          document.requiresVerification &&
-          !document.verificationConfirmed && (
-            <div className="flex flex-col gap-2 rounded-lg border border-border p-4">
-              <p className="text-sm font-medium text-foreground">
-                Este documento requiere verificación
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Solicita y valida tu código antes de firmar.
-              </p>
-              {!codeRequested ? (
-                <Button
-                  type="button"
-                  className="w-full"
-                  disabled={requestVerificationCodeMutation.isPending}
-                  onClick={() =>
-                    requestVerificationCodeMutation.mutate(undefined, {
-                      onSuccess: () => setCodeRequested(true),
-                    })
-                  }
-                >
-                  {requestVerificationCodeMutation.isPending
-                    ? 'Enviando código...'
-                    : 'Solicitar código de verificación'}
-                </Button>
-              ) : (
-                <>
-                  <Input
-                    inputMode="numeric"
-                    placeholder="Código de verificación"
-                    value={verificationCodeInput}
-                    onChange={(e) => setVerificationCodeInput(e.target.value)}
-                  />
+        {document.canSign && !showRejectForm && (
+          <div className="flex flex-col gap-2">
+            {needsSimpleSignatureSetup && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                Para firmar documentos con tu firma digital simple, esta debe
+                estar configurada.
+              </div>
+            )}
+
+            <div
+              inert={needsSimpleSignatureSetup}
+              aria-disabled={needsSimpleSignatureSetup}
+              className={
+                needsSimpleSignatureSetup
+                  ? 'pointer-events-none flex flex-col gap-2 opacity-50 select-none'
+                  : 'flex flex-col gap-2'
+              }
+            >
+              {document.requiresVerification &&
+                !document.verificationConfirmed && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-border p-4">
+                    <p className="text-sm font-medium text-foreground">
+                      Este documento requiere verificación
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Solicita y valida tu código antes de firmar.
+                    </p>
+                    {!codeRequested ? (
+                      <Button
+                        type="button"
+                        className="w-full"
+                        disabled={requestVerificationCodeMutation.isPending}
+                        onClick={() =>
+                          requestVerificationCodeMutation.mutate(undefined, {
+                            onSuccess: () => setCodeRequested(true),
+                          })
+                        }
+                      >
+                        {requestVerificationCodeMutation.isPending
+                          ? 'Enviando código...'
+                          : 'Solicitar código de verificación'}
+                      </Button>
+                    ) : (
+                      <>
+                        <Input
+                          inputMode="numeric"
+                          placeholder="Código de verificación"
+                          value={verificationCodeInput}
+                          onChange={(e) =>
+                            setVerificationCodeInput(e.target.value)
+                          }
+                        />
+                        <Button
+                          type="button"
+                          className="w-full"
+                          disabled={
+                            verifyCodeMutation.isPending ||
+                            !verificationCodeInput
+                          }
+                          onClick={() =>
+                            verifyCodeMutation.mutate(verificationCodeInput, {
+                              onSuccess: () => setVerificationCodeInput(''),
+                            })
+                          }
+                        >
+                          {verifyCodeMutation.isPending
+                            ? 'Verificando...'
+                            : 'Verificar código'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={requestVerificationCodeMutation.isPending}
+                          onClick={() =>
+                            requestVerificationCodeMutation.mutate()
+                          }
+                        >
+                          Reenviar código
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+              {(!document.requiresVerification ||
+                document.verificationConfirmed) && (
+                <div className="flex flex-col gap-2">
                   <Button
                     type="button"
                     className="w-full"
-                    disabled={
-                      verifyCodeMutation.isPending || !verificationCodeInput
-                    }
-                    onClick={() =>
-                      verifyCodeMutation.mutate(verificationCodeInput, {
-                        onSuccess: () => setVerificationCodeInput(''),
-                      })
-                    }
+                    disabled={signMutation.isPending}
+                    onClick={() => signMutation.mutate()}
                   >
-                    {verifyCodeMutation.isPending
-                      ? 'Verificando...'
-                      : 'Verificar código'}
+                    {signMutation.isPending
+                      ? 'Firmando...'
+                      : 'Continuar a firmar'}
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
-                    disabled={requestVerificationCodeMutation.isPending}
-                    onClick={() => requestVerificationCodeMutation.mutate()}
+                    onClick={() => setShowRejectForm(true)}
                   >
-                    Reenviar código
+                    Rechazar documento
                   </Button>
-                </>
+                </div>
               )}
             </div>
-          )}
-
-        {document.canSign &&
-          !showRejectForm &&
-          (!document.requiresVerification ||
-            document.verificationConfirmed) && (
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                className="w-full"
-                disabled={signMutation.isPending}
-                onClick={() => signMutation.mutate()}
-              >
-                {signMutation.isPending ? 'Firmando...' : 'Continuar a firmar'}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setShowRejectForm(true)}
-              >
-                Rechazar documento
-              </Button>
-            </div>
-          )}
+          </div>
+        )}
 
         {document.canReject && showRejectForm && (
           <form
@@ -316,11 +365,45 @@ export default function SignDocumentView({
         )}
       </div>
 
-      <Card className="h-[75vh] overflow-hidden p-0">
-        <CardContent className="h-full p-0">
-          <PdfPreview file={document.secureUrl} />
-        </CardContent>
-      </Card>
+      <div className="relative h-[75vh]">
+        <Card className="h-full overflow-hidden p-0">
+          <CardContent className="h-full p-0">
+            <PdfPreview file={document.secureUrl} />
+          </CardContent>
+        </Card>
+
+        {needsSimpleSignatureSetup && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/70 backdrop-blur-sm">
+            <p className="max-w-xs rounded-lg bg-popover px-4 py-3 text-center text-sm font-medium text-popover-foreground shadow-sm ring-1 ring-foreground/10">
+              Tu firma no ha sido configurada. Por favor confígurala para
+              continuar.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <Dialog
+        open={showSignatureRequiredDialog}
+        onOpenChange={setShowSignatureRequiredDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Firma no configurada</DialogTitle>
+            <DialogDescription>
+              Tu firma no ha sido configurada. Por favor confígurala para
+              continuar.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              nativeButton={false}
+              render={<Link href="/personal-documents#signature-documents" />}
+            >
+              Configurar firma
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CancellationConfirmDialog
         open={showCancellationDialog}
