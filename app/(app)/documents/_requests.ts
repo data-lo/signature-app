@@ -20,6 +20,22 @@ export interface DocumentsResult {
   meta: DocumentsMeta;
 }
 
+export interface DocumentFileUrl {
+  fileId: string;
+  secureUrl: string;
+  expiresIn: number;
+}
+
+export async function getDocumentFileUrlRequest(
+  documentId: string,
+): Promise<DocumentFileUrl> {
+  const { data } = await apiClient.get<DocumentFileUrl>(
+    `/document/file/${documentId}`,
+  );
+
+  return data;
+}
+
 export async function getParticipantDocumentsRequest(
   email: string,
   status: 'pending' | 'signed',

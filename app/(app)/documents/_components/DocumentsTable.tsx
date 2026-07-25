@@ -32,6 +32,7 @@ import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from './DocumentsFilterPanel';
+import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 
 export type DocumentListStatus =
   | 'created'
@@ -120,6 +121,7 @@ export default function DocumentsTable({
   showStatusFilter,
 }: DocumentsTableProps) {
   const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
+  const downloadMutation = useDownloadDocument();
 
   return (
     <div className="flex-1 min-w-0">
@@ -189,8 +191,19 @@ export default function DocumentsTable({
                       FIRMAR
                     </Button>
                   ) : (
-                    <Button variant="secondary" size="sm">
-                      DESCARGAR
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={
+                        downloadMutation.isPending &&
+                        downloadMutation.variables === doc.id
+                      }
+                      onClick={() => downloadMutation.mutate(doc.id)}
+                    >
+                      {downloadMutation.isPending &&
+                      downloadMutation.variables === doc.id
+                        ? 'Descargando...'
+                        : 'DESCARGAR'}
                       <ChevronDown className="size-3.5" />
                     </Button>
                   )}
