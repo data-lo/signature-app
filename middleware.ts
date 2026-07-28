@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+const AUTH_ROUTES = ['/login', '/signup'];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const token = request.cookies.get('token')?.value;
 
-  if (pathname === '/' || pathname === '/login' || pathname === '/signup') {
+  if (AUTH_ROUTES.includes(pathname)) {
+    if (token) {
+      return NextResponse.redirect(new URL('/home', request.url));
+    }
     return NextResponse.next();
   }
 
-  const token = request.cookies.get('token')?.value;
+  if (pathname === '/') {
+    return NextResponse.next();
+  }
 
   if (!token) {
     return NextResponse.redirect(new URL('/login', request.url));

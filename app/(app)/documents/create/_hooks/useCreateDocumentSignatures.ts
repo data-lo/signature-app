@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { createDocumentSignaturesRequest } from '../_requests';
 import {
   computeRequiresDifferentSignatures,
@@ -14,6 +15,7 @@ interface CreateDocumentSignaturesParams {
   file: File;
   fileName: string;
   requiresApproval: boolean;
+  requiresOrder: boolean;
   collaborators: CollaboratorFormValues[];
 }
 
@@ -31,15 +33,18 @@ export function useCreateDocumentSignatures() {
       file,
       fileName,
       requiresApproval,
+      requiresOrder,
       collaborators,
     }: CreateDocumentSignaturesParams) => {
-      const payload = collaborators.map(toBackendCollaboratorPayload);
+      const payload = collaborators.map((collaborator, index) =>
+        toBackendCollaboratorPayload(collaborator, index),
+      );
       const requiresDifferentSignatures =
         computeRequiresDifferentSignatures(collaborators);
 
       return createDocumentSignaturesRequest(
         file,
-        { fileName, requiresApproval },
+        { fileName, requiresApproval, isSequential: requiresOrder },
         payload,
         requiresDifferentSignatures,
       );

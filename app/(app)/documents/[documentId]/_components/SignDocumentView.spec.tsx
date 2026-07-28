@@ -8,7 +8,15 @@ import { useRequestCancellation } from '../_hooks/useRequestCancellation';
 import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
 import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
 import { useVerifyCode } from '../_hooks/useVerifyCode';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import type { AuthUser } from '@/lib/store/types/auth-store.types';
 import type { DocumentDetail } from '../_requests';
+import {
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDocumentDetail');
 jest.mock('../_hooks/useSignDocument');
@@ -39,19 +47,34 @@ function baseDocument(
     fileName: 'contrato.pdf',
     fileType: 'application/pdf',
     totalPages: 1,
-    status: 'pending',
+    status: DocumentStatus.Pending,
     creator: 'Creador Uno',
     secureUrl: 'https://minio/file',
     expiresIn: 3600,
     participants: [],
-    myRole: 'signer',
-    myStatus: 'pending',
+    myRole: ParticipantRole.Signer,
+    myStatus: ParticipantStatus.Pending,
+    mySignatureType: null,
     canSign: false,
     canReject: false,
     canRequestCancellation: false,
     canConfirmCancellation: false,
     requiresVerification: false,
     verificationConfirmed: false,
+    ...overrides,
+  };
+}
+
+function buildUser(overrides: Partial<AuthUser> = {}): AuthUser {
+  return {
+    id: 'user-1',
+    email: 'juan@empresa.com',
+    identificationNumber: 'PELJ850101HDFRNN08',
+    name: 'Juan',
+    lastName: 'Pérez',
+    isConfigured: false,
+    personalConfigured: false,
+    signatureConfigured: false,
     ...overrides,
   };
 }
@@ -67,6 +90,7 @@ describe('SignDocumentView', () => {
     rejectMutate.mockReset();
     requestCancellationMutate.mockReset();
     confirmCancellationMutate.mockReset();
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
 
     mockedUseSignDocument.mockReturnValue({
       mutate: signMutate,
@@ -194,12 +218,110 @@ describe('SignDocumentView', () => {
     expect(rejectMutate).toHaveBeenCalledWith('El documento tiene un error');
   });
 
+  it('bug corregido: si el documento requiere firma simple y el usuario no la tiene configurada, deshabilita/atenúa la firma y muestra la leyenda explicativa', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.getByText(
+        /para firmar documentos con tu firma digital simple, esta debe estar configurada/i,
+      ),
+    ).toBeInTheDocument();
+
+    const signButton = screen.getByRole('button', {
+      name: /continuar a firmar/i,
+      hidden: true,
+    });
+    const wrapper = signButton.parentElement?.parentElement;
+    expect(wrapper).toHaveAttribute('inert');
+    expect(wrapper).toHaveAttribute('aria-disabled', 'true');
+    expect(wrapper?.className).toContain('opacity-50');
+    expect(wrapper?.className).toContain('pointer-events-none');
+  });
+
+  it('bug corregido: al acceder por ruta directa sin firma simple configurada, bloquea el documento con un overlay y despliega un modal de alerta', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.getAllByText(
+        /tu firma no ha sido configurada\. por favor confígurala para continuar/i,
+      ).length,
+    ).toBeGreaterThan(0);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /configurar firma/i }),
+    ).toHaveAttribute('href', '/personal-documents#signature-documents');
+  });
+
+  it('no bloquea el documento ni abre el modal de firma cuando el documento no requiere firma simple', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Fiel,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/tu firma no ha sido configurada/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('no muestra la leyenda de firma simple cuando el usuario ya la tiene configurada', () => {
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.queryByText(/esta debe estar configurada/i),
+    ).not.toBeInTheDocument();
+    const signButton = screen.getByRole('button', {
+      name: /continuar a firmar/i,
+    });
+    expect(signButton.parentElement?.parentElement).not.toHaveAttribute(
+      'inert',
+    );
+  });
+
   it('muestra un mensaje cuando no es el turno del usuario', () => {
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: false,
         canReject: false,
-        myStatus: 'pending',
+        myStatus: ParticipantStatus.Pending,
       }),
       isLoading: false,
       isError: false,
@@ -214,8 +336,8 @@ describe('SignDocumentView', () => {
   it('permite al creador solicitar la cancelación de un documento firmado', async () => {
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
-        status: 'signed',
-        myRole: 'creator',
+        status: DocumentStatus.Signed,
+        myRole: ParticipantRole.Creator,
         myStatus: null,
         canRequestCancellation: true,
       }),
@@ -239,7 +361,7 @@ describe('SignDocumentView', () => {
   it('permite a un firmante confirmar la cancelación pendiente', async () => {
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
-        status: 'cancellation_pending',
+        status: DocumentStatus.CancellationPending,
         canConfirmCancellation: true,
       }),
       isLoading: false,

@@ -55,6 +55,9 @@ export const createDocumentSignaturesSchema = z
   .object({
     requiresApproval: z.boolean(),
     includeMeAsSigner: z.boolean(),
+    // Historia "Habilitar ordenamiento Drag and Drop para firmantes requeridos": solo tiene
+    // efecto real con más de 2 firmantes (ver RequiresOrderField).
+    requiresOrder: z.boolean(),
     collaborators: z.array(collaboratorSchema),
   })
   .superRefine((values, ctx) => {
@@ -126,6 +129,12 @@ export interface BackendCollaboratorPayload {
   signatureType?: 'SIMPLE' | 'ADVANCED';
   signaturePosition?: { page: number; x: number; y: number };
   requiresTwoFactorAuth?: boolean;
+  /**
+   * Posición final tras el reordenamiento manual (ver historia "Habilitar ordenamiento Drag and
+   * Drop para firmantes requeridos") — refleja el índice del colaborador dentro del arreglo ya
+   * reordenado (0-based); DocumentSignaturesService lo usa para calcular signingOrder.
+   */
+  orderIndex: number;
 }
 
 /**
@@ -136,6 +145,7 @@ export interface BackendCollaboratorPayload {
  */
 export function toBackendCollaboratorPayload(
   collaborator: CollaboratorFormValues,
+  orderIndex = 0,
 ): BackendCollaboratorPayload {
   if (collaborator.collaboratorType === 'VIEWER') {
     return {
@@ -144,6 +154,7 @@ export function toBackendCollaboratorPayload(
       lastName: collaborator.lastName,
       email: collaborator.email,
       rfc: collaborator.rfc,
+      orderIndex,
     };
   }
 
@@ -159,5 +170,6 @@ export function toBackendCollaboratorPayload(
       collaborator.signatureType === 'SIMPLE'
         ? true
         : collaborator.requiresTwoFactorAuth,
+    orderIndex,
   };
 }

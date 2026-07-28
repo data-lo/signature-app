@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatur
 import DocumentFilePicker from './DocumentFilePicker';
 import CollaboratorsFieldArray from './CollaboratorsFieldArray';
 import RequiresApprovalField from './RequiresApprovalField';
+import RequiresOrderField from './RequiresOrderField';
 import IncludeMeAsSignerField from './IncludeMeAsSignerField';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
@@ -35,6 +36,7 @@ const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
 const DEFAULT_VALUES: CreateDocumentSignaturesFormValues = {
   requiresApproval: false,
   includeMeAsSigner: false,
+  requiresOrder: false,
   collaborators: [],
 };
 
@@ -74,6 +76,11 @@ export default function CreateDocumentView({
     defaultValues: DEFAULT_VALUES,
   });
 
+  const collaboratorsWatch = useWatch({ control, name: 'collaborators' });
+  const signerCount = collaboratorsWatch.filter(
+    (collaborator) => collaborator.collaboratorType === 'SIGNER',
+  ).length;
+
   const { data: currentUser } = useCurrentUser();
   const { data: myDocuments } = useMyDocuments(
     currentUser?.email,
@@ -111,6 +118,7 @@ export default function CreateDocumentView({
         file,
         fileName: file.name,
         requiresApproval: values.requiresApproval,
+        requiresOrder: values.requiresOrder,
         collaborators,
       },
       {
@@ -151,6 +159,8 @@ export default function CreateDocumentView({
             />
 
             <RequiresApprovalField control={control} />
+
+            <RequiresOrderField control={control} signerCount={signerCount} />
 
             <CollaboratorsFieldArray control={control} errors={errors} />
 

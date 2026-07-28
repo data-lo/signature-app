@@ -1,8 +1,10 @@
 import apiClient from '@/lib/axios';
-import type { DocumentListStatus } from '../_components/DocumentsTable';
-
-export type ParticipantRole = 'signer' | 'reviewer' | 'watcher' | 'creator';
-export type ParticipantStatus = 'pending' | 'signed' | 'rejected';
+import {
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 
 export interface DocumentParticipant {
   id: string;
@@ -20,13 +22,14 @@ export interface DocumentDetail {
   fileName: string;
   fileType: string;
   totalPages: number;
-  status: DocumentListStatus;
+  status: DocumentStatus;
   creator: string;
   secureUrl: string;
   expiresIn: number;
   participants: DocumentParticipant[];
   myRole: ParticipantRole | null;
   myStatus: ParticipantStatus | null;
+  mySignatureType: SignatureType | null;
   canSign: boolean;
   canReject: boolean;
   canRequestCancellation: boolean;

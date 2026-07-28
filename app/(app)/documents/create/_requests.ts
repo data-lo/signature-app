@@ -17,7 +17,11 @@ interface CreateDocumentSignaturesResponseData {
 
 export async function createDocumentSignaturesRequest(
   file: File,
-  documentData: { fileName: string; requiresApproval: boolean },
+  documentData: {
+    fileName: string;
+    requiresApproval: boolean;
+    isSequential: boolean;
+  },
   collaborators: BackendCollaboratorPayload[],
   requiresDifferentSignatures: 'SIMPLE' | 'FIEL' | 'MIX',
 ): Promise<CreateDocumentSignaturesResponseData> {

@@ -2,6 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { acceptInvitationRequest } from '@/lib/api/organization-invitations';
 import { getErrorMessage } from '@/lib/error-handler';
 
