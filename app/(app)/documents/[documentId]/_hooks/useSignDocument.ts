@@ -2,17 +2,9 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { signDocumentRequest } from '../_requests';
-
-function getErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ??
-    'Ocurrió un error al firmar el documento. Intenta de nuevo.'
-  );
-}
 
 export function useSignDocument(documentId: string) {
   const router = useRouter();
@@ -29,7 +21,12 @@ export function useSignDocument(documentId: string) {
       router.push('/documents');
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        getErrorMessage(
+          error,
+          'Ocurrió un error al firmar el documento. Intenta de nuevo.',
+        ),
+      );
     },
   });
 }

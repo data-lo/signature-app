@@ -2,17 +2,9 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { registerRequest, type RegisterRequestValues } from '../_requests';
-
-export function getRegisterErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ??
-    'Ocurrió un error al crear tu cuenta. Intenta de nuevo.'
-  );
-}
+import { getErrorMessage } from '@/lib/error-handler';
 
 export function useRegister() {
   const router = useRouter();
@@ -24,7 +16,12 @@ export function useRegister() {
     },
     onError: (error) => {
       console.error('[register] falló la creación de cuenta:', error);
-      toast.error(getRegisterErrorMessage(error));
+      toast.error(
+        getErrorMessage(
+          error,
+          'Ocurrió un error al crear tu cuenta. Intenta de nuevo.',
+        ),
+      );
     },
   });
 }

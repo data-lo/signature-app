@@ -2,19 +2,11 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { createOrganizationRequest } from '@/lib/api/accounts';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { toAccountListEntry } from '@/lib/store/accounts-list.slice';
-
-function getErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ??
-    'Ocurrió un error al crear la organización. Intenta de nuevo.'
-  );
-}
+import { getErrorMessage } from '@/lib/error-handler';
 
 export function useCreateOrganization() {
   const router = useRouter();
@@ -34,7 +26,12 @@ export function useCreateOrganization() {
       router.push('/home');
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        getErrorMessage(
+          error,
+          'Ocurrió un error al crear la organización. Intenta de nuevo.',
+        ),
+      );
     },
   });
 }

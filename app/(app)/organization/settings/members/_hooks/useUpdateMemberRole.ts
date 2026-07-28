@@ -1,17 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { updateMemberRoleRequest } from '@/lib/api/organization-members';
-
-export function getMemberActionErrorMessage(
-  error: unknown,
-  fallback: string,
-): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return axiosError.response?.data?.message ?? fallback;
-}
+import { getErrorMessage } from '@/lib/error-handler';
 
 export function useUpdateMemberRole(organizationId: string | null) {
   const queryClient = useQueryClient();
@@ -33,7 +25,7 @@ export function useUpdateMemberRole(organizationId: string | null) {
     onError: (error) => {
       console.error('[organization-members] falló actualizar el rol:', error);
       toast.error(
-        getMemberActionErrorMessage(
+        getErrorMessage(
           error,
           'Ocurrió un error al actualizar el rol. Intenta de nuevo.',
         ),

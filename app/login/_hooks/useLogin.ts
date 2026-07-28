@@ -1,23 +1,16 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import apiClient from '@/lib/axios';
 import { setAuthToken } from '@/lib/cookies';
+import { getErrorMessage } from '@/lib/error-handler';
 import {
   getPendingSignatureContext,
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
 import { loginRequest } from '../_requests';
 import type { LoginFormValues } from '../_schemas';
-
-export function getLoginErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ?? 'Error de conexión con el servidor'
-  );
-}
 
 export function useLogin() {
   return useMutation({
@@ -52,7 +45,7 @@ export function useLogin() {
     },
     onError: (error) => {
       console.error('[login] falló el inicio de sesión:', error);
-      toast.error(getLoginErrorMessage(error));
+      toast.error(getErrorMessage(error, 'Error de conexión con el servidor'));
     },
   });
 }

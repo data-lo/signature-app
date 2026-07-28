@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
+import { getErrorMessage } from '@/lib/error-handler';
 import DocumentsTable from '../../_components/DocumentsTable';
 import {
   EMPTY_DOCUMENTS_FILTERS,
@@ -21,10 +22,7 @@ import {
   type SignerFormValues,
 } from '../_schemas';
 import { useMyDocuments } from '../_hooks/useMyDocuments';
-import {
-  useCreateDocumentSignatures,
-  getCreateDocumentSignaturesErrorMessage,
-} from '../_hooks/useCreateDocumentSignatures';
+import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatures';
 import DocumentFilePicker from './DocumentFilePicker';
 import CollaboratorsFieldArray from './CollaboratorsFieldArray';
 import RequiresApprovalField from './RequiresApprovalField';
@@ -168,8 +166,9 @@ export default function CreateDocumentView({
 
             {createMutation.isError && (
               <p className="text-sm text-destructive">
-                {getCreateDocumentSignaturesErrorMessage(
+                {getErrorMessage(
                   createMutation.error,
+                  'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.',
                 )}
               </p>
             )}

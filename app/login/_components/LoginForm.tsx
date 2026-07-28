@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { getPendingSignatureContext } from '@/lib/pending-signature-context';
+import { getErrorMessage } from '@/lib/error-handler';
 import { loginSchema, type LoginFormValues } from '../_schemas';
-import { useLogin, getLoginErrorMessage } from '../_hooks/useLogin';
+import { useLogin } from '../_hooks/useLogin';
 
 export default function LoginForm() {
   const [hasPendingSignature, setHasPendingSignature] = useState(false);
@@ -63,7 +64,12 @@ export default function LoginForm() {
             />
 
             {loginMutation.isError && (
-              <FieldError>{getLoginErrorMessage(loginMutation.error)}</FieldError>
+              <FieldError>
+                {getErrorMessage(
+                  loginMutation.error,
+                  'Error de conexión con el servidor',
+                )}
+              </FieldError>
             )}
 
             <Button

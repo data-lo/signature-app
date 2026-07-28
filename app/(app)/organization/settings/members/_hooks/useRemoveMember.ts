@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { removeMemberRequest } from '@/lib/api/organization-members';
-import { getMemberActionErrorMessage } from './useUpdateMemberRole';
+import { getErrorMessage } from '@/lib/error-handler';
 
 export function useRemoveMember(organizationId: string | null) {
   const queryClient = useQueryClient();
@@ -19,7 +19,7 @@ export function useRemoveMember(organizationId: string | null) {
     onError: (error) => {
       console.error('[organization-members] falló eliminar al miembro:', error);
       toast.error(
-        getMemberActionErrorMessage(
+        getErrorMessage(
           error,
           'Ocurrió un error al eliminar al miembro. Intenta de nuevo.',
         ),

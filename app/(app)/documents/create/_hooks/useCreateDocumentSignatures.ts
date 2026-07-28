@@ -1,7 +1,6 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { createDocumentSignaturesRequest } from '../_requests';
 import {
@@ -9,22 +8,13 @@ import {
   toBackendCollaboratorPayload,
   type CollaboratorFormValues,
 } from '../_schemas';
+import { getErrorMessage } from '@/lib/error-handler';
 
 interface CreateDocumentSignaturesParams {
   file: File;
   fileName: string;
   requiresApproval: boolean;
   collaborators: CollaboratorFormValues[];
-}
-
-export function getCreateDocumentSignaturesErrorMessage(
-  error: unknown,
-): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ??
-    'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.'
-  );
 }
 
 /**
@@ -59,7 +49,12 @@ export function useCreateDocumentSignatures() {
       queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
     },
     onError: (error) => {
-      toast.error(getCreateDocumentSignaturesErrorMessage(error));
+      toast.error(
+        getErrorMessage(
+          error,
+          'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.',
+        ),
+      );
     },
   });
 }
