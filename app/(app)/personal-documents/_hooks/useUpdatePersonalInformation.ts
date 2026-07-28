@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { updatePersonalInformationRequest } from '../_requests';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { getErrorMessage } from '@/lib/error-handler';
 
 export function useUpdatePersonalInformation() {
   const router = useRouter();

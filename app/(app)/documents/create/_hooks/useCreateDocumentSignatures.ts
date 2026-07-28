@@ -9,7 +9,6 @@ import {
   toBackendCollaboratorPayload,
   type CollaboratorFormValues,
 } from '../_schemas';
-import { getErrorMessage } from '@/lib/error-handler';
 
 interface CreateDocumentSignaturesParams {
   file: File;

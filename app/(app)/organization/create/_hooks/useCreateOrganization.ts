@@ -7,7 +7,6 @@ import { getErrorMessage } from '@/lib/error-handler';
 import { createOrganizationRequest } from '@/lib/api/accounts';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { toAccountListEntry } from '@/lib/store/accounts-list.slice';
-import { getErrorMessage } from '@/lib/error-handler';
 
 export function useCreateOrganization() {
   const router = useRouter();

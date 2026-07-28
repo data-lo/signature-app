@@ -4,7 +4,6 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { inviteMemberRequest } from '@/lib/api/accounts';
-import { getErrorMessage } from '@/lib/error-handler';
 
 export function useInviteMember() {
   return useMutation({

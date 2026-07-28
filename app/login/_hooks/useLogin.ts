@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 import apiClient from '@/lib/axios';
 import { getErrorMessage } from '@/lib/error-handler';
 import { setAuthToken } from '@/lib/cookies';
-import { getErrorMessage } from '@/lib/error-handler';
 import {
   getPendingSignatureContext,
   clearPendingSignatureContext,

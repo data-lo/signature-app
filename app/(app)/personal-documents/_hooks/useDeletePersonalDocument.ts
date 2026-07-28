@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { deleteIneFileRequest, deleteSignatureFileRequest } from '../_requests';
-import { getErrorMessage } from '@/lib/error-handler';
 
 type DeletableField = 'ine' | 'signature';
 

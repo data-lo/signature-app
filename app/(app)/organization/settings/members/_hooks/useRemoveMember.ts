@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { removeMemberRequest } from '@/lib/api/organization-members';
-import { getErrorMessage } from '@/lib/error-handler';
 
 export function useRemoveMember(organizationId: string | null) {
   const queryClient = useQueryClient();
