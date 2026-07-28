@@ -26,6 +26,7 @@ import {
   SignatureType,
 } from '@/lib/enums/document';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
+import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
 import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
 import { useRequestCancellation } from '../_hooks/useRequestCancellation';
@@ -72,6 +73,13 @@ export default function SignDocumentView({
     useState(false);
   const user = useAuthStore((state) => state.user);
   const { data: document, isLoading, isError } = useDocumentDetail(documentId);
+  const {
+    data: fileUrl,
+    isLoading: isFileUrlLoading,
+    isError: isFileUrlError,
+    isFetching: isFileUrlFetching,
+    refetch: refetchFileUrl,
+  } = useDocumentFileUrl(documentId);
   const signMutation = useSignDocument(documentId);
   const rejectMutation = useRejectDocument(documentId);
   const requestCancellationMutation = useRequestCancellation(documentId);
@@ -374,7 +382,29 @@ export default function SignDocumentView({
       <div className="relative h-[75vh]">
         <Card className="h-full overflow-hidden p-0">
           <CardContent className="h-full p-0">
-            <PdfPreview file={document.secureUrl} />
+            {isFileUrlLoading ? (
+              <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Cargando documento...
+              </div>
+            ) : isFileUrlError || !fileUrl ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                <p className="text-sm text-destructive">
+                  No se pudo cargar el archivo del documento.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isFileUrlFetching}
+                  onClick={() => refetchFileUrl()}
+                >
+                  {isFileUrlFetching ? 'Reintentando...' : 'Reintentar'}
+                </Button>
+              </div>
+            ) : (
+              <PdfPreview file={fileUrl.secureUrl} />
+            )}
           </CardContent>
         </Card>
 
