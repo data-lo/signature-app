@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { getPendingSignatureContext } from '@/lib/pending-signature-context';
+import { getErrorMessage } from '@/lib/error-handler';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
-import { useRegister, getRegisterErrorMessage } from '../_hooks/useRegister';
+import { useRegister } from '../_hooks/useRegister';
 
 interface SignupFormProps {
   /** Prellenado cuando se llega desde /join con un RFC nuevo (ver Escenario 4 de la historia). */
@@ -128,7 +129,10 @@ export default function SignupForm({
 
             {registerMutation.isError && (
               <FieldError>
-                {getRegisterErrorMessage(registerMutation.error)}
+                {getErrorMessage(
+                  registerMutation.error,
+                  'Ocurrió un error al crear tu cuenta. Intenta de nuevo.',
+                )}
               </FieldError>
             )}
 

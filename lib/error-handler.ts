@@ -1,12 +1,16 @@
-import type { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+
+const DEFAULT_ERROR_MESSAGE = 'Ocurrió un error inesperado. Intenta de nuevo.';
 
 /**
- * Único punto para leer el mensaje de error de una respuesta Axios — antes esta misma lógica
- * (leer `error.response.data.message` y caer a un mensaje genérico si no viene) estaba declarada
- * de forma local, casi idéntica, en cada hook de mutación de la app (uno por acción: firmar,
- * rechazar, invitar, crear organización, etc.).
+ * Único punto de verdad para mapear un error de una mutación a un mensaje mostrable al usuario:
+ * antes esta misma lógica (leer axiosError.response?.data?.message y caer a un fallback) estaba
+ * declarada de forma local en cada hook de mutación, duplicada más de una decena de veces.
  */
-export function getErrorMessage(error: unknown, fallbackMessage: string): string {
+export function getErrorMessage(
+  error: unknown,
+  fallback: string = DEFAULT_ERROR_MESSAGE,
+): string {
   const axiosError = error as AxiosError<{ message?: string }>;
-  return axiosError.response?.data?.message ?? fallbackMessage;
+  return axiosError.response?.data?.message ?? fallback;
 }

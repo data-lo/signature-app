@@ -6,10 +6,6 @@ import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { registerRequest, type RegisterRequestValues } from '../_requests';
 
-export function getRegisterErrorMessage(error: unknown): string {
-  return getErrorMessage(error, 'Ocurrió un error al crear tu cuenta. Intenta de nuevo.');
-}
-
 export function useRegister() {
   const router = useRouter();
   return useMutation({
@@ -20,7 +16,12 @@ export function useRegister() {
     },
     onError: (error) => {
       console.error('[register] falló la creación de cuenta:', error);
-      toast.error(getRegisterErrorMessage(error));
+      toast.error(
+        getErrorMessage(
+          error,
+          'Ocurrió un error al crear tu cuenta. Intenta de nuevo.',
+        ),
+      );
     },
   });
 }

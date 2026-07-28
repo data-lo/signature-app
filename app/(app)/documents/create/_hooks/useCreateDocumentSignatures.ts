@@ -18,15 +18,6 @@ interface CreateDocumentSignaturesParams {
   collaborators: CollaboratorFormValues[];
 }
 
-export function getCreateDocumentSignaturesErrorMessage(
-  error: unknown,
-): string {
-  return getErrorMessage(
-    error,
-    'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.',
-  );
-}
-
 /**
  * Escenario 4 de la historia: tras un envío exitoso, `mutate` invalida `myDocuments` (la tabla
  * se refresca sola por el refetch de React Query) — la limpieza del formulario/FilePond
@@ -62,7 +53,12 @@ export function useCreateDocumentSignatures() {
       queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
     },
     onError: (error) => {
-      toast.error(getCreateDocumentSignaturesErrorMessage(error));
+      toast.error(
+        getErrorMessage(
+          error,
+          'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.',
+        ),
+      );
     },
   });
 }

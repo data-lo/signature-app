@@ -12,10 +12,6 @@ import {
 import { loginRequest } from '../_requests';
 import type { LoginFormValues } from '../_schemas';
 
-export function getLoginErrorMessage(error: unknown): string {
-  return getErrorMessage(error, 'Error de conexión con el servidor');
-}
-
 export function useLogin() {
   return useMutation({
     mutationFn: (values: LoginFormValues) => loginRequest(values),
@@ -49,7 +45,7 @@ export function useLogin() {
     },
     onError: (error) => {
       console.error('[login] falló el inicio de sesión:', error);
-      toast.error(getLoginErrorMessage(error));
+      toast.error(getErrorMessage(error, 'Error de conexión con el servidor'));
     },
   });
 }
