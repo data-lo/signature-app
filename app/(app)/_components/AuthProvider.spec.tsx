@@ -103,4 +103,33 @@ describe('AuthProvider', () => {
 
     expect(useAuthStore.getState().activeAccount?.id).toBe('org-1');
   });
+
+  it('bug corregido (SCRUM-12): si PATCH /me/status falla, no reintenta la consolidación en bucle infinito', async () => {
+    const mutate = jest.fn((_vars, opts) => opts?.onError?.(new Error('boom')));
+    mockedUsePatchUserStatus.mockReturnValue({ mutate });
+    useAuthStore.setState({
+      user: {
+        id: 'user-1',
+        email: 'juan@empresa.com',
+        identificationNumber: 'PELJ850101HDFRNN08',
+        name: 'Juan',
+        lastName: 'Pérez',
+        isConfigured: false,
+        personalConfigured: true,
+        signatureConfigured: true,
+      },
+    });
+
+    renderWithProviders(<AuthProvider>hijos</AuthProvider>);
+
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledTimes(1);
+    });
+
+    // Antes del fix, onError dejaba el estado exactamente como antes del intento
+    // (consolidationInFlight en false, isConfigured en false), lo que volvía a cumplir la
+    // condición de disparo de inmediato y reintentaba mutate() sin límite ni backoff.
+    expect(useAuthStore.getState().consolidationInFlight).toBe(false);
+    expect(mutate).toHaveBeenCalledTimes(1);
+  });
 });
