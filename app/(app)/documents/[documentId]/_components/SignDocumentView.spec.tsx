@@ -2,6 +2,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, within } from '@/test-utils';
 import SignDocumentView from './SignDocumentView';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
+import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
 import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
 import { useRequestCancellation } from '../_hooks/useRequestCancellation';
@@ -19,6 +20,7 @@ import {
 } from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDocumentDetail');
+jest.mock('../../_hooks/useDocumentFileUrl');
 jest.mock('../_hooks/useSignDocument');
 jest.mock('../_hooks/useRejectDocument');
 jest.mock('../_hooks/useRequestCancellation');
@@ -27,10 +29,11 @@ jest.mock('../_hooks/useRequestVerificationCode');
 jest.mock('../_hooks/useVerifyCode');
 jest.mock('../../_components/PdfPreview', () => ({
   __esModule: true,
-  default: () => <div>PDF preview</div>,
+  default: ({ file }: { file: string }) => <div>PDF preview: {file}</div>,
 }));
 
 const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
+const mockedUseDocumentFileUrl = useDocumentFileUrl as jest.Mock;
 const mockedUseSignDocument = useSignDocument as jest.Mock;
 const mockedUseRejectDocument = useRejectDocument as jest.Mock;
 const mockedUseRequestCancellation = useRequestCancellation as jest.Mock;
@@ -49,7 +52,9 @@ function baseDocument(
     totalPages: 1,
     status: DocumentStatus.Pending,
     creator: 'Creador Uno',
-    secureUrl: 'https://minio/file',
+    // Distinto del secureUrl que devuelve el mock de useDocumentFileUrl a propósito: algunas
+    // pruebas verifican que el visor use el del endpoint dedicado, no este (ver bug corregido).
+    secureUrl: 'https://minio/stale-detail-url',
     expiresIn: 3600,
     participants: [],
     myRole: ParticipantRole.Signer,
@@ -115,6 +120,13 @@ describe('SignDocumentView', () => {
     mockedUseVerifyCode.mockReturnValue({
       mutate: jest.fn(),
       isPending: false,
+    });
+    mockedUseDocumentFileUrl.mockReturnValue({
+      data: { fileId: 'obj-1', secureUrl: 'https://minio/file', expiresIn: 86400 },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: jest.fn(),
     });
   });
 
@@ -379,5 +391,62 @@ describe('SignDocumentView', () => {
     );
 
     expect(confirmCancellationMutate).toHaveBeenCalled();
+  });
+
+  it('bug corregido: pide el secureUrl del archivo por separado del detalle del documento y muestra un loader propio mientras llega', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    mockedUseDocumentFileUrl.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: true,
+      refetch: jest.fn(),
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(screen.getByText(/cargando documento/i)).toBeInTheDocument();
+    expect(screen.queryByText(/pdf preview/i)).not.toBeInTheDocument();
+  });
+
+  it('bug corregido: si falla la obtención del secureUrl del archivo, ofrece un botón para reintentar en vez de quedarse sin explicación', async () => {
+    const refetchFileUrl = jest.fn();
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    mockedUseDocumentFileUrl.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      isFetching: false,
+      refetch: refetchFileUrl,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.getByText(/no se pudo cargar el archivo del documento/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/pdf preview/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }));
+    expect(refetchFileUrl).toHaveBeenCalled();
+  });
+
+  it('bug corregido: renderiza el PDF con el secureUrl obtenido del endpoint dedicado, no con el del detalle del documento', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(screen.getByText('PDF preview: https://minio/file')).toBeInTheDocument();
+    expect(screen.queryByText(/stale-detail-url/i)).not.toBeInTheDocument();
   });
 });
