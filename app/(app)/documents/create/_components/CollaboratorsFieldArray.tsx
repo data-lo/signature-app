@@ -1,10 +1,30 @@
 'use client';
 
-import { useFieldArray, type Control, type FieldErrors } from 'react-hook-form';
+import {
+  useFieldArray,
+  useWatch,
+  type Control,
+  type FieldErrors,
+} from 'react-hook-form';
 import { UserPlus, Eye } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import CollaboratorFormItem from './CollaboratorFormItem';
+import SortableCollaboratorItem from './SortableCollaboratorItem';
 import {
   emptySigner,
   emptyViewer,
@@ -21,10 +41,36 @@ export default function CollaboratorsFieldArray({
   control,
   errors,
 }: CollaboratorsFieldArrayProps) {
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control,
     name: 'collaborators',
   });
+  const requiresOrder = useWatch({ control, name: 'requiresOrder' });
+  const signerCount = fields.filter(
+    (field) => field.collaboratorType === 'SIGNER',
+  ).length;
+  // Espejo de MIN_SIGNERS_FOR_ORDER en RequiresOrderField: sin esta misma condición aquí, el
+  // toggle podría quedar en true (estado obsoleto, antes de que su propio useEffect lo apague)
+  // mientras esta lista ya no tiene suficientes firmantes para justificar el Drag and Drop.
+  const canReorder = requiresOrder === true && signerCount > 2;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = fields.findIndex((field) => field.id === active.id);
+    const newIndex = fields.findIndex((field) => field.id === over.id);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      move(oldIndex, newIndex);
+    }
+  }
 
   const rootError =
     errors.collaborators?.message ??
@@ -66,17 +112,47 @@ export default function CollaboratorsFieldArray({
 
       {rootError && <FieldError>{rootError}</FieldError>}
 
-      <div className="flex flex-col gap-3">
-        {fields.map((field, index) => (
-          <CollaboratorFormItem
-            key={field.id}
-            index={index}
-            control={control}
-            errors={errors}
-            onRemove={() => remove(index)}
-          />
-        ))}
-      </div>
+      {canReorder ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={fields.map((field) => field.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col gap-3">
+              {fields.map((field, index) => (
+                <SortableCollaboratorItem key={field.id} id={field.id}>
+                  {(dragHandleProps) => (
+                    <CollaboratorFormItem
+                      index={index}
+                      control={control}
+                      errors={errors}
+                      onRemove={() => remove(index)}
+                      orderIndex={index + 1}
+                      dragHandleProps={dragHandleProps}
+                    />
+                  )}
+                </SortableCollaboratorItem>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {fields.map((field, index) => (
+            <CollaboratorFormItem
+              key={field.id}
+              index={index}
+              control={control}
+              errors={errors}
+              onRemove={() => remove(index)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

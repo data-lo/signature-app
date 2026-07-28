@@ -5,6 +5,7 @@ import {
   buildDocumentsFilterParams,
   type DocumentsFilters,
 } from './_components/DocumentsFilterPanel';
+import type { ParticipantStatus } from '@/lib/enums/document';
 
 export interface DocumentsMeta {
   total: number;
@@ -20,9 +21,25 @@ export interface DocumentsResult {
   meta: DocumentsMeta;
 }
 
+export interface DocumentFileUrl {
+  fileId: string;
+  secureUrl: string;
+  expiresIn: number;
+}
+
+export async function getDocumentFileUrlRequest(
+  documentId: string,
+): Promise<DocumentFileUrl> {
+  const { data } = await apiClient.get<DocumentFileUrl>(
+    `/document/file/${documentId}`,
+  );
+
+  return data;
+}
+
 export async function getParticipantDocumentsRequest(
   email: string,
-  status: 'pending' | 'signed',
+  status: ParticipantStatus.Pending | ParticipantStatus.Signed,
   page = 1,
   limit = 25,
   filters: DocumentsFilters = EMPTY_DOCUMENTS_FILTERS,
