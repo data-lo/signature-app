@@ -4,17 +4,18 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { uploadPersonalDocumentsRequest } from '../_requests';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 
-function getErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
+function getUploadErrorMessage(error: unknown): string {
+  const axiosError = error as AxiosError;
   if (axiosError.response?.status === 401) {
     return 'Tu sesión ha expirado. Inicia sesión de nuevo.';
   }
-  return (
-    axiosError.response?.data?.message ??
-    'Ocurrió un error al guardar tus documentos. Intenta de nuevo.'
+  return getErrorMessage(
+    error,
+    'Ocurrió un error al guardar tus documentos. Intenta de nuevo.',
   );
 }
 
@@ -34,7 +35,7 @@ export function useUploadPersonalDocuments() {
       }
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error));
+      toast.error(getUploadErrorMessage(error));
     },
   });
 }

@@ -1,9 +1,9 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import apiClient from '@/lib/axios';
+import { getErrorMessage } from '@/lib/error-handler';
 import { setAuthToken } from '@/lib/cookies';
 import {
   getPendingSignatureContext,
@@ -13,10 +13,7 @@ import { loginRequest } from '../_requests';
 import type { LoginFormValues } from '../_schemas';
 
 export function getLoginErrorMessage(error: unknown): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  return (
-    axiosError.response?.data?.message ?? 'Error de conexión con el servidor'
-  );
+  return getErrorMessage(error, 'Error de conexión con el servidor');
 }
 
 export function useLogin() {

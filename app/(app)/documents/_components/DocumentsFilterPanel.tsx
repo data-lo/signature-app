@@ -12,12 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { DocumentListStatus } from './DocumentsTable';
+import { DocumentStatus } from '@/lib/enums/document';
 
 export interface DocumentsFilters {
   fileName: string;
   participantName: string;
-  status: DocumentListStatus | '';
+  status: DocumentStatus | '';
   createdFrom: string;
   createdTo: string;
   signedFrom: string;
@@ -36,14 +36,14 @@ export const EMPTY_DOCUMENTS_FILTERS: DocumentsFilters = {
   myTurnOnly: false,
 };
 
-const STATUS_OPTIONS: { value: DocumentListStatus; label: string }[] = [
-  { value: 'created', label: 'Creado' },
-  { value: 'pending', label: 'En progreso' },
-  { value: 'signed', label: 'Firmado por todos' },
-  { value: 'rejected', label: 'Rechazado' },
-  { value: 'expired', label: 'Expirado' },
-  { value: 'cancellation_pending', label: 'Cancelación pendiente' },
-  { value: 'cancelled', label: 'Cancelado' },
+const STATUS_OPTIONS: { value: DocumentStatus; label: string }[] = [
+  { value: DocumentStatus.Created, label: 'Creado' },
+  { value: DocumentStatus.Pending, label: 'En progreso' },
+  { value: DocumentStatus.Signed, label: 'Firmado por todos' },
+  { value: DocumentStatus.Rejected, label: 'Rechazado' },
+  { value: DocumentStatus.Expired, label: 'Expirado' },
+  { value: DocumentStatus.CancellationPending, label: 'Cancelación pendiente' },
+  { value: DocumentStatus.Cancelled, label: 'Cancelado' },
 ];
 
 export function buildDocumentsFilterParams(
@@ -141,7 +141,7 @@ export default function DocumentsFilterPanel({
           <Select
             value={draft.status || null}
             onValueChange={(value) =>
-              update('status', (value ?? '') as DocumentListStatus | '')
+              update('status', (value ?? '') as DocumentStatus | '')
             }
           >
             <SelectTrigger className="w-full">

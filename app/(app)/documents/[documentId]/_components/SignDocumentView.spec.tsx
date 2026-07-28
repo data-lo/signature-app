@@ -11,6 +11,12 @@ import { useVerifyCode } from '../_hooks/useVerifyCode';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { AuthUser } from '@/lib/store/types/auth-store.types';
 import type { DocumentDetail } from '../_requests';
+import {
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDocumentDetail');
 jest.mock('../_hooks/useSignDocument');
@@ -41,13 +47,13 @@ function baseDocument(
     fileName: 'contrato.pdf',
     fileType: 'application/pdf',
     totalPages: 1,
-    status: 'pending',
+    status: DocumentStatus.Pending,
     creator: 'Creador Uno',
     secureUrl: 'https://minio/file',
     expiresIn: 3600,
     participants: [],
-    myRole: 'signer',
-    myStatus: 'pending',
+    myRole: ParticipantRole.Signer,
+    myStatus: ParticipantStatus.Pending,
     mySignatureType: null,
     canSign: false,
     canReject: false,
@@ -218,7 +224,7 @@ describe('SignDocumentView', () => {
       data: baseDocument({
         canSign: true,
         canReject: true,
-        mySignatureType: 'simple',
+        mySignatureType: SignatureType.Simple,
       }),
       isLoading: false,
       isError: false,
@@ -248,7 +254,7 @@ describe('SignDocumentView', () => {
       data: baseDocument({
         canSign: true,
         canReject: true,
-        mySignatureType: 'simple',
+        mySignatureType: SignatureType.Simple,
       }),
       isLoading: false,
       isError: false,
@@ -273,7 +279,7 @@ describe('SignDocumentView', () => {
       data: baseDocument({
         canSign: true,
         canReject: true,
-        mySignatureType: 'fiel',
+        mySignatureType: SignatureType.Fiel,
       }),
       isLoading: false,
       isError: false,
@@ -292,7 +298,7 @@ describe('SignDocumentView', () => {
       data: baseDocument({
         canSign: true,
         canReject: true,
-        mySignatureType: 'simple',
+        mySignatureType: SignatureType.Simple,
       }),
       isLoading: false,
       isError: false,
@@ -315,7 +321,7 @@ describe('SignDocumentView', () => {
       data: baseDocument({
         canSign: false,
         canReject: false,
-        myStatus: 'pending',
+        myStatus: ParticipantStatus.Pending,
       }),
       isLoading: false,
       isError: false,
@@ -330,8 +336,8 @@ describe('SignDocumentView', () => {
   it('permite al creador solicitar la cancelación de un documento firmado', async () => {
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
-        status: 'signed',
-        myRole: 'creator',
+        status: DocumentStatus.Signed,
+        myRole: ParticipantRole.Creator,
         myStatus: null,
         canRequestCancellation: true,
       }),
@@ -355,7 +361,7 @@ describe('SignDocumentView', () => {
   it('permite a un firmante confirmar la cancelación pendiente', async () => {
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
-        status: 'cancellation_pending',
+        status: DocumentStatus.CancellationPending,
         canConfirmCancellation: true,
       }),
       isLoading: false,

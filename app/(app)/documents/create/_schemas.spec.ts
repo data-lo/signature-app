@@ -22,6 +22,7 @@ describe('createDocumentSignaturesSchema', () => {
   it('acepta un firmante SIMPLE sin rfc', () => {
     const result = createDocumentSignaturesSchema.safeParse({
       requiresApproval: false,
+      requiresOrder: false,
       includeMeAsSigner: false,
       collaborators: [signer({ signatureType: 'SIMPLE' })],
     });
@@ -32,6 +33,7 @@ describe('createDocumentSignaturesSchema', () => {
   it('rechaza un firmante ADVANCED sin rfc', () => {
     const result = createDocumentSignaturesSchema.safeParse({
       requiresApproval: false,
+      requiresOrder: false,
       includeMeAsSigner: false,
       collaborators: [
         signer({ signatureType: 'ADVANCED', rfc: null }),
@@ -44,6 +46,7 @@ describe('createDocumentSignaturesSchema', () => {
   it('acepta un firmante ADVANCED con rfc', () => {
     const result = createDocumentSignaturesSchema.safeParse({
       requiresApproval: false,
+      requiresOrder: false,
       includeMeAsSigner: false,
       collaborators: [
         signer({ signatureType: 'ADVANCED', rfc: 'PEAJ800101XXX' }),
@@ -56,6 +59,7 @@ describe('createDocumentSignaturesSchema', () => {
   it('rechaza un espectador sin rfc', () => {
     const result = createDocumentSignaturesSchema.safeParse({
       requiresApproval: false,
+      requiresOrder: false,
       includeMeAsSigner: false,
       collaborators: [{ ...emptyViewer(), firstName: 'Ana', lastName: 'Ruiz', email: 'ana@correo.com', rfc: '' }],
     });
@@ -66,6 +70,7 @@ describe('createDocumentSignaturesSchema', () => {
   it('rechaza si no hay ningún firmante manual ni "incluirme como firmante"', () => {
     const result = createDocumentSignaturesSchema.safeParse({
       requiresApproval: false,
+      requiresOrder: false,
       includeMeAsSigner: false,
       collaborators: [{ ...emptyViewer(), firstName: 'Ana', lastName: 'Ruiz', email: 'ana@correo.com', rfc: 'AURU800101ABC' }],
     });
@@ -76,6 +81,7 @@ describe('createDocumentSignaturesSchema', () => {
   it('acepta sin firmante manual si "incluirme como firmante" está activo', () => {
     const result = createDocumentSignaturesSchema.safeParse({
       requiresApproval: false,
+      requiresOrder: false,
       includeMeAsSigner: true,
       collaborators: [],
     });
@@ -168,5 +174,33 @@ describe('toBackendCollaboratorPayload', () => {
     expect(payload.signaturePosition).toBeUndefined();
     expect(payload.requiresTwoFactorAuth).toBeUndefined();
     expect(payload.rfc).toBe('AURU800101ABC');
+  });
+
+  it('historia "Habilitar ordenamiento Drag and Drop": sin orderIndex explícito, cae a 0 por defecto', () => {
+    const payload = toBackendCollaboratorPayload(
+      signer({ signatureType: 'SIMPLE' }),
+    );
+
+    expect(payload.orderIndex).toBe(0);
+  });
+
+  it('historia "Habilitar ordenamiento Drag and Drop": refleja el orderIndex explícito para SIGNER y VIEWER', () => {
+    const signerPayload = toBackendCollaboratorPayload(
+      signer({ signatureType: 'SIMPLE' }),
+      2,
+    );
+    const viewerPayload = toBackendCollaboratorPayload(
+      {
+        ...emptyViewer(),
+        firstName: 'Ana',
+        lastName: 'Ruiz',
+        email: 'ana@correo.com',
+        rfc: 'AURU800101ABC',
+      },
+      1,
+    );
+
+    expect(signerPayload.orderIndex).toBe(2);
+    expect(viewerPayload.orderIndex).toBe(1);
   });
 });

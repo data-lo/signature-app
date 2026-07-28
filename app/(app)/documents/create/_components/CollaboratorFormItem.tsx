@@ -1,18 +1,23 @@
 'use client';
 
 import { Controller, useWatch, type Control, type FieldErrors } from 'react-hook-form';
-import { X } from 'lucide-react';
+import { GripVertical, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldLabel, FieldError } from '@/components/ui/field';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
+import type { DragHandleProps } from './SortableCollaboratorItem';
 
 interface CollaboratorFormItemProps {
   index: number;
   control: Control<CreateDocumentSignaturesFormValues>;
   errors: FieldErrors<CreateDocumentSignaturesFormValues>;
   onRemove: () => void;
+  /** Posición secuencial (1-based) — solo se pasa cuando "Requiere firmas en orden" está activo. */
+  orderIndex?: number;
+  /** Solo se pasa junto con `orderIndex`, cuando el reordenamiento por Drag and Drop está activo. */
+  dragHandleProps?: DragHandleProps;
 }
 
 /**
@@ -29,6 +34,8 @@ export default function CollaboratorFormItem({
   control,
   errors,
   onRemove,
+  orderIndex,
+  dragHandleProps,
 }: CollaboratorFormItemProps) {
   const collaboratorType = useWatch({
     control,
@@ -48,9 +55,30 @@ export default function CollaboratorFormItem({
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          {isSigner ? 'Firmante' : 'Espectador'}
-        </span>
+        <div className="flex items-center gap-2">
+          {dragHandleProps && (
+            <button
+              type="button"
+              className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
+              aria-label="Arrastrar para reordenar"
+              {...dragHandleProps.attributes}
+              {...dragHandleProps.listeners}
+            >
+              <GripVertical className="size-4" />
+            </button>
+          )}
+          {orderIndex !== undefined && (
+            <span
+              className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+              aria-label={`Posición ${orderIndex}`}
+            >
+              {orderIndex}
+            </span>
+          )}
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            {isSigner ? 'Firmante' : 'Espectador'}
+          </span>
+        </div>
         <Button
           type="button"
           variant="ghost"

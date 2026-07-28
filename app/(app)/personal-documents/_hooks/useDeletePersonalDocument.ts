@@ -1,8 +1,8 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 import { deleteIneFileRequest, deleteSignatureFileRequest } from '../_requests';
 
 type DeletableField = 'ine' | 'signature';
@@ -12,13 +12,10 @@ interface DeletePersonalDocumentParams {
   field: DeletableField;
 }
 
-function getErrorMessage(error: unknown, field: DeletableField): string {
-  const axiosError = error as AxiosError<{ message?: string }>;
-  const fallback =
-    field === 'ine'
-      ? 'Ocurrió un error al eliminar la identificación (INE). Intenta de nuevo.'
-      : 'Ocurrió un error al eliminar la firma digital. Intenta de nuevo.';
-  return axiosError.response?.data?.message ?? fallback;
+function getDeleteFallbackMessage(field: DeletableField): string {
+  return field === 'ine'
+    ? 'Ocurrió un error al eliminar la identificación (INE). Intenta de nuevo.'
+    : 'Ocurrió un error al eliminar la firma digital. Intenta de nuevo.';
 }
 
 export function useDeletePersonalDocument() {
@@ -38,7 +35,7 @@ export function useDeletePersonalDocument() {
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     },
     onError: (error, { field }) => {
-      toast.error(getErrorMessage(error, field));
+      toast.error(getErrorMessage(error, getDeleteFallbackMessage(field)));
     },
   });
 }

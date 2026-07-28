@@ -19,6 +19,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import {
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
@@ -30,7 +36,6 @@ import {
   rejectDocumentSchema,
   type RejectDocumentFormValues,
 } from '../_schemas';
-import type { ParticipantRole, ParticipantStatus } from '../_requests';
 import CancellationConfirmDialog from './CancellationConfirmDialog';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
@@ -38,16 +43,16 @@ const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
 });
 
 const STATUS_LABELS: Record<ParticipantStatus, string> = {
-  pending: 'Pendiente',
-  signed: 'Firmado',
-  rejected: 'Rechazado',
+  [ParticipantStatus.Pending]: 'Pendiente',
+  [ParticipantStatus.Signed]: 'Firmado',
+  [ParticipantStatus.Rejected]: 'Rechazado',
 };
 
 const ROLE_LABELS: Record<ParticipantRole, string> = {
-  signer: 'Firmante',
-  reviewer: 'Revisor',
-  watcher: 'Espectador',
-  creator: 'Creador',
+  [ParticipantRole.Signer]: 'Firmante',
+  [ParticipantRole.Reviewer]: 'Revisor',
+  [ParticipantRole.Watcher]: 'Espectador',
+  [ParticipantRole.Creator]: 'Creador',
 };
 
 interface SignDocumentViewProps {
@@ -88,7 +93,8 @@ export default function SignDocumentView({
   }
 
   const needsSimpleSignatureSetup =
-    document?.mySignatureType === 'simple' && !user?.signatureConfigured;
+    document?.mySignatureType === SignatureType.Simple &&
+    !user?.signatureConfigured;
 
   // Alcance: solo firma simple. Bloquea también la lectura del documento (no solo
   // los botones de firma) porque el usuario puede llegar por URL directa (ej.
@@ -151,9 +157,9 @@ export default function SignDocumentView({
                   </span>
                   <span
                     className={
-                      participant.status === 'signed'
+                      participant.status === ParticipantStatus.Signed
                         ? 'text-emerald-600'
-                        : participant.status === 'rejected'
+                        : participant.status === ParticipantStatus.Rejected
                           ? 'text-red-600'
                           : 'text-amber-600'
                     }
@@ -322,9 +328,9 @@ export default function SignDocumentView({
 
         {!document.canSign && document.myStatus && (
           <p className="text-sm text-muted-foreground">
-            {document.myStatus === 'signed'
+            {document.myStatus === ParticipantStatus.Signed
               ? 'Ya firmaste este documento.'
-              : document.myStatus === 'rejected'
+              : document.myStatus === ParticipantStatus.Rejected
                 ? 'Ya rechazaste este documento.'
                 : 'Aún no es tu turno para firmar este documento.'}
           </p>
@@ -350,7 +356,7 @@ export default function SignDocumentView({
           </Button>
         )}
 
-        {document.status === 'cancellation_pending' &&
+        {document.status === DocumentStatus.CancellationPending &&
           !document.canConfirmCancellation && (
             <p className="text-sm text-muted-foreground">
               Se solicitó la cancelación de este documento. Está pendiente de
@@ -358,7 +364,7 @@ export default function SignDocumentView({
             </p>
           )}
 
-        {document.status === 'cancelled' && (
+        {document.status === DocumentStatus.Cancelled && (
           <p className="text-sm text-muted-foreground">
             Este documento fue cancelado.
           </p>
