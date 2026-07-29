@@ -29,9 +29,11 @@ import RequiresApprovalField from './RequiresApprovalField';
 import RequiresOrderField from './RequiresOrderField';
 import IncludeMeAsSignerField from './IncludeMeAsSignerField';
 
-const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
-  ssr: false,
-});
+// react-pdf necesita el DOM (canvas) — igual que PdfPreview, se carga solo en cliente.
+const SignaturePlacementField = dynamic(
+  () => import('./SignaturePlacementField'),
+  { ssr: false },
+);
 
 const DEFAULT_VALUES: CreateDocumentSignaturesFormValues = {
   requiresApproval: false,
@@ -69,6 +71,8 @@ export default function CreateDocumentView({
     control,
     handleSubmit,
     reset,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<CreateDocumentSignaturesFormValues>({
     resolver: zodResolver(createDocumentSignaturesSchema),
@@ -109,6 +113,10 @@ export default function CreateDocumentView({
         signatureType: 'SIMPLE',
         rfc: currentUser.rfc,
         requiresTwoFactorAuth: true,
+        // Este colaborador se agrega solo aquí, al enviar — nunca pasa por el arreglo de RHF que
+        // alimenta el panel de ubicación de firmas (ver SignaturePlacementField), así que no hay
+        // forma de que tenga una posición colocada.
+        signatures: [],
       };
       collaborators.push(self);
     }
@@ -184,7 +192,7 @@ export default function CreateDocumentView({
             )}
           </div>
 
-          <Card className="h-[520px] overflow-hidden p-0">
+          <Card className="h-[640px] overflow-hidden p-0">
             <CardContent className="h-full p-0">
               {isFileLoading ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -192,7 +200,12 @@ export default function CreateDocumentView({
                   Cargando documento...
                 </div>
               ) : file ? (
-                <PdfPreview file={file} />
+                <SignaturePlacementField
+                  file={file}
+                  control={control}
+                  getValues={getValues}
+                  setValue={setValue}
+                />
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   La previsualización del documento aparecerá aquí

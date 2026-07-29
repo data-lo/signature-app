@@ -128,3 +128,23 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+/*
+ * Historia "Ubicación de firmas por usuario" (Escenario 2, prevención de colisiones): indicador
+ * visual de "zona ocupada" cuando se rechaza soltar/mover un cuadro de firma. El componente ya
+ * no persiste la posición inválida (ver SignaturePlacementField) — esta animación es la única
+ * pista de que el intento fue rechazado.
+ */
+@keyframes signature-reject-flash {
+  0%,
+  100% {
+    border-color: var(--color-destructive);
+  }
+  50% {
+    border-color: transparent;
+  }
+}
+
+.animate-signature-reject {
+  animation: signature-reject-flash 0.35s ease-in-out 2;
+}
