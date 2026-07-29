@@ -128,15 +128,44 @@ describe('computeRequiresDifferentSignatures', () => {
 });
 
 describe('toBackendCollaboratorPayload', () => {
-  it('inyecta la posición de firma por defecto y no manda rfc para SIMPLE', () => {
+  it('sin firmas colocadas, manda un arreglo vacío y no manda rfc para SIMPLE', () => {
     const payload = toBackendCollaboratorPayload(
       signer({ signatureType: 'SIMPLE', rfc: null }),
     );
 
-    expect(payload.signaturePosition).toEqual({ page: 1, x: 100, y: 100 });
+    expect(payload.signatures).toEqual([]);
     expect(payload.rfc).toBeNull();
     // SIMPLE: requiresTwoFactorAuth forzado a true "oculto", sin importar el valor del form.
     expect(payload.requiresTwoFactorAuth).toBe(true);
+  });
+
+  it('historia "Ubicación de firmas por usuario": traduce cada posición colocada al shape del backend', () => {
+    const payload = toBackendCollaboratorPayload(
+      signer({
+        signatureType: 'SIMPLE',
+        signatures: [
+          {
+            id: 'client-id-1',
+            page: 2,
+            xRatio: 0.3,
+            yRatio: 0.4,
+            widthRatio: 0.2,
+            heightRatio: 0.08,
+          },
+        ],
+      }),
+    );
+
+    expect(payload.signatures).toEqual([
+      {
+        signatureId: 'client-id-1',
+        page: 2,
+        xRatio: 0.3,
+        yRatio: 0.4,
+        widthRatio: 0.2,
+        heightRatio: 0.08,
+      },
+    ]);
   });
 
   it('SIMPLE fuerza requiresTwoFactorAuth=true aunque el form tenga false', () => {
@@ -160,7 +189,7 @@ describe('toBackendCollaboratorPayload', () => {
     expect(payload.requiresTwoFactorAuth).toBe(false);
   });
 
-  it('un viewer no manda signatureType, signaturePosition ni requiresTwoFactorAuth', () => {
+  it('un viewer no manda signatureType, signatures ni requiresTwoFactorAuth', () => {
     const payload = toBackendCollaboratorPayload({
       ...emptyViewer(),
       firstName: 'Ana',
@@ -171,7 +200,7 @@ describe('toBackendCollaboratorPayload', () => {
 
     expect(payload.collaboratorType).toBe('VIEWER');
     expect(payload.signatureType).toBeUndefined();
-    expect(payload.signaturePosition).toBeUndefined();
+    expect(payload.signatures).toBeUndefined();
     expect(payload.requiresTwoFactorAuth).toBeUndefined();
     expect(payload.rfc).toBe('AURU800101ABC');
   });
