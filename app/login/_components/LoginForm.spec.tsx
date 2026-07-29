@@ -40,7 +40,7 @@ describe('LoginForm', () => {
       screen.getByLabelText(/correo electrónico/i),
       'usuario@correo.com',
     );
-    await user.type(screen.getByLabelText(/contraseña/i), 'secreto123');
+    await user.type(screen.getByLabelText(/^contraseña$/i), 'secreto123');
     await user.click(screen.getByRole('button', { name: /iniciar sesión/i }));
 
     expect(mutate).toHaveBeenCalledWith({
