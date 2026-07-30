@@ -100,7 +100,7 @@ export default function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/home" />}>
+            <SidebarMenuButton size="lg" render={<Link href="/documents/create" />}>
               <FileSignature className="text-emerald-500" />
               <span className="font-heading font-semibold">Firmalo</span>
             </SidebarMenuButton>
