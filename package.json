@@ -23,6 +23,7 @@
     "filepond": "^4.32.12",
     "filepond-plugin-file-validate-size": "^2.2.8",
     "filepond-plugin-file-validate-type": "^1.2.9",
+    "input-otp": "^1.4.2",
     "js-cookie": "^3.0.8",
     "lucide-react": "^1.23.0",
     "next": "15.5.18",
