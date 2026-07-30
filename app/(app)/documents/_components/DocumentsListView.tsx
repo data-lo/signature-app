@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
 import DocumentsTable from './DocumentsTable';
@@ -15,12 +15,18 @@ import { ParticipantStatus } from '@/lib/enums/document';
 type Tab = ParticipantStatus.Pending | ParticipantStatus.Signed;
 
 export default function DocumentsListView() {
-  const [tab, setTab] = useState<Tab>(ParticipantStatus.Pending);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // La pestaña activa vive en la URL (?status=) para que el Sidebar pueda resaltar
+  // "Documentos pendientes"/"Documentos firmados" según la ruta actual.
+  const tab: Tab =
+    searchParams.get('status') === ParticipantStatus.Signed
+      ? ParticipantStatus.Signed
+      : ParticipantStatus.Pending;
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DocumentsFilters>(
     EMPTY_DOCUMENTS_FILTERS,
   );
-  const router = useRouter();
 
   const { data: currentUser } = useCurrentUser();
   const { data: documentsResult } = useParticipantDocuments(
@@ -31,7 +37,7 @@ export default function DocumentsListView() {
   );
 
   function handleTabChange(nextTab: Tab) {
-    setTab(nextTab);
+    router.push(`/documents?status=${nextTab}`);
     setPage(1);
   }
 

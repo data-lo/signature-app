@@ -53,10 +53,13 @@ interface CreateDocumentViewProps {
    * consulta y la tabla dentro de esta vista siguen funcionando igual.
    */
   trackDocumentsCount?: boolean;
+  /** Cuando es `false`, oculta la tabla de "myDocuments" bajo el formulario (ver /documents/create, que la extrae a su propia sección "Documentos creados" del Sidebar). */
+  showCreatedDocuments?: boolean;
 }
 
 export default function CreateDocumentView({
   trackDocumentsCount = true,
+  showCreatedDocuments = true,
 }: CreateDocumentViewProps = {}) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -216,19 +219,21 @@ export default function CreateDocumentView({
         </form>
       </div>
 
-      <div className="mt-8 border-t border-border pt-6">
-        <DocumentsTable
-          documents={myDocuments?.documents ?? []}
-          page={myDocuments?.meta.page}
-          totalPages={myDocuments?.meta.totalPages}
-          hasNextPage={myDocuments?.meta.hasNextPage}
-          hasPrevPage={myDocuments?.meta.hasPrevPage}
-          onPageChange={setPage}
-          onViewDetail={(id) => router.push(`/documents/${id}`)}
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-        />
-      </div>
+      {showCreatedDocuments && (
+        <div className="mt-8 border-t border-border pt-6">
+          <DocumentsTable
+            documents={myDocuments?.documents ?? []}
+            page={myDocuments?.meta.page}
+            totalPages={myDocuments?.meta.totalPages}
+            hasNextPage={myDocuments?.meta.hasNextPage}
+            hasPrevPage={myDocuments?.meta.hasPrevPage}
+            onPageChange={setPage}
+            onViewDetail={(id) => router.push(`/documents/${id}`)}
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+          />
+        </div>
+      )}
     </main>
   );
 }
