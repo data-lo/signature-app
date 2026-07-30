@@ -30,5 +30,5 @@ export default function CreateDocumentGuard() {
     return null;
   }
 
-  return <CreateDocumentView />;
+  return <CreateDocumentView showCreatedDocuments={false} />;
 }
