@@ -3,11 +3,11 @@ import { FileSignature } from 'lucide-react';
 import LoginForm from './_components/LoginForm';
 
 interface LoginPageProps {
-  searchParams: Promise<{ registered?: string }>;
+  searchParams: Promise<{ registered?: string; reset?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { registered } = await searchParams;
+  const { registered, reset } = await searchParams;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
@@ -22,6 +22,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         {registered === '1' && (
           <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2 text-sm text-center dark:bg-green-950 dark:text-green-300 dark:border-green-900">
             Cuenta creada correctamente, inicia sesión
+          </div>
+        )}
+
+        {reset === '1' && (
+          <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2 text-sm text-center dark:bg-green-950 dark:text-green-300 dark:border-green-900">
+            Contraseña actualizada correctamente, inicia sesión
           </div>
         )}
         <LoginForm />
