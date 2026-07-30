@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// '/forgot-password' es pública: el wizard de recuperación de contraseña (ver historia
-// "Recuperación de Contraseña mediante Código de Verificación OTP") corre antes de tener
-// sesión — sin esto, el middleware la trataría como ruta protegida y rebotaría a /login a
-// cualquiera que intente usarla.
-const AUTH_ROUTES = ['/login', '/signup', '/forgot-password'];
+const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/signup/verify'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
