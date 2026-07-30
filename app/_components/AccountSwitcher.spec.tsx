@@ -119,6 +119,6 @@ describe('AccountSwitcher', () => {
       await screen.findByRole('menuitem', { name: /crear organización/i }),
     );
 
-    expect(push).toHaveBeenCalledWith('/organization/create');
+    expect(push).toHaveBeenCalledWith('/dashboard/organization/create');
   });
 });

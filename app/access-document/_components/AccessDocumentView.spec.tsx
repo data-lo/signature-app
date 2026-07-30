@@ -56,7 +56,9 @@ describe('AccessDocumentView', () => {
         '/document/doc-1/link-collaborator',
       ),
     );
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/documents/doc-1'));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/dashboard/documents/doc-1'),
+    );
     expect(getPendingSignatureContext()).toBeNull();
   });
 
@@ -72,7 +74,9 @@ describe('AccessDocumentView', () => {
       />,
     );
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/documents/doc-1'));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/dashboard/documents/doc-1'),
+    );
     expect(getPendingSignatureContext()).toBeNull();
   });
 

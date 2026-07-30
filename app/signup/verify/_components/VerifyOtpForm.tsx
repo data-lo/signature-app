@@ -58,7 +58,7 @@ export default function VerifyOtpForm() {
       const result = await verifyOtpRequest(context.email, values.code);
       clearPendingRegistrationContext();
       setAuthToken(result.token);
-      window.location.href = '/home';
+      window.location.href = '/dashboard/home';
     } catch (error) {
       setVerifyError(
         getErrorMessage(error, 'No se pudo verificar el código. Intenta de nuevo.'),
