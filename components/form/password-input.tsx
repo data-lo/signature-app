@@ -8,41 +8,39 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-interface TextFieldProps extends React.ComponentProps<typeof Input> {
+interface PasswordInputProps
+  extends Omit<React.ComponentProps<typeof Input>, 'type'> {
   id: string;
   label: string;
   error?: RHFFieldError;
 }
 
-function TextField({ id, label, error, type, className, ...props }: TextFieldProps) {
+/**
+ * Campo de contraseña con botón de mostrar/ocultar (Eye/EyeOff, ver historia
+ * "Recuperación de Contraseña mediante Código de Verificación OTP") — componente
+ * explícito y nombrado (a diferencia de un `type="password"` detectado implícitamente
+ * en TextField), para poder reutilizarlo puntualmente donde se pida por nombre.
+ */
+function PasswordInput({
+  id,
+  label,
+  error,
+  className,
+  ...props
+}: PasswordInputProps) {
   const [showPassword, setShowPassword] = useState(false);
-  const isPassword = type === 'password';
-
-  const input = (
-    <Input
-      id={id}
-      type={isPassword ? (showPassword ? 'text' : 'password') : type}
-      aria-invalid={!!error}
-      className={cn(isPassword && 'pr-8', className)}
-      {...props}
-    />
-  );
-
-  if (!isPassword) {
-    return (
-      <Field data-invalid={error ? true : undefined}>
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
-        {input}
-        <FieldError errors={error ? [error] : undefined} />
-      </Field>
-    );
-  }
 
   return (
     <Field data-invalid={error ? true : undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <div className="relative">
-        {input}
+        <Input
+          id={id}
+          type={showPassword ? 'text' : 'password'}
+          aria-invalid={!!error}
+          className={cn('pr-8', className)}
+          {...props}
+        />
         <Button
           type="button"
           variant="ghost"
@@ -59,4 +57,4 @@ function TextField({ id, label, error, type, className, ...props }: TextFieldPro
   );
 }
 
-export { TextField };
+export { PasswordInput };

@@ -38,3 +38,10 @@ if (typeof Element !== 'undefined') {
   Element.prototype.releasePointerCapture ??= () => {};
   Element.prototype.scrollIntoView ??= () => {};
 }
+
+// jsdom no implementa document.elementFromPoint — el InputOTP de shadcn/ui (paquete
+// input-otp) lo usa internamente para detectar si un gestor de contraseñas del navegador
+// (1Password/LastPass) le superpuso un ícono, y sin este stub el timer interno revienta.
+if (typeof document !== 'undefined') {
+  document.elementFromPoint ??= () => null;
+}
