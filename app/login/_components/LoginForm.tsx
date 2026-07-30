@@ -63,6 +63,15 @@ export default function LoginForm() {
               {...register('password')}
             />
 
+            <p className="-mt-2 text-right text-sm">
+              <Link
+                href="/forgot-password"
+                className="text-primary hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
+
             {loginMutation.isError && (
               <FieldError>
                 {getErrorMessage(

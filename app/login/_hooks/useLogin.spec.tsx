@@ -9,14 +9,23 @@ import {
   getPendingSignatureContext,
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
+import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
+import { resendOtpRequest } from '@/app/signup/_requests';
 
 jest.mock('../_requests');
 jest.mock('@/lib/cookies');
 jest.mock('@/lib/axios');
 jest.mock('@/lib/pending-signature-context');
+jest.mock('@/lib/pending-registration-context');
+jest.mock('@/app/signup/_requests');
 jest.mock('react-hot-toast', () => ({
   __esModule: true,
   default: { success: jest.fn(), error: jest.fn() },
+}));
+
+const push = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
 }));
 
 const mockedLoginRequest = loginRequest as jest.Mock;
@@ -26,6 +35,9 @@ const mockedGetPendingSignatureContext =
   getPendingSignatureContext as jest.Mock;
 const mockedClearPendingSignatureContext =
   clearPendingSignatureContext as jest.Mock;
+const mockedSetPendingRegistrationContext =
+  setPendingRegistrationContext as jest.Mock;
+const mockedResendOtpRequest = resendOtpRequest as jest.Mock;
 
 function wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({
@@ -49,6 +61,9 @@ describe('useLogin', () => {
     mockedApiClientPatch.mockReset().mockResolvedValue(undefined);
     mockedGetPendingSignatureContext.mockReset().mockReturnValue(null);
     mockedClearPendingSignatureContext.mockReset();
+    mockedSetPendingRegistrationContext.mockReset();
+    mockedResendOtpRequest.mockReset();
+    push.mockReset();
   });
 
   it('sin contexto pendiente: guarda el token y redirige a /home', async () => {
@@ -104,5 +119,30 @@ describe('useLogin', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(mockedClearPendingSignatureContext).toHaveBeenCalled();
+  });
+
+  it('bug corregido: con 403 (cuenta no verificada), reenvía el OTP y manda a /signup/verify en vez de mostrar un error genérico', async () => {
+    mockedLoginRequest.mockRejectedValue({
+      response: { status: 403, data: { message: 'Debes verificar tu correo' } },
+    });
+    mockedResendOtpRequest.mockResolvedValue({
+      email: 'a@a.com',
+      maskedEmail: 'a***a@a.com',
+    });
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    act(() => {
+      result.current.mutate({ email: 'a@a.com', password: 'secret' });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(mockedResendOtpRequest).toHaveBeenCalledWith('a@a.com');
+    expect(mockedSetPendingRegistrationContext).toHaveBeenCalledWith({
+      email: 'a@a.com',
+      maskedEmail: 'a***a@a.com',
+      isNewPreRegistration: false,
+    });
+    expect(push).toHaveBeenCalledWith('/signup/verify');
   });
 });
