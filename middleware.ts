@@ -27,6 +27,10 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Historia "Visualización pública de documentos firmados mediante MinIO": /public/* no debe
+    // pasar por este middleware en absoluto (ni el chequeo de token, ni ninguna redirección) —
+    // se excluye del matcher, igual que api/_next/estáticos, en vez de agregar un `if` dentro de
+    // la función, para que quede claro que esta ruta nunca depende de sesión.
+    '/((?!api|_next/static|_next/image|favicon.ico|brand/|public/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
