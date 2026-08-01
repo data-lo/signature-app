@@ -5,45 +5,60 @@ import { useOnboardingReady } from '@/lib/hooks/useOnboardingReady';
 jest.mock('@/lib/hooks/useOnboardingReady');
 jest.mock('./CreateDocumentView', () => ({
   __esModule: true,
-  default: () => <div>CreateDocumentView</div>,
+  default: ({ trackDocumentsCount }: { trackDocumentsCount?: boolean }) => (
+    <div>CreateDocumentView (trackDocumentsCount={String(trackDocumentsCount)})</div>
+  ),
 }));
-
-const replace = jest.fn();
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({ replace }),
+jest.mock('./OnboardingBanner', () => ({
+  __esModule: true,
+  default: () => <div>OnboardingBanner</div>,
+}));
+jest.mock('./InviteMemberModal', () => ({
+  __esModule: true,
+  default: () => <div>InviteMemberModal</div>,
 }));
 
 const mockedUseOnboardingReady = useOnboardingReady as jest.Mock;
 
 describe('CreateDocumentGuard', () => {
-  beforeEach(() => {
-    replace.mockReset();
-  });
-
-  it('mientras el store todavía no hidrata (isLoading), no redirige ni renderiza el formulario', () => {
+  it('mientras el store todavía no hidrata (isLoading), no renderiza nada', () => {
     mockedUseOnboardingReady.mockReturnValue({ isLoading: true, isReady: false });
 
-    render(<CreateDocumentGuard />);
+    const { container } = render(<CreateDocumentGuard />);
 
-    expect(replace).not.toHaveBeenCalled();
-    expect(screen.queryByText('CreateDocumentView')).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('bug corregido: con onboarding incompleto, redirige a /home en vez de mostrar el formulario completo sin restricción', () => {
+  it('con onboarding incompleto: renderiza la vista visible pero bloqueada (inert + opacidad), sin redirigir a otra ruta', () => {
     mockedUseOnboardingReady.mockReturnValue({ isLoading: false, isReady: false });
 
     render(<CreateDocumentGuard />);
 
-    expect(replace).toHaveBeenCalledWith('/home');
-    expect(screen.queryByText('CreateDocumentView')).not.toBeInTheDocument();
+    expect(screen.getByText('OnboardingBanner')).toBeInTheDocument();
+    const createDocumentView = screen.getByText(/CreateDocumentView/);
+    expect(createDocumentView).toBeInTheDocument();
+
+    const wrapper = createDocumentView.closest('[aria-disabled]');
+    expect(wrapper).toHaveAttribute('inert');
+    expect(wrapper).toHaveAttribute('aria-disabled', 'true');
+    expect(wrapper?.className).toContain('opacity-50');
+    expect(wrapper?.className).toContain('pointer-events-none');
+    expect(
+      screen.getByText('CreateDocumentView (trackDocumentsCount=false)'),
+    ).toBeInTheDocument();
   });
 
-  it('con onboarding completo, renderiza CreateDocumentView sin redirigir', () => {
+  it('con onboarding completo: renderiza la vista habilitada (sin inert ni opacidad)', () => {
     mockedUseOnboardingReady.mockReturnValue({ isLoading: false, isReady: true });
 
     render(<CreateDocumentGuard />);
 
-    expect(replace).not.toHaveBeenCalled();
-    expect(screen.getByText('CreateDocumentView')).toBeInTheDocument();
+    const createDocumentView = screen.getByText(/CreateDocumentView/);
+    const wrapper = createDocumentView.closest('[aria-disabled]');
+    expect(wrapper).not.toHaveAttribute('inert');
+    expect(wrapper).toHaveAttribute('aria-disabled', 'false');
+    expect(
+      screen.getByText('CreateDocumentView (trackDocumentsCount=true)'),
+    ).toBeInTheDocument();
   });
 });

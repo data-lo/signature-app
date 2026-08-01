@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
 
   if (AUTH_ROUTES.includes(pathname)) {
     if (token) {
-      return NextResponse.redirect(new URL('/home', request.url));
+      return NextResponse.redirect(new URL('/documents/create', request.url));
     }
     return NextResponse.next();
   }

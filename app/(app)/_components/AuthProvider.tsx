@@ -44,7 +44,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   // que lo resetea), no en cada toggle de consolidationInFlight.
   const consolidationAttemptedRef = useRef(false);
 
-  // Escenario 1: al aterrizar en /home, /users/me (Redis por CURP) rellena
+  // Escenario 1: al aterrizar en /documents/create, /users/me (Redis por CURP) rellena
   // el perfil y calcula personalConfigured/signatureConfigured.
   useEffect(() => {
     if (profile) {
