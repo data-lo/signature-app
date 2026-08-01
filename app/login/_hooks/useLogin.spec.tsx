@@ -66,7 +66,7 @@ describe('useLogin', () => {
     push.mockReset();
   });
 
-  it('sin contexto pendiente: guarda el token y redirige a /documents/create', async () => {
+  it('sin contexto pendiente: guarda el token y redirige a /dashboard/documents/create', async () => {
     mockedLoginRequest.mockResolvedValue({ token: 'jwt-1', user: {} });
     const { result } = renderHook(() => useLogin(), { wrapper });
 

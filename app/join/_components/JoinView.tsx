@@ -140,7 +140,7 @@ export default function JoinView({ token, orgId }: JoinViewProps) {
               setAccountsList(accounts);
               setActiveAccount(toAccountListEntry(joinedAccount));
             }
-            router.push('/documents/create');
+            router.push('/dashboard/documents/create');
           } else {
             router.push('/login');
           }

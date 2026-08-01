@@ -59,7 +59,9 @@ export default function AccountSwitcher() {
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push('/organization/create')}>
+        <DropdownMenuItem
+          onClick={() => router.push('/dashboard/organization/create')}
+        >
           <Plus className="size-4" />
           Crear organización
         </DropdownMenuItem>

@@ -44,41 +44,41 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   {
     label: 'Configuración de documento',
-    href: '/documents/create',
+    href: '/dashboard/documents/create',
     icon: FilePlus,
-    isActive: (pathname) => pathname === '/documents/create',
+    isActive: (pathname) => pathname === '/dashboard/documents/create',
   },
   {
     label: 'Documentos pendientes de firma',
-    href: '/documents?status=pending',
+    href: '/dashboard/documents?status=pending',
     icon: Clock,
     isActive: (pathname, status) =>
-      pathname === '/documents' && status !== 'signed',
+      pathname === '/dashboard/documents' && status !== 'signed',
   },
   {
     label: 'Documentos creados',
-    href: '/documents/created',
+    href: '/dashboard/documents/created',
     icon: Folder,
-    isActive: (pathname) => pathname === '/documents/created',
+    isActive: (pathname) => pathname === '/dashboard/documents/created',
   },
   {
     label: 'Documentos firmados',
-    href: '/documents?status=signed',
+    href: '/dashboard/documents?status=signed',
     icon: FileCheck,
     isActive: (pathname, status) =>
-      pathname === '/documents' && status === 'signed',
+      pathname === '/dashboard/documents' && status === 'signed',
   },
   {
     label: 'Suscripciones',
-    href: '/plans',
+    href: '/dashboard/plans',
     icon: CreditCard,
-    isActive: (pathname) => pathname.startsWith('/plans'),
+    isActive: (pathname) => pathname.startsWith('/dashboard/plans'),
   },
   {
     label: 'Configuración',
-    href: '/personal-documents',
+    href: '/dashboard/personal-documents',
     icon: Settings,
-    isActive: (pathname) => pathname.startsWith('/personal-documents'),
+    isActive: (pathname) => pathname.startsWith('/dashboard/personal-documents'),
   },
 ];
 
@@ -100,7 +100,7 @@ export default function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/documents/create" />}>
+            <SidebarMenuButton size="lg" render={<Link href="/dashboard/documents/create" />}>
               <FileSignature className="text-emerald-500" />
               <span className="font-heading font-semibold">Firmalo</span>
             </SidebarMenuButton>

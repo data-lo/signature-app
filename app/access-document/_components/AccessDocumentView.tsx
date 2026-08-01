@@ -64,7 +64,7 @@ export default function AccessDocumentView({
       } finally {
         if (!cancelled) {
           clearPendingSignatureContext();
-          router.replace(`/documents/${documentId}`);
+          router.replace(`/dashboard/documents/${documentId}`);
         }
       }
     })();
