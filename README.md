@@ -64,13 +64,13 @@ Antes de poder firmar cualquier documento, el usuario debe subir su rúbrica (PN
 
 ## 3. Autenticación, onboarding y multi-tenancy (Zustand)
 
-### 3.1 Login, registro y aterrizaje en `/home`
+### 3.1 Login, registro y aterrizaje en `/documents/create`
 
-`POST /auth/login` guarda el JWT en cookie (`setAuthToken`) y redirige a `/home`. El store (`useAuthStore`) **no** se llena en ese momento — `AuthProvider` (envuelve todo el route group `(app)`, ver `app/(app)/layout.tsx`) es quien lo hidrata al montar, leyendo `GET /api/v1/users/me` (perfil cacheado en Redis por CURP) y `GET /api/v1/accounts/me` (catálogo de cuentas). Si es la primera vez que el usuario entra (no hay `activeAccount` persistido) — o si el `activeAccount` persistido ya no aparece en el catálogo fresco (acceso revocado, organización eliminada) —, `AuthProvider` cae automáticamente a la cuenta de tipo `PERSONAL` del catálogo.
+`POST /auth/login` guarda el JWT en cookie (`setAuthToken`) y redirige a `/documents/create` — la ruta por defecto del dashboard (antes existía también `/home` apuntando al mismo contenido; se consolidó en una sola ruta, ver Pendientes). El store (`useAuthStore`) **no** se llena en ese momento — `AuthProvider` (envuelve todo el route group `(app)`, ver `app/(app)/layout.tsx`) es quien lo hidrata al montar, leyendo `GET /api/v1/users/me` (perfil cacheado en Redis por CURP) y `GET /api/v1/accounts/me` (catálogo de cuentas). Si es la primera vez que el usuario entra (no hay `activeAccount` persistido) — o si el `activeAccount` persistido ya no aparece en el catálogo fresco (acceso revocado, organización eliminada) —, `AuthProvider` cae automáticamente a la cuenta de tipo `PERSONAL` del catálogo.
 
 ### 3.2 Onboarding (`personalConfigured` / `signatureConfigured`)
 
-`OnboardingBanner` (en `/home`) lee `user.personalConfigured`/`user.signatureConfigured` del store y bloquea con **"Es requerido configurar tu usuario"** mientras cualquiera de las dos sea `false`, con accesos independientes a `/personal-documents` para completar cada una.
+`OnboardingBanner` (en `/documents/create`, montado por `CreateDocumentGuard`) lee `user.personalConfigured`/`user.signatureConfigured` del store y bloquea con **"Es requerido configurar tu usuario"** mientras cualquiera de las dos sea `false`, con accesos independientes a `/personal-documents` para completar cada una.
 
 Cada mini-flujo muta **solo su propia bandera**, sin esperar a un refetch:
 - `useUpdatePersonalInformation` (`PUT /api/v1/users/me/personal-information`) → al éxito, `updateOnboardingStatus('personal', true)`.
@@ -80,13 +80,13 @@ Cada mini-flujo muta **solo su propia bandera**, sin esperar a un refetch:
 
 ### 3.3 Organizaciones y el switcher de cuentas (multi-tenant)
 
-`/organization/create` (`CreateOrganizationForm` + `useCreateOrganization`) llama `POST /api/v1/organizations`. Al éxito, **sin ninguna petición extra a la red**: `addAccount(account)` inserta la cuenta nueva en `accountsList` y `setActiveAccount(...)` la vuelve el tenant activo de inmediato; luego toast de éxito y redirección a `/home`.
+`/organization/create` (`CreateOrganizationForm` + `useCreateOrganization`) llama `POST /api/v1/organizations`. Al éxito, **sin ninguna petición extra a la red**: `addAccount(account)` inserta la cuenta nueva en `accountsList` y `setActiveAccount(...)` la vuelve el tenant activo de inmediato; luego toast de éxito y redirección a `/documents/create`.
 
 `AccountSwitcher` (en el header, `app/_components/AccountSwitcher.tsx`) lee `accountsList`/`activeAccount` **directamente del store** — no vuelve a pedir el catálogo por su cuenta; `AuthProvider` ya lo carga una sola vez para toda la app autenticada.
 
 `lib/axios.ts` inyecta en cada request `X-Account-Id` (si hay `activeAccount`) y `X-Organization-Id` (solo si `activeAccount.accountType === 'ORGANIZATION'`). El backend ya lee y valida `X-Account-Id` para `POST /document`/`GET /document` (documentos scopeados por la cuenta activa, ver README de `signature-server`) — ningún cambio de este lado, ya se mandaba desde que se agregó el interceptor. El resto de los endpoints (detalle de documento, firma/rechazo/cancelación, `GET /user`) todavía no lo leen (ver Pendientes).
 
-**Invitar miembros a la organización activa** (`/home`, `InviteMemberModal` — solo se renderiza si `activeAccount.accountType === 'ORGANIZATION'`): al abrir el modal, `useSystemRoles()` consulta `GET /api/v1/roles` (deshabilitada hasta que el modal está abierto — `useQuery({..., enabled: open})`) para poblar el `Select` de rol. Al enviar, `useInviteMember()` llama `POST /api/v1/organizations/invite` (`{email, roleId}`, `X-Account-Id` inyectado igual que cualquier otro request) y cierra el modal al éxito. **Alcance delimitado a propósito** (misma historia que implementó el endpoint): el backend solo valida y confirma, no crea ninguna membresía todavía — el modal se cierra y muestra el toast de éxito, pero el usuario invitado no aparece en ningún listado real hasta que se conecte la lógica de persistencia (ver README de `signature-server`, sección Pendientes).
+**Invitar miembros a la organización activa** (`/documents/create`, `InviteMemberModal` — solo se renderiza si `activeAccount.accountType === 'ORGANIZATION'`): al abrir el modal, `useSystemRoles()` consulta `GET /api/v1/roles` (deshabilitada hasta que el modal está abierto — `useQuery({..., enabled: open})`) para poblar el `Select` de rol. Al enviar, `useInviteMember()` llama `POST /api/v1/organizations/invite` (`{email, roleId}`, `X-Account-Id` inyectado igual que cualquier otro request) y cierra el modal al éxito. **Alcance delimitado a propósito** (misma historia que implementó el endpoint): el backend solo valida y confirma, no crea ninguna membresía todavía — el modal se cierra y muestra el toast de éxito, pero el usuario invitado no aparece en ningún listado real hasta que se conecte la lógica de persistencia (ver README de `signature-server`, sección Pendientes).
 
 ### 3.4 Store global (`useAuthStore`) — Slices Pattern
 
@@ -119,12 +119,10 @@ app/
 ├── _components/               → compartidos entre landing y el flujo mock del dashboard
 └── (app)/                    → route group protegido por middleware
     ├── layout.tsx             → AuthProvider (hidrata useAuthStore) + DocumentsCountProvider + DashboardNavbar (con AccountSwitcher)
-    ├── home/                  → "/home" — aterrizaje post-login: OnboardingBanner + InviteMemberModal (solo con Org activa) + acceso a las demás secciones
     ├── organization/create/   → "/organization/create" — CreateOrganizationForm → POST /api/v1/organizations
-    ├── dashboard/             → "/dashboard" — renderiza el mismo flujo real que "/documents/create" (ver Pendientes)
     ├── documents/
     │   ├── page.tsx           → "/documents" — listado real (GET /document)
-    │   ├── create/            → "/documents/create" — flujo real de creación ⭐
+    │   ├── create/            → "/documents/create" — ruta por defecto del dashboard (aterrizaje post-login): CreateDocumentGuard monta OnboardingBanner + InviteMemberModal (solo con Org activa) + el flujo real de creación ⭐
     │   └── [documentId]/      → "/documents/:id" — pantalla de firma real ⭐
     ├── personal-documents/    → "/personal-documents" — credencial de firma (signature/INE) + datos de contacto del onboarding
     └── plans/                 → "/plans", "/plans/success", "/plans/cancel" — suscripciones Stripe

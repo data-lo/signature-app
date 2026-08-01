@@ -156,7 +156,7 @@ describe('JoinView', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/login'));
   });
 
-  it('al confirmar "Unirse" con sesión activa, actualiza el store y redirige a /home', async () => {
+  it('al confirmar "Unirse" con sesión activa, actualiza el store y redirige a /documents/create', async () => {
     const user = userEvent.setup();
     checkRfcMutate.mockImplementation((rfc, { onSuccess }) => onSuccess(true));
     acceptInvitationMutate.mockImplementation((vars, { onSuccess }) =>
@@ -180,7 +180,7 @@ describe('JoinView', () => {
     await user.click(screen.getByRole('button', { name: /continuar/i }));
     await user.click(screen.getByRole('button', { name: /^unirse$/i }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/home'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/documents/create'));
     expect(useAuthStore.getState().activeAccount?.id).toBe('account-1');
   });
 });

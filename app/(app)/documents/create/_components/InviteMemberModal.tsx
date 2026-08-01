@@ -26,7 +26,10 @@ import {
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useInviteMember } from '../_hooks/useInviteMember';
-import { inviteMemberSchema, type InviteMemberFormValues } from '../_schemas';
+import {
+  inviteMemberSchema,
+  type InviteMemberFormValues,
+} from '../_invite-member-schema';
 
 export default function InviteMemberModal() {
   const [open, setOpen] = useState(false);
