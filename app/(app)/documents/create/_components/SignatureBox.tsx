@@ -63,7 +63,18 @@ export default function SignatureBox({
         transform: CSS.Translate.toString(transform),
       }}
       className={cn(
-        'absolute flex touch-none cursor-grab items-center justify-center rounded border-2 bg-white/90 text-center text-[10px] leading-tight font-semibold text-foreground uppercase select-none',
+        // Bug corregido: sin z-index explícito, este cuadro (y su botón de eliminar) quedaban por
+        // debajo del `.textLayer` que react-pdf superpone sobre cada página (TextLayer.css fija
+        // z-index:2, cubriendo la página completa con `inset:0`) — ambos son hermanos
+        // absolutamente posicionados sin una raíz de stacking propia entre ellos, así que un
+        // z-index:auto pierde contra cualquier z-index explícito del hermano, sin importar el
+        // orden en el DOM. El síntoma: el primer drop (arrastrado desde el chip lateral, fuera del
+        // área del PDF) sí funcionaba porque dnd-kit resuelve la colisión por rects, no por
+        // hit-testing del DOM — pero un click en "×" o un nuevo arrastre iniciado DESDE la propia
+        // caja ya colocada requieren que el evento de puntero aterrice en este nodo, y el
+        // `.textLayer` lo interceptaba primero. z-10 lo deja por encima tanto del textLayer (2)
+        // como del annotationLayer (3, ver AnnotationLayer.css).
+        'absolute z-10 flex touch-none cursor-grab items-center justify-center rounded border-2 bg-white/90 text-center text-[10px] leading-tight font-semibold text-foreground uppercase select-none',
         colorClassName,
         isDragging && 'opacity-0',
         isRejected && 'animate-signature-reject border-destructive',
