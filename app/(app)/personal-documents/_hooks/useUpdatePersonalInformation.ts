@@ -19,7 +19,7 @@ export function useUpdatePersonalInformation() {
       queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
       useAuthStore.getState().updateOnboardingStatus('personal', true);
       if (!useAuthStore.getState().user?.isConfigured) {
-        router.push('/home');
+        router.push('/documents/create');
       }
     },
     onError: (error) => {

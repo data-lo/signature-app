@@ -24,7 +24,7 @@ function PlanCheckoutSuccessContent() {
           </>
         )}
       </p>
-      <Button variant="brand" onClick={() => router.push('/home')}>
+      <Button variant="brand" onClick={() => router.push('/documents/create')}>
         Ir al inicio
       </Button>
     </main>
