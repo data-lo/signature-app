@@ -46,7 +46,7 @@ describe('useCreateOrganization', () => {
     useAuthStore.setState({ accountsList: [], activeAccount: null });
   });
 
-  it('al éxito: inserta la cuenta en accountsList, la vuelve activa, muestra el toast y redirige a /dashboard/home', async () => {
+  it('al éxito: inserta la cuenta en accountsList, la vuelve activa, muestra el toast y redirige a /dashboard/documents/create', async () => {
     mockedCreateOrganizationRequest.mockResolvedValue(NEW_ORG);
     const { result } = renderHook(() => useCreateOrganization(), { wrapper });
 
@@ -70,7 +70,7 @@ describe('useCreateOrganization', () => {
     expect(toast.success).toHaveBeenCalledWith(
       'Puedes alternar entre tu cuenta personal y la de la organización',
     );
-    expect(push).toHaveBeenCalledWith('/dashboard/home');
+    expect(push).toHaveBeenCalledWith('/dashboard/documents/create');
   });
 
   it('al fallar: muestra el mensaje de error del backend y no toca el store', async () => {

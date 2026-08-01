@@ -23,7 +23,7 @@ export function useCreateOrganization() {
       toast.success(
         'Puedes alternar entre tu cuenta personal y la de la organización',
       );
-      router.push('/dashboard/home');
+      router.push('/dashboard/documents/create');
     },
     onError: (error) => {
       toast.error(

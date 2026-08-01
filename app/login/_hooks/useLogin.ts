@@ -27,9 +27,9 @@ export function useLogin() {
       // Ver historia "Notificación por Email para Firma Simple y Vinculación de Cuenta": si el
       // usuario llegó desde /access-document y tuvo que iniciar sesión (Casos B/C — Registro
       // redirige a /login antes de vincular), se vincula su accountId al Collaborator pendiente
-      // y se le manda directo al documento en vez de /dashboard/home. Best-effort: si la
-      // vinculación falla, igual se le manda al documento — sign() reintenta la vinculación por
-      // email al firmar (Caso A), así que el usuario nunca queda atascado.
+      // y se le manda directo al documento en vez de /dashboard/documents/create. Best-effort:
+      // si la vinculación falla, igual se le manda al documento — sign() reintenta la
+      // vinculación por email al firmar (Caso A), así que el usuario nunca queda atascado.
       const pendingContext = getPendingSignatureContext();
       if (pendingContext) {
         try {
@@ -47,7 +47,7 @@ export function useLogin() {
         return;
       }
 
-      window.location.href = '/dashboard/home';
+      window.location.href = '/dashboard/documents/create';
     },
     onError: async (error, variables) => {
       console.error('[login] falló el inicio de sesión:', error);
