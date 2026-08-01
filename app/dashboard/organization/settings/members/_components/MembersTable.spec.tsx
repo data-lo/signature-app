@@ -62,6 +62,26 @@ describe('MembersTable', () => {
     expect(onEditRole).toHaveBeenCalledWith(MEMBERS[0]);
   });
 
+  it('al elegir "Configurar permisos" llama a onConfigurePermissions con el miembro de esa fila', async () => {
+    const user = userEvent.setup();
+    const onConfigurePermissions = jest.fn();
+    render(
+      <MembersTable
+        members={MEMBERS}
+        canManage
+        onConfigurePermissions={onConfigurePermissions}
+      />,
+    );
+
+    const [firstRowTrigger] = screen.getAllByRole('button');
+    await user.click(firstRowTrigger);
+    await user.click(
+      await screen.findByRole('menuitem', { name: /configurar permisos/i }),
+    );
+
+    expect(onConfigurePermissions).toHaveBeenCalledWith(MEMBERS[0]);
+  });
+
   it('al elegir "Eliminar" llama a onRemove con el miembro de esa fila', async () => {
     const user = userEvent.setup();
     const onRemove = jest.fn();

@@ -10,6 +10,7 @@ import {
   FileCheck,
   CreditCard,
   Settings,
+  Building2,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -39,6 +40,8 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   isActive: (pathname: string, status: string | null) => boolean;
+  /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
+  orgOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -80,6 +83,14 @@ const NAV_ITEMS: NavItem[] = [
     icon: Settings,
     isActive: (pathname) => pathname.startsWith('/dashboard/personal-documents'),
   },
+  {
+    label: 'Organización',
+    href: '/dashboard/organization/settings/members',
+    icon: Building2,
+    isActive: (pathname) =>
+      pathname.startsWith('/dashboard/organization/settings'),
+    orgOnly: true,
+  },
 ];
 
 const ACCOUNT_TYPE_LABELS: Record<AccountKind, string> = {
@@ -113,7 +124,10 @@ export default function AppSidebar() {
           <SidebarGroupLabel>Documentos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
+              {NAV_ITEMS.filter(
+                (item) =>
+                  !item.orgOnly || activeAccount?.accountType === 'ORGANIZATION',
+              ).map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
                     isActive={item.isActive(pathname, status)}

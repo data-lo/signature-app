@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { KeyRound, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,7 @@ interface MembersTableProps {
   members: OrganizationMember[];
   canManage: boolean;
   onEditRole?: (member: OrganizationMember) => void;
+  onConfigurePermissions?: (member: OrganizationMember) => void;
   onRemove?: (member: OrganizationMember) => void;
 }
 
@@ -37,6 +38,7 @@ export default function MembersTable({
   members,
   canManage,
   onEditRole,
+  onConfigurePermissions,
   onRemove,
 }: MembersTableProps) {
   return (
@@ -69,6 +71,12 @@ export default function MembersTable({
                     <DropdownMenuItem onClick={() => onEditRole?.(member)}>
                       <Pencil className="size-4" />
                       Editar Rol
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onConfigurePermissions?.(member)}
+                    >
+                      <KeyRound className="size-4" />
+                      Configurar permisos
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       variant="destructive"
