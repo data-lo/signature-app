@@ -68,6 +68,14 @@ describe('SignatureBox', () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
+  it('bug corregido: se renderiza por encima del textLayer/annotationLayer de react-pdf (z-index explícito), para que el click en "×" y el arrastre no queden bloqueados por esas capas', () => {
+    renderBox({ label: 'ANA GÓMEZ' });
+
+    expect(screen.getByText('ANA GÓMEZ').closest('div[class*="absolute"]')).toHaveClass(
+      'z-10',
+    );
+  });
+
   it('aplica la animación de rechazo cuando isRejected es true', () => {
     renderBox({ isRejected: true, label: 'ANA GÓMEZ' });
 
