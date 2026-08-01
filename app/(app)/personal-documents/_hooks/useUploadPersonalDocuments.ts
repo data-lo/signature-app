@@ -31,7 +31,7 @@ export function useUploadPersonalDocuments() {
       queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
       useAuthStore.getState().updateOnboardingStatus('signature', true);
       if (!useAuthStore.getState().user?.isConfigured) {
-        router.push('/home');
+        router.push('/documents/create');
       }
     },
     onError: (error) => {
