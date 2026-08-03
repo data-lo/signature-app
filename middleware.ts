@@ -37,10 +37,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname === '/') {
-    return NextResponse.next();
-  }
-
   if (!token) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
@@ -54,6 +50,6 @@ export const config = {
     // pasar por este middleware en absoluto (ni el chequeo de token, ni ninguna redirección) —
     // se excluye del matcher, igual que api/_next/estáticos, en vez de agregar un `if` dentro de
     // la función, para que quede claro que esta ruta nunca depende de sesión.
-    '/((?!api|_next/static|_next/image|favicon.ico|brand/|public/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
