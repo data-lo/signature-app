@@ -4,23 +4,32 @@ import MembersView from './MembersView';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import { useOrganizationPermissions } from '@/lib/hooks/useOrganizationPermissions';
 import { useOrganizationMembers } from '../_hooks/useOrganizationMembers';
 import { useUpdateMemberRole } from '../_hooks/useUpdateMemberRole';
 import { useRemoveMember } from '../_hooks/useRemoveMember';
+import { useMemberPermissions } from '../_hooks/useMemberPermissions';
+import { useUpdateMemberPermissions } from '../_hooks/useUpdateMemberPermissions';
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import type { OrganizationMember } from '@/lib/api/organization-members';
 
 jest.mock('@/lib/hooks/useIsOrganizationAdmin');
 jest.mock('@/lib/hooks/useSystemRoles');
+jest.mock('@/lib/hooks/useOrganizationPermissions');
 jest.mock('../_hooks/useOrganizationMembers');
 jest.mock('../_hooks/useUpdateMemberRole');
 jest.mock('../_hooks/useRemoveMember');
+jest.mock('../_hooks/useMemberPermissions');
+jest.mock('../_hooks/useUpdateMemberPermissions');
 
 const mockedUseIsOrganizationAdmin = useIsOrganizationAdmin as jest.Mock;
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
+const mockedUseOrganizationPermissions = useOrganizationPermissions as jest.Mock;
 const mockedUseOrganizationMembers = useOrganizationMembers as jest.Mock;
 const mockedUseUpdateMemberRole = useUpdateMemberRole as jest.Mock;
 const mockedUseRemoveMember = useRemoveMember as jest.Mock;
+const mockedUseMemberPermissions = useMemberPermissions as jest.Mock;
+const mockedUseUpdateMemberPermissions = useUpdateMemberPermissions as jest.Mock;
 
 const ORG_ACCOUNT: ActiveAccount = {
   id: 'org-account-1',
@@ -50,10 +59,12 @@ const MEMBERS: OrganizationMember[] = [
 describe('MembersView', () => {
   const updateRoleMutate = jest.fn();
   const removeMemberMutate = jest.fn();
+  const updateMemberPermissionsMutate = jest.fn();
 
   beforeEach(() => {
     updateRoleMutate.mockReset();
     removeMemberMutate.mockReset();
+    updateMemberPermissionsMutate.mockReset();
     useAuthStore.setState({ activeAccount: ORG_ACCOUNT });
     mockedUseIsOrganizationAdmin.mockReturnValue({
       isAdmin: true,
@@ -63,6 +74,12 @@ describe('MembersView', () => {
       data: [
         { id: 'admin-role-1', name: 'ADMIN', isSystemRole: true },
         { id: 'member-role-1', name: 'MEMBER', isSystemRole: true },
+      ],
+      isLoading: false,
+    });
+    mockedUseOrganizationPermissions.mockReturnValue({
+      data: [
+        { id: 'perm-1', organizationId: 'org-1', name: 'Aprobar', isActive: true },
       ],
       isLoading: false,
     });
@@ -76,6 +93,14 @@ describe('MembersView', () => {
     });
     mockedUseRemoveMember.mockReturnValue({
       mutate: removeMemberMutate,
+      isPending: false,
+    });
+    mockedUseMemberPermissions.mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+    mockedUseUpdateMemberPermissions.mockReturnValue({
+      mutate: updateMemberPermissionsMutate,
       isPending: false,
     });
   });
@@ -149,6 +174,29 @@ describe('MembersView', () => {
 
     expect(removeMemberMutate).toHaveBeenCalledWith(
       'account-1',
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it('configurar permisos: abre el modal, marca un permiso y llama a la mutación con accountId+permissionIds', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MembersView />);
+
+    const [rowActionsTrigger] = screen.getAllByRole('button', { name: '' });
+    await user.click(rowActionsTrigger);
+    await user.click(
+      await screen.findByRole('menuitem', { name: /configurar permisos/i }),
+    );
+
+    expect(
+      await screen.findByText(/selecciona los permisos que tendrá/i),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: /aprobar/i }));
+    await user.click(screen.getByRole('button', { name: /guardar/i }));
+
+    expect(updateMemberPermissionsMutate).toHaveBeenCalledWith(
+      { accountId: 'account-1', permissionIds: ['perm-1'] },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });

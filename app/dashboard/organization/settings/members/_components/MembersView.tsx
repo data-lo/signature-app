@@ -6,9 +6,11 @@ import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
 import { useOrganizationMembers } from '../_hooks/useOrganizationMembers';
 import { useUpdateMemberRole } from '../_hooks/useUpdateMemberRole';
 import { useRemoveMember } from '../_hooks/useRemoveMember';
+import { useUpdateMemberPermissions } from '../_hooks/useUpdateMemberPermissions';
 import MembersTable from './MembersTable';
 import EditRoleModal from './EditRoleModal';
 import RemoveMemberDialog from './RemoveMemberDialog';
+import ConfigureMemberPermissionsModal from './ConfigureMemberPermissionsModal';
 import type { OrganizationMember } from '@/lib/api/organization-members';
 
 export default function MembersView() {
@@ -19,6 +21,8 @@ export default function MembersView() {
   );
   const [removingMember, setRemovingMember] =
     useState<OrganizationMember | null>(null);
+  const [configuringPermissionsMember, setConfiguringPermissionsMember] =
+    useState<OrganizationMember | null>(null);
 
   const organizationId = activeAccount?.organizationId ?? null;
   const {
@@ -27,6 +31,7 @@ export default function MembersView() {
   } = useOrganizationMembers(organizationId, isAdmin);
   const updateRoleMutation = useUpdateMemberRole(organizationId);
   const removeMemberMutation = useRemoveMember(organizationId);
+  const updateMemberPermissionsMutation = useUpdateMemberPermissions();
 
   if (activeAccount?.accountType !== 'ORGANIZATION') {
     return (
@@ -61,6 +66,16 @@ export default function MembersView() {
     });
   }
 
+  function handleConfirmConfigurePermissions(
+    accountId: string,
+    permissionIds: string[],
+  ) {
+    updateMemberPermissionsMutation.mutate(
+      { accountId, permissionIds },
+      { onSuccess: () => setConfiguringPermissionsMember(null) },
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -77,6 +92,7 @@ export default function MembersView() {
           members={members ?? []}
           canManage
           onEditRole={setEditingMember}
+          onConfigurePermissions={setConfiguringPermissionsMember}
           onRemove={setRemovingMember}
         />
       )}
@@ -86,6 +102,14 @@ export default function MembersView() {
         onOpenChange={(open) => !open && setEditingMember(null)}
         onConfirm={handleConfirmEditRole}
         confirming={updateRoleMutation.isPending}
+      />
+
+      <ConfigureMemberPermissionsModal
+        member={configuringPermissionsMember}
+        organizationId={organizationId}
+        onOpenChange={(open) => !open && setConfiguringPermissionsMember(null)}
+        onConfirm={handleConfirmConfigurePermissions}
+        confirming={updateMemberPermissionsMutation.isPending}
       />
 
       <RemoveMemberDialog
