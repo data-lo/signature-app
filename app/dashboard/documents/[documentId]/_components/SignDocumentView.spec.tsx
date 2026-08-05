@@ -282,7 +282,7 @@ describe('SignDocumentView', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /configurar firma/i }),
-    ).toHaveAttribute('href', '/dashboard/personal-documents#signature-documents');
+    ).toHaveAttribute('href', '/dashboard/personal-documents/identity');
   });
 
   it('no bloquea el documento ni abre el modal de firma cuando el documento no requiere firma simple', () => {
