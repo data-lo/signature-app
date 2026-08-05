@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -10,6 +11,8 @@ import {
   FileCheck,
   CreditCard,
   Settings,
+  Building2,
+  Users,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -39,6 +42,8 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   isActive: (pathname: string, status: string | null) => boolean;
+  /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
+  orgOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -80,6 +85,22 @@ const NAV_ITEMS: NavItem[] = [
     icon: Settings,
     isActive: (pathname) => pathname.startsWith('/dashboard/personal-documents'),
   },
+  {
+    label: 'Organización',
+    href: '/dashboard/organization/settings/members',
+    icon: Building2,
+    isActive: (pathname) =>
+      pathname.startsWith('/dashboard/organization/settings'),
+    orgOnly: true,
+  },
+  {
+    label: 'Administrar miembros',
+    href: '/dashboard/organization/settings/members',
+    icon: Users,
+    isActive: (pathname) =>
+      pathname === '/dashboard/organization/settings/members',
+    orgOnly: true,
+  },
 ];
 
 const ACCOUNT_TYPE_LABELS: Record<AccountKind, string> = {
@@ -94,6 +115,22 @@ export default function AppSidebar() {
   const logoutMutation = useLogout();
   const { data: currentUser } = useCurrentUser();
   const activeAccount = useAuthStore((state) => state.activeAccount);
+
+  /**
+   * Bug corregido: este componente vive dentro de `<Suspense fallback={null}>` (ver
+   * app/dashboard/layout.tsx, requerido por `useSearchParams()`), mientras que otros componentes
+   * de la misma página (p. ej. CreateDocumentView) también llaman `useCurrentUser()` — comparten
+   * la misma query key ('currentUser') fuera de ese boundary. React puede hidratar ese
+   * sub-árbol suspendido en un momento distinto al del resto de la página: si el otro
+   * componente ya resolvió la query para cuando este boundary hidrata, el primer render del
+   * cliente ve datos ya disponibles mientras el HTML de SSR (congelado antes de que cualquier
+   * fetch pudiera resolver) todavía dice "Cargando..." — mismatch de hidratación. Igual que ya
+   * se hace con `activeAccount` (`skipHydration` + rehidratación manual en `AuthProvider`), se
+   * fuerza el estado de carga en el primer render del cliente y solo se refleja el dato real
+   * después de montar.
+   */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <Sidebar collapsible="icon">
@@ -113,7 +150,10 @@ export default function AppSidebar() {
           <SidebarGroupLabel>Documentos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
+              {NAV_ITEMS.filter(
+                (item) =>
+                  !item.orgOnly || activeAccount?.accountType === 'ORGANIZATION',
+              ).map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
                     isActive={item.isActive(pathname, status)}
@@ -140,12 +180,12 @@ export default function AppSidebar() {
 
         <div className="flex flex-col gap-0.5 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:hidden">
           <p className="truncate text-sm font-medium text-foreground">
-            {currentUser
+            {mounted && currentUser
               ? `${currentUser.firstName} ${currentUser.lastName}`
               : 'Cargando...'}
           </p>
           <p className="truncate text-xs text-muted-foreground">
-            RFC: {currentUser?.rfc ?? '—'}
+            RFC: {mounted ? (currentUser?.rfc ?? '—') : '—'}
           </p>
           <p className="truncate text-xs text-muted-foreground">
             {activeAccount
