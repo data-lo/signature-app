@@ -17,7 +17,7 @@ import type { AccountListEntry } from '@/lib/store/types/auth-store.types';
 function labelFor(account: AccountListEntry): string {
   return account.accountType === 'ORGANIZATION'
     ? (account.organizationName ?? 'Organización')
-    : 'Cuenta personal';
+    : 'Mi cuenta personal';
 }
 
 export default function AccountSwitcher() {
@@ -43,7 +43,7 @@ export default function AccountSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Tus cuentas</DropdownMenuLabel>
+          <DropdownMenuLabel>Cambiar de cuenta</DropdownMenuLabel>
           {accountsList.map((account) => (
             <DropdownMenuItem
               key={account.id}
@@ -52,7 +52,7 @@ export default function AccountSwitcher() {
               {labelFor(account)}
               {account.id === activeAccount?.id && (
                 <span className="ml-auto text-xs text-muted-foreground">
-                  Activa
+                  Actual
                 </span>
               )}
             </DropdownMenuItem>

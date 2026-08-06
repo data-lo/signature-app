@@ -58,11 +58,11 @@ describe('AccountSwitcher', () => {
     expect(screen.getByText('Cuenta')).toBeInTheDocument();
   });
 
-  it('muestra "Cuenta personal" cuando la cuenta activa es PERSONAL', () => {
+  it('muestra "Mi cuenta personal" cuando la cuenta activa es PERSONAL', () => {
     setActiveAccount(PERSONAL);
     render(<AccountSwitcher />);
 
-    expect(screen.getByText('Cuenta personal')).toBeInTheDocument();
+    expect(screen.getByText('Mi cuenta personal')).toBeInTheDocument();
   });
 
   it('muestra el nombre de la organización cuando la cuenta activa es ORGANIZATION', () => {
@@ -72,16 +72,16 @@ describe('AccountSwitcher', () => {
     expect(screen.getByText('Acme Corp S.A. de C.V.')).toBeInTheDocument();
   });
 
-  it('lista todas las cuentas del catálogo y marca la activa como "Activa"', async () => {
+  it('lista todas las cuentas del catálogo y marca la activa como "Actual"', async () => {
     const user = userEvent.setup();
     setActiveAccount(PERSONAL);
     render(<AccountSwitcher />);
 
-    await user.click(screen.getByText('Cuenta personal'));
+    await user.click(screen.getByText('Mi cuenta personal'));
 
     const items = await screen.findAllByRole('menuitem');
     const labels = items.map((item) => item.textContent);
-    expect(labels.some((label) => label?.includes('Cuenta personal'))).toBe(
+    expect(labels.some((label) => label?.includes('Mi cuenta personal'))).toBe(
       true,
     );
     expect(
@@ -89,9 +89,9 @@ describe('AccountSwitcher', () => {
     ).toBe(true);
 
     const activePersonalItem = items.find((item) =>
-      item.textContent?.includes('Cuenta personal'),
+      item.textContent?.includes('Mi cuenta personal'),
     );
-    expect(activePersonalItem?.textContent).toContain('Activa');
+    expect(activePersonalItem?.textContent).toContain('Actual');
   });
 
   it('al elegir otra cuenta, la vuelve la activa en el store', async () => {
@@ -99,7 +99,7 @@ describe('AccountSwitcher', () => {
     setActiveAccount(PERSONAL);
     render(<AccountSwitcher />);
 
-    await user.click(screen.getByText('Cuenta personal'));
+    await user.click(screen.getByText('Mi cuenta personal'));
     await user.click(
       await screen.findByRole('menuitem', {
         name: /acme corp s\.a\. de c\.v\./i,
@@ -114,7 +114,7 @@ describe('AccountSwitcher', () => {
     setActiveAccount(PERSONAL);
     render(<AccountSwitcher />);
 
-    await user.click(screen.getByText('Cuenta personal'));
+    await user.click(screen.getByText('Mi cuenta personal'));
     await user.click(
       await screen.findByRole('menuitem', { name: /crear organización/i }),
     );
