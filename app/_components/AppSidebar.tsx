@@ -10,7 +10,8 @@ import {
   Folder,
   FileCheck,
   CreditCard,
-  Settings,
+  User,
+  IdCard,
   Building2,
   Users,
   LogOut,
@@ -34,7 +35,6 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import type { AccountKind } from '@/lib/store/types/auth-store.types';
 import AccountSwitcher from './AccountSwitcher';
 
 interface NavItem {
@@ -42,71 +42,97 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   isActive: (pathname: string, status: string | null) => boolean;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
   /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
   orgOnly?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Configuración de documento',
-    href: '/dashboard/documents/create',
-    icon: FilePlus,
-    isActive: (pathname) => pathname === '/dashboard/documents/create',
+    label: 'Documentos',
+    items: [
+      {
+        label: 'Nuevo documento',
+        href: '/dashboard/documents/create',
+        icon: FilePlus,
+        isActive: (pathname) => pathname === '/dashboard/documents/create',
+      },
+      {
+        label: 'Por firmar',
+        href: '/dashboard/documents?status=pending',
+        icon: Clock,
+        isActive: (pathname, status) =>
+          pathname === '/dashboard/documents' && status !== 'signed',
+      },
+      {
+        label: 'Enviados para firma',
+        href: '/dashboard/documents/created',
+        icon: Folder,
+        isActive: (pathname) => pathname === '/dashboard/documents/created',
+      },
+      {
+        label: 'Completados',
+        href: '/dashboard/documents?status=signed',
+        icon: FileCheck,
+        isActive: (pathname, status) =>
+          pathname === '/dashboard/documents' && status === 'signed',
+      },
+    ],
   },
   {
-    label: 'Documentos pendientes de firma',
-    href: '/dashboard/documents?status=pending',
-    icon: Clock,
-    isActive: (pathname, status) =>
-      pathname === '/dashboard/documents' && status !== 'signed',
-  },
-  {
-    label: 'Documentos creados',
-    href: '/dashboard/documents/created',
-    icon: Folder,
-    isActive: (pathname) => pathname === '/dashboard/documents/created',
-  },
-  {
-    label: 'Documentos firmados',
-    href: '/dashboard/documents?status=signed',
-    icon: FileCheck,
-    isActive: (pathname, status) =>
-      pathname === '/dashboard/documents' && status === 'signed',
-  },
-  {
-    label: 'Suscripciones',
-    href: '/dashboard/plans',
-    icon: CreditCard,
-    isActive: (pathname) => pathname.startsWith('/dashboard/plans'),
+    label: 'Pagos',
+    items: [
+      {
+        label: 'Suscripciones',
+        href: '/dashboard/plans',
+        icon: CreditCard,
+        isActive: (pathname) => pathname.startsWith('/dashboard/plans'),
+      },
+    ],
   },
   {
     label: 'Configuración',
-    href: '/dashboard/personal-documents',
-    icon: Settings,
-    isActive: (pathname) => pathname.startsWith('/dashboard/personal-documents'),
+    items: [
+      {
+        label: 'Información personal',
+        href: '/dashboard/personal-documents',
+        icon: User,
+        isActive: (pathname) => pathname === '/dashboard/personal-documents',
+      },
+      {
+        label: 'Identidad y firma',
+        href: '/dashboard/personal-documents/identity',
+        icon: IdCard,
+        isActive: (pathname) =>
+          pathname === '/dashboard/personal-documents/identity',
+      },
+    ],
   },
   {
     label: 'Organización',
-    href: '/dashboard/organization/settings/members',
-    icon: Building2,
-    isActive: (pathname) =>
-      pathname.startsWith('/dashboard/organization/settings'),
     orgOnly: true,
-  },
-  {
-    label: 'Administrar miembros',
-    href: '/dashboard/organization/settings/members',
-    icon: Users,
-    isActive: (pathname) =>
-      pathname === '/dashboard/organization/settings/members',
-    orgOnly: true,
+    items: [
+      {
+        label: 'Organización',
+        href: '/dashboard/organization/settings/members',
+        icon: Building2,
+        isActive: (pathname) =>
+          pathname.startsWith('/dashboard/organization/settings'),
+      },
+      {
+        label: 'Administrar miembros',
+        href: '/dashboard/organization/settings/members',
+        icon: Users,
+        isActive: (pathname) =>
+          pathname === '/dashboard/organization/settings/members',
+      },
+    ],
   },
 ];
-
-const ACCOUNT_TYPE_LABELS: Record<AccountKind, string> = {
-  PERSONAL: 'Personal',
-  ORGANIZATION: 'Empresarial',
-};
 
 export default function AppSidebar() {
   const pathname = usePathname();
@@ -146,28 +172,30 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Documentos</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.filter(
-                (item) =>
-                  !item.orgOnly || activeAccount?.accountType === 'ORGANIZATION',
-              ).map((item) => (
-                <SidebarMenuItem key={item.label}>
-                  <SidebarMenuButton
-                    isActive={item.isActive(pathname, status)}
-                    tooltip={item.label}
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {NAV_GROUPS.filter(
+          (group) =>
+            !group.orgOnly || activeAccount?.accountType === 'ORGANIZATION',
+        ).map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.label}>
+                    <SidebarMenuButton
+                      isActive={item.isActive(pathname, status)}
+                      tooltip={item.label}
+                      render={<Link href={item.href} />}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>
@@ -179,21 +207,17 @@ export default function AppSidebar() {
         <Separator className="my-1 group-data-[collapsible=icon]:hidden" />
 
         <div className="flex flex-col gap-0.5 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:hidden">
-          <p className="truncate text-sm font-medium text-foreground">
+          <p className="break-words text-sm font-medium text-foreground">
             {mounted && currentUser
               ? `${currentUser.firstName} ${currentUser.lastName}`
               : 'Cargando...'}
           </p>
-          <p className="truncate text-xs text-muted-foreground">
-            RFC: {mounted ? (currentUser?.rfc ?? '—') : '—'}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {activeAccount
-              ? (ACCOUNT_TYPE_LABELS[activeAccount.accountType] ??
-                activeAccount.accountType)
-              : '—'}
+          <p className="break-words text-xs text-muted-foreground">
+            {mounted ? (currentUser?.email ?? '—') : '—'}
           </p>
         </div>
+
+        <Separator className="my-1 group-data-[collapsible=icon]:hidden" />
 
         <SidebarMenu>
           <SidebarMenuItem>
