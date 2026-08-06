@@ -3,9 +3,6 @@
 import { Loader2 } from 'lucide-react';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import UserInfoCard from './UserInfoCard';
-import PersonalDocumentsCompleted from './PersonalDocumentsCompleted';
-import PersonalDocumentsPartial from './PersonalDocumentsPartial';
-import PersonalDocumentsForm from './PersonalDocumentsForm';
 
 export default function PersonalDocumentsView() {
   const { data: user, isLoading, isError } = useCurrentUser();
@@ -30,21 +27,6 @@ export default function PersonalDocumentsView() {
   return (
     <div className="flex w-full flex-col items-center gap-6">
       <UserInfoCard user={user} />
-      <div id="signature-documents" className="scroll-mt-6 w-full flex justify-center">
-        {user.signature && user.officialFile ? (
-          <PersonalDocumentsCompleted
-            signature={user.signature}
-            officialFile={user.officialFile}
-          />
-        ) : user.signature || user.officialFile ? (
-          <PersonalDocumentsPartial
-            signature={user.signature ?? null}
-            officialFile={user.officialFile ?? null}
-          />
-        ) : (
-          <PersonalDocumentsForm />
-        )}
-      </div>
     </div>
   );
 }

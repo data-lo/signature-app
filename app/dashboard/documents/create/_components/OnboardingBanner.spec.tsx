@@ -92,7 +92,7 @@ describe('OnboardingBanner', () => {
     expect(screen.getByText('Configura tu firma')).toBeInTheDocument();
   });
 
-  it('los links de cada mini-flujo apuntan a anclas independientes', () => {
+  it('los links de cada mini-flujo apuntan a su pantalla correspondiente', () => {
     useAuthStore.setState({
       user: buildUser({
         personalConfigured: false,
@@ -106,7 +106,7 @@ describe('OnboardingBanner', () => {
     ).toHaveAttribute('href', '/dashboard/personal-documents#personal-info');
     expect(screen.getByText('Configura tu firma')).toHaveAttribute(
       'href',
-      '/dashboard/personal-documents#signature-documents',
+      '/dashboard/personal-documents/identity',
     );
   });
 });

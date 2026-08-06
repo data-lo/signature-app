@@ -435,7 +435,7 @@ export default function SignDocumentView({
             <Button
               nativeButton={false}
               render={
-                <Link href="/dashboard/personal-documents#signature-documents" />
+                <Link href="/dashboard/personal-documents/identity" />
               }
             >
               Configurar firma

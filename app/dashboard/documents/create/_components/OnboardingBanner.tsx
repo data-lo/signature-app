@@ -28,7 +28,7 @@ export default function OnboardingBanner() {
         )}
         {!user.signatureConfigured && (
           <Link
-            href="/dashboard/personal-documents#signature-documents"
+            href="/dashboard/personal-documents/identity"
             className="underline underline-offset-2 hover:opacity-80"
           >
             Configura tu firma
