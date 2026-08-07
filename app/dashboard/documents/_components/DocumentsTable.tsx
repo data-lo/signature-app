@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import {
   ArrowUp,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   Eye,
+  FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -196,7 +196,7 @@ export default function DocumentsTable({
                       downloadMutation.variables === doc.id
                         ? 'Descargando...'
                         : 'DESCARGAR'}
-                      <ChevronDown className="size-3.5" />
+                      <FileDown className="size-3.5" />
                     </Button>
                   )}
                   {doc.status === DocumentStatus.Signed && (
