@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import PageContainer from '@/app/dashboard/_components/PageContainer';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 import { getErrorMessage } from '@/lib/error-handler';
@@ -149,7 +150,7 @@ export default function CreateDocumentView({
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-8 py-8">
+    <PageContainer>
       <div className="rounded-lg border border-border bg-card p-6">
         <h1 className="text-base font-semibold text-foreground">
           Prepara un documento para solicitar que sea firmado
@@ -234,6 +235,6 @@ export default function CreateDocumentView({
           />
         </div>
       )}
-    </main>
+    </PageContainer>
   );
 }
