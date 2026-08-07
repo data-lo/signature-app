@@ -12,8 +12,8 @@ import {
   CreditCard,
   User,
   IdCard,
-  Building2,
   Users,
+  ShieldCheck,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -117,18 +117,18 @@ const NAV_GROUPS: NavGroup[] = [
     orgOnly: true,
     items: [
       {
-        label: 'Organización',
-        href: '/dashboard/organization/settings/members',
-        icon: Building2,
-        isActive: (pathname) =>
-          pathname.startsWith('/dashboard/organization/settings'),
-      },
-      {
         label: 'Administrar miembros',
         href: '/dashboard/organization/settings/members',
         icon: Users,
         isActive: (pathname) =>
           pathname === '/dashboard/organization/settings/members',
+      },
+      {
+        label: 'Permisos',
+        href: '/dashboard/organization/settings/permissions',
+        icon: ShieldCheck,
+        isActive: (pathname) =>
+          pathname === '/dashboard/organization/settings/permissions',
       },
     ],
   },
