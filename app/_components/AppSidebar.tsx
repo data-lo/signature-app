@@ -13,7 +13,7 @@ import {
   User,
   IdCard,
   Users,
-  ShieldCheck,
+  KeyRound,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -126,7 +126,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: 'Permisos',
         href: '/dashboard/organization/settings/permissions',
-        icon: ShieldCheck,
+        icon: KeyRound,
         isActive: (pathname) =>
           pathname === '/dashboard/organization/settings/permissions',
       },
