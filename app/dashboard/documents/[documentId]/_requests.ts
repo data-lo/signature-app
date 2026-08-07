@@ -50,8 +50,17 @@ export async function getDocumentDetailRequest(
   return data.data;
 }
 
-export async function signDocumentRequest(documentId: string): Promise<void> {
-  await apiClient.patch(`/document/${documentId}/sign`);
+export interface SignDocumentGeolocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}
+
+export async function signDocumentRequest(
+  documentId: string,
+  geolocation?: SignDocumentGeolocation,
+): Promise<void> {
+  await apiClient.patch(`/document/${documentId}/sign`, { geolocation });
 }
 
 export async function requestVerificationCodeRequest(
