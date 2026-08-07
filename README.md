@@ -18,59 +18,82 @@ Frontend en Next.js (App Router) para la plataforma de firma electrónica de doc
 | Notificaciones | `react-hot-toast` | Toaster global |
 | Sesión | `js-cookie` | Persistencia del JWT en cookie |
 | Tema | `next-themes` | Modo claro/oscuro |
+| Drag and drop | `@dnd-kit/core` + `@dnd-kit/sortable` + `@dnd-kit/utilities` | Colocación de firmas sobre el PDF (`SignaturePageDropZone`/`SignatureBox`) y reordenamiento de firmantes (`SortableCollaboratorItem`) en `documents/create` |
+| OTP | `input-otp` | `components/ui/input-otp.tsx`, usado en `/signup/verify` y el wizard de `/forgot-password` |
 
 `next.config.ts`: `output: 'standalone'` (Dockerfile multi-stage) + alias que desactiva `canvas` (pdf.js lo intenta resolver en Node, no aplica en navegador).
 
+> ⚠️ **Bug crítico activo, ya documentado dos veces como "resuelto" en la sección 9 y aparentemente recurrente por tercera vez**: `lib/axios.ts` tiene hoy `baseURL: '/api'` (hardcodeado, no lee `NEXT_PUBLIC_API_BASE_URL`) y `next.config.ts` vuelve a traer un bloque `rewrites()` que reenvía `/api/:path*` a `${process.env.BACKEND_API_URL || 'http://backend:3000'}/:path*` — `BACKEND_API_URL` no está definida en `.env.local`, y `backend:3000` solo resuelve dentro de la red de Docker Compose, no en `next dev` local. El test dedicado a esta regresión (`lib/axios.spec.ts`) está fallando ahora mismo (`npm run test` → 1 suite roja). Si esto no fue un cambio intencional (p. ej. para probar contra un `docker-compose` con el frontend containerizado), es el mismo bug crítico de siempre: ninguna llamada real del navegador llega al backend. Ver sección 9, entradas "bug crítico: el frontend no llegaba al backend", para el fix ya aplicado dos veces antes.
+
 ### Middleware de autenticación (`middleware.ts`)
 
-Protege todas las rutas excepto `/`, `/login`, `/signup`, `/error` y assets estáticos. Lee la cookie `token`, **decodifica el payload del JWT sin verificar la firma** (solo para chequear `exp`) y redirige a `/login` si no existe o expiró. No refresca el token — es una optimización de UX para evitar flashes de contenido protegido; la validación de seguridad real ocurre en el backend en cada request.
+Reescrito desde la versión que protegía por lista simple. Ahora:
+- **Rutas públicas** (`AUTH_ROUTES`): `/login`, `/signup`, `/signup/verify`, `/forgot-password`. **`/error` ya no está excluida** — sin token, un request a `/error` redirige a `/login`. Tampoco existe ya una landing pública en `/` (ver sección 4, hallazgo) — no hay `app/page.tsx`, así que la ruta ni siquiera tiene qué renderizar.
+- **Redirects legacy (308, permanentes)**: cualquier URL bajo los prefijos viejos `/home`, `/documents`, `/organization`, `/dashboard/personal-documents`, `/plans` (la estructura que describía este README antes de esta ronda) se redirige a su equivalente bajo `/dashboard/*` — evidencia de que el prefijo `/dashboard` fue una migración real, no un rediseño desde cero.
+- El `matcher` excluye `api`, `_next/static`, `_next/image`, `favicon.ico`, `public/` y extensiones de imagen — a propósito para que `/public/documents/:id` (visor público de documentos firmados, ver sección 4) nunca pase por el guard de sesión.
+- Lee la cookie `token`, **decodifica el payload del JWT sin verificar la firma** (solo para chequear `exp`) y redirige a `/login` si no existe o expiró. No refresca el token — es una optimización de UX para evitar flashes de contenido protegido; la validación de seguridad real ocurre en el backend en cada request.
+- Login exitoso redirige a `/dashboard/documents/create` (antes `/documents/create`).
 
 ---
 
 ## 2. Proceso de firmado de documentos (desde la UI)
 
-> El backend distingue entre la **credencial de firma** del usuario (rúbrica + INE, se registra una vez) y el **acto de firmar un documento concreto**. En el frontend esto se refleja en dos secciones separadas: `/personal-documents` (credencial) y `/documents/*` (documentos a firmar).
+> El backend distingue entre la **credencial de firma** del usuario (rúbrica + INE, se registra una vez) y el **acto de firmar un documento concreto**. En el frontend esto se refleja en dos secciones separadas: `/dashboard/personal-documents` (credencial) y `/dashboard/documents/*` (documentos a firmar).
 
-### Paso 1 — Registrar la credencial de firma (`/personal-documents`)
+### Paso 1 — Registrar la credencial de firma (`/dashboard/personal-documents`)
 
 Antes de poder firmar cualquier documento, el usuario debe subir su rúbrica (PNG) e identificación oficial (PDF/JPG/PNG). La pantalla se adapta según el estado actual:
 - **Sin nada subido** → formulario que sube ambos archivos juntos (`PUT /api/v1/users/me/signature`).
 - **Falta uno de los dos** → formulario para completar el que falta (`PATCH /signature/:id`) + opción de eliminar el existente.
 - **Ambos completos** → solo visualización + opción de eliminar cada archivo (`DELETE /signature/:id/official-file` o `/signature-image`).
 
-### Paso 2 — Crear un documento y enviarlo a firma (`/documents/create`)
+### Paso 2 — Crear un documento y enviarlo a firma (`/dashboard/documents/create`)
 
-1. Selección del PDF con `DocumentFilePicker` (FilePond, valida tipo `application/pdf` y tamaño ≤20MB) + previsualización en vivo (`PdfPreview`, react-pdf).
-2. Selección de participantes con `ParticipantPicker` (dos instancias: firmantes y espectadores), poblado desde `GET /user`. Mínimo un firmante; un mismo usuario no puede ser firmante y espectador a la vez. El orden de selección de firmantes define el **orden de firma**.
-3. Al enviar, `useCreateDocument` encadena dos llamadas: `POST /document` (crea el documento) y luego `PATCH /document/:id/submit-for-authorization` (lo envía a firma). Al terminar, navega a `/documents`.
-4. Debajo del formulario, `DocumentsTable` lista los documentos ya creados por el usuario (`GET /document?email=...`).
+Rediseñado por completo respecto al flujo original de `ParticipantPicker` (ver sección 9 para el detalle histórico del cambio) — hoy es un solo formulario con colaboradores de datos libres, no un picker de usuarios existentes:
 
-### Paso 3 — Firmar o rechazar (`/documents/[documentId]`)
+1. Selección del PDF con `DocumentFilePicker` (FilePond, valida `application/pdf` ≤20MB) + previsualización en vivo (`PdfPreview`, react-pdf).
+2. `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray` de react-hook-form): cada colaborador se captura como datos libres (nombre/apellido/email/RFC, sin buscar cuentas existentes), con `collaboratorType` `SIGNER`/`VIEWER`. Un SIGNER con firma `ADVANCED` exige RFC y puede requerir 2FA; SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) permite reordenar firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder`.
+3. `SignaturePlacementField`/`SignaturePageDropZone`/`SignatureBox` (`@dnd-kit`, `lib/signature-geometry.ts`): coloca por arrastre la posición de cada firma sobre una miniatura del PDF, en vez del `{page:1,x:100,y:100}` fijo que se mandaba antes sin UI.
+4. `RequiresApprovalField` (checkbox + tooltip) e `IncludeMeAsSignerField` (agrega al usuario actual como SIGNER autocompletado desde `useCurrentUser()`).
+5. Al enviar, `useCreateDocumentSignatures` hace **una sola llamada multipart**: `POST /api/v1/documents/signatures` (archivo + `documentData` + `collaboratorsdata` + `requiresDifferentSignatures`, todo serializado como JSON dentro de campos de texto) — ya no son dos llamadas encadenadas (`POST /document` + `submit-for-authorization`). Al terminar, invalida `['myDocuments']` y limpia el formulario.
+6. `/dashboard/documents/created` (`CreatedDocumentsView`, ruta separada) lista los documentos que el usuario creó (`GET /document?email=...`) — antes vivía debajo del mismo formulario de creación.
 
-1. `SignDocumentView` carga el detalle (`GET /document/:id`): PDF (`secureUrl`), lista de participantes con su estado, y los flags `canSign`/`canReject`/`canRequestCancellation`/`canConfirmCancellation`/`myRole`/`myStatus` que calcula el backend según el turno y rol del usuario.
-2. El PDF se muestra con `PdfPreview`. Los participantes se listan con su estado (verde=firmado, rojo=rechazado, ámbar=pendiente).
-3. Si `canSign` es `true`, el botón **"Continuar a firmar"** llama directamente `PATCH /document/:id/sign` — no hay ningún paso intermedio de captura de firma en el frontend (la firma visual se compone en el backend a partir de la credencial ya guardada en el paso 1).
-4. "Rechazar documento" abre un textarea de motivo (mínimo 5 caracteres) y llama `PATCH /document/:id/reject`.
-5. Si no es el turno del usuario, o ya actuó, se muestra un mensaje contextual en vez de los botones de acción.
-6. **Cancelación** (misma pantalla): si `canRequestCancellation` (el creador, con el documento ya `SIGNED`), un botón "Solicitar cancelación" abre `CancellationConfirmDialog` y llama `PATCH /document/:id/submit-for-cancellation`. Si `canConfirmCancellation` (cualquier firmante, con el documento en `CANCELLATION_PENDING`), un botón "Confirmar cancelación" llama `PATCH /document/:id/confirm-cancellation`. Ambos usan el mismo diálogo de confirmación (no `window.confirm`).
+### Paso 3 — Firmar o rechazar (`/dashboard/documents/[documentId]`)
 
-### Paso 4 — Consultar documentos (`/documents`)
+1. `SignDocumentView` carga el detalle (`GET /document/:id`): PDF (`secureUrl`), lista de colaboradores con su estado, y los flags `canSign`/`canReject`/`canRequestCancellation`/`canConfirmCancellation`/`myRole`/`myStatus` que calcula el backend según el turno y rol del usuario.
+2. El PDF se muestra con `PdfPreview`. Los colaboradores se listan con su estado (verde=firmado, rojo=rechazado, ámbar=pendiente).
+3. Si el documento exige verificación (`requiresVerification`/2FA), `useRequestVerificationCode`/`useVerifyCode` corren un paso previo (`POST /document/:id/verification-codes` + `/verify`) antes de habilitar la firma.
+4. Si `canSign` es `true`, el botón **"Continuar a firmar"** llama `PATCH /document/:id/sign` — la firma visual se compone en el backend a partir de la credencial guardada en el paso 1 y la posición elegida en el paso 2.
+5. "Rechazar documento" abre un textarea de motivo (mínimo 5 caracteres) y llama `PATCH /document/:id/reject`.
+6. Si no es el turno del usuario, o ya actuó, se muestra un mensaje contextual en vez de los botones de acción.
+7. **Cancelación** (misma pantalla): "Solicitar cancelación" (`canRequestCancellation`, el creador con el documento `SIGNED`) llama `PATCH /document/:id/submit-for-cancellation`; "Confirmar cancelación" (`canConfirmCancellation`, cualquier firmante con el documento en `CANCELLATION_PENDING`) llama `PATCH /document/:id/confirm-cancellation`. Ambos usan `CancellationConfirmDialog` (no `window.confirm`).
 
-`DocumentsListView`: pestañas "Pendientes"/"Firmados", lista documentos donde el usuario es participante (`GET /document?participantEmail=...`) con filtros por nombre, participante, estado y fechas, y un toggle "solo mi turno". Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final. Para documentos firmados, en cancelación pendiente o cancelados, un botón "Ver detalle" (`onViewDetail`) navega a `/documents/:id`, donde `SignDocumentView` decide qué mostrar según los flags de arriba.
+### Paso 3.5 — Vincular cuenta desde el correo (`/access-document`) y ver un documento firmado sin sesión (`/public/documents/[id]`)
 
-> `/dashboard` (primer punto de entrada tras login) renderiza el mismo componente `CreateDocumentView` que `/documents/create` — ya no existe un flujo mock/en memoria separado.
+- **`/access-document`**: entry point del link que llega por correo a un colaborador invitado solo por email (sin `userId`/cuenta todavía). Guarda el contexto (`docId`/`collabId`/`email`) en `localStorage` (`lib/pending-signature-context.ts`) y, si hay sesión activa, llama `PATCH /document/:id/link-collaborator` para vincular al colaborador con la cuenta ya logueada; si no hay sesión, redirige a `/login` (o registro) y retoma el contexto guardado después.
+- **`/public/documents/[id]`** (route group `(public)`, fuera del middleware de auth): visor de solo lectura del PDF final vía `GET /document/public/:id` — solo responde si el documento está `SIGNED`, sin JWT.
+
+### Paso 4 — Consultar documentos (`/dashboard/documents`)
+
+`DocumentsListView`: pestañas "Pendientes"/"Firmados", lista documentos donde el usuario es colaborador (`GET /document?participantEmail=...`) con filtros por nombre, participante, estado y fechas, y un toggle "solo mi turno". Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final. Para documentos firmados, en cancelación pendiente o cancelados, un botón "Ver detalle" navega a `/dashboard/documents/:id`, donde `SignDocumentView` decide qué mostrar según los flags de arriba.
+
+> `/dashboard` (primer punto de entrada tras login) hace `redirect()` a `/dashboard/documents/create` — ya no renderiza contenido propio.
 
 ---
 
 ## 3. Autenticación, onboarding y multi-tenancy (Zustand)
 
-### 3.1 Login, registro y aterrizaje en `/documents/create`
+### 3.1 Login, registro y aterrizaje en `/dashboard/documents/create`
 
-`POST /auth/login` guarda el JWT en cookie (`setAuthToken`) y redirige a `/documents/create` — la ruta por defecto del dashboard (antes existía también `/home` apuntando al mismo contenido; se consolidó en una sola ruta, ver Pendientes). El store (`useAuthStore`) **no** se llena en ese momento — `AuthProvider` (envuelve todo el route group `(app)`, ver `app/(app)/layout.tsx`) es quien lo hidrata al montar, leyendo `GET /api/v1/users/me` (perfil cacheado en Redis por CURP) y `GET /api/v1/accounts/me` (catálogo de cuentas). Si es la primera vez que el usuario entra (no hay `activeAccount` persistido) — o si el `activeAccount` persistido ya no aparece en el catálogo fresco (acceso revocado, organización eliminada) —, `AuthProvider` cae automáticamente a la cuenta de tipo `PERSONAL` del catálogo.
+`POST /auth/login` guarda el JWT en cookie (`setAuthToken`) y redirige a `/dashboard/documents/create` — la ruta por defecto del dashboard (`/dashboard` a secas hace `redirect()` a esta misma ruta). El store (`useAuthStore`) **no** se llena en ese momento — `AuthProvider` (`app/dashboard/_components/AuthProvider.tsx`, envuelve todo el prefijo `/dashboard`, ver `app/dashboard/layout.tsx`) es quien lo hidrata al montar, leyendo `GET /api/v1/users/me` (perfil cacheado en Redis por CURP) y `GET /api/v1/accounts/me` (catálogo de cuentas). Si es la primera vez que el usuario entra (no hay `activeAccount` persistido) — o si el `activeAccount` persistido ya no aparece en el catálogo fresco (acceso revocado, organización eliminada) —, `AuthProvider` cae automáticamente a la cuenta de tipo `PERSONAL` del catálogo.
+
+**Registro con OTP** (`/signup` → `/signup/verify`): a diferencia de lo anterior, el registro ya no deja al usuario autenticado de inmediato — `POST /auth/register` crea una pre-cuenta (`isEmailVerified: false`) y envía un código; `/signup/verify` (`VerifyOtpForm`) lo confirma y recién ahí autentica. **Recuperación de contraseña** (`/forgot-password`, `ForgotPasswordWizard`): wizard de 3 pasos sin cambiar de URL (email → OTP → nueva contraseña), contra `POST /auth/forgot-password` / `/auth/verify-reset-code` / `/auth/reset-password`.
 
 ### 3.2 Onboarding (`personalConfigured` / `signatureConfigured`)
 
-`OnboardingBanner` (en `/documents/create`, montado por `CreateDocumentGuard`) lee `user.personalConfigured`/`user.signatureConfigured` del store y bloquea con **"Es requerido configurar tu usuario"** mientras cualquiera de las dos sea `false`, con accesos independientes a `/personal-documents` para completar cada una.
+`OnboardingBanner` (en `/dashboard/documents/create`, montado por `CreateDocumentGuard`) lee `user.personalConfigured`/`user.signatureConfigured` del store y bloquea con **"Es requerido configurar tu usuario"** mientras cualquiera de las dos sea `false`, con accesos independientes a `/dashboard/personal-documents` para completar cada una.
+
+**Estas dos banderas ya no vienen tal cual del backend** — `auth.slice.ts` las deriva en el propio frontend: `personalConfigured = !!user.phoneNumber && !!user.secondaryEmail`, `signatureConfigured = user.signatureId != null` (`derivePersonalConfigured`/`deriveSignatureConfigured`).
 
 Cada mini-flujo muta **solo su propia bandera**, sin esperar a un refetch:
 - `useUpdatePersonalInformation` (`PUT /api/v1/users/me/personal-information`) → al éxito, `updateOnboardingStatus('personal', true)`.
@@ -80,13 +103,17 @@ Cada mini-flujo muta **solo su propia bandera**, sin esperar a un refetch:
 
 ### 3.3 Organizaciones y el switcher de cuentas (multi-tenant)
 
-`/organization/create` (`CreateOrganizationForm` + `useCreateOrganization`) llama `POST /api/v1/organizations`. Al éxito, **sin ninguna petición extra a la red**: `addAccount(account)` inserta la cuenta nueva en `accountsList` y `setActiveAccount(...)` la vuelve el tenant activo de inmediato; luego toast de éxito y redirección a `/documents/create`.
+`/dashboard/organization/create` (`CreateOrganizationForm` + `useCreateOrganization`) llama `POST /api/v1/organizations`. Al éxito, **sin ninguna petición extra a la red**: `addAccount(account)` inserta la cuenta nueva en `accountsList` y `setActiveAccount(...)` la vuelve el tenant activo de inmediato; luego toast de éxito y redirección a `/dashboard/documents/create`.
 
-`AccountSwitcher` (en el header, `app/_components/AccountSwitcher.tsx`) lee `accountsList`/`activeAccount` **directamente del store** — no vuelve a pedir el catálogo por su cuenta; `AuthProvider` ya lo carga una sola vez para toda la app autenticada.
+`AccountSwitcher` (en el footer del sidebar, `app/_components/AccountSwitcher.tsx`, ver sección 4) lee `accountsList`/`activeAccount` **directamente del store** — no vuelve a pedir el catálogo por su cuenta; `AuthProvider` ya lo carga una sola vez para toda la app autenticada. `logout()` (`auth.slice.ts`) limpia también `accountsList`/`activeAccount`, no solo `authToken`/`user` — evita que una sesión nueva en la misma pestaña herede el tenant de la sesión anterior.
 
-`lib/axios.ts` inyecta en cada request `X-Account-Id` (si hay `activeAccount`) y `X-Organization-Id` (solo si `activeAccount.accountType === 'ORGANIZATION'`). El backend ya lee y valida `X-Account-Id` para `POST /document`/`GET /document` (documentos scopeados por la cuenta activa, ver README de `signature-server`) — ningún cambio de este lado, ya se mandaba desde que se agregó el interceptor. El resto de los endpoints (detalle de documento, firma/rechazo/cancelación, `GET /user`) todavía no lo leen (ver Pendientes).
+`lib/axios.ts` inyecta en cada request `X-Account-Id` (si hay `activeAccount`) y `X-Organization-Id` (solo si `activeAccount.accountType === 'ORGANIZATION'`). El backend ya lee y valida `X-Account-Id` para `POST /document`/`GET /document` (documentos scopeados por la cuenta activa) y para todo el módulo `organizations`/`account-member` (ver README de `signature-server`) — el resto de los endpoints de documento (detalle, firma/rechazo/cancelación) todavía no lo leen. `X-Organization-Id` no lo lee ningún endpoint del backend todavía (ver Pendientes).
 
-**Invitar miembros a la organización activa** (`/documents/create`, `InviteMemberModal` — solo se renderiza si `activeAccount.accountType === 'ORGANIZATION'`): al abrir el modal, `useSystemRoles()` consulta `GET /api/v1/roles` (deshabilitada hasta que el modal está abierto — `useQuery({..., enabled: open})`) para poblar el `Select` de rol. Al enviar, `useInviteMember()` llama `POST /api/v1/organizations/invite` (`{email, roleId}`, `X-Account-Id` inyectado igual que cualquier otro request) y cierra el modal al éxito. **Alcance delimitado a propósito** (misma historia que implementó el endpoint): el backend solo valida y confirma, no crea ninguna membresía todavía — el modal se cierra y muestra el toast de éxito, pero el usuario invitado no aparece en ningún listado real hasta que se conecte la lógica de persistencia (ver README de `signature-server`, sección Pendientes).
+**Gestión de miembros y permisos de la organización activa** (`/dashboard/organization/settings/`, accesible solo si `activeAccount.accountType === 'ORGANIZATION'`): un `layout.tsx` propio con tabs "Miembros"/"Permisos" envuelve dos rutas —
+- **`members/`** (`MembersView`): tabla de miembros (correo/RFC/rol/fecha de ingreso) con menú de acciones ("Editar Rol"/"Eliminar"/"Configurar permisos" vía `ConfigureMemberPermissionsModal`), gateada por `useIsOrganizationAdmin()`.
+- **`permissions/`** (`PermissionsView`): catálogo de "permisos" **administrativos de la organización** (`OrganizationPermissionEntity`/`AccountPermissionEntity` en el backend) — nombres libres definidos por el ADMIN (p. ej. "puede aprobar gastos") que **no otorgan ningún acceso técnico real**; son un sistema deliberadamente paralelo al RBAC (`roles`/`role_permissions`) que sí gobierna la autorización de cada endpoint (ver README de `signature-server`). `PermissionsTable` + `CreatePermissionModal`/`EditPermissionModal`/`DeletePermissionDialog`, hooks en `_hooks/` (`useCreateOrganizationPermission`/`useUpdateOrganizationPermission`/`useDeleteOrganizationPermission`) contra `lib/api/organization-permissions.ts`. La asignación por miembro (`ConfigureMemberPermissionsModal`, en la pestaña Miembros) comparte el hook `useOrganizationPermissions` (vive en `lib/hooks/`, no en `_hooks/` de una sola ruta, porque lo consumen ambas pestañas) y usa `useMemberPermissions`/`useUpdateMemberPermissions` para leer/reemplazar (`GET`/`PATCH /api/v1/organizations/members/:accountId/permissions`) la lista de permisos de un miembro.
+
+**Invitar miembros a la organización activa** (`/dashboard/documents/create`, `InviteMemberModal` — solo se renderiza si `activeAccount.accountType === 'ORGANIZATION'`): al abrir el modal, `useSystemRoles()` consulta `GET /api/v1/roles` (deshabilitada hasta que el modal está abierto) para poblar el `Select` de rol. Al enviar, `useInviteMember()` llama `POST /api/v1/organizations/invite` (`{email, roleId}`) y cierra el modal al éxito. **Ya no es un alcance delimitado que solo valida**: el backend hoy persiste la invitación (`OrganizationInvitationEntity`), publica el evento en Kafka y envía el correo real con el link a `/join` — ver README de `signature-server`, este README quedó desactualizado en ese punto hasta esta ronda.
 
 ### 3.4 Store global (`useAuthStore`) — Slices Pattern
 
@@ -94,7 +121,7 @@ El store vive en `lib/store/` partido en 3 slices + un archivo de tipos, unidos 
 
 | Archivo | Responsabilidad |
 |---|---|
-| `types/auth-store.types.ts` | Tipos centrales: `AuthUser` (con `personalConfigured`/`signatureConfigured` anidados), `AccountListEntry`, `ActiveAccount`, `AuthState = AuthSlice & AccountsListSlice & ActiveAccountSlice` |
+| `types/auth-store.types.ts` | Tipos centrales: `AuthUser` (con `personalConfigured`/`signatureConfigured` anidados), `AccountListEntry`, `ActiveAccount`, `AccountKind` (`'PERSONAL' \| 'ORGANIZATION'`), `AccountStatus` (`'ACTIVE' \| 'INACTIVE'`), `AuthState = AuthSlice & AccountsListSlice & ActiveAccountSlice` |
 | `auth.slice.ts` | `authToken`, `user`, `setAuth(token, profile)`, `updateOnboardingStatus(step, value)`, `logout()`, más `consolidationInFlight`/`markConsolidating`/`markConsolidated` (guard interno para el disparador automático, no forma parte del contrato "de negocio" del store) |
 | `accounts-list.slice.ts` | `accountsList`, `setAccountsList(accounts)` (reemplaza todo el catálogo), `addAccount(account)` (inserta una sola cuenta sin refetch), y el mapper `toAccountListEntry` que normaliza la `Account` cruda del backend (`type`→`accountType`, deriva `organizationId`, `organizationName` desde `organizationDetail.name`) |
 | `active-account.slice.ts` | `activeAccount`, `setActiveAccount(account)` — se queda solo con `{id, accountType, organizationId, roleId}`, ignorando cualquier campo extra del objeto que reciba |
@@ -109,23 +136,43 @@ Un detalle de implementación no obvio, ya resuelto (ver Pendientes por si gener
 
 ## 4. Estructura de rutas (App Router)
 
+> ⚠️ **Ya no existe una landing pública en `/`**: no hay `app/page.tsx`. `app/layout.tsx` trae metadata de "Visualizador de documentos" en vez de branding de landing, y `/join`/`/signup/verify` todavía enlazan `<Link href="/">` a una ruta sin página. El middleware (sección 1) tampoco excluye ya `/` del guard de sesión. No quedó claro en esta auditoría si fue intencional (¿la landing se movió a `signature-site`, el otro proyecto del monorepo?) o una regresión — vale confirmarlo con el equipo antes de decidir si hay que restaurar `app/page.tsx`.
+
+El prefijo `/documents`, `/organization`, `/personal-documents`, `/plans`, `/home` (route group `(app)`) que describía este README se migró por completo a un prefijo único `/dashboard/*`, con redirects 308 automáticos desde las rutas viejas (ver `middleware.ts`, sección 1). Árbol real:
+
 ```
 app/
-├── page.tsx                  → "/" landing pública
-├── layout.tsx / providers.tsx → layout raíz (QueryClientProvider + ThemeProvider + Toaster)
-├── error/page.tsx            → "/error" — pantalla de error genérica (?code=&message=)
-├── login/                    → "/login" (LoginForm, useLogin → POST /auth/login)
-├── signup/                   → "/signup" (SignupForm, useRegister → POST /auth/register)
-├── _components/               → compartidos entre landing y el flujo mock del dashboard
-└── (app)/                    → route group protegido por middleware
-    ├── layout.tsx             → AuthProvider (hidrata useAuthStore) + DocumentsCountProvider + DashboardNavbar (con AccountSwitcher)
-    ├── organization/create/   → "/organization/create" — CreateOrganizationForm → POST /api/v1/organizations
+├── layout.tsx / providers.tsx    → layout raíz (QueryClientProvider + ThemeProvider + Toaster); metadata "Visualizador de documentos"
+├── error/page.tsx                → "/error" — pantalla de error genérica (?code=&message=)
+├── login/                        → "/login" (LoginForm, useLogin → POST /auth/login)
+├── signup/
+│   ├── page.tsx                   → "/signup" (SignupForm, useRegister → POST /auth/register; acepta ?rfc=&token= desde /join)
+│   └── verify/page.tsx            → "/signup/verify" — VerifyOtpForm, confirma el OTP de registro
+├── forgot-password/              → "/forgot-password" — ForgotPasswordWizard, 3 pasos sin cambiar de URL (email → OTP → nueva contraseña)
+├── join/                         → "/join" — aceptar invitación a una organización (JoinView/JoinExistingUser/RfcForm)
+├── access-document/              → "/access-document" — entry point del link de correo de firma; vincula el colaborador a la sesión activa o redirige a /login
+├── (public)/public/documents/[id]/ → "/public/documents/:id" — visor de PDF firmado sin sesión (GET /document/public/:id), fuera del middleware de auth
+├── _components/
+│   ├── AppSidebar.tsx             → navegación del dashboard (reemplaza al viejo DashboardNavbar) + AccountSwitcher en el footer
+│   ├── AccountSwitcher.tsx
+│   └── DocumentsCountContext.tsx
+└── dashboard/                    → prefijo real de todo lo autenticado (ya no es el route group "(app)")
+    ├── layout.tsx                 → AuthProvider (hidrata useAuthStore) + DocumentsCountProvider + SidebarProvider + AppSidebar
+    ├── page.tsx                    → "/dashboard" → redirect() a /dashboard/documents/create
+    ├── _components/AuthProvider.tsx
+    ├── organization/
+    │   ├── create/                 → "/dashboard/organization/create" — CreateOrganizationForm → POST /api/v1/organizations
+    │   └── settings/
+    │       ├── layout.tsx           → tabs "Miembros"/"Permisos"
+    │       ├── members/             → "/dashboard/organization/settings/members" — MembersView/MembersTable/EditRoleModal/RemoveMemberDialog/ConfigureMemberPermissionsModal
+    │       └── permissions/         → "/dashboard/organization/settings/permissions" — PermissionsView, catálogo de permisos administrativos de la organización (ver sección 3.3)
     ├── documents/
-    │   ├── page.tsx           → "/documents" — listado real (GET /document)
-    │   ├── create/            → "/documents/create" — ruta por defecto del dashboard (aterrizaje post-login): CreateDocumentGuard monta OnboardingBanner + InviteMemberModal (solo con Org activa) + el flujo real de creación ⭐
-    │   └── [documentId]/      → "/documents/:id" — pantalla de firma real ⭐
-    ├── personal-documents/    → "/personal-documents" — credencial de firma (signature/INE) + datos de contacto del onboarding
-    └── plans/                 → "/plans", "/plans/success", "/plans/cancel" — suscripciones Stripe
+    │   ├── page.tsx                 → "/dashboard/documents" — listado real, scopeado a "soy colaborador" (GET /document)
+    │   ├── create/                  → "/dashboard/documents/create" — ruta por defecto del dashboard: CreateDocumentGuard monta OnboardingBanner + InviteMemberModal (solo con Org activa) + el flujo real de creación (colaboradores libres + colocación de firma por drag&drop) ⭐
+    │   ├── created/                 → "/dashboard/documents/created" — CreatedDocumentsView, documentos que el usuario creó (antes vivía debajo del formulario de creación)
+    │   └── [documentId]/            → "/dashboard/documents/:id" — pantalla de firma real (SignDocumentView) ⭐
+    ├── personal-documents/          → "/dashboard/personal-documents" — credencial de firma (signature/INE) + datos de contacto del onboarding
+    └── plans/                       → "/dashboard/plans", "/dashboard/plans/success", "/dashboard/plans/cancel" — suscripciones Stripe
 ```
 
 Cada ruta con lógica propia trae sus propias carpetas privadas (no forman parte del routing, prefijo `_`):
@@ -133,11 +180,11 @@ Cada ruta con lógica propia trae sus propias carpetas privadas (no forman parte
 | Carpeta | Contenido |
 |---|---|
 | `_components/` | Componentes de presentación específicos de esa ruta |
-| `_hooks/` | Hooks de React Query, un archivo por operación (`useCreateDocument.ts`, `useSignDocument.ts`, ...) |
+| `_hooks/` | Hooks de React Query, un archivo por operación (`useCreateDocumentSignatures.ts`, `useSignDocument.ts`, ...) |
 | `_requests.ts` | Funciones de acceso a la API específicas de esa ruta |
 | `_schemas.ts` | Esquemas Zod + tipos inferidos para los formularios de esa ruta |
 
-Solo `auth` y `plans` tienen su capa de API centralizada en `lib/api/`; el resto vive co-localizado junto a su ruta (ver sección 6).
+`lib/api/` centraliza la capa de API de todo lo que no es exclusivo de una sola ruta o que consumen varias rutas a la vez (`auth`, `accounts`, `roles`, `plans`, `users`, `organization-invitations`, `organization-members`, `organization-permissions`); el resto (creación/detalle/firma de documentos, personal-documents, forgot-password) vive co-localizado junto a su ruta (ver sección 5). `lib/hooks/` (sin prefijo `_`, a propósito) reúne hooks de React Query compartidos entre rutas distintas (p. ej. `useOrganizationPermissions`, consumido tanto por `organization/settings/members` como por `organization/settings/permissions`).
 
 ---
 
@@ -145,9 +192,10 @@ Solo `auth` y `plans` tienen su capa de API centralizada en `lib/api/`; el resto
 
 ### Cliente HTTP (`lib/axios.ts`)
 
-- `baseURL`: `process.env.NEXT_PUBLIC_API_BASE_URL` (fallback hardcodeado `http://localhost:3000`, consistente con `.env.local` y el puerto real del backend).
+- **Estado actual (confirmado en código, ver aviso en la sección 1): `baseURL: '/api'` hardcodeado**, no `NEXT_PUBLIC_API_BASE_URL`. Documentado aquí como está, no como debería estar — este README ya narró este mismo bug crítico como "resuelto" dos veces (ver sección 9); si en el momento de leer esto sigue así, es una tercera recurrencia real, confírmalo corriendo `npm run test -- axios` (el spec dedicado a esto está fallando en esta auditoría).
 - Interceptor de request: agrega `Authorization: Bearer <token>` leyendo la cookie.
-- Interceptor de response: si `401`, limpia la cookie y fuerza redirección a `/login`. No hay refresh token.
+- Interceptor de response: loggea cada llamada (`console.log('[API Success]', ...)` / `console.error('[API Error]', ...)`, no documentado antes, revisar si debe ir a producción) y, si `401`, limpia la cookie y fuerza redirección a `/login`. No hay refresh token.
+- `next.config.ts` trae un bloque `rewrites()` que reenvía `/api/:path*` a `${process.env.BACKEND_API_URL || 'http://backend:3000'}/:path*` — coherente con el `baseURL: '/api'` de arriba, pero `BACKEND_API_URL` no está definida en `.env.local` y `backend:3000` solo resuelve dentro de la red de Docker Compose.
 
 ### Sesión (`lib/cookies.ts`, `lib/auth.ts`)
 
@@ -159,7 +207,7 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 
 | Función | Endpoint |
 |---|---|
-| `getCurrentUserRequest` | `GET /auth/me` (perfil completo, incluye URLs prefirmadas de firma/INE; usado por `/personal-documents`) |
+| `getCurrentUserRequest` | `GET /auth/me` (perfil completo, incluye URLs prefirmadas de firma/INE; usado por `/dashboard/personal-documents`) |
 | `getOnboardingProfileRequest` | `GET /api/v1/users/me` (snapshot cacheado en Redis por CURP; usado por `AuthProvider` para hidratar `useAuthStore`) |
 
 *(`loginRequest` y `registerRequest` viven en `app/login/_requests.ts` y `app/signup/_requests.ts` respectivamente, no en `lib/api/` — inconsistencia menor de ubicación.)*
@@ -170,13 +218,45 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 |---|---|
 | `getAccountsCatalogRequest` | `GET /api/v1/accounts/me` (catálogo cacheado en Redis; usado por `AuthProvider` para poblar `accountsList`, no por `AccountSwitcher` directamente) |
 | `createOrganizationRequest` | `POST /api/v1/organizations` |
-| `inviteMemberRequest` | `POST /api/v1/organizations/invite` (alcance delimitado — ver sección 3.3) |
+| `inviteMemberRequest` | `POST /api/v1/organizations/invite` (persiste de verdad — ver sección 3.3) |
 
 **`lib/api/roles.ts`**
 
 | Función | Endpoint |
 |---|---|
 | `getSystemRolesRequest` | `GET /api/v1/roles` — usado por `useSystemRoles` para poblar el `Select` de `InviteMemberModal` |
+
+**`lib/api/users.ts`**
+
+| Función | Endpoint |
+|---|---|
+| `checkRfcRequest` | `GET /api/v1/users/check-rfc?rfc=` (público, sin JWT) — bifurca `/join`/`/signup` según si el RFC ya tiene cuenta |
+
+**`lib/api/organization-invitations.ts`**
+
+| Función | Endpoint |
+|---|---|
+| `getInvitationPreviewRequest` | `GET /api/v1/organizations/invitations/:token` (público) |
+| `acceptInvitationRequest` | `POST /api/v1/organizations/invitations/:token/accept` (público, `{rfc}`) |
+
+**`lib/api/organization-members.ts`**
+
+| Función | Endpoint |
+|---|---|
+| `getOrganizationMembersRequest` | `GET /api/v1/organizations/:organizationId/members` |
+| `updateMemberRoleRequest` | `PATCH /api/v1/organizations/members/:accountId/role` |
+| `removeMemberRequest` | `DELETE /api/v1/organizations/members/:accountId` |
+
+**`lib/api/organization-permissions.ts`**
+
+| Función | Endpoint |
+|---|---|
+| `getOrganizationPermissionsRequest` | `GET /api/v1/organizations/:organizationId/permissions` |
+| `createOrganizationPermissionRequest` | `POST /api/v1/organizations/:organizationId/permissions` (`{name}`) |
+| `updateOrganizationPermissionRequest` | `PATCH /api/v1/organizations/:organizationId/permissions/:permissionId` (`{name?, isActive?}`) |
+| `deleteOrganizationPermissionRequest` | `DELETE /api/v1/organizations/:organizationId/permissions/:permissionId` |
+| `getMemberPermissionsRequest` | `GET /api/v1/organizations/members/:accountId/permissions` |
+| `updateMemberPermissionsRequest` | `PATCH /api/v1/organizations/members/:accountId/permissions` (`{permissionIds}`) |
 
 **`lib/api/plans/`**
 
@@ -186,44 +266,59 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 | `createCheckoutSessionRequest(planId)` | `POST /stripe/checkout/session` |
 | `getSubscriptionStateRequest` | `GET /stripe/subscription` |
 
-**`app/(app)/documents/_requests.ts`**
+**`app/dashboard/documents/_requests.ts`**
 
 | Función | Endpoint |
 |---|---|
-| `getUsersRequest` | `GET /user` |
-| `getParticipantDocumentsRequest` | `GET /document?participantEmail=&status=&page=&limit=...` |
+| `getParticipantDocumentsRequest` | `GET /document?participantEmail=&status=&page=&limit=...` (con más filtros vía `buildDocumentsFilterParams`) |
+| `getDocumentFileUrlRequest` | `GET /document/file/:id` |
 
-**`app/(app)/documents/create/_requests.ts`**
+**`app/dashboard/documents/create/_requests.ts`**
 
 | Función | Endpoint |
 |---|---|
-| `createDocumentRequest` | `POST /document` (multipart) |
-| `submitForAuthorizationRequest` | `PATCH /document/:id/submit-for-authorization` |
+| `createDocumentSignaturesRequest` | `POST /api/v1/documents/signatures` (multipart: `file` + `documentData` + `collaboratorsdata` + `requiresDifferentSignatures`) — reemplazó el patrón viejo `POST /document` + `submit-for-authorization` |
 | `getMyDocumentsRequest` | `GET /document?email=&page=&limit=...` |
 
-**`app/(app)/documents/[documentId]/_requests.ts`**
+**`app/dashboard/documents/[documentId]/_requests.ts`**
 
 | Función | Endpoint |
 |---|---|
 | `getDocumentDetailRequest` | `GET /document/:id` |
 | `signDocumentRequest` | `PATCH /document/:id/sign` |
 | `rejectDocumentRequest` | `PATCH /document/:id/reject` |
+| `requestCancellationRequest` / `confirmCancellationRequest` | `PATCH /document/:id/submit-for-cancellation` \| `/confirm-cancellation` |
+| `requestVerificationCodeRequest` / `verifyCodeRequest` | `POST /document/:id/verification-codes` \| `/verify` — 2FA de firma |
+| `linkCollaboratorRequest` | `PATCH /document/:id/link-collaborator` — usado por `/access-document` |
 
-**`app/(app)/personal-documents/_requests.ts`**
+**`app/dashboard/personal-documents/_requests.ts`**
 
 | Función | Endpoint |
 |---|---|
 | `uploadPersonalDocumentsRequest` | `PUT /api/v1/users/me/signature` (multipart: officialFile + signatureImage) |
 | `updateIneFileRequest` / `updateSignatureFileRequest` | `PATCH /signature/:id` |
 | `deleteIneFileRequest` / `deleteSignatureFileRequest` | `DELETE /signature/:id/official-file` \| `/signature-image` |
+| `updatePersonalInformationRequest` | `PUT /api/v1/users/me/personal-information` |
+
+**`app/forgot-password/_requests.ts`**
+
+| Función | Endpoint |
+|---|---|
+| `forgotPasswordRequest` | `POST /auth/forgot-password` |
+| `verifyResetCodeRequest` | `POST /auth/verify-reset-code` |
+| `resetPasswordRequest` | `POST /auth/reset-password` |
 
 Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y `meta` en listados paginados).
+
+**`lib/hooks/`** (compartidos entre rutas, no co-localizados): `useAccountsCatalog`, `useCreateCheckoutSession`, `useCurrentUser`, `useIsOrganizationAdmin`, `useLogout`, `useOnboardingProfile`, `useOnboardingReady`, `useOrganizationPermissions`, `usePatchUserStatus`, `usePlans`, `useSubscriptionState`, `useSystemRoles`.
+
+**Otros helpers en `lib/`**: `lib/error-handler.ts` (`getErrorMessage`, formaliza el patrón de manejo de error repetido en todos los hooks de mutación — ver sección 7), `lib/signature-geometry.ts` (constantes de proporción para la colocación de firmas por drag&drop), `lib/pending-signature-context.ts`/`lib/pending-registration-context.ts` (contexto en `localStorage` para `/access-document` y registro con invitación pendiente), `lib/enums/document.ts` (`DocumentStatus`, `ParticipantStatus`, `ParticipantRole`, `SignatureType`).
 
 ---
 
 ## 6. Componentes reutilizables
 
-- **`components/ui/`** — librería base tipo shadcn sobre `@base-ui/react`: `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `label`, `popover`, `select`, `switch`, `table`, `textarea`, `field`, `separator`. `button.tsx` define las variantes propias (`default`, `brand` — CTA principal verde esmeralda, `outline`, `secondary`, `ghost`, `destructive`, `link`).
+- **`components/ui/`** — librería base tipo shadcn sobre `@base-ui/react`: `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `input-otp`, `label`, `popover`, `select`, `separator`, `sheet`, `sidebar` (el más grande, soporta `AppSidebar` — `Sidebar`/`SidebarProvider`/`SidebarTrigger`/etc.), `skeleton`, `switch`, `table`, `tabs` (usado en `organization/settings/layout.tsx`), `textarea`, `field`, `tooltip`. `button.tsx` define las variantes propias (`default`, `brand` — CTA principal verde esmeralda, `outline`, `secondary`, `ghost`, `destructive`, `link`).
 - **`components/form/text-field.tsx`** — único helper de formulario reutilizable: envuelve `Field` + `FieldLabel` + `Input` + `FieldError` para usarse directamente con `register()` de react-hook-form. Usado en `LoginForm`/`SignupForm`; el resto de formularios (documentos, personal-documents) construyen sus campos ad-hoc.
 - **`lib/utils.ts`** — `cn()` (clsx + tailwind-merge), usado en todo el proyecto para clases condicionales.
 
@@ -233,7 +328,7 @@ Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y
 
 - **Co-locación por ruta**: cada ruta trae su propia lógica en `_components/`, `_hooks/`, `_requests.ts`, `_schemas.ts` — evita un `lib/` monolítico.
 - **Rutas anidadas reutilizan tipos/componentes del padre**: p. ej. `documents/create/_components` importa desde `documents/_components/`.
-- **Route group `(app)`**: agrupa todas las rutas autenticadas bajo un layout común sin afectar la URL.
+- **Prefijo `/dashboard`**: agrupa todas las rutas autenticadas bajo un layout común (`AuthProvider` + `AppSidebar`) — ya no es un route group `(app)` sin URL propia, es un segmento real de la URL (ver sección 4).
 - **`next/dynamic({ ssr: false })`** para cualquier componente que use `react-pdf` (depende de APIs del navegador).
 - **Manejo de errores uniforme**: los hooks de mutación repiten el patrón de castear el error a `AxiosError<{message}>` y caer a un mensaje genérico en español, mostrado con `react-hot-toast`.
 - **Idioma**: todo el copy de UI en español; nombres de variables/funciones en inglés.
@@ -247,7 +342,7 @@ npm install
 npm run dev     # levanta en modo desarrollo (Turbopack)
 ```
 
-Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) corriendo.
+Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) corriendo — ver el aviso de la sección 1/5 sobre el estado actual de `lib/axios.ts`/`next.config.ts` antes de asumir que esta variable se está usando de verdad.
 
 ### Tests
 
@@ -258,11 +353,21 @@ npm run test:watch  # modo watch
 
 Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `eslint.config.mjs`/`postcss.config.mjs`) + React Testing Library + `jest-dom`. `test-utils.tsx` en la raíz expone `renderWithProviders()`, que envuelve en un `QueryClientProvider` de prueba (retries desactivados) para componentes que usan React Query. Los specs están co-localizados junto a su componente/schema (`*.spec.ts`/`*.spec.tsx`), igual que en `signature-server`.
 
+**Estado real de la suite (esta auditoría, `npx jest --listTests` + `npx jest --silent`)**: **45 suites / 237 tests**, con **1 suite / 2 tests en rojo** — exactamente `lib/axios.spec.ts`, el spec dedicado a la regresión de `baseURL` descrita en la sección 1/5 (espera una URL absoluta y recibe `/api`). Cualquier cifra de tests reportada en entradas anteriores de la sección 9 (p. ej. "116 tests", "101 tests en 21 suites") quedó desactualizada — usa esta cifra como la vigente hasta la próxima ronda.
+
 **`jest.setup.ts` polyfills para popups de `@base-ui/react`**: jsdom no implementa `ResizeObserver` ni `PointerEvent` (ni `hasPointerCapture`/`setPointerCapture`/`scrollIntoView` en `Element`), y `Select`/`Popover`/`dropdown-menu` los usan para posicionarse y para abrir con click. Sin estos stubs, un popup se queda montado con `hidden`/`data-closed` sin importar cuántas veces se le haga `userEvent.click()` al trigger — no es un bug del componente, es la ausencia de estas APIs en jsdom. Con el polyfill, `click` sigue sin abrir el popup de forma confiable (aparentemente porque base-ui espera una secuencia de eventos de puntero más específica que la que dispara `userEvent` incluso con el polyfill) — el camino confiable que sí funciona es teclado: `trigger.focus()` + `userEvent.keyboard('{Enter}')` para abrir, luego `userEvent.click()` sobre la opción (`role="option"`) para seleccionar y cerrar (ver `InviteMemberModal.spec.tsx` para el patrón completo).
 
 ---
 
 ## 9. Pendientes / trabajo futuro
+
+### Auditoría de documentación (README vs. código real) — 2026-08-06
+Este README había quedado desactualizado en varios puntos estructurales desde la migración de rutas a `/dashboard/*` y desde que se agregaron los módulos de permisos de organización, OTP de registro/recuperación de contraseña, y el visor público de documentos — ninguno tenía una sola línea de documentación. Se hizo una auditoría de solo lectura (dos agentes en paralelo, uno por proyecto del monorepo, más lectura directa) contra el código real y se reescribieron las secciones 1-8 (referencia técnica) para reflejar el estado actual; la sección 9 (este changelog) se dejó intacta salvo esta entrada nueva.
+
+**Hallazgos que NO se corrigieron en esta ronda** (auditoría de documentación únicamente, no de código — se dejan documentados como pendientes reales en vez de arreglarse de paso):
+- **Bug crítico recurrente (3ra vez)**: `lib/axios.ts` tiene `baseURL: '/api'` hardcodeado y `next.config.ts` trae de vuelta el `rewrites()` roto (`BACKEND_API_URL` sin definir, fallback a un host que solo resuelve en Docker) — el mismo bug que este README ya documentó como "resuelto" dos veces (ver las dos entradas de "bug crítico: el frontend no llegaba al backend" más abajo), incluyendo una donde se agregó `lib/axios.spec.ts` explícitamente para que esto "no vuelva a colarse en silencio una tercera vez". Ese spec está fallando ahora mismo. Si esto no fue un cambio intencional (p. ej. para probar el frontend containerizado contra un backend en el mismo `docker-compose`), hay que revertirlo — ninguna llamada real del navegador está llegando al backend mientras esté así.
+- **No existe landing pública en `/`**: falta `app/page.tsx` por completo, y el middleware ya no la excluye del guard de sesión. Hay que confirmar con el equipo si la landing se movió a otro lado (`signature-site`, el tercer proyecto del monorepo) o si es una regresión.
+- **Cifras de tests desactualizadas en entradas anteriores de este changelog**: no se corrigieron retroactivamente (el changelog es un registro histórico) — la cifra vigente hoy es la que aparece en la sección 8.
 
 ### Resuelto en esta ronda ([STORY] Frontend: Carga de Documentos y Configuración de Firmantes)
 Rediseño completo de `/documents/create` (`app/(app)/documents/create/`) — reemplaza el picker de usuarios existentes por un formulario donde cada colaborador se captura como datos libres (nombre/apellido/email/RFC), y cambia el endpoint consumido de `POST /document` + `POST /document/:id/submit-for-authorization` a `POST /api/v1/documents/signatures` (ver README de `signature-server`, que se ajustó en la misma ronda para matchear el JSON exacto de esta historia).
@@ -359,8 +464,8 @@ Auditoría completa contra las 6 historias del README raíz (`C:/Signature/READM
 ### Resuelto recientemente
 - **Flujo de documentos duplicado**: el prototipo en memoria de `/dashboard` (`DocumentUploadFlow`/`DocumentPrepareModal`/`SignerFormCard`/`SpectatorFormCard`/`DocumentPreviewPane`) fue eliminado. `/dashboard` ahora renderiza el mismo `CreateDocumentView` real que `/documents/create` (mismos hooks, mismo `lib/api`, misma validación Zod de `documents/create/_schemas.ts`).
 - **Duplicados en la creación de documentos**: el backend ahora rechaza (`400`) seleccionar al mismo usuario dos veces entre firmantes/espectadores, y rechaza crear un documento con el mismo nombre de archivo que otro documento propio en estatus `CREATED`/`PENDING` (`DocumentService.create`).
-- **Edición de información personal**: `/personal-documents` (`UserInfoCard`) permite editar `phoneNumber` y `secondaryEmail` vía `PUT /api/v1/users/me/personal-information`. `name`, `lastName`, `curp` y `rfc` son campos de identidad y **no son editables por diseño**: el backend los quitó de `UpdatePersonalInformationDto` (no solo el frontend deja de mandarlos, el endpoint los rechaza si algún otro cliente los envía). El CURP tampoco es editable vía `PATCH /user/:id` (se quitó de `UpdateUserDto`) — se fija una sola vez al crear/registrar el usuario.
-- **Firma electrónica avanzada vs simple**: se eliminó del proyecto (landing y cualquier mención de "e.firma"/firma avanzada). El producto solo ofrece firma electrónica simple, resuelta por la credencial (rúbrica + INE) registrada en `/personal-documents`.
+- **Edición de información personal**: `/dashboard/personal-documents` (`UserInfoCard`) permite editar `phoneNumber` y `secondaryEmail` vía `PUT /api/v1/users/me/personal-information`. `name`, `lastName`, `curp` y `rfc` son campos de identidad y **no son editables por diseño**: el backend los quitó de `UpdatePersonalInformationDto` (no solo el frontend deja de mandarlos, el endpoint los rechaza si algún otro cliente los envía). El CURP tampoco es editable vía `PATCH /user/:id` (se quitó de `UpdateUserDto`) — se fija una sola vez al crear/registrar el usuario.
+- **Firma electrónica avanzada vs simple**: se eliminó del proyecto (landing y cualquier mención de "e.firma"/firma avanzada). El producto solo ofrece firma electrónica simple, resuelta por la credencial (rúbrica + INE) registrada en `/dashboard/personal-documents`.
 - **Previews unificados**: se eliminó `DocumentPreviewPane` (duplicado); todo el proyecto usa `PdfPreview` (`documents/_components/`), que ya soporta ancho responsivo y `File | string`.
 - **`useSubmitForAuthorization`**: confirmado como código muerto (la lógica real vive en `useCreateDocument`) y eliminado.
 - **Puerto por defecto**: el fallback de `lib/axios.ts` ahora es `http://localhost:3000`, consistente con `.env.local` y con el backend.

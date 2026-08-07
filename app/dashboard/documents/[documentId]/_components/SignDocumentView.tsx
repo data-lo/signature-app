@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import PageContainer from '@/app/dashboard/_components/PageContainer';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import {
   DocumentStatus,
@@ -133,7 +134,7 @@ export default function SignDocumentView({
   }
 
   return (
-    <main className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-8 py-8 lg:grid-cols-[380px_1fr]">
+    <PageContainer className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
@@ -470,6 +471,6 @@ export default function SignDocumentView({
         }
         confirming={confirmCancellationMutation.isPending}
       />
-    </main>
+    </PageContainer>
   );
 }

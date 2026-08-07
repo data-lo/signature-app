@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import PageContainer from '@/app/dashboard/_components/PageContainer';
 import DocumentsTable from '../../_components/DocumentsTable';
 import {
   EMPTY_DOCUMENTS_FILTERS,
@@ -30,7 +31,7 @@ export default function CreatedDocumentsView() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-8 py-8">
+    <PageContainer>
       <h1 className="mb-4 text-lg font-semibold text-foreground">
         Documentos creados
       </h1>
@@ -46,6 +47,6 @@ export default function CreatedDocumentsView() {
         filters={filters}
         onFiltersChange={handleFiltersChange}
       />
-    </main>
+    </PageContainer>
   );
 }
