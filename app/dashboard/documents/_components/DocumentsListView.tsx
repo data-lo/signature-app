@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import { cn } from '@/lib/utils';
 import DocumentsTable from './DocumentsTable';
 import {
   EMPTY_DOCUMENTS_FILTERS,
@@ -17,8 +16,8 @@ type Tab = ParticipantStatus.Pending | ParticipantStatus.Signed;
 export default function DocumentsListView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // La pestaña activa vive en la URL (?status=) para que el Sidebar pueda resaltar
-  // "Documentos pendientes"/"Documentos firmados" según la ruta actual.
+  // La sección activa vive en la URL (?status=), fijada por el link del Sidebar
+  // correspondiente ("Por firmar" / "Completados") — ya no hay navegación por tabs aquí.
   const tab: Tab =
     searchParams.get('status') === ParticipantStatus.Signed
       ? ParticipantStatus.Signed
@@ -36,11 +35,6 @@ export default function DocumentsListView() {
     filters,
   );
 
-  function handleTabChange(nextTab: Tab) {
-    router.push(`/dashboard/documents?status=${nextTab}`);
-    setPage(1);
-  }
-
   function handleFiltersChange(nextFilters: DocumentsFilters) {
     setFilters(nextFilters);
     setPage(1);
@@ -48,33 +42,6 @@ export default function DocumentsListView() {
 
   return (
     <main className="mx-auto max-w-7xl px-8 py-8">
-      <div className="mb-6 flex items-center gap-2 border-b border-border">
-        <button
-          type="button"
-          onClick={() => handleTabChange(ParticipantStatus.Pending)}
-          className={cn(
-            'border-b-2 px-4 py-2 text-sm font-semibold tracking-wide',
-            tab === ParticipantStatus.Pending
-              ? 'border-emerald-500 text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
-        >
-          PENDIENTES
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange(ParticipantStatus.Signed)}
-          className={cn(
-            'border-b-2 px-4 py-2 text-sm font-semibold tracking-wide',
-            tab === ParticipantStatus.Signed
-              ? 'border-emerald-500 text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
-        >
-          FIRMADOS
-        </button>
-      </div>
-
       <h1 className="mb-4 text-lg font-semibold text-foreground">
         {tab === ParticipantStatus.Pending
           ? 'Tus documentos pendientes'
