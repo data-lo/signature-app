@@ -5,7 +5,7 @@ import {
   buildDocumentsFilterParams,
   type DocumentsFilters,
 } from './_components/DocumentsFilterPanel';
-import type { ParticipantStatus } from '@/lib/enums/document';
+import type { DocumentStatus, ParticipantStatus } from '@/lib/enums/document';
 
 export interface DocumentsMeta {
   total: number;
@@ -37,13 +37,27 @@ export async function getDocumentFileUrlRequest(
   return data;
 }
 
-export async function getParticipantDocumentsRequest(
-  email: string,
-  status: ParticipantStatus.Pending | ParticipantStatus.Signed,
+export interface GetDocumentsParams {
+  /** Documentos donde el usuario participa como colaborador (Por firmar/Completados). */
+  participantEmail?: string;
+  /** Documentos creados/enviados por el usuario (Enviados para firma). */
+  email?: string;
+  status?: DocumentStatus | ParticipantStatus.Pending | ParticipantStatus.Signed;
+  page?: number;
+  limit?: number;
+  filters?: DocumentsFilters;
+}
+
+/** Endpoint único de listado de documentos (`GET /document`), usado por las tres vistas
+ * (Por firmar, Enviados para firma, Completados) variando solo los parámetros de filtrado. */
+export async function getDocumentsRequest({
+  participantEmail,
+  email,
+  status,
   page = 1,
-  limit = 25,
-  filters: DocumentsFilters = EMPTY_DOCUMENTS_FILTERS,
-): Promise<DocumentsResult> {
+  limit = 10,
+  filters = EMPTY_DOCUMENTS_FILTERS,
+}: GetDocumentsParams): Promise<DocumentsResult> {
   const { data } = await apiClient.get<{
     success: boolean;
     message: string;
@@ -51,7 +65,8 @@ export async function getParticipantDocumentsRequest(
     meta: DocumentsMeta;
   }>('/document', {
     params: {
-      participantEmail: email,
+      participantEmail,
+      email,
       status,
       page,
       limit,

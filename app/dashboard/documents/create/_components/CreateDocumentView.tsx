@@ -14,15 +14,12 @@ import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 import { getErrorMessage } from '@/lib/error-handler';
 import DocumentsTable from '../../_components/DocumentsTable';
 import {
-  EMPTY_DOCUMENTS_FILTERS,
-  type DocumentsFilters,
-} from '../../_components/DocumentsFilterPanel';
-import {
   createDocumentSignaturesSchema,
   type CreateDocumentSignaturesFormValues,
   type SignerFormValues,
 } from '../_schemas';
-import { useMyDocuments } from '../_hooks/useMyDocuments';
+import { useDocuments } from '../../_hooks/useDocuments';
+import { useDocumentsListState } from '../../_hooks/useDocumentsListState';
 import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatures';
 import DocumentFilePicker from './DocumentFilePicker';
 import CollaboratorsFieldArray from './CollaboratorsFieldArray';
@@ -66,10 +63,8 @@ export default function CreateDocumentView({
   const [file, setFile] = useState<File | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [filePondKey, setFilePondKey] = useState(0);
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<DocumentsFilters>(
-    EMPTY_DOCUMENTS_FILTERS,
-  );
+  const { page, setPage, filters, handleFiltersChange } =
+    useDocumentsListState();
 
   const {
     control,
@@ -90,11 +85,13 @@ export default function CreateDocumentView({
   ).length;
 
   const { data: currentUser } = useCurrentUser();
-  const { data: myDocuments } = useMyDocuments(
-    currentUser?.email,
+  const { data: myDocuments } = useDocuments({
+    scope: 'creator',
+    email: currentUser?.email,
     page,
+    limit: 10,
     filters,
-  );
+  });
   const createMutation = useCreateDocumentSignatures();
   const { setDocumentsCount } = useDocumentsCount();
 
@@ -142,11 +139,6 @@ export default function CreateDocumentView({
         },
       },
     );
-  }
-
-  function handleFiltersChange(nextFilters: DocumentsFilters) {
-    setFilters(nextFilters);
-    setPage(1);
   }
 
   return (
