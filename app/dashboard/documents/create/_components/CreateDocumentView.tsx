@@ -8,20 +8,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import PageContainer from '@/app/dashboard/_components/PageContainer';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 import { getErrorMessage } from '@/lib/error-handler';
 import DocumentsTable from '../../_components/DocumentsTable';
 import {
-  EMPTY_DOCUMENTS_FILTERS,
-  type DocumentsFilters,
-} from '../../_components/DocumentsFilterPanel';
-import {
   createDocumentSignaturesSchema,
   type CreateDocumentSignaturesFormValues,
   type SignerFormValues,
 } from '../_schemas';
-import { useMyDocuments } from '../_hooks/useMyDocuments';
+import { useDocuments } from '../../_hooks/useDocuments';
+import { useDocumentsListState } from '../../_hooks/useDocumentsListState';
 import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatures';
 import DocumentFilePicker from './DocumentFilePicker';
 import CollaboratorsFieldArray from './CollaboratorsFieldArray';
@@ -65,10 +63,8 @@ export default function CreateDocumentView({
   const [file, setFile] = useState<File | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [filePondKey, setFilePondKey] = useState(0);
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<DocumentsFilters>(
-    EMPTY_DOCUMENTS_FILTERS,
-  );
+  const { page, setPage, filters, handleFiltersChange } =
+    useDocumentsListState();
 
   const {
     control,
@@ -89,11 +85,13 @@ export default function CreateDocumentView({
   ).length;
 
   const { data: currentUser } = useCurrentUser();
-  const { data: myDocuments } = useMyDocuments(
-    currentUser?.email,
+  const { data: myDocuments } = useDocuments({
+    scope: 'creator',
+    email: currentUser?.email,
     page,
+    limit: 10,
     filters,
-  );
+  });
   const createMutation = useCreateDocumentSignatures();
   const { setDocumentsCount } = useDocumentsCount();
 
@@ -143,13 +141,8 @@ export default function CreateDocumentView({
     );
   }
 
-  function handleFiltersChange(nextFilters: DocumentsFilters) {
-    setFilters(nextFilters);
-    setPage(1);
-  }
-
   return (
-    <main className="mx-auto max-w-7xl px-8 py-8">
+    <PageContainer>
       <div className="rounded-lg border border-border bg-card p-6">
         <h1 className="text-base font-semibold text-foreground">
           Prepara un documento para solicitar que sea firmado
@@ -234,6 +227,6 @@ export default function CreateDocumentView({
           />
         </div>
       )}
-    </main>
+    </PageContainer>
   );
 }

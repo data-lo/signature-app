@@ -2,7 +2,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen } from '@/test-utils';
 import CreateDocumentView from './CreateDocumentView';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import { useMyDocuments } from '../_hooks/useMyDocuments';
+import { useDocuments } from '../../_hooks/useDocuments';
 import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatures';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 
@@ -10,7 +10,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 jest.mock('@/lib/hooks/useCurrentUser');
-jest.mock('../_hooks/useMyDocuments');
+jest.mock('../../_hooks/useDocuments');
 jest.mock('../_hooks/useCreateDocumentSignatures', () => ({
   ...jest.requireActual('../_hooks/useCreateDocumentSignatures'),
   useCreateDocumentSignatures: jest.fn(),
@@ -39,7 +39,7 @@ jest.mock('../../_components/PdfPreview', () => ({
 }));
 
 const mockedUseCurrentUser = useCurrentUser as jest.Mock;
-const mockedUseMyDocuments = useMyDocuments as jest.Mock;
+const mockedUseDocuments = useDocuments as jest.Mock;
 const mockedUseCreateDocumentSignatures =
   useCreateDocumentSignatures as jest.Mock;
 const mockedUseDocumentsCount = useDocumentsCount as jest.Mock;
@@ -64,7 +64,7 @@ describe('CreateDocumentView', () => {
         rfc: 'CRUN800101ABC',
       },
     });
-    mockedUseMyDocuments.mockReturnValue({ data: undefined });
+    mockedUseDocuments.mockReturnValue({ data: undefined });
     mockedUseCreateDocumentSignatures.mockReturnValue({
       mutate,
       isPending: false,
@@ -83,7 +83,7 @@ describe('CreateDocumentView', () => {
   it('por defecto (trackDocumentsCount omitido), publica el conteo de documentos en el contexto global', () => {
     const setDocumentsCount = jest.fn();
     mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
-    mockedUseMyDocuments.mockReturnValue({
+    mockedUseDocuments.mockReturnValue({
       data: { documents: [], meta: { total: 3 } },
     });
 
@@ -95,7 +95,7 @@ describe('CreateDocumentView', () => {
   it('bug corregido: con trackDocumentsCount={false} (sección deshabilitada en HomeContent), no publica el conteo — evita que el badge "DOCUMENTOS:N" del navbar quede clickeable mientras el onboarding está incompleto', () => {
     const setDocumentsCount = jest.fn();
     mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
-    mockedUseMyDocuments.mockReturnValue({
+    mockedUseDocuments.mockReturnValue({
       data: { documents: [], meta: { total: 3 } },
     });
 

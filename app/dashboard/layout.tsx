@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import AppSidebar from '../_components/AppSidebar';
 import { DocumentsCountProvider } from '../_components/DocumentsCountContext';
 import AuthProvider from './_components/AuthProvider';
+import DashboardBreadcrumbs from './_components/DashboardBreadcrumbs';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <header className="flex h-12 items-center border-b border-border px-4 md:hidden">
               <SidebarTrigger />
             </header>
+            <DashboardBreadcrumbs />
             {children}
           </SidebarInset>
         </SidebarProvider>

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import PageContainer from '@/app/dashboard/_components/PageContainer';
 
 const SETTINGS_TABS = [
   { value: '/dashboard/organization/settings/members', label: 'Miembros' },
@@ -31,7 +32,7 @@ export default function OrganizationSettingsLayout({
   }, []);
 
   return (
-    <div className="flex w-full flex-col gap-6 p-6">
+    <PageContainer className="flex flex-col gap-6">
       {mounted && (
         <Tabs value={pathname} onValueChange={() => {}}>
           <TabsList>
@@ -50,6 +51,6 @@ export default function OrganizationSettingsLayout({
       )}
 
       {children}
-    </div>
+    </PageContainer>
   );
 }
