@@ -50,8 +50,30 @@ export async function getDocumentDetailRequest(
   return data.data;
 }
 
-export async function signDocumentRequest(documentId: string): Promise<void> {
-  await apiClient.patch(`/document/${documentId}/sign`);
+export interface AdvancedSignatureFiles {
+  password: string;
+  keyFile: File;
+  cerFile: File;
+}
+
+/**
+ * Siempre manda multipart/form-data (aunque no haya archivos): el backend usa
+ * `FileFieldsInterceptor` en este endpoint para poder recibir `.key`/`.cer` cuando la firma es
+ * electrónica avanzada (FIEL) — mandar el PATCH sin body/Content-Type rompía a multer
+ * ("Boundary not found"). Para firma simple, `advancedSignature` viene undefined y el FormData
+ * simplemente va vacío.
+ */
+export async function signDocumentRequest(
+  documentId: string,
+  advancedSignature?: AdvancedSignatureFiles,
+): Promise<void> {
+  const formData = new FormData();
+  if (advancedSignature) {
+    formData.append('password', advancedSignature.password);
+    formData.append('key', advancedSignature.keyFile);
+    formData.append('cer', advancedSignature.cerFile);
+  }
+  await apiClient.patch(`/document/${documentId}/sign`, formData);
 }
 
 export async function requestVerificationCodeRequest(
