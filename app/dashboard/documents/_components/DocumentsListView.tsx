@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
+import PageContainer from '@/app/dashboard/_components/PageContainer';
 import DocumentsTable from './DocumentsTable';
 import { useDocuments } from '../_hooks/useDocuments';
 import { useDocumentsListState } from '../_hooks/useDocumentsListState';
@@ -38,7 +39,7 @@ export default function DocumentsListView() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-8 py-8">
+    <PageContainer>
       <div className="mb-6 flex items-center gap-2 border-b border-border">
         <button
           type="button"
@@ -90,6 +91,6 @@ export default function DocumentsListView() {
         showMyTurnFilter
         showStatusFilter={false}
       />
-    </main>
+    </PageContainer>
   );
 }
