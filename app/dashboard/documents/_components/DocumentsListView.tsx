@@ -1,15 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
 import DocumentsTable from './DocumentsTable';
-import {
-  EMPTY_DOCUMENTS_FILTERS,
-  type DocumentsFilters,
-} from './DocumentsFilterPanel';
-import { useParticipantDocuments } from '../_hooks/useParticipantDocuments';
+import { useDocuments } from '../_hooks/useDocuments';
+import { useDocumentsListState } from '../_hooks/useDocumentsListState';
 import { ParticipantStatus } from '@/lib/enums/document';
 
 type Tab = ParticipantStatus.Pending | ParticipantStatus.Signed;
@@ -23,26 +19,21 @@ export default function DocumentsListView() {
     searchParams.get('status') === ParticipantStatus.Signed
       ? ParticipantStatus.Signed
       : ParticipantStatus.Pending;
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<DocumentsFilters>(
-    EMPTY_DOCUMENTS_FILTERS,
-  );
+  const { page, setPage, filters, handleFiltersChange } =
+    useDocumentsListState();
 
   const { data: currentUser } = useCurrentUser();
-  const { data: documentsResult } = useParticipantDocuments(
-    currentUser?.email,
-    tab,
+  const { data: documentsResult } = useDocuments({
+    scope: 'participant',
+    email: currentUser?.email,
+    status: tab,
     page,
+    limit: 25,
     filters,
-  );
+  });
 
   function handleTabChange(nextTab: Tab) {
     router.push(`/dashboard/documents?status=${nextTab}`);
-    setPage(1);
-  }
-
-  function handleFiltersChange(nextFilters: DocumentsFilters) {
-    setFilters(nextFilters);
     setPage(1);
   }
 
