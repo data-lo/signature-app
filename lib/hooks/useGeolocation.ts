@@ -37,18 +37,6 @@ function mapPositionError(
   }
 }
 
-/**
- * Solicita la ubicación del dispositivo vía `navigator.geolocation` solo cuando se llama
- * `requestLocation()` — pensado para el momento de confirmar una firma, nunca en segundo plano
- * ni fuera de ese flujo. `maximumAge: 0` fuerza una lectura fresca en cada llamada: no se
- * reutiliza una posición cacheada de una firma anterior.
- *
- * Rechazar el permiso, no tener soporte (o no estar en un contexto seguro) y agotar el tiempo de
- * espera nunca lanzan una excepción: `requestLocation()` siempre resuelve, con `coords: null` y
- * el motivo en `error`. Decisión de producto: la firma continúa sin ubicación en vez de
- * bloquearse (ver historia "Capturar y almacenar la geolocalización al firmar documentos");
- * quien use el hook decide qué hacer con `error` (por ejemplo, avisar al usuario).
- */
 export function useGeolocation() {
   const [status, setStatus] = useState<GeolocationStatus>('idle');
 
