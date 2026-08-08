@@ -53,6 +53,9 @@ export function useDocuments({
         limit,
         filters,
       }),
-    enabled: Boolean(email),
+    // Bug corregido: esperar solo a `email` disparaba la petición antes de que activeAccount
+    // terminara de hidratarse desde el store persistido (ver AuthProvider), llegando sin
+    // X-Account-Id y recibiendo 400 del backend en cada carga inicial del dashboard.
+    enabled: Boolean(email) && Boolean(activeAccountId),
   });
 }

@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import {
   signDocumentRequest,
-  type AdvancedSignatureFiles,
+  type SignDocumentPayload,
 } from '../_requests';
 
 export function useSignDocument(documentId: string) {
@@ -14,8 +14,8 @@ export function useSignDocument(documentId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (advancedSignature?: AdvancedSignatureFiles) =>
-      signDocumentRequest(documentId, advancedSignature),
+    mutationFn: (payload?: SignDocumentPayload) =>
+      signDocumentRequest(documentId, payload),
     onSuccess: () => {
       toast.success('Documento firmado correctamente');
       queryClient.invalidateQueries({

@@ -6,6 +6,11 @@ import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import {
+  useGeolocation,
+  type GeolocationErrorReason,
+} from '@/lib/hooks/useGeolocation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -60,6 +65,13 @@ const ROLE_LABELS: Record<ParticipantRole, string> = {
   [ParticipantRole.Creator]: 'Creador',
 };
 
+const GEOLOCATION_ERROR_MESSAGES: Record<GeolocationErrorReason, string> = {
+  unsupported: 'tu navegador no permite compartir ubicación aquí',
+  'permission-denied': 'no diste permiso de ubicación',
+  'position-unavailable': 'no se pudo determinar tu ubicación',
+  timeout: 'se agotó el tiempo de espera para obtener tu ubicación',
+};
+
 interface SignDocumentViewProps {
   documentId: string;
 }
@@ -87,6 +99,7 @@ export default function SignDocumentView({
     refetch: refetchFileUrl,
   } = useDocumentFileUrl(documentId);
   const signMutation = useSignDocument(documentId);
+  const { status: geoStatus, requestLocation } = useGeolocation();
   const rejectMutation = useRejectDocument(documentId);
   const requestCancellationMutation = useRequestCancellation(documentId);
   const confirmCancellationMutation = useConfirmCancellation(documentId);
@@ -106,12 +119,18 @@ export default function SignDocumentView({
     rejectMutation.mutate(values.reason);
   }
 
-  function handleSignClick() {
+  async function handleSignClick() {
     if (document?.mySignatureType === SignatureType.Fiel) {
       setShowAdvancedSignatureDialog(true);
       return;
     }
-    signMutation.mutate(undefined);
+    const { coords, error } = await requestLocation();
+    if (error) {
+      toast(
+        `Firmando sin datos de ubicación: ${GEOLOCATION_ERROR_MESSAGES[error]}.`,
+      );
+    }
+    signMutation.mutate(coords ?? undefined);
   }
 
   function handleAdvancedSignatureSubmit(
@@ -297,15 +316,22 @@ export default function SignDocumentView({
               {(!document.requiresVerification ||
                 document.verificationConfirmed) && (
                 <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Al confirmar, solicitaremos tu ubicación para registrarla
+                    como parte de la evidencia de esta firma. Si no la
+                    compartes, la firma continúa igual.
+                  </p>
                   <Button
                     type="button"
                     className="w-full"
-                    disabled={signMutation.isPending}
+                    disabled={geoStatus === 'requesting' || signMutation.isPending}
                     onClick={handleSignClick}
                   >
-                    {signMutation.isPending
-                      ? 'Firmando...'
-                      : 'Continuar a firmar'}
+                    {geoStatus === 'requesting'
+                      ? 'Obteniendo ubicación...'
+                      : signMutation.isPending
+                        ? 'Firmando...'
+                        : 'Continuar a firmar'}
                   </Button>
                   <Button
                     type="button"

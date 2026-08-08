@@ -1,5 +1,6 @@
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, screen, within } from '@/test-utils';
+import toast from 'react-hot-toast';
+import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import SignDocumentView from './SignDocumentView';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
@@ -55,6 +56,10 @@ jest.mock('./EfirmaFilePicker', () => ({
     </button>
   ),
 }));
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: Object.assign(jest.fn(), { success: jest.fn(), error: jest.fn() }),
+}));
 
 const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
 const mockedUseDocumentFileUrl = useDocumentFileUrl as jest.Mock;
@@ -65,6 +70,7 @@ const mockedUseConfirmCancellation = useConfirmCancellation as jest.Mock;
 const mockedUseRequestVerificationCode =
   useRequestVerificationCode as jest.Mock;
 const mockedUseVerifyCode = useVerifyCode as jest.Mock;
+const mockedToast = toast as unknown as jest.Mock;
 
 function baseDocument(
   overrides: Partial<DocumentDetail> = {},
@@ -108,6 +114,47 @@ function buildUser(overrides: Partial<AuthUser> = {}): AuthUser {
   };
 }
 
+const DEFAULT_COORDS = {
+  latitude: 19.4326,
+  longitude: -99.1332,
+  accuracy: 15,
+};
+
+function mockGeolocationSuccess(coords = DEFAULT_COORDS) {
+  Object.defineProperty(global.navigator, 'geolocation', {
+    configurable: true,
+    value: {
+      getCurrentPosition: jest.fn((success: PositionCallback) =>
+        success({ coords } as GeolocationPosition),
+      ),
+    },
+  });
+}
+
+function mockGeolocationError(code: 1 | 2 | 3) {
+  Object.defineProperty(global.navigator, 'geolocation', {
+    configurable: true,
+    value: {
+      getCurrentPosition: jest.fn(
+        (_success: PositionCallback, error: PositionErrorCallback) =>
+          error({
+            code,
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          } as GeolocationPositionError),
+      ),
+    },
+  });
+}
+
+function mockGeolocationUnsupported() {
+  Object.defineProperty(global.navigator, 'geolocation', {
+    configurable: true,
+    value: undefined,
+  });
+}
+
 describe('SignDocumentView', () => {
   const signMutate = jest.fn();
   const rejectMutate = jest.fn();
@@ -119,6 +166,8 @@ describe('SignDocumentView', () => {
     rejectMutate.mockReset();
     requestCancellationMutate.mockReset();
     confirmCancellationMutate.mockReset();
+    mockedToast.mockClear();
+    mockGeolocationSuccess();
     useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
 
     mockedUseSignDocument.mockReturnValue({
@@ -167,7 +216,140 @@ describe('SignDocumentView', () => {
       screen.getByRole('button', { name: /continuar a firmar/i }),
     );
 
-    expect(signMutate).toHaveBeenCalled();
+    await waitFor(() => expect(signMutate).toHaveBeenCalled());
+  });
+
+  it('muestra un aviso explicando por qué se solicita la ubicación antes de firmar', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.getByText(/solicitaremos tu ubicación/i),
+    ).toBeInTheDocument();
+  });
+
+  it('al confirmar la firma, solicita la geolocalización y la envía junto con la firma', async () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+
+    await waitFor(() =>
+      expect(signMutate).toHaveBeenCalledWith(DEFAULT_COORDS),
+    );
+    expect(mockedToast).not.toHaveBeenCalled();
+  });
+
+  it('si el usuario rechaza el permiso de ubicación, firma igual sin bloquear y avisa que no se envió ubicación', async () => {
+    mockGeolocationError(1);
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+
+    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
+    expect(mockedToast).toHaveBeenCalledWith(
+      expect.stringMatching(/no diste permiso de ubicación/i),
+    );
+  });
+
+  it('si la ubicación no está disponible, firma igual sin bloquear', async () => {
+    mockGeolocationError(2);
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+
+    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
+    expect(mockedToast).toHaveBeenCalledWith(
+      expect.stringMatching(/no se pudo determinar tu ubicación/i),
+    );
+  });
+
+  it('si se agota el tiempo de espera de la ubicación, firma igual sin bloquear', async () => {
+    mockGeolocationError(3);
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+
+    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
+    expect(mockedToast).toHaveBeenCalledWith(
+      expect.stringMatching(/se agotó el tiempo de espera/i),
+    );
+  });
+
+  it('si el navegador no soporta geolocalización, firma igual sin bloquear', async () => {
+    mockGeolocationUnsupported();
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+
+    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
+    expect(mockedToast).toHaveBeenCalledWith(
+      expect.stringMatching(/tu navegador no permite compartir ubicación/i),
+    );
+  });
+
+  it('no reutiliza una posición cacheada: cada intento de firma pide una lectura fresca', async () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+    await waitFor(() => expect(signMutate).toHaveBeenCalledTimes(1));
+
+    expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      expect.objectContaining({ maximumAge: 0 }),
+    );
   });
 
   it('bug corregido: si el documento requiere verificación y aún no se confirma, oculta "Continuar a firmar" y muestra el flujo de código en su lugar', async () => {
