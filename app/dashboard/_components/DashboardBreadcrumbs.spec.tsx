@@ -62,6 +62,36 @@ describe('DashboardBreadcrumbs', () => {
     expect(screen.queryByText('doc-1')).not.toBeInTheDocument();
   });
 
+  it('bug corregido: "/dashboard/documents/create" usa el breadcrumb estático, no lo interpreta como id de documento', () => {
+    mockUsePathname.mockReturnValue('/dashboard/documents/create');
+
+    renderWithProviders(<DashboardBreadcrumbs />);
+
+    expect(screen.getByText('Nuevo documento')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+      '',
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it('bug corregido: "/dashboard/documents/created" usa el breadcrumb estático, no lo interpreta como id de documento', () => {
+    mockUsePathname.mockReturnValue('/dashboard/documents/created');
+
+    renderWithProviders(<DashboardBreadcrumbs />);
+
+    expect(screen.getByText('Enviados para firma')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+      '',
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
   it('no renderiza nada para una ruta sin breadcrumbs configurados', () => {
     mockUsePathname.mockReturnValue('/dashboard/unknown-route');
 

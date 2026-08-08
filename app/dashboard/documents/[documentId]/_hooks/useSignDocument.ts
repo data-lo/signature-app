@@ -4,14 +4,18 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
-import { signDocumentRequest } from '../_requests';
+import {
+  signDocumentRequest,
+  type SignDocumentGeolocation,
+} from '../_requests';
 
 export function useSignDocument(documentId: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => signDocumentRequest(documentId),
+    mutationFn: (geolocation?: SignDocumentGeolocation) =>
+      signDocumentRequest(documentId, geolocation),
     onSuccess: () => {
       toast.success('Documento firmado correctamente');
       queryClient.invalidateQueries({

@@ -66,7 +66,14 @@ const STATIC_CRUMBS: Record<string, Crumb[]> = {
 const DOCUMENT_DETAIL_PATTERN = /^\/dashboard\/documents\/([^/]+)$/;
 
 function useCrumbs(pathname: string): Crumb[] {
-  const documentId = pathname.match(DOCUMENT_DETAIL_PATTERN)?.[1];
+  const staticCrumbs = STATIC_CRUMBS[pathname];
+  // Solo se interpreta como un id de documento si la ruta no coincide con ninguna ruta estática
+  // conocida (bug corregido: "/dashboard/documents/create" y ".../created" también matchean
+  // DOCUMENT_DETAIL_PATTERN por ser un solo segmento, lo que disparaba un
+  // GET /document/create|created inexistente y rompía sus propios breadcrumbs estáticos).
+  const documentId = staticCrumbs
+    ? undefined
+    : pathname.match(DOCUMENT_DETAIL_PATTERN)?.[1];
   const { data: document } = useDocumentDetail(documentId ?? '', {
     enabled: !!documentId,
   });
@@ -78,7 +85,7 @@ function useCrumbs(pathname: string): Crumb[] {
     ];
   }
 
-  return STATIC_CRUMBS[pathname] ?? [];
+  return staticCrumbs ?? [];
 }
 
 export default function DashboardBreadcrumbs() {
