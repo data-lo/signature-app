@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  useFieldArray,
-  useWatch,
-  type Control,
-  type FieldErrors,
-} from 'react-hook-form';
+import { useFieldArray, useWatch, type Control } from 'react-hook-form';
 import { UserPlus, Eye } from 'lucide-react';
 import {
   DndContext,
@@ -22,10 +17,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Button } from '@/components/ui/button';
-import { FieldError } from '@/components/ui/field';
 import CollaboratorFormItem from './CollaboratorFormItem';
 import SortableCollaboratorItem from './SortableCollaboratorItem';
 import {
+  countSigners,
   emptySigner,
   emptyViewer,
   type CreateDocumentSignaturesFormValues,
@@ -33,26 +28,27 @@ import {
 
 interface CollaboratorsFieldArrayProps {
   control: Control<CreateDocumentSignaturesFormValues>;
-  errors: FieldErrors<CreateDocumentSignaturesFormValues>;
 }
 
-/** Escenario 2 de la historia: firmantes y espectadores viven en un solo arreglo (`collaborators`), diferenciados por `collaboratorType`. */
+/**
+ * Escenario 2 de la historia: firmantes y espectadores viven en un solo arreglo
+ * (`collaborators`), diferenciados por `collaboratorType`. Este componente es dueño del arreglo
+ * (alta, baja y reordenamiento); los errores de cada campo los muestra cada campo, y el error
+ * general de "agrega al menos un firmante" lo muestra la sección que lo envuelve
+ * (`DocumentParticipantsSection`).
+ */
 export default function CollaboratorsFieldArray({
   control,
-  errors,
 }: CollaboratorsFieldArrayProps) {
   const { fields, append, remove, move } = useFieldArray({
     control,
     name: 'collaborators',
   });
   const requiresOrder = useWatch({ control, name: 'requiresOrder' });
-  const signerCount = fields.filter(
-    (field) => field.collaboratorType === 'SIGNER',
-  ).length;
   // Espejo de MIN_SIGNERS_FOR_ORDER en RequiresOrderField: sin esta misma condición aquí, el
   // toggle podría quedar en true (estado obsoleto, antes de que su propio useEffect lo apague)
   // mientras esta lista ya no tiene suficientes firmantes para justificar el Drag and Drop.
-  const canReorder = requiresOrder === true && signerCount > 2;
+  const canReorder = requiresOrder === true && countSigners(fields) > 2;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -71,10 +67,6 @@ export default function CollaboratorsFieldArray({
       move(oldIndex, newIndex);
     }
   }
-
-  const rootError =
-    errors.collaborators?.message ??
-    (errors.collaborators?.root as { message?: string } | undefined)?.message;
 
   return (
     <div className="flex flex-col gap-3">
@@ -110,8 +102,6 @@ export default function CollaboratorsFieldArray({
         </p>
       )}
 
-      {rootError && <FieldError>{rootError}</FieldError>}
-
       {canReorder ? (
         <DndContext
           sensors={sensors}
@@ -129,7 +119,6 @@ export default function CollaboratorsFieldArray({
                     <CollaboratorFormItem
                       index={index}
                       control={control}
-                      errors={errors}
                       onRemove={() => remove(index)}
                       orderIndex={index + 1}
                       dragHandleProps={dragHandleProps}
@@ -147,7 +136,6 @@ export default function CollaboratorsFieldArray({
               key={field.id}
               index={index}
               control={control}
-              errors={errors}
               onRemove={() => remove(index)}
             />
           ))}

@@ -19,7 +19,7 @@ function Harness({
   signerCount: number;
   requiresOrder: boolean;
 }) {
-  const { control, formState } = useForm<CreateDocumentSignaturesFormValues>({
+  const { control } = useForm<CreateDocumentSignaturesFormValues>({
     defaultValues: {
       requiresApproval: false,
       includeMeAsSigner: false,
@@ -28,7 +28,7 @@ function Harness({
     },
   });
 
-  return <CollaboratorsFieldArray control={control} errors={formState.errors} />;
+  return <CollaboratorsFieldArray control={control} />;
 }
 
 describe('CollaboratorsFieldArray', () => {

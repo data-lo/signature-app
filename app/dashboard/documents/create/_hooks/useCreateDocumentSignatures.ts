@@ -6,23 +6,21 @@ import { getErrorMessage } from '@/lib/error-handler';
 import { createDocumentSignaturesRequest } from '../_requests';
 import {
   computeRequiresDifferentSignatures,
-  toBackendCollaboratorPayload,
-  type CollaboratorFormValues,
-} from '../_schemas';
+  toCollaboratorPayloads,
+} from '../_mappers/collaborator-payload.mapper';
+import type { CreateDocumentSignaturesInput } from '../_interfaces/create-document-signatures-request.interface';
 
-interface CreateDocumentSignaturesParams {
-  file: File;
-  fileName: string;
-  requiresApproval: boolean;
-  requiresOrder: boolean;
-  collaborators: CollaboratorFormValues[];
-}
+export const CREATE_DOCUMENT_ERROR_MESSAGE =
+  'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.';
 
 /**
  * Escenario 4 de la historia: tras un envío exitoso, `mutate` invalida `myDocuments` (la tabla
- * se refresca sola por el refetch de React Query) — la limpieza del formulario/FilePond
- * (`form.reset()`) la maneja el caller en `onSuccess`, porque solo el componente tiene la
- * instancia del form de react-hook-form y el estado del File de FilePond.
+ * se refresca sola por el refetch de React Query) — la limpieza del formulario y del widget de
+ * carga la maneja el caller en `onSuccess` (ver `useCreateDocumentForm`), porque solo él tiene
+ * la instancia del formulario y el estado del archivo.
+ *
+ * La traducción de los valores del formulario al payload del backend vive en `_mappers/`: aquí
+ * solo se orquesta la mutación y sus efectos (toast, invalidación de caché).
  */
 export function useCreateDocumentSignatures() {
   const queryClient = useQueryClient();
@@ -34,31 +32,20 @@ export function useCreateDocumentSignatures() {
       requiresApproval,
       requiresOrder,
       collaborators,
-    }: CreateDocumentSignaturesParams) => {
-      const payload = collaborators.map((collaborator, index) =>
-        toBackendCollaboratorPayload(collaborator, index),
-      );
-      const requiresDifferentSignatures =
-        computeRequiresDifferentSignatures(collaborators);
-
-      return createDocumentSignaturesRequest(
+    }: CreateDocumentSignaturesInput) =>
+      createDocumentSignaturesRequest({
         file,
-        { fileName, requiresApproval, isSequential: requiresOrder },
-        payload,
-        requiresDifferentSignatures,
-      );
-    },
+        documentData: { fileName, requiresApproval, isSequential: requiresOrder },
+        collaborators: toCollaboratorPayloads(collaborators),
+        requiresDifferentSignatures:
+          computeRequiresDifferentSignatures(collaborators),
+      }),
     onSuccess: () => {
       toast.success('Documento enviado a firma correctamente');
       queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
     },
     onError: (error) => {
-      toast.error(
-        getErrorMessage(
-          error,
-          'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.',
-        ),
-      );
+      toast.error(getErrorMessage(error, CREATE_DOCUMENT_ERROR_MESSAGE));
     },
   });
 }
