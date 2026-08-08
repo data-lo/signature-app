@@ -44,6 +44,9 @@ import {
   type RejectDocumentFormValues,
 } from '../_schemas';
 import CancellationConfirmDialog from './CancellationConfirmDialog';
+import AdvancedSignatureDialog, {
+  type AdvancedSignatureSubmitValues,
+} from './AdvancedSignatureDialog';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
   ssr: false,
@@ -84,6 +87,8 @@ export default function SignDocumentView({
   const [codeRequested, setCodeRequested] = useState(false);
   const [showSignatureRequiredDialog, setShowSignatureRequiredDialog] =
     useState(false);
+  const [showAdvancedSignatureDialog, setShowAdvancedSignatureDialog] =
+    useState(false);
   const user = useAuthStore((state) => state.user);
   const { data: document, isLoading, isError } = useDocumentDetail(documentId);
   const {
@@ -114,7 +119,11 @@ export default function SignDocumentView({
     rejectMutation.mutate(values.reason);
   }
 
-  async function handleSign() {
+  async function handleSignClick() {
+    if (document?.mySignatureType === SignatureType.Fiel) {
+      setShowAdvancedSignatureDialog(true);
+      return;
+    }
     const { coords, error } = await requestLocation();
     if (error) {
       toast(
@@ -122,6 +131,14 @@ export default function SignDocumentView({
       );
     }
     signMutation.mutate(coords ?? undefined);
+  }
+
+  function handleAdvancedSignatureSubmit(
+    values: AdvancedSignatureSubmitValues,
+  ) {
+    signMutation.mutate(values, {
+      onSuccess: () => setShowAdvancedSignatureDialog(false),
+    });
   }
 
   const needsSimpleSignatureSetup =
@@ -308,7 +325,7 @@ export default function SignDocumentView({
                     type="button"
                     className="w-full"
                     disabled={geoStatus === 'requesting' || signMutation.isPending}
-                    onClick={handleSign}
+                    onClick={handleSignClick}
                   >
                     {geoStatus === 'requesting'
                       ? 'Obteniendo ubicación...'
@@ -473,6 +490,13 @@ export default function SignDocumentView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AdvancedSignatureDialog
+        open={showAdvancedSignatureDialog}
+        onOpenChange={setShowAdvancedSignatureDialog}
+        onSubmit={handleAdvancedSignatureSubmit}
+        confirming={signMutation.isPending}
+      />
 
       <CancellationConfirmDialog
         open={showCancellationDialog}

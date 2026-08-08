@@ -32,6 +32,30 @@ jest.mock('../../_components/PdfPreview', () => ({
   __esModule: true,
   default: ({ file }: { file: string }) => <div>PDF preview: {file}</div>,
 }));
+jest.mock('./EfirmaFilePicker', () => ({
+  __esModule: true,
+  default: ({
+    extension,
+    onFileSelected,
+  }: {
+    extension: string;
+    fileLabel: string;
+    onFileSelected: (file: File | null) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onFileSelected(
+          new File(['contenido'], `archivo.${extension}`, {
+            type: 'application/octet-stream',
+          }),
+        )
+      }
+    >
+      {`Seleccionar archivo .${extension} de prueba`}
+    </button>
+  ),
+}));
 jest.mock('react-hot-toast', () => ({
   __esModule: true,
   default: Object.assign(jest.fn(), { success: jest.fn(), error: jest.fn() }),
@@ -630,5 +654,89 @@ describe('SignDocumentView', () => {
 
     expect(screen.getByText('PDF preview: https://minio/file')).toBeInTheDocument();
     expect(screen.queryByText(/stale-detail-url/i)).not.toBeInTheDocument();
+  });
+
+  describe('firma electrónica avanzada (FIEL)', () => {
+    function renderFielDocument() {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({
+          canSign: true,
+          canReject: true,
+          mySignatureType: SignatureType.Fiel,
+        }),
+        isLoading: false,
+        isError: false,
+      });
+      return renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    }
+
+    it('al hacer clic en "Continuar a firmar" abre el diálogo de e.firma en vez de firmar directamente', async () => {
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      expect(
+        await screen.findByText(/firma electrónica avanzada \(e\.firma\)/i),
+      ).toBeInTheDocument();
+      expect(signMutate).not.toHaveBeenCalled();
+    });
+
+    it('al completar y enviar el formulario de e.firma, llama a signMutate con la contraseña y los archivos', async () => {
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+      const dialog = await screen.findByRole('dialog');
+
+      await user.click(
+        within(dialog).getByRole('button', {
+          name: /seleccionar archivo \.key/i,
+        }),
+      );
+      await user.click(
+        within(dialog).getByRole('button', {
+          name: /seleccionar archivo \.cer/i,
+        }),
+      );
+      await user.type(
+        within(dialog).getByLabelText(/contraseña de la llave privada/i),
+        'MiContraseña123',
+      );
+      await user.click(
+        within(dialog).getByRole('button', { name: /firmar documento/i }),
+      );
+
+      expect(signMutate).toHaveBeenCalledWith(
+        {
+          password: 'MiContraseña123',
+          keyFile: expect.any(File),
+          cerFile: expect.any(File),
+        },
+        expect.anything(),
+      );
+    });
+
+    it('cancelar el diálogo de e.firma lo cierra sin firmar', async () => {
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      await user.click(
+        within(dialog).getByRole('button', { name: /cancelar/i }),
+      );
+
+      expect(
+        screen.queryByText(/firma electrónica avanzada \(e\.firma\)/i),
+      ).not.toBeInTheDocument();
+      expect(signMutate).not.toHaveBeenCalled();
+    });
   });
 });
