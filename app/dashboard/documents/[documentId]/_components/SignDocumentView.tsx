@@ -37,7 +37,10 @@ import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
 import { useRequestCancellation } from '../_hooks/useRequestCancellation';
 import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
-import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
+import {
+  useRequestVerificationCode,
+  UNDELIVERED_CODE_MESSAGE,
+} from '../_hooks/useRequestVerificationCode';
 import { useVerifyCode } from '../_hooks/useVerifyCode';
 import {
   rejectDocumentSchema,
@@ -85,6 +88,12 @@ export default function SignDocumentView({
     useState(false);
   const [verificationCodeInput, setVerificationCodeInput] = useState('');
   const [codeRequested, setCodeRequested] = useState(false);
+  // `null` mientras no se ha pedido ningún código; `false` cuando el backend lo emitió pero no
+  // pudo mandar el correo (ver useRequestVerificationCode) — ahí se avisa de forma persistente,
+  // porque un toast se va y el usuario se quedaría esperando un correo que no va a llegar.
+  const [codeEmailDelivered, setCodeEmailDelivered] = useState<boolean | null>(
+    null,
+  );
   const [showSignatureRequiredDialog, setShowSignatureRequiredDialog] =
     useState(false);
   const [showAdvancedSignatureDialog, setShowAdvancedSignatureDialog] =
@@ -141,9 +150,15 @@ export default function SignDocumentView({
     });
   }
 
+  // Bug corregido: mientras el store todavía no hidrata el perfil (`user` undefined), esta
+  // condición daba `true` y abría el modal "Firma no configurada" —bloqueando la pantalla
+  // completa— a usuarios que sí tenían su firma lista; se veía como un modal fantasma que
+  // aparecía y desaparecía según lo que tardara `/auth/me`. Igual que `useOnboardingReady`,
+  // "todavía no sé" se trata distinto de "sé que falta": sin perfil no se afirma nada.
   const needsSimpleSignatureSetup =
     document?.mySignatureType === SignatureType.Simple &&
-    !user?.signatureConfigured;
+    user != null &&
+    !user.signatureConfigured;
 
   // Alcance: solo firma simple. Bloquea también la lectura del documento (no solo
   // los botones de firma) porque el usuario puede llegar por URL directa (ej.
@@ -256,6 +271,11 @@ export default function SignDocumentView({
                     <p className="text-sm text-muted-foreground">
                       Solicita y valida tu código antes de firmar.
                     </p>
+                    {codeEmailDelivered === false && (
+                      <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                        {UNDELIVERED_CODE_MESSAGE}
+                      </p>
+                    )}
                     {!codeRequested ? (
                       <Button
                         type="button"
@@ -263,7 +283,10 @@ export default function SignDocumentView({
                         disabled={requestVerificationCodeMutation.isPending}
                         onClick={() =>
                           requestVerificationCodeMutation.mutate(undefined, {
-                            onSuccess: () => setCodeRequested(true),
+                            onSuccess: (data) => {
+                              setCodeRequested(true);
+                              setCodeEmailDelivered(data?.emailDelivered ?? true);
+                            },
                           })
                         }
                       >
@@ -303,7 +326,12 @@ export default function SignDocumentView({
                           variant="ghost"
                           disabled={requestVerificationCodeMutation.isPending}
                           onClick={() =>
-                            requestVerificationCodeMutation.mutate()
+                            requestVerificationCodeMutation.mutate(undefined, {
+                              onSuccess: (data) =>
+                                setCodeEmailDelivered(
+                                  data?.emailDelivered ?? true,
+                                ),
+                            })
                           }
                         >
                           Reenviar código
@@ -333,14 +361,27 @@ export default function SignDocumentView({
                         ? 'Firmando...'
                         : 'Continuar a firmar'}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setShowRejectForm(true)}
-                  >
-                    Rechazar documento
-                  </Button>
                 </div>
+              )}
+
+              {/*
+                Bug corregido: "Rechazar documento" vivía dentro del bloque que exige la
+                verificación confirmada, así que un firmante con 2FA pendiente no podía ni firmar
+                ni rechazar — y si además el correo del código no salía, se quedaba sin ninguna
+                acción disponible. Rechazar es negarse a firmar, no firmar: el backend nunca pidió
+                el código para `PATCH /document/:id/reject` (ver reject() en signature-server), así
+                que la única puerta era esta condición de UI. Sigue dentro del bloque `inert` de
+                "firma no configurada" porque el backend sí exige firma en archivo para rechazar.
+              */}
+              {document.canReject && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setShowRejectForm(true)}
+                >
+                  Rechazar documento
+                </Button>
               )}
             </div>
           </div>
