@@ -12,6 +12,7 @@ import { getPendingSignatureContext } from '@/lib/pending-signature-context';
 import { getErrorMessage } from '@/lib/error-handler';
 import { loginSchema, type LoginFormValues } from '../_schemas';
 import { useLogin } from '../_hooks/useLogin';
+import { Form } from '@/components/form/form';
 
 export default function LoginForm() {
   const [hasPendingSignature, setHasPendingSignature] = useState(false);
@@ -43,7 +44,7 @@ export default function LoginForm() {
             simple.
           </div>
         )}
-        <form onSubmit={handleSubmit((values) => loginMutation.mutate(values))}>
+        <Form onSubmit={handleSubmit((values) => loginMutation.mutate(values))}>
           <FieldGroup>
             <TextField
               id="email"
@@ -98,7 +99,7 @@ export default function LoginForm() {
               </Link>
             </p>
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </Card>
   );

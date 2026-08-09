@@ -14,6 +14,7 @@ import {
 import { getErrorMessage } from '@/lib/error-handler';
 import { forgotPasswordRequest, verifyResetCodeRequest } from '../_requests';
 import { otpStepSchema, type OtpStepFormValues } from '../_schemas';
+import { Form } from '@/components/form/form';
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -99,7 +100,7 @@ export default function OtpVerificationStep({
           Ingrésalo para continuar.
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <Form onSubmit={handleSubmit(onSubmit)}>
           <FieldGroup>
             <Field data-invalid={errors.code ? true : undefined}>
               <FieldLabel htmlFor="code">Código de verificación</FieldLabel>
@@ -154,7 +155,7 @@ export default function OtpVerificationStep({
               </p>
             )}
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </>
   );

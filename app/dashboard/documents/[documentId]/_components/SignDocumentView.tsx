@@ -50,6 +50,7 @@ import CancellationConfirmDialog from './CancellationConfirmDialog';
 import AdvancedSignatureDialog, {
   type AdvancedSignatureSubmitValues,
 } from './AdvancedSignatureDialog';
+import { Form } from '@/components/form/form';
 
 const PdfPreview = dynamic(() => import('../../_components/PdfPreview'), {
   ssr: false,
@@ -388,7 +389,7 @@ export default function SignDocumentView({
         )}
 
         {document.canReject && showRejectForm && (
-          <form
+          <Form
             onSubmit={handleSubmit(onReject)}
             className="flex flex-col gap-2 rounded-lg border border-border p-4"
           >
@@ -420,7 +421,7 @@ export default function SignDocumentView({
                 Cancelar
               </Button>
             </div>
-          </form>
+          </Form>
         )}
 
         {!document.canSign && document.myStatus && (

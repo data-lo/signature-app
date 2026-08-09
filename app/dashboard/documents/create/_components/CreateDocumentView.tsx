@@ -12,6 +12,7 @@ import DocumentConfigurationSection from './DocumentConfigurationSection';
 import DocumentParticipantsSection from './DocumentParticipantsSection';
 import DocumentSignaturePlacementSection from './DocumentSignaturePlacementSection';
 import CreatedDocumentsSection from './CreatedDocumentsSection';
+import { Form } from '@/components/form/form';
 
 interface CreateDocumentViewProps {
   /**
@@ -64,7 +65,7 @@ export default function CreateDocumentView({
           Prepara un documento para solicitar que sea firmado
         </h1>
 
-        <form
+        <Form
           onSubmit={createDocumentForm.handleSubmit}
           className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2"
         >
@@ -107,7 +108,7 @@ export default function CreateDocumentView({
             getValues={createDocumentForm.form.getValues}
             setValue={createDocumentForm.form.setValue}
           />
-        </form>
+        </Form>
       </div>
 
       <CreatedDocumentsSection
