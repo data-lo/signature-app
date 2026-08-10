@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { FieldGroup } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { rfcSchema, type RfcFormValues } from '../_schemas';
+import { Form } from '@/components/form/form';
 
 interface RfcFormProps {
   onSubmit: (rfc: string) => void;
@@ -20,7 +21,7 @@ export default function RfcForm({ onSubmit, submitting }: RfcFormProps) {
   } = useForm<RfcFormValues>({ resolver: zodResolver(rfcSchema) });
 
   return (
-    <form
+    <Form
       onSubmit={handleSubmit((values) => onSubmit(values.rfc.toUpperCase()))}
       className="flex flex-col gap-4"
     >
@@ -37,6 +38,6 @@ export default function RfcForm({ onSubmit, submitting }: RfcFormProps) {
       <Button type="submit" disabled={submitting} className="w-full">
         {submitting ? 'Validando...' : 'Continuar'}
       </Button>
-    </form>
+    </Form>
   );
 }

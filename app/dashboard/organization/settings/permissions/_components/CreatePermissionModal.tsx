@@ -21,6 +21,7 @@ import {
   createPermissionSchema,
   type CreatePermissionFormValues,
 } from '../_schemas';
+import { Form } from '@/components/form/form';
 
 interface CreatePermissionModalProps {
   organizationId: string;
@@ -70,7 +71,7 @@ export default function CreatePermissionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form
+        <Form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-4"
         >
@@ -100,7 +101,7 @@ export default function CreatePermissionModal({
               {createPermissionMutation.isPending ? 'Creando...' : 'Crear'}
             </Button>
           </DialogFooter>
-        </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

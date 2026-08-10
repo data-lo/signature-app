@@ -18,6 +18,7 @@ import {
 } from '@/lib/pending-registration-context';
 import { verifyOtpRequest, resendOtpRequest } from '../../_requests';
 import { verifyOtpSchema, type VerifyOtpFormValues } from '../_schemas';
+import { Form } from '@/components/form/form';
 
 type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -109,7 +110,7 @@ export default function VerifyOtpForm() {
           cuenta.
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <Form onSubmit={handleSubmit(onSubmit)}>
           <FieldGroup>
             <TextField
               id="code"
@@ -148,7 +149,7 @@ export default function VerifyOtpForm() {
               </p>
             )}
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </Card>
   );

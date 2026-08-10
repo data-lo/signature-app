@@ -12,6 +12,7 @@ import { getPendingSignatureContext } from '@/lib/pending-signature-context';
 import { getErrorMessage } from '@/lib/error-handler';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
 import { useRegister } from '../_hooks/useRegister';
+import { Form } from '@/components/form/form';
 
 interface SignupFormProps {
   /** Prellenado cuando se llega desde /join con un RFC nuevo (ver Escenario 4 de la historia). */
@@ -62,7 +63,7 @@ export default function SignupForm({
             firma del documento.
           </div>
         )}
-        <form
+        <Form
           onSubmit={handleSubmit((values) =>
             registerMutation.mutate({ ...values, invitationToken }),
           )}
@@ -153,7 +154,7 @@ export default function SignupForm({
               </Link>
             </p>
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </Card>
   );

@@ -92,10 +92,28 @@ export async function signDocumentRequest(
   await apiClient.patch(`/document/${documentId}/sign`, formData);
 }
 
+/**
+ * Emisión del código de verificación de firma. `emailDelivered` distingue "el código quedó
+ * emitido y salió el correo" de "quedó emitido pero el correo no salió": el backend ya no
+ * responde 500 cuando falla el proveedor de correo (dejaba al firmante sin poder firmar ni
+ * rechazar, ver signature-server), así que la pantalla necesita ese dato para avisarlo.
+ */
+export interface RequestVerificationCodeResponseData {
+  emailDelivered: boolean;
+}
+
 export async function requestVerificationCodeRequest(
   documentId: string,
-): Promise<void> {
-  await apiClient.post(`/document/${documentId}/verification-codes`);
+): Promise<RequestVerificationCodeResponseData> {
+  const { data } = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: RequestVerificationCodeResponseData | null;
+  }>(`/document/${documentId}/verification-codes`);
+
+  // Un backend anterior a este contrato responde `data: null`; si llegó hasta acá con 2xx, el
+  // correo salió (antes un fallo de envío era un 500), así que se asume entregado.
+  return { emailDelivered: data.data?.emailDelivered ?? true };
 }
 
 export async function verifyCodeRequest(

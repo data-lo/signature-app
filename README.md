@@ -393,19 +393,49 @@ Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) co
 ### Tests
 
 ```bash
-npm run test        # corre toda la suite con Jest
-npm run test:watch  # modo watch
+npm run test          # unitarias/componente (Jest + React Testing Library)
+npm run test:watch    # modo watch
+npm run test:e2e      # end-to-end reales (Playwright + Chromium) — ver e2e/README.md
+npm run test:e2e:report
 ```
 
 Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `eslint.config.mjs`/`postcss.config.mjs`) + React Testing Library + `jest-dom`. `test-utils.tsx` en la raíz expone `renderWithProviders()`, que envuelve en un `QueryClientProvider` de prueba (retries desactivados) para componentes que usan React Query. Los specs están co-localizados junto a su componente/schema (`*.spec.ts`/`*.spec.tsx`), igual que en `signature-server`.
 
 **Estado real de la suite (`npx jest --silent`, tras el refactor de la pantalla de carga y configuración)**: **57 suites / 327 tests**, con **1 suite / 2 tests en rojo** — exactamente `lib/axios.spec.ts`, el spec dedicado a la regresión de `baseURL` descrita en la sección 1/5 (espera una URL absoluta y recibe `/api`). Cualquier cifra de tests reportada en entradas anteriores de la sección 9 (p. ej. "116 tests", "101 tests en 21 suites") quedó desactualizada — usa esta cifra como la vigente hasta la próxima ronda.
 
+**Suite E2E (`e2e/`, Playwright + Chromium)**: **34 pruebas en 6 archivos, todas en verde**, corriendo contra la aplicación real (frontend `:3001` + backend NestJS `:3000` + docker-compose de `signature-server`) — sin mocks: los documentos que crea se suben a MinIO y quedan en Postgres. Cubre rutas públicas y guardas del middleware, registro con OTP y login, onboarding, la pantalla de carga y configuración (incluida la ubicación de firmas por arrastre y el envío real), el recorrido de firma/rechazo entre dos cuentas, y organizaciones. Ver `e2e/README.md` para requisitos, decisiones del arnés y por qué la sesión se prepara por API (el login está limitado a 5 intentos por minuto). Las pruebas cuyo nombre empieza con `HALLAZGO:` documentan bugs reales encontrados (ver sección 9), no comportamiento deseado.
+
 **`jest.setup.ts` polyfills para popups de `@base-ui/react`**: jsdom no implementa `ResizeObserver` ni `PointerEvent` (ni `hasPointerCapture`/`setPointerCapture`/`scrollIntoView` en `Element`), y `Select`/`Popover`/`dropdown-menu` los usan para posicionarse y para abrir con click. Sin estos stubs, un popup se queda montado con `hidden`/`data-closed` sin importar cuántas veces se le haga `userEvent.click()` al trigger — no es un bug del componente, es la ausencia de estas APIs en jsdom. Con el polyfill, `click` sigue sin abrir el popup de forma confiable (aparentemente porque base-ui espera una secuencia de eventos de puntero más específica que la que dispara `userEvent` incluso con el polyfill) — el camino confiable que sí funciona es teclado: `trigger.focus()` + `userEvent.keyboard('{Enter}')` para abrir, luego `userEvent.click()` sobre la opción (`role="option"`) para seleccionar y cerrar (ver `InviteMemberModal.spec.tsx` para el patrón completo).
 
 ---
 
 ## 9. Pendientes / trabajo futuro
+
+### Hallazgos de la auditoría E2E (Playwright + Chromium, aplicación real) — 2026-08-08
+
+Corrida completa del producto en Chromium contra el backend y la infraestructura reales. Los bugs de abajo están **reproducidos y fijados en pruebas** (las que empiezan con `HALLAZGO:` en `e2e/`), así que fallarán solas cuando se corrijan y haya que actualizarlas.
+
+**Bloqueantes del flujo de firma**
+
+1. ~~**El firmante no puede abrir un documento desde su propio listado (403).**~~ **CORREGIDO (2026-08-08).** `GET /document/:id` y `GET /document/file/:id` autorizaban por `accountId` del colaborador, que queda en `NULL` hasta que el firmante entra por el enlace del correo (`/access-document` → `PATCH /document/:id/link-collaborator`); el listado "Por firmar", en cambio, filtra por correo, así que **mostraba documentos que la pantalla de detalle después rechazaba** con "No se pudo cargar el documento". Ahora el backend resuelve al colaborador por cuenta vinculada o, si la invitación sigue pendiente, por correo — el mismo criterio que `sign()`/`reject()` ya usaban, sin vincular nada en una lectura (ver `signature-server/README.md`, sección 7). Las pruebas E2E que documentaban el 403 ahora verifican el detalle y el visor del PDF cargando para el firmante invitado.
+2. ~~**Un fallo de correo bloquea la firma aunque el código ya exista.**~~ **CORREGIDO (2026-08-09).** `POST /document/:id/verification-codes` persistía el código y *después* intentaba enviarlo; si el proveedor de correo fallaba respondía 500 y la pantalla nunca mostraba el campo para capturarlo — el firmante no podía avanzar aunque el código estuviera emitido. Ahora el envío es no fatal (mismo criterio que ya usaba el OTP de registro) y el endpoint reporta `data.emailDelivered`: el hook cambia el toast por una advertencia y `SignDocumentView` muestra un aviso persistente junto a "Reenviar código", de modo que el firmante siempre puede continuar. Ver `signature-server/README.md`, sección 7.
+3. ~~**Sin código validado, el firmante tampoco puede rechazar.**~~ **CORREGIDO (2026-08-09).** En `SignDocumentView` el bloque de acciones —incluido "Rechazar documento"— solo se renderizaba cuando `verificationConfirmed` era true; combinado con el punto 2, el firmante se quedaba literalmente sin ninguna acción. Era una puerta puramente de UI: `PATCH /document/:id/reject` nunca exigió el código (ver `reject()` en signature-server, que sí valida estatus, turno y firma en archivo). El botón salió de esa condición y ahora se ofrece según `canReject`, manteniéndose dentro del bloque de "firma no configurada" porque el backend sí exige firma en archivo para rechazar.
+
+**Validación e inconsistencias de UI**
+
+4. **La validación nativa del navegador tapa los mensajes de la aplicación.** Ningún `<form>` declara `noValidate`, así que con un correo mal escrito el navegador corta el envío y muestra su globo en inglés; react-hook-form nunca llega a validar y **no se muestra ningún mensaje en español**, ni siquiera el de los otros campos que también están mal. Se reproduce en `/signup` y `/login`. Arreglo: `noValidate` en los formularios que ya validan con Zod.
+5. **`/error` no es alcanzable.** La pantalla genérica de error queda detrás del guard de sesión (no está en `AUTH_ROUTES` ni excluida del matcher del middleware): sin token, cualquier visita termina en `/login`.
+6. **Branding inconsistente entre pantallas públicas.** `/login` y el dashboard dicen "Firmalo"; `/signup` y `/access-document` dicen "Signature".
+7. **Accesibilidad**: `CardTitle` se renderiza como `div`, así que pantallas como `/login` no tienen ningún encabezado real; y la caja de firma colocada sobre el PDF (`SignatureBox`) expone `role="button"` (de dnd-kit) sin nombre propio, por lo que un lector de pantalla anuncia dos botones "Eliminar firma" indistinguibles. Un `aria-label` explícito (`Firma de {nombre} en la página N`) resuelve el segundo.
+
+10. ~~**Modal fantasma "Firma no configurada".**~~ **CORREGIDO (2026-08-09).** Detectado por la intermitencia de la suite E2E: `needsSimpleSignatureSetup` en `SignDocumentView` evaluaba `!user?.signatureConfigured` mientras el store todavía no hidrataba el perfil, así que el modal bloqueaba la pantalla completa a usuarios que sí tenían su firma lista, según lo que tardara `/auth/me`. Ahora "todavía no sé" se distingue de "sé que falta" (mismo criterio que `useOnboardingReady`).
+
+**Operación**
+
+8. **El límite de 5 peticiones por minuto por IP en `/auth/*` es agresivo para IP compartida** (oficina/NAT): basta que tres personas se equivoquen de contraseña para dejar sin login a toda la red durante un minuto. La suite E2E tuvo que preparar sesiones por API justamente por esto. Vale considerar la ventana por IP+correo.
+9. **Intermitente (1 de ~4 corridas)**: tras crear una organización, la pantalla de creación quedó bloqueada por "onboarding incompleto" para un usuario que sí estaba configurado, y el switcher seguía mostrando la cuenta personal; se recuperó al recargar. Apunta a una carrera entre la creación de la cuenta de organización y el perfil cacheado que hidrata `useAuthStore`. No se pudo reproducir de forma determinista — queda anotado con la evidencia (`expectCreateScreenReady` en `e2e/helpers/ui.ts` recarga una vez por esta razón).
+
+**Lo que sí funciona de punta a punta** (verificado en la corrida): registro con OTP → login → onboarding → carga de PDF → configuración de participantes → ubicación de firmas por arrastre → envío multipart real (MinIO + Kafka + Postgres) → listado de creados → enlace del correo → verificación → firma → rechazo → organizaciones e invitaciones.
 
 ### Resuelto en esta ronda (refactor de la pantalla de carga y configuración de documentos) — 2026-08-08
 

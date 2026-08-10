@@ -24,6 +24,7 @@ import {
   inviteMemberSchema,
   type InviteMemberFormValues,
 } from '../_invite-member-schema';
+import { Form } from '@/components/form/form';
 
 export default function InviteMemberModal() {
   const [open, setOpen] = useState(false);
@@ -75,7 +76,7 @@ export default function InviteMemberModal() {
             la organización.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        <Form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FieldGroup>
             <FormInput
               control={control}
@@ -123,7 +124,7 @@ export default function InviteMemberModal() {
                 : 'Enviar invitación'}
             </Button>
           </DialogFooter>
-        </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
