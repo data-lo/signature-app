@@ -17,6 +17,7 @@ import {
 } from '../_schemas';
 import { useUploadPersonalDocuments } from '../_hooks/useUploadPersonalDocuments';
 import DocumentDropzone from './DocumentDropzone';
+import { Form } from '@/components/form/form';
 
 export default function PersonalDocumentsForm() {
   const {
@@ -58,7 +59,7 @@ export default function PersonalDocumentsForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
+        <Form
           onSubmit={handleSubmit((values) => uploadMutation.mutate(values))}
         >
           <FieldGroup>
@@ -94,7 +95,7 @@ export default function PersonalDocumentsForm() {
                 : 'Guardar documentos'}
             </Button>
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </Card>
   );

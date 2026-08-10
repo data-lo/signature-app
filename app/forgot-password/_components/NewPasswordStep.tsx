@@ -10,6 +10,7 @@ import { PasswordInput } from '@/components/form/password-input';
 import { getErrorMessage } from '@/lib/error-handler';
 import { resetPasswordRequest } from '../_requests';
 import { resetStepSchema, type ResetStepFormValues } from '../_schemas';
+import { Form } from '@/components/form/form';
 
 interface NewPasswordStepProps {
   resetToken: string;
@@ -56,7 +57,7 @@ export default function NewPasswordStep({
         <CardTitle>Nueva contraseña</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <Form onSubmit={handleSubmit(onSubmit)}>
           <FieldGroup>
             <PasswordInput
               id="newPassword"
@@ -80,7 +81,7 @@ export default function NewPasswordStep({
               {isSubmitting ? 'Actualizando...' : 'Actualizar contraseña'}
             </Button>
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </>
   );

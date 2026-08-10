@@ -17,6 +17,7 @@ import {
   type CreateOrganizationFormValues,
 } from '../_schemas';
 import { useCreateOrganization } from '../_hooks/useCreateOrganization';
+import { Form } from '@/components/form/form';
 
 export default function CreateOrganizationForm() {
   const {
@@ -41,7 +42,7 @@ export default function CreateOrganizationForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
+        <Form
           onSubmit={handleSubmit((values) =>
             createOrganizationMutation.mutate(values),
           )}
@@ -73,7 +74,7 @@ export default function CreateOrganizationForm() {
                 : 'Crear organización'}
             </Button>
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </Card>
   );

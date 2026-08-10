@@ -11,6 +11,7 @@ import { TextField } from '@/components/form/text-field';
 import { getErrorMessage } from '@/lib/error-handler';
 import { forgotPasswordRequest } from '../_requests';
 import { emailStepSchema, type EmailStepFormValues } from '../_schemas';
+import { Form } from '@/components/form/form';
 
 interface EmailRequestStepProps {
   onSuccess: (email: string) => void;
@@ -56,7 +57,7 @@ export default function EmailRequestStep({ onSuccess }: EmailRequestStepProps) {
           restablecer tu contraseña.
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <Form onSubmit={handleSubmit(onSubmit)}>
           <FieldGroup>
             <TextField
               id="email"
@@ -73,7 +74,7 @@ export default function EmailRequestStep({ onSuccess }: EmailRequestStepProps) {
               {isSubmitting ? 'Enviando...' : 'Enviar código'}
             </Button>
           </FieldGroup>
-        </form>
+        </Form>
       </CardContent>
     </>
   );

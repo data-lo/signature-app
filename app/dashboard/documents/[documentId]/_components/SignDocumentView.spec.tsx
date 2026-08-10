@@ -353,7 +353,9 @@ describe('SignDocumentView', () => {
   });
 
   it('bug corregido: si el documento requiere verificación y aún no se confirma, oculta "Continuar a firmar" y muestra el flujo de código en su lugar', async () => {
-    const requestCodeMutate = jest.fn((_vars, opts) => opts?.onSuccess?.());
+    const requestCodeMutate = jest.fn((_vars, opts) =>
+      opts?.onSuccess?.({ emailDelivered: true }),
+    );
     mockedUseRequestVerificationCode.mockReturnValue({
       mutate: requestCodeMutate,
       isPending: false,
@@ -395,6 +397,113 @@ describe('SignDocumentView', () => {
       '123456',
       expect.anything(),
     );
+  });
+
+  it('bug corregido: si el correo del código no se pudo enviar, la pantalla igual avanza al campo del código y avisa que no llegó (antes el 500 dejaba al firmante encerrado)', async () => {
+    const requestCodeMutate = jest.fn((_vars, opts) =>
+      opts?.onSuccess?.({ emailDelivered: false }),
+    );
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: requestCodeMutate,
+      isPending: false,
+    });
+    mockedUseVerifyCode.mockReturnValue({ mutate: jest.fn(), isPending: false });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /solicitar código de verificación/i }),
+    );
+
+    expect(
+      screen.getByPlaceholderText(/código de verificación/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no pudimos enviarte el correo/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /reenviar código/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('bug corregido: mientras el perfil no ha hidratado, NO se abre el modal "Firma no configurada" (antes bloqueaba la pantalla a quien sí la tenía lista)', () => {
+    useAuthStore.setState({ user: null });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.queryByRole('dialog', { name: /firma no configurada/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('bug corregido: con la verificación pendiente, el firmante todavía puede rechazar (rechazar es negarse a firmar, no firmar)', async () => {
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    // Firmar sigue bloqueado hasta validar el código...
+    expect(
+      screen.queryByRole('button', { name: /continuar a firmar/i }),
+    ).not.toBeInTheDocument();
+
+    // ...pero rechazar está disponible y abre el formulario de motivo.
+    await user.click(
+      screen.getByRole('button', { name: /rechazar documento/i }),
+    );
+
+    expect(
+      screen.getByPlaceholderText(/explica detalladamente por qué rechazas/i),
+    ).toBeInTheDocument();
+  });
+
+  it('sin permiso para rechazar (canReject:false) no se ofrece la acción', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: false,
+        requiresVerification: false,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    expect(
+      screen.queryByRole('button', { name: /rechazar documento/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('muestra "Continuar a firmar" directamente cuando la verificación ya fue confirmada', () => {
