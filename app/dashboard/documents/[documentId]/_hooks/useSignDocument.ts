@@ -8,6 +8,7 @@ import {
   signDocumentRequest,
   type SignDocumentPayload,
 } from '../_requests';
+import { DOCUMENTS_SECTIONS } from '../../_config/sections';
 
 export function useSignDocument(documentId: string) {
   const router = useRouter();
@@ -22,7 +23,7 @@ export function useSignDocument(documentId: string) {
         queryKey: ['documentDetail', documentId],
       });
       queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
-      router.push('/dashboard/documents');
+      router.push(DOCUMENTS_SECTIONS['to-sign'].href);
     },
     onError: (error) => {
       toast.error(

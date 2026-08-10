@@ -20,6 +20,7 @@ import {
 } from '../_schemas';
 import { useDocuments } from '../../_hooks/useDocuments';
 import { useDocumentsListState } from '../../_hooks/useDocumentsListState';
+import { DOCUMENTS_LIST_CONFIG } from '../../_config/sections';
 import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatures';
 import DocumentFilePicker from './DocumentFilePicker';
 import CollaboratorsFieldArray from './CollaboratorsFieldArray';
@@ -85,11 +86,11 @@ export default function CreateDocumentView({
   ).length;
 
   const { data: currentUser } = useCurrentUser();
+  // Mismo listado que la sección "Enviados para firma": documentos creados por el usuario.
   const { data: myDocuments } = useDocuments({
-    scope: 'creator',
-    email: currentUser?.email,
+    type: 'sent',
     page,
-    limit: 10,
+    limit: DOCUMENTS_LIST_CONFIG.sent.limit,
     filters,
   });
   const createMutation = useCreateDocumentSignatures();

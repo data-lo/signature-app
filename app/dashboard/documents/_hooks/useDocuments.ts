@@ -2,48 +2,43 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { getDocumentsRequest } from '../_requests';
 import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from '../_components/DocumentsFilterPanel';
-import type { DocumentStatus, ParticipantStatus } from '@/lib/enums/document';
+import {
+  DOCUMENTS_LIST_CONFIG,
+  type DocumentsListType,
+} from '../_config/sections';
 
 interface UseDocumentsParams {
-  /** 'participant': documentos donde el usuario colabora (Por firmar/Completados).
-   * 'creator': documentos enviados por el usuario (Enviados para firma). */
-  scope: 'participant' | 'creator';
-  email: string | undefined;
-  status?: DocumentStatus | ParticipantStatus.Pending | ParticipantStatus.Signed;
+  /** Sección del módulo (ver DOCUMENTS_LIST_CONFIG): define scope y status de la consulta. */
+  type: DocumentsListType;
   page: number;
   limit?: number;
   filters?: DocumentsFilters;
 }
 
 export function useDocuments({
-  scope,
-  email,
-  status,
+  type,
   page,
   limit,
   filters = EMPTY_DOCUMENTS_FILTERS,
 }: UseDocumentsParams) {
   const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
+  // El email siempre es el del usuario en sesión: se resuelve aquí para que cada sección solo
+  // tenga que declarar su `type` y no repita el mismo `useCurrentUser()` en cada vista.
+  const { data: currentUser } = useCurrentUser();
+  const email = currentUser?.email;
+  const { scope, status } = DOCUMENTS_LIST_CONFIG[type];
 
   // GET /document se filtra en el backend por X-Account-Id/X-Organization-Id (cuenta activa).
   // La queryKey debe incluir esa cuenta para que un cambio de cuenta invalide el caché en
   // vez de reutilizar la lista de la cuenta anterior.
   return useQuery({
-    queryKey: [
-      'myDocuments',
-      activeAccountId,
-      scope,
-      email,
-      status,
-      page,
-      limit,
-      filters,
-    ],
+    queryKey: ['myDocuments', activeAccountId, type, email, page, limit, filters],
     queryFn: () =>
       getDocumentsRequest({
         participantEmail: scope === 'participant' ? email : undefined,
