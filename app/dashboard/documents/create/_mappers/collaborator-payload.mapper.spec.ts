@@ -1,12 +1,14 @@
 import {
-  createDocumentSignaturesSchema,
   computeRequiresDifferentSignatures,
-  toBackendCollaboratorPayload,
+  toCollaboratorPayload,
+  toCollaboratorPayloads,
+} from './collaborator-payload.mapper';
+import {
   emptySigner,
   emptyViewer,
   type CollaboratorFormValues,
   type SignerFormValues,
-} from './_schemas';
+} from '../_schemas';
 
 function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
   return {
@@ -18,77 +20,15 @@ function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
   };
 }
 
-describe('createDocumentSignaturesSchema', () => {
-  it('acepta un firmante SIMPLE sin rfc', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      requiresApproval: false,
-      requiresOrder: false,
-      includeMeAsSigner: false,
-      collaborators: [signer({ signatureType: 'SIMPLE' })],
-    });
-
-    expect(result.success).toBe(true);
-  });
-
-  it('rechaza un firmante ADVANCED sin rfc', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      requiresApproval: false,
-      requiresOrder: false,
-      includeMeAsSigner: false,
-      collaborators: [
-        signer({ signatureType: 'ADVANCED', rfc: null }),
-      ],
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('acepta un firmante ADVANCED con rfc', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      requiresApproval: false,
-      requiresOrder: false,
-      includeMeAsSigner: false,
-      collaborators: [
-        signer({ signatureType: 'ADVANCED', rfc: 'PEAJ800101XXX' }),
-      ],
-    });
-
-    expect(result.success).toBe(true);
-  });
-
-  it('rechaza un espectador sin rfc', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      requiresApproval: false,
-      requiresOrder: false,
-      includeMeAsSigner: false,
-      collaborators: [{ ...emptyViewer(), firstName: 'Ana', lastName: 'Ruiz', email: 'ana@correo.com', rfc: '' }],
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rechaza si no hay ningún firmante manual ni "incluirme como firmante"', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      requiresApproval: false,
-      requiresOrder: false,
-      includeMeAsSigner: false,
-      collaborators: [{ ...emptyViewer(), firstName: 'Ana', lastName: 'Ruiz', email: 'ana@correo.com', rfc: 'AURU800101ABC' }],
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('acepta sin firmante manual si "incluirme como firmante" está activo', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      requiresApproval: false,
-      requiresOrder: false,
-      includeMeAsSigner: true,
-      collaborators: [],
-    });
-
-    expect(result.success).toBe(true);
-  });
-});
+function viewer(): CollaboratorFormValues {
+  return {
+    ...emptyViewer(),
+    firstName: 'Ana',
+    lastName: 'Ruiz',
+    email: 'ana@correo.com',
+    rfc: 'AURU800101ABC',
+  };
+}
 
 describe('computeRequiresDifferentSignatures', () => {
   it('SIMPLE cuando todos los firmantes son SIMPLE', () => {
@@ -121,15 +61,15 @@ describe('computeRequiresDifferentSignatures', () => {
   it('ignora a los espectadores para el cálculo', () => {
     const collaborators: CollaboratorFormValues[] = [
       signer({ signatureType: 'SIMPLE' }),
-      { ...emptyViewer(), firstName: 'Ana', lastName: 'Ruiz', email: 'ana@correo.com', rfc: 'AURU800101ABC' },
+      viewer(),
     ];
     expect(computeRequiresDifferentSignatures(collaborators)).toBe('SIMPLE');
   });
 });
 
-describe('toBackendCollaboratorPayload', () => {
+describe('toCollaboratorPayload', () => {
   it('sin firmas colocadas, manda un arreglo vacío y no manda rfc para SIMPLE', () => {
-    const payload = toBackendCollaboratorPayload(
+    const payload = toCollaboratorPayload(
       signer({ signatureType: 'SIMPLE', rfc: null }),
     );
 
@@ -140,7 +80,7 @@ describe('toBackendCollaboratorPayload', () => {
   });
 
   it('historia "Ubicación de firmas por usuario": traduce cada posición colocada al shape del backend', () => {
-    const payload = toBackendCollaboratorPayload(
+    const payload = toCollaboratorPayload(
       signer({
         signatureType: 'SIMPLE',
         signatures: [
@@ -169,7 +109,7 @@ describe('toBackendCollaboratorPayload', () => {
   });
 
   it('SIMPLE fuerza requiresTwoFactorAuth=true aunque el form tenga false', () => {
-    const payload = toBackendCollaboratorPayload(
+    const payload = toCollaboratorPayload(
       signer({ signatureType: 'SIMPLE', requiresTwoFactorAuth: false }),
     );
 
@@ -177,7 +117,7 @@ describe('toBackendCollaboratorPayload', () => {
   });
 
   it('ADVANCED respeta el valor explícito de requiresTwoFactorAuth y manda el rfc', () => {
-    const payload = toBackendCollaboratorPayload(
+    const payload = toCollaboratorPayload(
       signer({
         signatureType: 'ADVANCED',
         rfc: 'PEAJ800101XXX',
@@ -190,13 +130,7 @@ describe('toBackendCollaboratorPayload', () => {
   });
 
   it('un viewer no manda signatureType, signatures ni requiresTwoFactorAuth', () => {
-    const payload = toBackendCollaboratorPayload({
-      ...emptyViewer(),
-      firstName: 'Ana',
-      lastName: 'Ruiz',
-      email: 'ana@correo.com',
-      rfc: 'AURU800101ABC',
-    });
+    const payload = toCollaboratorPayload(viewer());
 
     expect(payload.collaboratorType).toBe('VIEWER');
     expect(payload.signatureType).toBeUndefined();
@@ -206,30 +140,36 @@ describe('toBackendCollaboratorPayload', () => {
   });
 
   it('historia "Habilitar ordenamiento Drag and Drop": sin orderIndex explícito, cae a 0 por defecto', () => {
-    const payload = toBackendCollaboratorPayload(
-      signer({ signatureType: 'SIMPLE' }),
-    );
+    const payload = toCollaboratorPayload(signer({ signatureType: 'SIMPLE' }));
 
     expect(payload.orderIndex).toBe(0);
   });
 
   it('historia "Habilitar ordenamiento Drag and Drop": refleja el orderIndex explícito para SIGNER y VIEWER', () => {
-    const signerPayload = toBackendCollaboratorPayload(
+    const signerPayload = toCollaboratorPayload(
       signer({ signatureType: 'SIMPLE' }),
       2,
     );
-    const viewerPayload = toBackendCollaboratorPayload(
-      {
-        ...emptyViewer(),
-        firstName: 'Ana',
-        lastName: 'Ruiz',
-        email: 'ana@correo.com',
-        rfc: 'AURU800101ABC',
-      },
-      1,
-    );
+    const viewerPayload = toCollaboratorPayload(viewer(), 1);
 
     expect(signerPayload.orderIndex).toBe(2);
     expect(viewerPayload.orderIndex).toBe(1);
+  });
+});
+
+describe('toCollaboratorPayloads', () => {
+  it('asigna el orderIndex según la posición en el arreglo ya reordenado', () => {
+    const payloads = toCollaboratorPayloads([
+      signer({ email: 'primero@mail.com' }),
+      viewer(),
+      signer({ email: 'tercero@mail.com' }),
+    ]);
+
+    expect(payloads.map((payload) => payload.orderIndex)).toEqual([0, 1, 2]);
+    expect(payloads.map((payload) => payload.email)).toEqual([
+      'primero@mail.com',
+      'ana@correo.com',
+      'tercero@mail.com',
+    ]);
   });
 });

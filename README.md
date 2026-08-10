@@ -49,14 +49,26 @@ Antes de poder firmar cualquier documento, el usuario debe subir su rúbrica (PN
 
 ### Paso 2 — Crear un documento y enviarlo a firma (`/dashboard/documents/create`)
 
-Rediseñado por completo respecto al flujo original de `ParticipantPicker` (ver sección 9 para el detalle histórico del cambio) — hoy es un solo formulario con colaboradores de datos libres, no un picker de usuarios existentes:
+Rediseñado por completo respecto al flujo original de `ParticipantPicker` (ver sección 9 para el detalle histórico del cambio) — hoy es un solo formulario con colaboradores de datos libres, no un picker de usuarios existentes.
 
-1. Selección del PDF con `DocumentFilePicker` (FilePond, valida `application/pdf` ≤20MB) + previsualización en vivo (`PdfPreview`, react-pdf).
-2. `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray` de react-hook-form): cada colaborador se captura como datos libres (nombre/apellido/email/RFC, sin buscar cuentas existentes), con `collaboratorType` `SIGNER`/`VIEWER`. Un SIGNER con firma `ADVANCED` exige RFC y puede requerir 2FA; SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) permite reordenar firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder`.
-3. `SignaturePlacementField`/`SignaturePageDropZone`/`SignatureBox` (`@dnd-kit`, `lib/signature-geometry.ts`): coloca por arrastre la posición de cada firma sobre una miniatura del PDF, en vez del `{page:1,x:100,y:100}` fijo que se mandaba antes sin UI.
-4. `RequiresApprovalField` (checkbox + tooltip) e `IncludeMeAsSignerField` (agrega al usuario actual como SIGNER autocompletado desde `useCurrentUser()`).
-5. Al enviar, `useCreateDocumentSignatures` hace **una sola llamada multipart**: `POST /api/v1/documents/signatures` (archivo + `documentData` + `collaboratorsdata` + `requiresDifferentSignatures`, todo serializado como JSON dentro de campos de texto) — ya no son dos llamadas encadenadas (`POST /document` + `submit-for-authorization`). Al terminar, invalida `['myDocuments']` y limpia el formulario.
-6. `/dashboard/documents/created` (`CreatedDocumentsView`, ruta separada) lista los documentos que el usuario creó (`GET /document?email=...`) — antes vivía debajo del mismo formulario de creación.
+`CreateDocumentView` es solo composición: monta las secciones y les reparte el estado que producen los hooks especializados. **Ninguna sección decide por su cuenta si otra está habilitada** — eso lo resuelve `_section-rules.ts` (función pura, testeada) y cada sección recibe su `SectionState` (`isEnabled`/`isLoading`/`hasError`/`errorMessage`/`missingRequirementMessage`).
+
+| Sección | Qué hace | Regla de activación |
+|---|---|---|
+| `DocumentUploadSection` | Selección del PDF (`DocumentFilePicker` → `FormFileUpload`, valida `application/pdf` ≤20MB) | Siempre habilitada: es el punto de entrada. Reporta "procesando" mientras FilePond lee el archivo |
+| `DocumentConfigurationSection` | `RequiresApprovalField` (solo cuentas ORGANIZATION) y `RequiresOrderField` (solo con >2 firmantes) | Siempre habilitada: no depende del PDF; las restricciones son de campo, con su propio contexto |
+| `DocumentParticipantsSection` | `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray`) + `IncludeMeAsSignerField`. Cada colaborador se captura como datos libres (nombre/apellido/email/RFC), con `collaboratorType` `SIGNER`/`VIEWER`; un SIGNER `ADVANCED` exige RFC y puede requerir 2FA, SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) reordena firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder` | Siempre habilitada; muestra el error general "agrega al menos un firmante" (el único que no pertenece a un campo) |
+| `DocumentSignaturePlacementSection` | `SignaturePlacementField`/`SignaturePageDropZone`/`SignatureBox` (`@dnd-kit`, `lib/signature-geometry.ts`): coloca por arrastre la posición de cada firma sobre el PDF | **Requisito duro**: un PDF completamente cargado. Sin él se muestra deshabilitada explicando qué falta |
+| `CreatedDocumentsSection` | Documentos que el usuario ya envió a firma (`GET /document?email=...`) | Solo cuando `showCreatedDocuments`; en `/documents/create` vive en su propia ruta, `/dashboard/documents/created` |
+
+La lógica vive fuera de los componentes:
+
+- `_hooks/useDocumentFileSelection` — el PDF y su estado de carga (fuera de react-hook-form: lo gobierna FilePond).
+- `_hooks/useCreateDocumentForm` — formulario, validación, composición de colaboradores y limpieza tras el envío; expone `currentUserQuery` y `createDocumentSignaturesMutation` como instancias con nombre.
+- `_hooks/useCreatedDocuments` — paginación, filtros, consulta del listado y publicación del conteo global.
+- `_mappers/` — `buildSubmissionCollaborators` (agrega al usuario en sesión si marcó "Incluirme como firmante") y `toCollaboratorPayloads`/`computeRequiresDifferentSignatures` (traducción al payload del backend).
+
+Al enviar, `useCreateDocumentSignatures` hace **una sola llamada multipart**: `POST /api/v1/documents/signatures` (archivo + `documentData` + `collaborators` + `requiresDifferentSignatures`, todo serializado como JSON dentro de campos de texto) — ya no son dos llamadas encadenadas (`POST /document` + `submit-for-authorization`). Al terminar, invalida `['myDocuments']` y limpia el formulario y el widget de carga.
 
 ### Paso 3 — Firmar o rechazar (`/dashboard/documents/[documentId]`)
 
@@ -179,10 +191,13 @@ Cada ruta con lógica propia trae sus propias carpetas privadas (no forman parte
 
 | Carpeta | Contenido |
 |---|---|
-| `_components/` | Componentes de presentación específicos de esa ruta |
-| `_hooks/` | Hooks de React Query, un archivo por operación (`useCreateDocumentSignatures.ts`, `useSignDocument.ts`, ...) |
+| `_components/` | Componentes de presentación específicos de esa ruta (los que representan una sección completa de la pantalla usan el sufijo `Section`) |
+| `_hooks/` | Hooks de React Query o de estado, un archivo por operación (`useCreateDocumentSignatures.ts`, `useSignDocument.ts`, ...) |
 | `_requests.ts` | Funciones de acceso a la API específicas de esa ruta |
-| `_schemas.ts` | Esquemas Zod + tipos inferidos para los formularios de esa ruta |
+| `_schemas.ts` | Esquemas Zod + tipos inferidos para los formularios de esa ruta (una carpeta `_schemas/` con un archivo por sección + `index.ts` cuando la pantalla tiene varias — ver `documents/create`) |
+| `_interfaces/` | Contratos de datos que no son del formulario: `*.request.interface.ts`, `*.response.interface.ts`, entidades. Una interfaz explícita por respuesta con estructura propia, sin `any` ni genéricos anónimos declarados en línea |
+| `_mappers/` | Traducción entre los valores del formulario y los payloads del backend (`*.mapper.ts`), fuera de los componentes y de los esquemas |
+| `_config/` | Configuración declarativa de campos y restricciones (`*.config.ts`), para no repetir la misma definición en cada campo |
 
 `lib/api/` centraliza la capa de API de todo lo que no es exclusivo de una sola ruta o que consumen varias rutas a la vez (`auth`, `accounts`, `roles`, `plans`, `users`, `organization-invitations`, `organization-members`, `organization-permissions`); el resto (creación/detalle/firma de documentos, personal-documents, forgot-password) vive co-localizado junto a su ruta (ver sección 5). `lib/hooks/` (sin prefijo `_`, a propósito) reúne hooks de React Query compartidos entre rutas distintas (p. ej. `useOrganizationPermissions`, consumido tanto por `organization/settings/members` como por `organization/settings/permissions`).
 
@@ -319,7 +334,18 @@ Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y
 ## 6. Componentes reutilizables
 
 - **`components/ui/`** — librería base tipo shadcn sobre `@base-ui/react`: `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `input-otp`, `label`, `popover`, `select`, `separator`, `sheet`, `sidebar` (el más grande, soporta `AppSidebar` — `Sidebar`/`SidebarProvider`/`SidebarTrigger`/etc.), `skeleton`, `switch`, `table`, `tabs` (usado en `organization/settings/layout.tsx`), `textarea`, `field`, `tooltip`. `button.tsx` define las variantes propias (`default`, `brand` — CTA principal verde esmeralda, `outline`, `secondary`, `ghost`, `destructive`, `link`).
-- **`components/form/text-field.tsx`** — único helper de formulario reutilizable: envuelve `Field` + `FieldLabel` + `Input` + `FieldError` para usarse directamente con `register()` de react-hook-form. Usado en `LoginForm`/`SignupForm`; el resto de formularios (documentos, personal-documents) construyen sus campos ad-hoc.
+- **`components/form/`** — kit de formulario reutilizable, agnóstico del dominio (no conoce documentos ni miembros): recibe `control` + `name` de react-hook-form, resuelve el error del propio campo con `useController` y mantiene los estilos de `components/ui/field`.
+
+  | Componente | Uso |
+  |---|---|
+  | `FormInput` / `FormTextarea` | Texto de una o varias líneas; aceptan las props nativas del elemento (`type`, `placeholder`, `autoComplete`, ...) |
+  | `FormSelect` | Selector con las opciones como datos (`options`), para poder declararlas desde una configuración de campos |
+  | `FormCheckbox` / `FormSwitch` | Booleanos; `FormCheckbox` acepta `checkedValue`/`uncheckedValue` para gobernar campos que no son booleanos (p. ej. `'SIMPLE'`/`'ADVANCED'`) |
+  | `FormFileUpload` | Carga de archivos (FilePond + validación de tipo/tamaño); compatible con `<Controller>` (`name`/`value`/`onChange`/`onBlur`) |
+  | `FormSection` | Envoltura de una sección: título, carga, deshabilitado (con el requisito que falta, `inert`) y error general |
+  | `FormFieldShell` / `FormToggleShell` | Envolturas internas que comparten los anteriores (etiqueta + obligatorio + control + descripción + error) |
+
+  `components/form/text-field.tsx` es el hermano basado en `register()` (y el único con el ojo de mostrar/ocultar contraseña); se conserva para `LoginForm`/`SignupForm`.
 - **`lib/utils.ts`** — `cn()` (clsx + tailwind-merge), usado en todo el proyecto para clases condicionales.
 
 ---
@@ -331,6 +357,8 @@ Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y
 - **Prefijo `/dashboard`**: agrupa todas las rutas autenticadas bajo un layout común (`AuthProvider` + `AppSidebar`) — ya no es un route group `(app)` sin URL propia, es un segmento real de la URL (ver sección 4).
 - **`next/dynamic({ ssr: false })`** para cualquier componente que use `react-pdf` (depende de APIs del navegador).
 - **Manejo de errores uniforme**: los hooks de mutación repiten el patrón de castear el error a `AxiosError<{message}>` y caer a un mensaje genérico en español, mostrado con `react-hot-toast`.
+- **Consultas y mutaciones como instancias con nombre**: cuando un componente o hook usa más de un `useQuery`/`useMutation`, no se desestructuran — se asignan a una instancia descriptiva con sufijo `Query`/`Mutation` (`documentQuery.isLoading`, `createDocumentSignaturesMutation.mutate()`). Evita alias artificiales para diferenciar `data`/`error`/`isLoading`/`isPending` repetidos y deja claro a qué operación pertenece cada propiedad.
+- **Presentación separada de la lógica**: los componentes de sección (`*Section`) reciben su estado (`isEnabled`/`isLoading`/`hasError`/`errorMessage`) y solo lo dibujan; la carga de datos, las validaciones, las transformaciones y las reglas de activación viven en hooks, mappers y funciones puras (ver `documents/create` como referencia).
 - **Idioma**: todo el copy de UI en español; nombres de variables/funciones en inglés.
 
 ---
@@ -353,13 +381,29 @@ npm run test:watch  # modo watch
 
 Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `eslint.config.mjs`/`postcss.config.mjs`) + React Testing Library + `jest-dom`. `test-utils.tsx` en la raíz expone `renderWithProviders()`, que envuelve en un `QueryClientProvider` de prueba (retries desactivados) para componentes que usan React Query. Los specs están co-localizados junto a su componente/schema (`*.spec.ts`/`*.spec.tsx`), igual que en `signature-server`.
 
-**Estado real de la suite (esta auditoría, `npx jest --listTests` + `npx jest --silent`)**: **45 suites / 237 tests**, con **1 suite / 2 tests en rojo** — exactamente `lib/axios.spec.ts`, el spec dedicado a la regresión de `baseURL` descrita en la sección 1/5 (espera una URL absoluta y recibe `/api`). Cualquier cifra de tests reportada en entradas anteriores de la sección 9 (p. ej. "116 tests", "101 tests en 21 suites") quedó desactualizada — usa esta cifra como la vigente hasta la próxima ronda.
+**Estado real de la suite (`npx jest --silent`, tras el refactor de la pantalla de carga y configuración)**: **57 suites / 327 tests**, con **1 suite / 2 tests en rojo** — exactamente `lib/axios.spec.ts`, el spec dedicado a la regresión de `baseURL` descrita en la sección 1/5 (espera una URL absoluta y recibe `/api`). Cualquier cifra de tests reportada en entradas anteriores de la sección 9 (p. ej. "116 tests", "101 tests en 21 suites") quedó desactualizada — usa esta cifra como la vigente hasta la próxima ronda.
 
 **`jest.setup.ts` polyfills para popups de `@base-ui/react`**: jsdom no implementa `ResizeObserver` ni `PointerEvent` (ni `hasPointerCapture`/`setPointerCapture`/`scrollIntoView` en `Element`), y `Select`/`Popover`/`dropdown-menu` los usan para posicionarse y para abrir con click. Sin estos stubs, un popup se queda montado con `hidden`/`data-closed` sin importar cuántas veces se le haga `userEvent.click()` al trigger — no es un bug del componente, es la ausencia de estas APIs en jsdom. Con el polyfill, `click` sigue sin abrir el popup de forma confiable (aparentemente porque base-ui espera una secuencia de eventos de puntero más específica que la que dispara `userEvent` incluso con el polyfill) — el camino confiable que sí funciona es teclado: `trigger.focus()` + `userEvent.keyboard('{Enter}')` para abrir, luego `userEvent.click()` sobre la opción (`role="option"`) para seleccionar y cerrar (ver `InviteMemberModal.spec.tsx` para el patrón completo).
 
 ---
 
 ## 9. Pendientes / trabajo futuro
+
+### Resuelto en esta ronda (refactor de la pantalla de carga y configuración de documentos) — 2026-08-08
+
+`CreateDocumentView` concentraba la carga de datos, la transformación de respuestas, las validaciones, el manejo de errores, la habilitación de secciones y el render completo de los formularios en un solo componente. Se separó en presentación, lógica, esquemas y contratos de datos, sin cambiar el comportamiento del flujo (mismo payload, mismas validaciones, mismo orden de campos en pantalla):
+
+- **Secciones con responsabilidad única**: `DocumentUploadSection`, `DocumentConfigurationSection`, `DocumentParticipantsSection`, `DocumentSignaturePlacementSection` y `CreatedDocumentsSection` (ver la tabla del paso 2 en la sección 2). El componente principal quedó como composición.
+- **Reglas de activación explícitas y testeadas**: `_section-rules.ts` (función pura) produce el `SectionState` de cada sección. Cada regla está justificada en el código, incluidas las secciones que están siempre habilitadas (que no dependan de nada es una decisión, no un olvido). El único requisito duro es el de la ubicación de firmas: sin PDF cargado no hay nada sobre lo que arrastrar.
+- **Lógica en hooks y mappers**: `useDocumentFileSelection`, `useCreateDocumentForm`, `useCreatedDocuments`, `_mappers/collaborator-payload.mapper.ts` y `_mappers/submission-collaborators.mapper.ts`.
+- **Esquemas por sección**: `_schemas.ts` pasó a ser `_schemas/` con un archivo por sección más el esquema compuesto; la regla cruzada ("al menos un firmante, o incluirme") vive en la composición, que es donde se conocen ambas secciones.
+- **Contratos de datos separados**: `_interfaces/` distingue solicitud, respuesta y entidad (`CreateDocumentSignaturesRequest`, `CreateDocumentSignaturesResponse`, `CreatedDocumentSignatures`) — antes el sobre de la respuesta era un genérico anónimo escrito en línea dentro de `_requests.ts`.
+- **Kit de formulario reutilizable** en `components/form/` (`FormInput`, `FormSelect`, `FormTextarea`, `FormCheckbox`, `FormSwitch`, `FormFileUpload`, `FormSection`), adoptado por `CollaboratorFormItem`, los campos de configuración, `DocumentFilePicker` e `InviteMemberModal`. Cada campo resuelve su propio error con `useController`: `CollaboratorFormItem` ya no recibe ni recorre `formState.errors` con casts.
+- **Configuración de campos** en `_config/collaborator-fields.config.ts` (sin perder tipado: `name` está acotado a las llaves reales del colaborador) y `_config/document-file.config.ts` (el límite de 20 MB se escribía a mano en tres lugares).
+- **Efecto secundario del kit**: `FormFileUpload` se vacía solo cuando el consumidor limpia el valor, así que desapareció el `filePondKey` que la pantalla incrementaba a mano para remontar el widget.
+- **Pruebas**: +5 suites y +39 tests — reglas de activación, mappers, `useDocumentFileSelection`, el kit de formulario, y casos nuevos en `CreateDocumentView.spec` (sección deshabilitada, archivo procesándose, error general de participantes, error del listado).
+
+**Pendiente relacionado**: `FormTextarea` es el único componente del kit sin consumidor todavía — el candidato natural es el formulario de rechazo de `SignDocumentView`, que hoy arma su `Textarea` + error a mano (queda fuera de esta historia por ser otra pantalla).
 
 ### Auditoría de documentación (README vs. código real) — 2026-08-06
 Este README había quedado desactualizado en varios puntos estructurales desde la migración de rutas a `/dashboard/*` y desde que se agregaron los módulos de permisos de organización, OTP de registro/recuperación de contraseña, y el visor público de documentos — ninguno tenía una sola línea de documentación. Se hizo una auditoría de solo lectura (dos agentes en paralelo, uno por proyecto del monorepo, más lectura directa) contra el código real y se reescribieron las secciones 1-8 (referencia técnica) para reflejar el estado actual; la sección 9 (este changelog) se dejó intacta salvo esta entrada nueva.
