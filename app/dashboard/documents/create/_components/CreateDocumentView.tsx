@@ -25,7 +25,8 @@ interface CreateDocumentViewProps {
    * consulta y la tabla dentro de esta vista siguen funcionando igual.
    */
   trackDocumentsCount?: boolean;
-  /** Cuando es `false`, oculta la tabla de documentos creados bajo el formulario (ver /documents/create, que la extrae a su propia sección "Documentos creados" del Sidebar). */
+  /** Cuando es `false`, oculta la tabla de documentos creados bajo el formulario: esa lista ya
+   * tiene su propia entrada en el Sidebar ("Enviados para firma", `/dashboard/documents/sent`). */
   showCreatedDocuments?: boolean;
 }
 

@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 import { getErrorMessage } from '@/lib/error-handler';
 import { useDocuments } from '../../_hooks/useDocuments';
 import { useDocumentsListState } from '../../_hooks/useDocumentsListState';
-
-const CREATED_DOCUMENTS_PAGE_SIZE = 10;
+import { DOCUMENTS_LIST_CONFIG } from '../../_config/sections';
 
 interface UseCreatedDocumentsParams {
   /**
@@ -29,12 +27,12 @@ export function useCreatedDocuments({
 }: UseCreatedDocumentsParams) {
   const { page, setPage, filters, handleFiltersChange } =
     useDocumentsListState();
-  const currentUserQuery = useCurrentUser();
+  // Mismo listado que la sección "Enviados para firma" (`/dashboard/documents/sent`): comparten
+  // `type` y `limit`, así que también comparten caché de React Query.
   const createdDocumentsQuery = useDocuments({
-    scope: 'creator',
-    email: currentUserQuery.data?.email,
+    type: 'sent',
     page,
-    limit: CREATED_DOCUMENTS_PAGE_SIZE,
+    limit: DOCUMENTS_LIST_CONFIG.sent.limit,
     filters,
   });
   const { setDocumentsCount } = useDocumentsCount();

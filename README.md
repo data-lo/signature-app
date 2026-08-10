@@ -59,7 +59,7 @@ Rediseñado por completo respecto al flujo original de `ParticipantPicker` (ver 
 | `DocumentConfigurationSection` | `RequiresApprovalField` (solo cuentas ORGANIZATION) y `RequiresOrderField` (solo con >2 firmantes) | Siempre habilitada: no depende del PDF; las restricciones son de campo, con su propio contexto |
 | `DocumentParticipantsSection` | `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray`) + `IncludeMeAsSignerField`. Cada colaborador se captura como datos libres (nombre/apellido/email/RFC), con `collaboratorType` `SIGNER`/`VIEWER`; un SIGNER `ADVANCED` exige RFC y puede requerir 2FA, SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) reordena firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder` | Siempre habilitada; muestra el error general "agrega al menos un firmante" (el único que no pertenece a un campo) |
 | `DocumentSignaturePlacementSection` | `SignaturePlacementField`/`SignaturePageDropZone`/`SignatureBox` (`@dnd-kit`, `lib/signature-geometry.ts`): coloca por arrastre la posición de cada firma sobre el PDF | **Requisito duro**: un PDF completamente cargado. Sin él se muestra deshabilitada explicando qué falta |
-| `CreatedDocumentsSection` | Documentos que el usuario ya envió a firma (`GET /document?email=...`) | Solo cuando `showCreatedDocuments`; en `/documents/create` vive en su propia ruta, `/dashboard/documents/created` |
+| `CreatedDocumentsSection` | Documentos que el usuario ya envió a firma (`GET /document?email=...`) | Solo cuando `showCreatedDocuments`; esta lista también vive en su propia ruta, `/dashboard/documents/sent` ("Enviados para firma") |
 
 La lógica vive fuera de los componentes:
 
@@ -85,9 +85,22 @@ Al enviar, `useCreateDocumentSignatures` hace **una sola llamada multipart**: `P
 - **`/access-document`**: entry point del link que llega por correo a un colaborador invitado solo por email (sin `userId`/cuenta todavía). Guarda el contexto (`docId`/`collabId`/`email`) en `localStorage` (`lib/pending-signature-context.ts`) y, si hay sesión activa, llama `PATCH /document/:id/link-collaborator` para vincular al colaborador con la cuenta ya logueada; si no hay sesión, redirige a `/login` (o registro) y retoma el contexto guardado después.
 - **`/public/documents/[id]`** (route group `(public)`, fuera del middleware de auth): visor de solo lectura del PDF final vía `GET /document/public/:id` — solo responde si el documento está `SIGNED`, sin JWT.
 
-### Paso 4 — Consultar documentos (`/dashboard/documents`)
+### Paso 4 — Consultar documentos (`/dashboard/documents/to-sign`, `/sent`, `/completed`)
 
-`DocumentsListView`: pestañas "Pendientes"/"Firmados", lista documentos donde el usuario es colaborador (`GET /document?participantEmail=...`) con filtros por nombre, participante, estado y fechas, y un toggle "solo mi turno". Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final. Para documentos firmados, en cancelación pendiente o cancelados, un botón "Ver detalle" navega a `/dashboard/documents/:id`, donde `SignDocumentView` decide qué mostrar según los flags de arriba.
+Cada sección del módulo tiene su propia ruta y su propio `page.tsx`, pero **una sola vista compartida**: `DocumentsView` (`documents/_components/DocumentsView.tsx`), que recibe el `type` de la sección y saca de él la consulta y las acciones visibles. Tabla, filtros, paginación y estados visuales no se duplican por sección.
+
+| Ruta | `type` | Consulta | Breadcrumb |
+|---|---|---|---|
+| `/dashboard/documents/create` | — (vista propia) | — | Documentos / Nuevo documento |
+| `/dashboard/documents/to-sign` | `to-sign` | `GET /document?participantEmail=…&status=pending` | Documentos / Por firmar |
+| `/dashboard/documents/sent` | `sent` | `GET /document?email=…` | Documentos / Enviados para firma |
+| `/dashboard/documents/completed` | `completed` | `GET /document?participantEmail=…&status=signed` | Documentos / Completados |
+
+Nombres, rutas, iconos y la configuración de consulta de cada sección viven en **`documents/_config/sections.ts`** (`DOCUMENTS_SECTIONS`, `DOCUMENTS_NAV_SECTIONS`, `DOCUMENTS_LIST_CONFIG`), la fuente única que consumen `AppSidebar`, `DashboardBreadcrumbs` y los `page.tsx` — el nombre del sidebar y el del breadcrumb no pueden divergir. "Documentos" es solo un **agrupador**: no tiene página propia y se muestra sin enlace en el breadcrumb; el último nivel es siempre la página actual y no es interactivo.
+
+Todas las secciones ofrecen filtros por nombre, participante, estado y fechas (y un toggle "solo mi turno" en las secciones de participante). Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final. Para documentos firmados, en cancelación pendiente o cancelados, un botón "Ver detalle" navega a `/dashboard/documents/:id`, donde `SignDocumentView` decide qué mostrar según los flags de arriba.
+
+**Rutas anteriores (solo redirigen, para no romper bookmarks):** `/dashboard/documents` → `/dashboard/documents/to-sign` (o `/completed` si traía `?status=signed`, que era como se distinguían ambas secciones antes) y `/dashboard/documents/created` → `/dashboard/documents/sent` (308).
 
 > `/dashboard` (primer punto de entrada tras login) hace `redirect()` a `/dashboard/documents/create` — ya no renderiza contenido propio.
 
@@ -179,9 +192,14 @@ app/
     │       ├── members/             → "/dashboard/organization/settings/members" — MembersView/MembersTable/EditRoleModal/RemoveMemberDialog/ConfigureMemberPermissionsModal
     │       └── permissions/         → "/dashboard/organization/settings/permissions" — PermissionsView, catálogo de permisos administrativos de la organización (ver sección 3.3)
     ├── documents/
-    │   ├── page.tsx                 → "/dashboard/documents" — listado real, scopeado a "soy colaborador" (GET /document)
+    │   ├── _config/sections.ts      → fuente única de nombres/rutas/consulta de cada sección (la usan AppSidebar, DashboardBreadcrumbs y los page.tsx)
+    │   ├── _components/DocumentsView.tsx → vista compartida de listado (tabla + filtros + paginación); las secciones solo varían por `type`
+    │   ├── page.tsx                 → "/dashboard/documents" — ruta anterior: redirect a /to-sign (o /completed con ?status=signed)
     │   ├── create/                  → "/dashboard/documents/create" — ruta por defecto del dashboard: CreateDocumentGuard monta OnboardingBanner + InviteMemberModal (solo con Org activa) + el flujo real de creación (colaboradores libres + colocación de firma por drag&drop) ⭐
-    │   ├── created/                 → "/dashboard/documents/created" — CreatedDocumentsView, documentos que el usuario creó (antes vivía debajo del formulario de creación)
+    │   ├── to-sign/                 → "/dashboard/documents/to-sign" — "Por firmar": DocumentsView type="to-sign" (GET /document?participantEmail=…&status=pending)
+    │   ├── sent/                    → "/dashboard/documents/sent" — "Enviados para firma": DocumentsView type="sent" (GET /document?email=…)
+    │   ├── completed/               → "/dashboard/documents/completed" — "Completados": DocumentsView type="completed" (GET /document?participantEmail=…&status=signed)
+    │   ├── created/                 → ruta anterior de "Enviados para firma": solo redirect (308) a /dashboard/documents/sent
     │   └── [documentId]/            → "/dashboard/documents/:id" — pantalla de firma real (SignDocumentView) ⭐
     ├── personal-documents/          → "/dashboard/personal-documents" — credencial de firma (signature/INE) + datos de contacto del onboarding
     └── plans/                       → "/dashboard/plans", "/dashboard/plans/success", "/dashboard/plans/cancel" — suscripciones Stripe
@@ -481,7 +499,7 @@ Auditoría completa contra las 6 historias del README raíz (`C:/Signature/READM
 - **"Requiere aprobación" no tiene efecto real todavía**: `/documents/create` manda `requiresApproval` correctamente y el backend lo guarda, pero nada enruta el documento a un aprobador — se notifica a los firmantes igual que si el checkbox estuviera apagado. Ver README de `signature-server`, sección de pendientes, para el detalle de lo que falta del lado del backend antes de que esto tenga sentido construir algo más en la UI (ej. una vista de "documentos por aprobar").
 - **`useCreateCheckoutSession` sin manejo de error**: si `POST /stripe/checkout/session` falla, el botón "Suscribirse" solo vuelve a su estado normal sin ningún toast — a diferencia del resto de los hooks de mutación del proyecto, que sí muestran el mensaje del backend. Encontrado en la auditoría general de esta ronda.
 - **De los dos headers que manda `lib/axios.ts`, solo `X-Account-Id` tiene efecto, y solo en documentos (crear + listar) y en la invitación/gestión de miembros**: cambiar de cuenta en el switcher ya filtra `/document` de verdad, y las rutas de organización ya validan contra la cuenta activa — ver README de `signature-server`. `X-Organization-Id` se manda igual en cada request (cuando la cuenta activa es una organización) pero **ningún endpoint del backend lo lee todavía**. El resto de recursos (detalle de documento, firma/rechazo/cancelación) tampoco distinguen cuenta activa; cambiar de cuenta ahí sigue sin efecto en el backend. (`GET /user` para elegir firmantes/espectadores ya no aplica: `/documents/create` dejó de usar ese picker, ver "Resuelto en esta ronda" de la historia de carga de documentos.)
-- **Cobertura de tests desigual**: 101 tests en 21 suites. `AuthProvider`, `AccountSwitcher`, `OnboardingBanner`, `CreateOrganizationForm`/`useCreateOrganization`, `InviteMemberModal`/`useInviteMember`, `MembersView`/`MembersTable` y `JoinView`/`SignupForm` ya tienen tests de componente (ver "Resuelto" abajo). **Siguen sin cobertura** los hooks de `personal-documents` que mutan el onboarding (`useUpdatePersonalInformation`, `useUploadPersonalDocuments`), `PersonalDocumentsView`/`UserInfoCard`, `DocumentsListView`, y los flujos de `plans`/Stripe. Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
+- **Cobertura de tests desigual**: 101 tests en 21 suites. `AuthProvider`, `AccountSwitcher`, `OnboardingBanner`, `CreateOrganizationForm`/`useCreateOrganization`, `InviteMemberModal`/`useInviteMember`, `MembersView`/`MembersTable` y `JoinView`/`SignupForm` ya tienen tests de componente (ver "Resuelto" abajo). **Siguen sin cobertura** los hooks de `personal-documents` que mutan el onboarding (`useUpdatePersonalInformation`, `useUploadPersonalDocuments`), `PersonalDocumentsView`/`UserInfoCard`, `DocumentsView`, y los flujos de `plans`/Stripe. Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
 - **Reminders / mensaje para participantes / fecha de expiración**: sigue **deliberadamente pendiente** (decisión del equipo) — ver "Ideas descartadas" más abajo. Si el producto los pide más adelante, hay que diseñarlos end-to-end (no es reconectar código existente).
 - **/join no distingue "invitación ya utilizada" de "ya soy miembro"**: si el backend rechaza el `accept` (409/410), la UI solo muestra el toast de error genérico del backend — no hay una pantalla dedicada por cada caso (ver README de `signature-server`, sección de la historia de Kafka/Email/Miembros).
 

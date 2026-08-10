@@ -17,8 +17,8 @@ interface CreatedDocumentsSectionProps {
 
 /**
  * Sección con los documentos que el usuario ya envió a firma. Solo se renderiza en las pantallas
- * que la piden (ver `showCreatedDocuments` en `CreateDocumentView`): en `/documents/create` esta
- * lista vive en su propia ruta, `/dashboard/documents/created`.
+ * que la piden (ver `showCreatedDocuments` en `CreateDocumentView`): esta lista también vive en
+ * su propia ruta, `/dashboard/documents/sent` ("Enviados para firma").
  */
 export default function CreatedDocumentsSection({
   state,

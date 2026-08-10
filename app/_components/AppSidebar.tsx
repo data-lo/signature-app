@@ -2,13 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   FileSignature,
-  FilePlus,
-  Clock,
-  Folder,
-  FileCheck,
   CreditCard,
   User,
   IdCard,
@@ -35,13 +31,18 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import {
+  DOCUMENTS_GROUP_LABEL,
+  DOCUMENTS_NAV_SECTIONS,
+  DOCUMENTS_SECTIONS,
+} from '@/app/dashboard/documents/_config/sections';
 import AccountSwitcher from './AccountSwitcher';
 
 interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  isActive: (pathname: string, status: string | null) => boolean;
+  isActive: (pathname: string) => boolean;
 }
 
 interface NavGroup {
@@ -53,35 +54,16 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Documentos',
-    items: [
-      {
-        label: 'Nuevo documento',
-        href: '/dashboard/documents/create',
-        icon: FilePlus,
-        isActive: (pathname) => pathname === '/dashboard/documents/create',
-      },
-      {
-        label: 'Por firmar',
-        href: '/dashboard/documents?status=pending',
-        icon: Clock,
-        isActive: (pathname, status) =>
-          pathname === '/dashboard/documents' && status !== 'signed',
-      },
-      {
-        label: 'Enviados para firma',
-        href: '/dashboard/documents/created',
-        icon: Folder,
-        isActive: (pathname) => pathname === '/dashboard/documents/created',
-      },
-      {
-        label: 'Completados',
-        href: '/dashboard/documents?status=signed',
-        icon: FileCheck,
-        isActive: (pathname, status) =>
-          pathname === '/dashboard/documents' && status === 'signed',
-      },
-    ],
+    label: DOCUMENTS_GROUP_LABEL,
+    // Nombres y rutas salen de la configuración compartida del módulo, la misma que usa
+    // DashboardBreadcrumbs: cada sección tiene su propia ruta, así que el estado activo es
+    // simplemente la coincidencia exacta del pathname.
+    items: DOCUMENTS_NAV_SECTIONS.map((section) => ({
+      label: section.label,
+      href: section.href,
+      icon: section.icon,
+      isActive: (pathname: string) => pathname === section.href,
+    })),
   },
   {
     label: 'Pagos',
@@ -136,8 +118,6 @@ const NAV_GROUPS: NavGroup[] = [
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const status = searchParams.get('status');
   const logoutMutation = useLogout();
   const { data: currentUser } = useCurrentUser();
   const activeAccount = useAuthStore((state) => state.activeAccount);
@@ -163,7 +143,10 @@ export default function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/dashboard/documents/create" />}>
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href={DOCUMENTS_SECTIONS.create.href} />}
+            >
               <FileSignature className="text-emerald-500" />
               <span className="font-heading font-semibold">Firmalo</span>
             </SidebarMenuButton>
@@ -183,7 +166,7 @@ export default function AppSidebar() {
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton
-                      isActive={item.isActive(pathname, status)}
+                      isActive={item.isActive(pathname)}
                       tooltip={item.label}
                       render={<Link href={item.href} />}
                     >

@@ -43,10 +43,9 @@ describe('DashboardBreadcrumbs', () => {
 
     renderWithProviders(<DashboardBreadcrumbs />);
 
-    expect(screen.getByRole('link', { name: 'Documentos' })).toHaveAttribute(
-      'href',
-      '/dashboard/documents',
-    );
+    expect(
+      screen.queryByRole('link', { name: 'Documentos' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('contrato.pdf')).toHaveAttribute(
       'aria-current',
       'page',
@@ -62,35 +61,62 @@ describe('DashboardBreadcrumbs', () => {
     expect(screen.queryByText('doc-1')).not.toBeInTheDocument();
   });
 
-  it('bug corregido: "/dashboard/documents/create" usa el breadcrumb estático, no lo interpreta como id de documento', () => {
-    mockUsePathname.mockReturnValue('/dashboard/documents/create');
+  it.each([
+    ['/dashboard/documents/create', 'Nuevo documento'],
+    ['/dashboard/documents/to-sign', 'Por firmar'],
+    ['/dashboard/documents/sent', 'Enviados para firma'],
+    ['/dashboard/documents/completed', 'Completados'],
+  ])(
+    'en %s muestra "Documentos / %s": el agrupador sin enlace y la sección como página actual',
+    (pathname, sectionLabel) => {
+      mockUsePathname.mockReturnValue(pathname);
 
-    renderWithProviders(<DashboardBreadcrumbs />);
+      renderWithProviders(<DashboardBreadcrumbs />);
 
-    expect(screen.getByText('Nuevo documento')).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
-      '',
-      expect.objectContaining({ enabled: false }),
-    );
-  });
+      const group = screen.getByText('Documentos');
+      expect(group).toHaveAttribute('aria-disabled', 'true');
+      expect(group).not.toHaveAttribute('aria-current');
+      expect(
+        screen.queryByRole('link', { name: 'Documentos' }),
+      ).not.toBeInTheDocument();
 
-  it('bug corregido: "/dashboard/documents/created" usa el breadcrumb estático, no lo interpreta como id de documento', () => {
-    mockUsePathname.mockReturnValue('/dashboard/documents/created');
+      expect(screen.getByText(sectionLabel)).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(
+        screen.queryByRole('link', { name: sectionLabel }),
+      ).not.toBeInTheDocument();
 
-    renderWithProviders(<DashboardBreadcrumbs />);
+      // Bug corregido: cada sección es un solo segmento bajo /dashboard/documents, así que
+      // también matchea el patrón del detalle — no debe dispararse ningún GET /document/:id.
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        '',
+        expect.objectContaining({ enabled: false }),
+      );
+    },
+  );
 
-    expect(screen.getByText('Enviados para firma')).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
-      '',
-      expect.objectContaining({ enabled: false }),
-    );
-  });
+  it.each([
+    ['/dashboard/documents', 'Por firmar'],
+    ['/dashboard/documents/created', 'Enviados para firma'],
+  ])(
+    'la ruta anterior %s muestra el breadcrumb de su ruta nueva mientras redirige, sin interpretarla como id de documento',
+    (legacyPathname, sectionLabel) => {
+      mockUsePathname.mockReturnValue(legacyPathname);
+
+      renderWithProviders(<DashboardBreadcrumbs />);
+
+      expect(screen.getByText(sectionLabel)).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        '',
+        expect.objectContaining({ enabled: false }),
+      );
+    },
+  );
 
   it('no renderiza nada para una ruta sin breadcrumbs configurados', () => {
     mockUsePathname.mockReturnValue('/dashboard/unknown-route');
