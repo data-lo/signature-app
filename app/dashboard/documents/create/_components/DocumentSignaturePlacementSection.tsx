@@ -1,0 +1,78 @@
+'use client';
+
+import dynamic from 'next/dynamic';
+import type {
+  Control,
+  UseFormGetValues,
+  UseFormSetValue,
+} from 'react-hook-form';
+import { Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { FieldError } from '@/components/ui/field';
+import type { SectionState } from '../_interfaces/section-state.interface';
+import type { CreateDocumentSignaturesFormValues } from '../_schemas';
+
+// react-pdf necesita el DOM (canvas) — igual que PdfPreview, se carga solo en cliente.
+const SignaturePlacementField = dynamic(
+  () => import('./SignaturePlacementField'),
+  { ssr: false },
+);
+
+interface DocumentSignaturePlacementSectionProps {
+  state: SectionState;
+  file: File | null;
+  control: Control<CreateDocumentSignaturesFormValues>;
+  getValues: UseFormGetValues<CreateDocumentSignaturesFormValues>;
+  setValue: UseFormSetValue<CreateDocumentSignaturesFormValues>;
+}
+
+/**
+ * Sección de ubicación de firmas: la única con un requisito previo duro — las firmas se colocan
+ * arrastrándolas sobre el PDF renderizado, así que sin un archivo completamente cargado no hay
+ * nada sobre lo que trabajar (ver `_section-rules.ts`).
+ *
+ * A diferencia del resto, no usa `FormSection`: sus estados (cargando, requisito faltante,
+ * error) tienen que dibujarse *dentro* de la tarjeta de altura fija que sostiene la columna
+ * derecha de la retícula — si se mostraran encima, la columna cambiaría de alto según el estado.
+ */
+export default function DocumentSignaturePlacementSection({
+  state,
+  file,
+  control,
+  getValues,
+  setValue,
+}: DocumentSignaturePlacementSectionProps) {
+  return (
+    <section
+      data-slot="form-section"
+      aria-busy={state.isLoading || undefined}
+      aria-disabled={!state.isEnabled || undefined}
+    >
+      <Card className="h-[640px] overflow-hidden p-0">
+        <CardContent className="h-full p-0">
+          {state.isLoading ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Cargando documento...
+            </div>
+          ) : state.hasError && state.errorMessage ? (
+            <div className="flex h-full items-center justify-center p-6">
+              <FieldError>{state.errorMessage}</FieldError>
+            </div>
+          ) : state.isEnabled && file ? (
+            <SignaturePlacementField
+              file={file}
+              control={control}
+              getValues={getValues}
+              setValue={setValue}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {state.missingRequirementMessage}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}

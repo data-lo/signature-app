@@ -1,55 +1,45 @@
 'use client';
 
-import { FilePond, registerPlugin } from 'react-filepond';
-import { FileStatus } from 'filepond';
-import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type';
-import FilePondPluginFileValidateSize from 'filepond-plugin-file-validate-size';
-import 'filepond/dist/filepond.min.css';
-
-registerPlugin(FilePondPluginFileValidateType, FilePondPluginFileValidateSize);
+import { FormFileUpload } from '@/components/form/form-file-upload';
+import {
+  DOCUMENT_FILE_ACCEPTED_TYPES,
+  DOCUMENT_FILE_LABELS,
+  DOCUMENT_FILE_MAX_SIZE,
+} from '../_config/document-file.config';
 
 interface DocumentFilePickerProps {
+  /** Archivo actualmente seleccionado (ver `useDocumentFileSelection`). */
+  file: File | null;
   onFileSelected: (file: File | null) => void;
-  /**
-   * Bug corregido: mientras FilePond procesa el archivo localmente (status LOADING/INIT), cada
-   * disparo de `onupdatefiles` traía una referencia de `File` distinta para el mismo archivo —
-   * <PdfPreview> (react-pdf) recargaba el documento en cada una, causando el parpadeo reportado
-   * (a veces escalando a "Maximum update depth exceeded"). Ahora solo se propaga el archivo una
-   * vez que FilePond lo deja en IDLE (completamente cargado); mientras tanto se avisa "cargando"
-   * para que el padre pueda mostrar un indicador en vez de la previsualización inestable.
-   */
+  /** Avisa mientras FilePond procesa el archivo, para no previsualizar uno a medio cargar. */
   onLoadingChange?: (isLoading: boolean) => void;
+  disabled?: boolean;
 }
 
+/**
+ * Configuración concreta del campo de carga para documentos a firmar (PDF ≤ 20 MB, con los
+ * textos en español de la pantalla). Toda la mecánica de carga vive en `FormFileUpload`
+ * (`components/form/`), que es genérico y reutilizable; este componente solo aplica las
+ * restricciones del dominio, centralizadas en `_config/document-file.config.ts`.
+ */
 export default function DocumentFilePicker({
+  file,
   onFileSelected,
   onLoadingChange,
+  disabled,
 }: DocumentFilePickerProps) {
   return (
-    <FilePond
-      onupdatefiles={(fileItems) => {
-        const item = fileItems[0];
-
-        if (!item) {
-          onLoadingChange?.(false);
-          onFileSelected(null);
-          return;
-        }
-
-        const isSettled = item.status === FileStatus.IDLE;
-        onLoadingChange?.(!isSettled);
-
-        if (isSettled) {
-          onFileSelected(item.file as File);
-        }
-      }}
-      allowMultiple={false}
-      acceptedFileTypes={['application/pdf']}
-      labelFileTypeNotAllowed="El documento debe estar en formato PDF"
-      maxFileSize="20MB"
-      labelMaxFileSizeExceeded="El documento debe pesar menos de 20MB"
-      labelIdle='Arrastra tu documento aquí o <span class="filepond--label-action">da clic para seleccionar uno</span>'
-      credits={false}
+    <FormFileUpload
+      name="documentFile"
+      value={file}
+      onChange={onFileSelected}
+      onLoadingChange={onLoadingChange}
+      acceptedFileTypes={DOCUMENT_FILE_ACCEPTED_TYPES}
+      labelFileTypeNotAllowed={DOCUMENT_FILE_LABELS.typeNotAllowed}
+      maxFileSize={DOCUMENT_FILE_MAX_SIZE}
+      labelMaxFileSizeExceeded={DOCUMENT_FILE_LABELS.maxSizeExceeded}
+      labelIdle={DOCUMENT_FILE_LABELS.idle}
+      disabled={disabled}
     />
   );
 }

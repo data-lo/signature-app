@@ -2,8 +2,7 @@
 
 import { useEffect } from 'react';
 import { useController, type Control } from 'react-hook-form';
-import { Switch } from '@/components/ui/switch';
-import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
+import { FormSwitch } from '@/components/form/form-switch';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 
 const MIN_SIGNERS_FOR_ORDER = 2;
@@ -35,21 +34,17 @@ export default function RequiresOrderField({
   }, [canEnable]);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <Field orientation="horizontal" className="items-center">
-        <Switch
-          id="requiresOrder"
-          checked={field.value}
-          disabled={!canEnable}
-          onCheckedChange={(checked) => field.onChange(checked === true)}
-        />
-        <FieldLabel htmlFor="requiresOrder">Requiere firmas en orden</FieldLabel>
-      </Field>
-      <FieldDescription>
-        {canEnable
+    <FormSwitch
+      control={control}
+      name="requiresOrder"
+      id="requiresOrder"
+      label="Requiere firmas en orden"
+      disabled={!canEnable}
+      description={
+        canEnable
           ? 'Arrastra a los participantes para definir el orden en que deben firmar.'
-          : 'Agrega más de 2 firmantes para poder definir un orden de firma.'}
-      </FieldDescription>
-    </div>
+          : `Agrega más de ${MIN_SIGNERS_FOR_ORDER} firmantes para poder definir un orden de firma.`
+      }
+    />
   );
 }
