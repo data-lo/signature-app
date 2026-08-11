@@ -3,6 +3,17 @@ import type { NextRequest } from 'next/server';
 
 const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/signup/verify'];
 
+// Punto de entrada de los enlaces de correo para firmar (ver historia "Notificación por Email
+// para Firma Simple y Vinculación de Cuenta"). NO puede pasar por el guard de sesión: el
+// destinatario abre el correo casi siempre sin sesión iniciada, y si el middleware lo manda a
+// /login antes de renderizar la página, `setPendingSignatureContext` nunca corre y se pierde
+// para siempre qué documento venía a firmar (termina en /dashboard/documents/create tras el
+// login). La propia página decide a dónde va: a /login si no hay token — guardando antes el
+// contexto, que /login consume para devolverlo al documento — o directo al documento si ya hay
+// sesión. Tampoco va en AUTH_ROUTES, porque ahí un usuario con sesión sería desviado al
+// dashboard y se saltaría la vinculación del colaborador.
+const PUBLIC_ROUTES = ['/access-document'];
+
 // El dashboard vivía en la raíz (/home, /documents, /organization, /personal-documents, /plans)
 // antes de moverlo bajo /dashboard. Cualquier link/bookmark viejo a una de estas rutas se
 // redirige permanentemente (308) a su equivalente bajo /dashboard — la protección de auth no se
@@ -26,6 +37,10 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = `/dashboard${pathname}`;
     return NextResponse.redirect(url, 308);
+  }
+
+  if (PUBLIC_ROUTES.includes(pathname)) {
+    return NextResponse.next();
   }
 
   if (AUTH_ROUTES.includes(pathname)) {
