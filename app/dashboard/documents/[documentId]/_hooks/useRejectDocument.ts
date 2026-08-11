@@ -18,6 +18,12 @@ export function useRejectDocument(documentId: string) {
       queryClient.invalidateQueries({
         queryKey: ['documentDetail', documentId],
       });
+      // Rechazar cambia el bucket del documento (created_documents → rejected_documents), así
+      // que la URL prefirmada cacheada apunta a un bucket que ya no corresponde — ver el mismo
+      // razonamiento en useSignDocument.
+      queryClient.invalidateQueries({
+        queryKey: ['documentFileUrl', documentId],
+      });
       queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
       router.push(DOCUMENTS_SECTIONS['to-sign'].href);
     },

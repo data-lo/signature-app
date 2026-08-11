@@ -22,6 +22,14 @@ export function useSignDocument(documentId: string) {
       queryClient.invalidateQueries({
         queryKey: ['documentDetail', documentId],
       });
+      // Firmar mueve el documento de bucket en MinIO (created_documents →
+      // signed_documents, ver STATUS_BUCKET_MAP en signature-server): la URL prefirmada que
+      // devolvió GET /document/file/:id antes de firmar apunta al PDF SIN firmar. Sin invalidar
+      // esta query, el `staleTime` global de 5 min (ver app/providers.tsx) la sigue sirviendo
+      // desde cache y el visor muestra la versión original de un documento ya firmado.
+      queryClient.invalidateQueries({
+        queryKey: ['documentFileUrl', documentId],
+      });
       queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
       router.push(DOCUMENTS_SECTIONS['to-sign'].href);
     },
