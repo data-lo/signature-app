@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   useGeolocation,
+  type GeolocationCoords,
   type GeolocationErrorReason,
 } from '@/lib/hooks/useGeolocation';
 import { Button } from '@/components/ui/button';
@@ -97,6 +98,13 @@ export default function SignDocumentView({
   );
   const [showSignatureRequiredDialog, setShowSignatureRequiredDialog] =
     useState(false);
+  // Motivo por el que la ubicación no pudo obtenerse. Se muestra de forma persistente (no solo
+  // como toast) porque ahora bloquea la firma: el usuario necesita ver qué corregir para poder
+  // reintentar.
+  const [geoBlockedReason, setGeoBlockedReason] = useState<string | null>(null);
+  // Ubicación ya obtenida para una firma FIEL, capturada antes de abrir el diálogo de e.firma.
+  const [advancedSignatureCoords, setAdvancedSignatureCoords] =
+    useState<GeolocationCoords | null>(null);
   const [showAdvancedSignatureDialog, setShowAdvancedSignatureDialog] =
     useState(false);
   const user = useAuthStore((state) => state.user);
@@ -129,26 +137,58 @@ export default function SignDocumentView({
     rejectMutation.mutate(values.reason);
   }
 
+  /**
+   * La ubicación es obligatoria para firmar: si no se puede obtener (permiso rechazado, no
+   * disponible, timeout o navegador sin soporte) el proceso se detiene aquí y no se manda nada
+   * al backend — que de todos modos responde 400 sin ella. Antes se firmaba igual y se
+   * registraba la firma sin ubicación; el requisito cambió.
+   *
+   * Devuelve las coordenadas o null, dejando el mensaje de error visible para que el usuario
+   * sepa qué corregir y pueda reintentar.
+   */
+  async function resolveRequiredLocation(): Promise<GeolocationCoords | null> {
+    const { coords, error } = await requestLocation();
+    if (error || !coords) {
+      const reason = error
+        ? GEOLOCATION_ERROR_MESSAGES[error]
+        : 'no se pudo determinar tu ubicación';
+      setGeoBlockedReason(reason);
+      toast.error(`No se puede firmar sin tu ubicación: ${reason}.`);
+      return null;
+    }
+    setGeoBlockedReason(null);
+    return coords;
+  }
+
   async function handleSignClick() {
+    // También para FIEL se pide la ubicación ANTES de abrir el diálogo de e.firma: así el
+    // usuario no captura contraseña ni archivos para toparse con el bloqueo al final.
+    const coords = await resolveRequiredLocation();
+    if (!coords) return;
+
     if (document?.mySignatureType === SignatureType.Fiel) {
+      setAdvancedSignatureCoords(coords);
       setShowAdvancedSignatureDialog(true);
       return;
     }
-    const { coords, error } = await requestLocation();
-    if (error) {
-      toast(
-        `Firmando sin datos de ubicación: ${GEOLOCATION_ERROR_MESSAGES[error]}.`,
-      );
-    }
-    signMutation.mutate(coords ?? undefined);
+
+    signMutation.mutate({ geolocation: coords });
   }
 
   function handleAdvancedSignatureSubmit(
     values: AdvancedSignatureSubmitValues,
   ) {
-    signMutation.mutate(values, {
-      onSuccess: () => setShowAdvancedSignatureDialog(false),
-    });
+    if (!advancedSignatureCoords) return;
+
+    signMutation.mutate(
+      { geolocation: advancedSignatureCoords, advancedSignature: values },
+      {
+        onSuccess: () => {
+          setShowAdvancedSignatureDialog(false);
+          setAdvancedSignatureCoords(null);
+        },
+      },
+    );
   }
 
   // Bug corregido: mientras el store todavía no hidrata el perfil (`user` undefined), esta
@@ -367,9 +407,19 @@ export default function SignDocumentView({
                 <div className="flex flex-col gap-2">
                   <p className="text-xs text-muted-foreground">
                     Al confirmar, solicitaremos tu ubicación para registrarla
-                    como parte de la evidencia de esta firma. Si no la
-                    compartes, la firma continúa igual.
+                    como parte de la evidencia de esta firma. Es obligatoria: sin
+                    ella no es posible firmar el documento.
                   </p>
+                  {geoBlockedReason && (
+                    <div
+                      role="alert"
+                      className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                    >
+                      No se puede firmar sin tu ubicación: {geoBlockedReason}.
+                      Habilita el permiso de ubicación en tu navegador y vuelve a
+                      intentarlo.
+                    </div>
+                  )}
                   <Button
                     type="button"
                     className="w-full"
@@ -380,7 +430,9 @@ export default function SignDocumentView({
                       ? 'Obteniendo ubicación...'
                       : signMutation.isPending
                         ? 'Firmando...'
-                        : 'Continuar a firmar'}
+                        : geoBlockedReason
+                          ? 'Reintentar con ubicación'
+                          : 'Continuar a firmar'}
                   </Button>
                 </div>
               )}

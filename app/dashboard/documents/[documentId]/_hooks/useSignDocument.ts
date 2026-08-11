@@ -15,7 +15,8 @@ export function useSignDocument(documentId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload?: SignDocumentPayload) =>
+    // `payload` ya no es opcional: la geolocalización es obligatoria para firmar.
+    mutationFn: (payload: SignDocumentPayload) =>
       signDocumentRequest(documentId, payload),
     onSuccess: () => {
       toast.success('Documento firmado correctamente');

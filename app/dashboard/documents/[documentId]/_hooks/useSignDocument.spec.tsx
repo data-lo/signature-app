@@ -82,7 +82,9 @@ describe('invalidación de la URL del archivo al cambiar el estatus del document
       expect(result.current.fileUrl.data?.secureUrl).toBe(ORIGINAL_URL),
     );
 
-    result.current.mutation.mutate(undefined);
+    result.current.mutation.mutate({
+      geolocation: { latitude: 19.4326, longitude: -99.1332 },
+    });
 
     // Regresión: sin invalidar ['documentFileUrl', documentId], el staleTime de 5 min mantenía
     // viva la URL del bucket original y el documento firmado se seguía viendo sin firmar.
