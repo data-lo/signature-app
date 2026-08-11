@@ -1,14 +1,14 @@
 'use client';
 
 import { memo, useEffect, useRef, useState } from 'react';
-import { Document, pdfjs } from 'react-pdf';
+import { Document } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+// Configura el worker de PDF.js desde el propio origen (ver lib/pdf-worker.ts).
+import '@/lib/pdf-worker';
 import SignaturePageDropZone, {
   type PlacedBoxView,
 } from './SignaturePageDropZone';
-
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const CONTAINER_PADDING = 48;
 const MIN_PAGE_WIDTH = 320;
