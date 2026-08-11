@@ -247,10 +247,30 @@ export default function SignDocumentView({
 
         {document.canSign && !showRejectForm && (
           <div className="flex flex-col gap-2">
+            {/*
+              Bug corregido: "el firmante ve el documento pero no aparece el botón para iniciar
+              la firma". Un firmante recién invitado todavía no tiene rúbrica/INE en archivo, y
+              el backend las exige tanto para firmar como para rechazar (ver
+              assertUserHasSignatureOnFile en signature-server) — por eso TODAS las acciones de
+              abajo quedan inertes. El único camino para desbloquearse vivía dentro del diálogo
+              "Firma no configurada", que se puede cerrar y no se vuelve a abrir: al cerrarlo, la
+              pantalla quedaba sin ninguna acción habilitada ni forma de avanzar. El acceso a la
+              configuración vive ahora también aquí, fuera del bloque inerte, para que la
+              pantalla nunca sea un callejón sin salida.
+            */}
             {needsSimpleSignatureSetup && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                Para firmar documentos con tu firma digital simple, esta debe
-                estar configurada.
+              <div className="flex flex-col items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                <p>
+                  Para firmar documentos con tu firma digital simple, esta debe
+                  estar configurada.
+                </p>
+                <Button
+                  nativeButton={false}
+                  size="sm"
+                  render={<Link href="/dashboard/personal-documents/identity" />}
+                >
+                  Configurar mi firma
+                </Button>
               </div>
             )}
 
