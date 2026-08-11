@@ -575,6 +575,34 @@ describe('SignDocumentView', () => {
     expect(wrapper?.className).toContain('pointer-events-none');
   });
 
+  it('bug corregido: sin firma configurada, la leyenda incluye un acceso HABILITADO para configurarla — al cerrar el modal la pantalla quedaba sin ninguna acción posible', async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+
+    // Se cierra el diálogo, que es justo lo que dejaba al firmante encerrado.
+    await user.keyboard('{Escape}');
+
+    const configure = screen.getByRole('button', {
+      name: /configurar mi firma/i,
+    });
+    expect(configure).toHaveAttribute(
+      'href',
+      '/dashboard/personal-documents/identity',
+    );
+    // Fuera del bloque inerte: es la única acción con la que el firmante puede avanzar.
+    expect(configure.closest('[inert]')).toBeNull();
+  });
+
   it('bug corregido: al acceder por ruta directa sin firma simple configurada, bloquea el documento con un overlay y despliega un modal de alerta', () => {
     useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
     mockedUseDocumentDetail.mockReturnValue({
