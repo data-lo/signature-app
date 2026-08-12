@@ -1,9 +1,17 @@
 name: Continuous Integration Development
 
 on:
+  push:
+    branches:
+      - development
+      - 'fix/**'
+      - 'feature/**'
+
   pull_request:
     branches:
       - development
+      - 'fix/**'
+      - 'feature/**'
 
 jobs:
   test:
