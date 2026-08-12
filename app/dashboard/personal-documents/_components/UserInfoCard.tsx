@@ -14,6 +14,7 @@ import {
   type UpdatePersonalInfoFormValues,
 } from '../_schemas';
 import { useUpdatePersonalInformation } from '../_hooks/useUpdatePersonalInformation';
+import { Form } from '@/components/form/form';
 
 interface UserInfoCardProps {
   user: CurrentUser;
@@ -87,7 +88,7 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
         </dl>
 
         {isEditing && (
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-4">
+          <Form onSubmit={handleSubmit(onSubmit)} className="mt-4">
             <FieldGroup>
               <TextField
                 id="phoneNumber"
@@ -126,7 +127,7 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
                 </Button>
               </div>
             </FieldGroup>
-          </form>
+          </Form>
         )}
       </CardContent>
     </Card>

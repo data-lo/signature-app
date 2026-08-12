@@ -3,8 +3,7 @@
 import { useEffect } from 'react';
 import { useController, type Control } from 'react-hook-form';
 import { Info } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { FormCheckbox } from '@/components/form/form-checkbox';
 import {
   Tooltip,
   TooltipContent,
@@ -45,24 +44,24 @@ export default function RequiresApprovalField({
   }
 
   return (
-    <Field orientation="horizontal" className="items-center">
-      <Checkbox
-        id="requiresApproval"
-        checked={field.value}
-        onCheckedChange={(checked) => field.onChange(checked === true)}
-      />
-      <FieldLabel htmlFor="requiresApproval" className="flex items-center gap-1.5">
-        Requiere aprobación
-        <Tooltip>
-          <TooltipTrigger
-            aria-label="¿Qué significa 'Requiere aprobación'?"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Info className="size-3.5" />
-          </TooltipTrigger>
-          <TooltipContent>{HELP_TEXT}</TooltipContent>
-        </Tooltip>
-      </FieldLabel>
-    </Field>
+    <FormCheckbox
+      control={control}
+      name="requiresApproval"
+      id="requiresApproval"
+      label={
+        <span className="flex items-center gap-1.5">
+          Requiere aprobación
+          <Tooltip>
+            <TooltipTrigger
+              aria-label="¿Qué significa 'Requiere aprobación'?"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Info className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{HELP_TEXT}</TooltipContent>
+          </Tooltip>
+        </span>
+      }
+    />
   );
 }

@@ -14,15 +14,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { TextField } from '@/components/form/text-field';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FieldGroup } from '@/components/ui/field';
+import { FormInput } from '@/components/form/form-input';
+import { FormSelect } from '@/components/form/form-select';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useInviteMember } from '../_hooks/useInviteMember';
@@ -30,27 +24,26 @@ import {
   inviteMemberSchema,
   type InviteMemberFormValues,
 } from '../_invite-member-schema';
+import { Form } from '@/components/form/form';
 
 export default function InviteMemberModal() {
   const [open, setOpen] = useState(false);
   const activeAccount = useAuthStore((state) => state.activeAccount);
-  const { data: roles, isLoading: rolesLoading } = useSystemRoles(open);
+  // Consulta y mutación como instancias con nombre: `systemRolesQuery.isLoading` no se confunde
+  // con `inviteMemberMutation.isPending` ni obliga a renombrar `data` con alias.
+  const systemRolesQuery = useSystemRoles(open);
   const inviteMemberMutation = useInviteMember();
 
   const {
-    register,
+    control,
     handleSubmit,
-    watch,
-    setValue,
     reset,
-    formState: { errors, isValid },
+    formState: { isValid },
   } = useForm<InviteMemberFormValues>({
     resolver: zodResolver(inviteMemberSchema),
     mode: 'onChange',
     defaultValues: { email: '', roleId: '' },
   });
-
-  const roleId = watch('roleId');
 
   if (activeAccount?.accountType !== 'ORGANIZATION') {
     return null;
@@ -83,47 +76,34 @@ export default function InviteMemberModal() {
             la organización.
           </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="flex flex-col gap-4"
-        >
+        <Form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FieldGroup>
-            <TextField
+            <FormInput
+              control={control}
+              name="email"
               id="invite-email"
               label="Correo electrónico"
               type="email"
               placeholder="nuevo.miembro@empresa.com"
-              error={errors.email}
-              {...register('email')}
+              required
             />
 
-            <Field data-invalid={errors.roleId ? true : undefined}>
-              <FieldLabel htmlFor="invite-role">Rol</FieldLabel>
-              <Select
-                value={roleId || null}
-                onValueChange={(value) =>
-                  setValue('roleId', value ?? '', { shouldValidate: true })
-                }
-              >
-                <SelectTrigger id="invite-role" className="w-full">
-                  <SelectValue
-                    placeholder={
-                      rolesLoading ? 'Cargando roles...' : 'Selecciona un rol'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles?.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldError
-                errors={errors.roleId ? [errors.roleId] : undefined}
-              />
-            </Field>
+            <FormSelect
+              control={control}
+              name="roleId"
+              id="invite-role"
+              label="Rol"
+              required
+              placeholder={
+                systemRolesQuery.isLoading
+                  ? 'Cargando roles...'
+                  : 'Selecciona un rol'
+              }
+              options={(systemRolesQuery.data ?? []).map((role) => ({
+                value: role.id,
+                label: role.name,
+              }))}
+            />
           </FieldGroup>
 
           <DialogFooter>
@@ -144,7 +124,7 @@ export default function InviteMemberModal() {
                 : 'Enviar invitación'}
             </Button>
           </DialogFooter>
-        </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

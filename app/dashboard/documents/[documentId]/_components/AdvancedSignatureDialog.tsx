@@ -18,6 +18,7 @@ import {
   advancedSignatureSchema,
   type AdvancedSignatureFormValues,
 } from '../_schemas';
+import { Form } from '@/components/form/form';
 
 export interface AdvancedSignatureSubmitValues {
   password: string;
@@ -88,7 +89,7 @@ export default function AdvancedSignatureDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form
+        <Form
           onSubmit={handleSubmit(handleFormSubmit)}
           className="flex flex-col gap-4"
         >
@@ -140,7 +141,7 @@ export default function AdvancedSignatureDialog({
               {confirming ? 'Validando y firmando...' : 'Firmar documento'}
             </Button>
           </DialogFooter>
-        </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

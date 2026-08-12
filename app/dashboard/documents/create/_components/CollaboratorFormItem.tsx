@@ -1,18 +1,21 @@
 'use client';
 
-import { Controller, useWatch, type Control, type FieldErrors } from 'react-hook-form';
+import { useWatch, type Control } from 'react-hook-form';
 import { GripVertical, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldLabel, FieldError } from '@/components/ui/field';
+import { FormInput } from '@/components/form/form-input';
+import { FormCheckbox } from '@/components/form/form-checkbox';
+import {
+  COLLABORATOR_EMAIL_FIELD,
+  COLLABORATOR_NAME_FIELDS,
+  COLLABORATOR_RFC_FIELD,
+} from '../_config/collaborator-fields.config';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 import type { DragHandleProps } from './SortableCollaboratorItem';
 
 interface CollaboratorFormItemProps {
   index: number;
   control: Control<CreateDocumentSignaturesFormValues>;
-  errors: FieldErrors<CreateDocumentSignaturesFormValues>;
   onRemove: () => void;
   /** Posición secuencial (1-based) — solo se pasa cuando "Requiere firmas en orden" está activo. */
   orderIndex?: number;
@@ -26,13 +29,16 @@ interface CollaboratorFormItemProps {
  * solo los campos que aplican a cada uno:
  *  - SIGNER: nombre/apellido/email siempre; checkbox "¿firma avanzada?" que revela RFC
  *    (obligatorio) y el checkbox de 2FA (interactivo) cuando está activo; si no, RFC
- *    desaparece y 2FA se fuerza a true sin mostrarse (ver toBackendCollaboratorPayload).
+ *    desaparece y 2FA se fuerza a true sin mostrarse (ver `_mappers/`).
  *  - VIEWER: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
+ *
+ * Los campos se arman desde `_config/collaborator-fields.config.ts` y cada uno resuelve su
+ * propio error con `useController` (dentro de `FormInput`), así que este componente ya no
+ * recibe ni recorre `formState.errors`.
  */
 export default function CollaboratorFormItem({
   index,
   control,
-  errors,
   onRemove,
   orderIndex,
   dragHandleProps,
@@ -48,9 +54,7 @@ export default function CollaboratorFormItem({
 
   const isSigner = collaboratorType === 'SIGNER';
   const isAdvanced = isSigner && signatureType === 'ADVANCED';
-  const itemError = errors.collaborators?.[index] as
-    | Record<string, { message?: string } | undefined>
-    | undefined;
+  const showRfc = isAdvanced || collaboratorType === 'VIEWER';
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -91,98 +95,54 @@ export default function CollaboratorFormItem({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Controller
-          control={control}
-          name={`collaborators.${index}.firstName`}
-          render={({ field }) => (
-            <Field>
-              <FieldLabel htmlFor={`collab-${index}-firstName`}>
-                Nombre(s)
-              </FieldLabel>
-              <Input id={`collab-${index}-firstName`} {...field} />
-              <FieldError errors={[itemError?.firstName]} />
-            </Field>
-          )}
-        />
-
-        <Controller
-          control={control}
-          name={`collaborators.${index}.lastName`}
-          render={({ field }) => (
-            <Field>
-              <FieldLabel htmlFor={`collab-${index}-lastName`}>
-                Apellido
-              </FieldLabel>
-              <Input id={`collab-${index}-lastName`} {...field} />
-              <FieldError errors={[itemError?.lastName]} />
-            </Field>
-          )}
-        />
+        {COLLABORATOR_NAME_FIELDS.map((field) => (
+          <FormInput
+            key={field.name}
+            control={control}
+            name={`collaborators.${index}.${field.name}`}
+            label={field.label}
+            type={field.type}
+            placeholder={field.placeholder}
+            required={field.required}
+          />
+        ))}
       </div>
 
-      <Controller
+      <FormInput
         control={control}
-        name={`collaborators.${index}.email`}
-        render={({ field }) => (
-          <Field>
-            <FieldLabel htmlFor={`collab-${index}-email`}>Email</FieldLabel>
-            <Input id={`collab-${index}-email`} type="email" {...field} />
-            <FieldError errors={[itemError?.email]} />
-          </Field>
-        )}
+        name={`collaborators.${index}.${COLLABORATOR_EMAIL_FIELD.name}`}
+        label={COLLABORATOR_EMAIL_FIELD.label}
+        type={COLLABORATOR_EMAIL_FIELD.type}
+        placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
+        required={COLLABORATOR_EMAIL_FIELD.required}
       />
 
       {isSigner && (
-        <Controller
+        <FormCheckbox
           control={control}
           name={`collaborators.${index}.signatureType`}
-          render={({ field }) => (
-            <Field orientation="horizontal">
-              <Checkbox
-                id={`collab-${index}-advanced`}
-                checked={field.value === 'ADVANCED'}
-                onCheckedChange={(checked) => {
-                  field.onChange(checked ? 'ADVANCED' : 'SIMPLE');
-                }}
-              />
-              <FieldLabel htmlFor={`collab-${index}-advanced`}>
-                ¿Requiere firma avanzada (FIEL)?
-              </FieldLabel>
-            </Field>
-          )}
+          label="¿Requiere firma avanzada (FIEL)?"
+          checkedValue="ADVANCED"
+          uncheckedValue="SIMPLE"
         />
       )}
 
-      {(isAdvanced || collaboratorType === 'VIEWER') && (
-        <Controller
+      {showRfc && (
+        <FormInput
           control={control}
-          name={`collaborators.${index}.rfc`}
-          render={({ field }) => (
-            <Field>
-              <FieldLabel htmlFor={`collab-${index}-rfc`}>RFC</FieldLabel>
-              <Input id={`collab-${index}-rfc`} {...field} value={field.value ?? ''} />
-              <FieldError errors={[itemError?.rfc]} />
-            </Field>
-          )}
+          name={`collaborators.${index}.${COLLABORATOR_RFC_FIELD.name}`}
+          label={COLLABORATOR_RFC_FIELD.label}
+          type={COLLABORATOR_RFC_FIELD.type}
+          placeholder={COLLABORATOR_RFC_FIELD.placeholder}
+          required={COLLABORATOR_RFC_FIELD.required}
         />
       )}
 
       {isAdvanced && (
-        <Controller
+        <FormCheckbox
           control={control}
           name={`collaborators.${index}.requiresTwoFactorAuth`}
-          render={({ field }) => (
-            <Field orientation="horizontal">
-              <Checkbox
-                id={`collab-${index}-2fa`}
-                checked={field.value === true}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-              />
-              <FieldLabel htmlFor={`collab-${index}-2fa`}>
-                Código de verificación (2FA)
-              </FieldLabel>
-            </Field>
-          )}
+          label="Código de verificación (2FA)"
         />
       )}
     </div>
