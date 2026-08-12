@@ -70,7 +70,10 @@ const mockedUseConfirmCancellation = useConfirmCancellation as jest.Mock;
 const mockedUseRequestVerificationCode =
   useRequestVerificationCode as jest.Mock;
 const mockedUseVerifyCode = useVerifyCode as jest.Mock;
-const mockedToast = toast as unknown as jest.Mock;
+const mockedToast = toast as unknown as jest.Mock & {
+  error: jest.Mock;
+  success: jest.Mock;
+};
 
 function baseDocument(
   overrides: Partial<DocumentDetail> = {},
@@ -167,6 +170,8 @@ describe('SignDocumentView', () => {
     requestCancellationMutate.mockReset();
     confirmCancellationMutate.mockReset();
     mockedToast.mockClear();
+    mockedToast.error.mockClear();
+    mockedToast.success.mockClear();
     mockGeolocationSuccess();
     useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
 
@@ -246,13 +251,43 @@ describe('SignDocumentView', () => {
     );
 
     await waitFor(() =>
-      expect(signMutate).toHaveBeenCalledWith(DEFAULT_COORDS),
+      expect(signMutate).toHaveBeenCalledWith({ geolocation: DEFAULT_COORDS }),
     );
     expect(mockedToast).not.toHaveBeenCalled();
   });
 
-  it('si el usuario rechaza el permiso de ubicación, firma igual sin bloquear y avisa que no se envió ubicación', async () => {
-    mockGeolocationError(1);
+  /**
+   * La ubicación pasó de opcional a OBLIGATORIA: antes, cualquiera de estos fallos dejaba firmar
+   * igual y solo avisaba que la firma iba sin ubicación. Ahora corta el proceso — no se llama a
+   * la mutación — y explica el motivo de forma persistente para poder reintentar.
+   */
+  it.each([
+    [
+      'el usuario rechaza el permiso',
+      () => mockGeolocationError(1),
+      /no diste permiso de ubicación/i,
+    ],
+    [
+      'la ubicación no está disponible',
+      () => mockGeolocationError(2),
+      /no se pudo determinar tu ubicación/i,
+    ],
+    [
+      'se agota el tiempo de espera',
+      () => mockGeolocationError(3),
+      /se agotó el tiempo de espera/i,
+    ],
+    [
+      'el navegador no soporta geolocalización',
+      mockGeolocationUnsupported,
+      /tu navegador no permite compartir ubicación/i,
+    ],
+  ])('si %s: NO firma y explica por qué está bloqueado', async (
+    _caso,
+    mockGeo,
+    expectedReason,
+  ) => {
+    mockGeo();
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({ canSign: true, canReject: true }),
       isLoading: false,
@@ -265,70 +300,18 @@ describe('SignDocumentView', () => {
       screen.getByRole('button', { name: /continuar a firmar/i }),
     );
 
-    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
-    expect(mockedToast).toHaveBeenCalledWith(
-      expect.stringMatching(/no diste permiso de ubicación/i),
+    await waitFor(() =>
+      expect(mockedToast.error).toHaveBeenCalledWith(
+        expect.stringMatching(expectedReason),
+      ),
     );
-  });
+    expect(signMutate).not.toHaveBeenCalled();
 
-  it('si la ubicación no está disponible, firma igual sin bloquear', async () => {
-    mockGeolocationError(2);
-    mockedUseDocumentDetail.mockReturnValue({
-      data: baseDocument({ canSign: true, canReject: true }),
-      isLoading: false,
-      isError: false,
-    });
-    const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
-
-    await user.click(
-      screen.getByRole('button', { name: /continuar a firmar/i }),
-    );
-
-    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
-    expect(mockedToast).toHaveBeenCalledWith(
-      expect.stringMatching(/no se pudo determinar tu ubicación/i),
-    );
-  });
-
-  it('si se agota el tiempo de espera de la ubicación, firma igual sin bloquear', async () => {
-    mockGeolocationError(3);
-    mockedUseDocumentDetail.mockReturnValue({
-      data: baseDocument({ canSign: true, canReject: true }),
-      isLoading: false,
-      isError: false,
-    });
-    const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
-
-    await user.click(
-      screen.getByRole('button', { name: /continuar a firmar/i }),
-    );
-
-    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
-    expect(mockedToast).toHaveBeenCalledWith(
-      expect.stringMatching(/se agotó el tiempo de espera/i),
-    );
-  });
-
-  it('si el navegador no soporta geolocalización, firma igual sin bloquear', async () => {
-    mockGeolocationUnsupported();
-    mockedUseDocumentDetail.mockReturnValue({
-      data: baseDocument({ canSign: true, canReject: true }),
-      isLoading: false,
-      isError: false,
-    });
-    const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
-
-    await user.click(
-      screen.getByRole('button', { name: /continuar a firmar/i }),
-    );
-
-    await waitFor(() => expect(signMutate).toHaveBeenCalledWith(undefined));
-    expect(mockedToast).toHaveBeenCalledWith(
-      expect.stringMatching(/tu navegador no permite compartir ubicación/i),
-    );
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(expectedReason);
+    expect(
+      screen.getByRole('button', { name: /reintentar con ubicación/i }),
+    ).toBeInTheDocument();
   });
 
   it('no reutiliza una posición cacheada: cada intento de firma pide una lectura fresca', async () => {
@@ -821,6 +804,20 @@ describe('SignDocumentView', () => {
       expect(signMutate).not.toHaveBeenCalled();
     });
 
+    it('sin ubicación no abre siquiera el diálogo de e.firma: el bloqueo ocurre antes de pedir contraseña y archivos', async () => {
+      mockGeolocationError(1);
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      await waitFor(() => expect(mockedToast.error).toHaveBeenCalled());
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(signMutate).not.toHaveBeenCalled();
+    });
+
     it('al completar y enviar el formulario de e.firma, llama a signMutate con la contraseña y los archivos', async () => {
       const user = userEvent.setup();
       renderFielDocument();
@@ -848,11 +845,16 @@ describe('SignDocumentView', () => {
         within(dialog).getByRole('button', { name: /firmar documento/i }),
       );
 
+      // La firma FIEL también manda la ubicación (obligatoria): antes el payload era una unión
+      // excluyente y la firma avanzada viajaba SIN geolocalización.
       expect(signMutate).toHaveBeenCalledWith(
         {
-          password: 'MiContraseña123',
-          keyFile: expect.any(File),
-          cerFile: expect.any(File),
+          geolocation: DEFAULT_COORDS,
+          advancedSignature: {
+            password: 'MiContraseña123',
+            keyFile: expect.any(File),
+            cerFile: expect.any(File),
+          },
         },
         expect.anything(),
       );
