@@ -6,7 +6,11 @@ import {
   setPendingRegistrationContext,
   clearPendingRegistrationContext,
 } from '@/lib/pending-registration-context';
-import { verifyOtpRequest, resendOtpRequest } from '../../_requests';
+import {
+  verifyOtpRequest,
+  resendOtpRequest,
+  updatePreRegistrationRequest,
+} from '../../_requests';
 import { setAuthToken } from '@/lib/cookies';
 
 jest.mock('@/lib/pending-registration-context');
@@ -26,6 +30,8 @@ const mockedClearPendingRegistrationContext =
   clearPendingRegistrationContext as jest.Mock;
 const mockedVerifyOtpRequest = verifyOtpRequest as jest.Mock;
 const mockedResendOtpRequest = resendOtpRequest as jest.Mock;
+const mockedUpdatePreRegistrationRequest =
+  updatePreRegistrationRequest as jest.Mock;
 const mockedSetAuthToken = setAuthToken as jest.Mock;
 
 describe('VerifyOtpForm', () => {
@@ -40,6 +46,7 @@ describe('VerifyOtpForm', () => {
     mockedClearPendingRegistrationContext.mockReset();
     mockedVerifyOtpRequest.mockReset();
     mockedResendOtpRequest.mockReset();
+    mockedUpdatePreRegistrationRequest.mockReset();
     mockedSetAuthToken.mockReset();
   });
 
@@ -96,10 +103,7 @@ describe('VerifyOtpForm', () => {
     const user = userEvent.setup();
     renderWithProviders(<VerifyOtpForm />);
 
-    await user.type(
-      screen.getByLabelText(/código de verificación/i),
-      '123456',
-    );
+    await user.type(screen.getByLabelText(/código de verificación/i), '123456');
     await user.click(screen.getByRole('button', { name: /^verificar$/i }));
 
     await waitFor(() =>
@@ -119,10 +123,7 @@ describe('VerifyOtpForm', () => {
     const user = userEvent.setup();
     renderWithProviders(<VerifyOtpForm />);
 
-    await user.type(
-      screen.getByLabelText(/código de verificación/i),
-      '000000',
-    );
+    await user.type(screen.getByLabelText(/código de verificación/i), '000000');
     await user.click(screen.getByRole('button', { name: /^verificar$/i }));
 
     expect(
@@ -151,5 +152,126 @@ describe('VerifyOtpForm', () => {
     expect(
       await screen.findByText(/te reenviamos un nuevo código/i),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * Salida para el error de dedo en el correo: reenviar el código no sirve si la dirección no
+   * existe, y volver a registrarse tampoco, porque el CURP ya está tomado por este mismo
+   * pre-registro (ver historia "Permitir corregir datos antes de verificar el correo").
+   */
+  describe('corrección de datos antes de verificar', () => {
+    async function openEditForm() {
+      const user = userEvent.setup();
+      renderWithProviders(<VerifyOtpForm />);
+      await user.click(
+        screen.getByRole('button', { name: /corrige tus datos/i }),
+      );
+      return user;
+    }
+
+    it('el formulario de corrección llega precargado con el correo del registro, para arreglarlo en vez de reescribirlo', async () => {
+      await openEditForm();
+
+      expect(screen.getByLabelText(/correo electrónico/i)).toHaveValue(
+        'ana@empresa.com',
+      );
+      expect(
+        screen.getByLabelText(/contraseña de tu registro/i),
+      ).toBeInTheDocument();
+    });
+
+    it('corrige el correo y pasa a esperar el código en la dirección nueva', async () => {
+      mockedUpdatePreRegistrationRequest.mockResolvedValue({
+        userId: 'user-1',
+        email: 'ana@empresa.com.mx',
+        maskedEmail: 'a***a@empresa.com.mx',
+        isNewPreRegistration: false,
+      });
+      const user = await openEditForm();
+
+      const emailInput = screen.getByLabelText(/correo electrónico/i);
+      await user.clear(emailInput);
+      await user.type(emailInput, 'ana@empresa.com.mx');
+      await user.type(
+        screen.getByLabelText(/contraseña de tu registro/i),
+        'SuperSecret123',
+      );
+      await user.click(
+        screen.getByRole('button', { name: /guardar y enviar código/i }),
+      );
+
+      await waitFor(() =>
+        expect(mockedUpdatePreRegistrationRequest).toHaveBeenCalledWith({
+          currentEmail: 'ana@empresa.com',
+          email: 'ana@empresa.com.mx',
+          password: 'SuperSecret123',
+          firstName: undefined,
+          lastName: undefined,
+          nationalId: undefined,
+          rfc: undefined,
+        }),
+      );
+
+      // El contexto pendiente pasa a apuntar al correo corregido: si no, verificar el código
+      // seguiría mandándose contra la dirección equivocada.
+      expect(mockedSetPendingRegistrationContext).toHaveBeenCalledWith({
+        email: 'ana@empresa.com.mx',
+        maskedEmail: 'a***a@empresa.com.mx',
+        isNewPreRegistration: false,
+      });
+      expect(
+        await screen.findByText(/enviamos un código nuevo a a\*\*\*a@empresa/i),
+      ).toBeInTheDocument();
+    });
+
+    it('exige la contraseña del registro: sin ella no se manda nada', async () => {
+      const user = await openEditForm();
+
+      await user.click(
+        screen.getByRole('button', { name: /guardar y enviar código/i }),
+      );
+
+      expect(
+        await screen.findByText(/escribe la contraseña que elegiste/i),
+      ).toBeInTheDocument();
+      expect(mockedUpdatePreRegistrationRequest).not.toHaveBeenCalled();
+    });
+
+    it('muestra el error del backend cuando el correo nuevo ya está tomado', async () => {
+      mockedUpdatePreRegistrationRequest.mockRejectedValue({
+        response: {
+          data: {
+            message:
+              'Ya existe un usuario registrado con ese correo electrónico',
+          },
+        },
+      });
+      const user = await openEditForm();
+
+      await user.type(
+        screen.getByLabelText(/contraseña de tu registro/i),
+        'SuperSecret123',
+      );
+      await user.click(
+        screen.getByRole('button', { name: /guardar y enviar código/i }),
+      );
+
+      expect(
+        await screen.findByText(
+          /ya existe un usuario registrado con ese correo/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('cancelar regresa a la pantalla del código sin tocar el contexto', async () => {
+      const user = await openEditForm();
+
+      await user.click(screen.getByRole('button', { name: /cancelar/i }));
+
+      expect(
+        screen.getByLabelText(/código de verificación/i),
+      ).toBeInTheDocument();
+      expect(mockedSetPendingRegistrationContext).not.toHaveBeenCalled();
+    });
   });
 });
