@@ -63,6 +63,7 @@ export function useCreateDocumentForm({
         fileName: file.name,
         requiresApproval: values.requiresApproval,
         requiresOrder: values.requiresOrder,
+        signatureType: values.signatureType,
         collaborators: buildSubmissionCollaborators(
           values,
           currentUserQuery.data,

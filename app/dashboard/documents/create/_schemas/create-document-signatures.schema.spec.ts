@@ -5,6 +5,7 @@ import {
   countSigners,
   type CollaboratorFormValues,
   type SignerFormValues,
+  type ViewerFormValues,
 } from './index';
 
 function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
@@ -17,7 +18,7 @@ function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
   };
 }
 
-function viewer(): CollaboratorFormValues {
+function viewer(): ViewerFormValues {
   return {
     ...emptyViewer(),
     firstName: 'Ana',
@@ -27,8 +28,13 @@ function viewer(): CollaboratorFormValues {
   };
 }
 
-function formValues(collaborators: CollaboratorFormValues[], includeMeAsSigner = false) {
+function formValues(
+  collaborators: CollaboratorFormValues[],
+  includeMeAsSigner = false,
+  signatureType: 'SIMPLE' | 'ADVANCED' = 'SIMPLE',
+) {
   return {
+    signatureType,
     requiresApproval: false,
     requiresOrder: false,
     includeMeAsSigner,
@@ -37,37 +43,30 @@ function formValues(collaborators: CollaboratorFormValues[], includeMeAsSigner =
 }
 
 describe('createDocumentSignaturesSchema', () => {
-  it('acepta un firmante SIMPLE sin rfc', () => {
+  it('acepta un documento de firma simple con un firmante', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'SIMPLE' })]),
+      formValues([signer()]),
     );
 
     expect(result.success).toBe(true);
   });
 
-  it('rechaza un firmante ADVANCED sin rfc', () => {
+  it('historia "Selección de tipo de firma": acepta firma avanzada sin pedirle rfc al firmante', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'ADVANCED', rfc: null })]),
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  it('el error de rfc faltante se reporta en el campo rfc del firmante, no en la raíz', () => {
-    const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'ADVANCED', rfc: null })]),
-    );
-
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].path).toEqual(['collaborators', 0, 'rfc']);
-  });
-
-  it('acepta un firmante ADVANCED con rfc', () => {
-    const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'ADVANCED', rfc: 'PEAJ800101XXX' })]),
+      formValues([signer()], false, 'ADVANCED'),
     );
 
     expect(result.success).toBe(true);
+  });
+
+  it('historia "Selección de tipo de firma": rechaza cualquier tipo de firma fuera de los dos flujos', () => {
+    const result = createDocumentSignaturesSchema.safeParse({
+      ...formValues([signer()]),
+      signatureType: 'MIX',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
   it('rechaza un espectador sin rfc', () => {

@@ -7,9 +7,10 @@ import type {
 
 /**
  * "Incluirme como firmante": el usuario en sesión se convierte en un SIGNER autocompletado con
- * sus datos de perfil, con firma SIMPLE y 2FA activo. Nunca pasa por el `useFieldArray` que
- * alimenta el panel de ubicación de firmas (ver `SignaturePlacementField`), así que por
- * construcción no puede tener posiciones colocadas: se agrega recién al enviar.
+ * sus datos de perfil y 2FA activo. Firma con el tipo que se eligió para el documento, igual que
+ * cualquier otro firmante — no lo declara acá. Nunca pasa por el `useFieldArray` que alimenta el
+ * panel de ubicación de firmas (ver `SignaturePlacementField`), así que por construcción no puede
+ * tener posiciones colocadas: se agrega recién al enviar.
  */
 export function buildSelfSigner(currentUser: CurrentUser): SignerFormValues {
   return {
@@ -17,8 +18,6 @@ export function buildSelfSigner(currentUser: CurrentUser): SignerFormValues {
     firstName: currentUser.firstName,
     lastName: currentUser.lastName,
     email: currentUser.email,
-    signatureType: 'SIMPLE',
-    rfc: currentUser.rfc,
     requiresTwoFactorAuth: true,
     signatures: [],
   };

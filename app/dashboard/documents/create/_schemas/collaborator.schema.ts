@@ -9,35 +9,31 @@ const emailField = z
   .email({ message: 'Correo inválido' });
 const rfcField = z.string().trim().min(1, { message: 'El RFC es obligatorio' });
 
-export const signerSchema = z
-  .object({
-    collaboratorType: z.literal('SIGNER'),
-    firstName: nameField,
-    lastName: nameField,
-    email: emailField,
-    signatureType: z.enum(['SIMPLE', 'ADVANCED'], {
-      message: 'Selecciona el tipo de firma',
-    }),
-    rfc: z.string().trim().nullable().optional(),
-    // Solo tiene efecto real cuando signatureType es ADVANCED — para SIMPLE el formulario lo
-    // fuerza a true y oculta el control (ver CollaboratorFormItem).
-    requiresTwoFactorAuth: z.boolean(),
-    // Ubicaciones de firma colocadas por arrastre sobre el PDF (ver historia "Ubicación de
-    // firmas por usuario") — un arreglo vacío es válido: el firmante firma sin estampado visual.
-    // Sin `.default()` a propósito: con `.default()` el input/output del schema divergen
-    // (input optativo, output requerido), lo que rompe la inferencia de tipos de zodResolver
-    // contra `CreateDocumentSignaturesFormValues`. Todo lugar que arma un SignerFormValues
-    // (`emptySigner`, `buildSelfSigner`) ya manda `signatures` explícito.
-    signatures: z.array(signaturePositionSchema),
-  })
-  .refine(
-    (value) => value.signatureType !== 'ADVANCED' || Boolean(value.rfc?.trim()),
-    {
-      message: 'El RFC es obligatorio para firma avanzada (FIEL)',
-      path: ['rfc'],
-    },
-  );
+/**
+ * Un firmante NO declara su propio tipo de firma ni su RFC (ver historia "Selección de tipo de
+ * firma al crear documentos"): el tipo lo define el documento completo (`signatureType` en
+ * `documentConfigurationSchema`) y el RFC del flujo avanzado se extrae del certificado de e.firma
+ * en el momento de firmar (ver `EfirmaService.extaerRfcDeSubject` en el backend), así que pedirlo
+ * al crear el documento era capturar un dato que nadie valida ni usa.
+ */
+export const signerSchema = z.object({
+  collaboratorType: z.literal('SIGNER'),
+  firstName: nameField,
+  lastName: nameField,
+  email: emailField,
+  // Solo tiene efecto real cuando el documento es ADVANCED — para SIMPLE el formulario lo
+  // fuerza a true y oculta el control (ver CollaboratorFormItem).
+  requiresTwoFactorAuth: z.boolean(),
+  // Ubicaciones de firma colocadas por arrastre sobre el PDF (ver historia "Ubicación de
+  // firmas por usuario") — un arreglo vacío es válido: el firmante firma sin estampado visual.
+  // Sin `.default()` a propósito: con `.default()` el input/output del schema divergen
+  // (input optativo, output requerido), lo que rompe la inferencia de tipos de zodResolver
+  // contra `CreateDocumentSignaturesFormValues`. Todo lugar que arma un SignerFormValues
+  // (`emptySigner`, `buildSelfSigner`) ya manda `signatures` explícito.
+  signatures: z.array(signaturePositionSchema),
+});
 
+/** El RFC sobrevive solo acá: un espectador no firma, así que no hay certificado del que leerlo. */
 export const viewerSchema = z.object({
   collaboratorType: z.literal('VIEWER'),
   firstName: nameField,
@@ -62,8 +58,6 @@ export function emptySigner(): SignerFormValues {
     firstName: '',
     lastName: '',
     email: '',
-    signatureType: 'SIMPLE',
-    rfc: null,
     requiresTwoFactorAuth: true,
     signatures: [],
   };
