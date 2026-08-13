@@ -1,17 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import type { CurrentUser } from '@/lib/api/auth';
+import {
+  INE_DOCUMENT,
+  SIGNATURE_DOCUMENT,
+  getPersonalDocumentConfig,
+  type PersonalDocumentField,
+} from '../_config/personal-documents.config';
 import { useDeletePersonalDocument } from '../_hooks/useDeletePersonalDocument';
-import DocumentPreviewItem from './DocumentPreviewItem';
+import PersonalDocumentCard from './PersonalDocumentCard';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 
 interface PersonalDocumentsCompletedProps {
@@ -23,9 +21,8 @@ export default function PersonalDocumentsCompleted({
   signature,
   officialFile,
 }: PersonalDocumentsCompletedProps) {
-  const [pendingDelete, setPendingDelete] = useState<
-    'ine' | 'signature' | null
-  >(null);
+  const [pendingDelete, setPendingDelete] =
+    useState<PersonalDocumentField | null>(null);
   const deleteMutation = useDeletePersonalDocument();
 
   function handleConfirmDelete() {
@@ -37,41 +34,34 @@ export default function PersonalDocumentsCompleted({
   }
 
   return (
-    <Card className="max-w-xl w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CheckCircle2 className="size-5 text-emerald-500" />
-          Documentos personales completos
-        </CardTitle>
-        <CardDescription>
-          Ya registraste tu identificación oficial y tu firma digital.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <DocumentPreviewItem
-          label="Identificación (INE)"
-          secureUrl={officialFile.secureUrl}
-          deleting={deleteMutation.isPending}
+    <>
+      <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-2">
+        <PersonalDocumentCard
+          config={INE_DOCUMENT}
+          storedUrl={officialFile.secureUrl}
           onDelete={() => setPendingDelete('ine')}
+          deleting={deleteMutation.isPending}
         />
 
-        <DocumentPreviewItem
-          label="Firma digital"
-          secureUrl={signature.secureUrl}
-          deleting={deleteMutation.isPending}
+        <PersonalDocumentCard
+          config={SIGNATURE_DOCUMENT}
+          storedUrl={signature.secureUrl}
           onDelete={() => setPendingDelete('signature')}
+          deleting={deleteMutation.isPending}
         />
-      </CardContent>
+      </div>
 
       <DeleteConfirmDialog
         open={pendingDelete !== null}
         label={
-          pendingDelete === 'ine' ? 'tu identificación (INE)' : 'tu firma digital'
+          pendingDelete
+            ? getPersonalDocumentConfig(pendingDelete).possessiveName
+            : ''
         }
         onOpenChange={(open) => !open && setPendingDelete(null)}
         onConfirm={handleConfirmDelete}
         confirming={deleteMutation.isPending}
       />
-    </Card>
+    </>
   );
 }

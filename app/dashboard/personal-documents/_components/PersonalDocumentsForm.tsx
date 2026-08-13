@@ -4,19 +4,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { FieldGroup } from '@/components/ui/field';
-import {
   personalDocumentsSchema,
   type PersonalDocumentsFormValues,
 } from '../_schemas';
+import {
+  INE_DOCUMENT,
+  SIGNATURE_DOCUMENT,
+} from '../_config/personal-documents.config';
 import { useUploadPersonalDocuments } from '../_hooks/useUploadPersonalDocuments';
-import DocumentDropzone from './DocumentDropzone';
+import PersonalDocumentCard from './PersonalDocumentCard';
 import { Form } from '@/components/form/form';
 
 export default function PersonalDocumentsForm() {
@@ -50,53 +46,38 @@ export default function PersonalDocumentsForm() {
   }
 
   return (
-    <Card className="max-w-xl w-full">
-      <CardHeader>
-        <CardTitle>Documentos personales</CardTitle>
-        <CardDescription>
-          Sube tu firma digital para completar tu perfil. La identificación
-          oficial (INE) es opcional y puedes agregarla después.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form
-          onSubmit={handleSubmit((values) => uploadMutation.mutate(values))}
-        >
-          <FieldGroup>
-            <DocumentDropzone
-              id="ineFile"
-              label="Identificación (INE) (opcional)"
-              hint="PDF, JPG o PNG. Máximo 20MB."
-              accept="application/pdf,image/jpeg,image/png"
-              file={ineFile}
-              error={errors.ineFile?.message}
-              onFileChange={handleIneChange}
-              maxFileSizeMB={20}
-            />
+    <Form
+      className="flex w-full flex-col gap-6"
+      onSubmit={handleSubmit((values) => uploadMutation.mutate(values))}
+    >
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <PersonalDocumentCard
+          config={INE_DOCUMENT}
+          optional
+          storedUrl={null}
+          pendingFile={ineFile}
+          error={errors.ineFile?.message}
+          onFileChange={handleIneChange}
+        />
 
-            <DocumentDropzone
-              id="signatureFile"
-              label="Firma digital"
-              hint="Formato PNG. Máximo 10MB."
-              accept="image/png"
-              file={signatureFile}
-              error={errors.signatureFile?.message}
-              onFileChange={handleSignatureChange}
-              maxFileSizeMB={10}
-            />
+        <PersonalDocumentCard
+          config={SIGNATURE_DOCUMENT}
+          storedUrl={null}
+          pendingFile={signatureFile}
+          error={errors.signatureFile?.message}
+          onFileChange={handleSignatureChange}
+        />
+      </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={!isValid || uploadMutation.isPending}
-            >
-              {uploadMutation.isPending
-                ? 'Guardando documentos...'
-                : 'Guardar documentos'}
-            </Button>
-          </FieldGroup>
-        </Form>
-      </CardContent>
-    </Card>
+      <Button
+        type="submit"
+        className="w-full sm:w-auto sm:self-start"
+        disabled={!isValid || uploadMutation.isPending}
+      >
+        {uploadMutation.isPending
+          ? 'Guardando documentos...'
+          : 'Guardar documentos'}
+      </Button>
+    </Form>
   );
 }
