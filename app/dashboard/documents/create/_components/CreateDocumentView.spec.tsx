@@ -242,6 +242,59 @@ describe('CreateDocumentView', () => {
       );
     });
 
+    /**
+     * La confirmación dejó de ser un toast: el envío cierra un flujo largo y su confirmación
+     * trae datos que el usuario necesita retener (el aviso por correo y dónde seguir el estado),
+     * así que ahora es un AlertDialog que hay que reconocer y no algo que se desvanece solo.
+     */
+    it('tras un envío exitoso, confirma con un diálogo que explica el correo y dónde seguir el estado', async () => {
+      const mutateWithSuccess = jest.fn((_vars, opts) => opts?.onSuccess?.());
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: mutateWithSuccess,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+
+      const dialog = await screen.findByRole('alertdialog');
+      expect(dialog).toHaveTextContent(/documento enviado a firma/i);
+      expect(dialog).toHaveTextContent(
+        /se envió correctamente a los usuarios asignados para su firma/i,
+      );
+      expect(dialog).toHaveTextContent(
+        /notificación por correo cuando el proceso se complete/i,
+      );
+
+      // Manda a la sección real donde el creador ve lo que envió, con el mismo nombre que usa
+      // el sidebar (ver DOCUMENTS_SECTIONS).
+      expect(
+        screen.getByRole('link', { name: 'Enviados para firma' }),
+      ).toHaveAttribute('href', '/dashboard/documents/sent');
+
+      await user.click(screen.getByRole('button', { name: /entendido/i }));
+      await waitFor(() =>
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+      );
+    });
+
+    it('no muestra la confirmación mientras el envío no haya salido bien', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+
+      expect(mutate).toHaveBeenCalled();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
     it('mientras la mutación está pendiente, el botón se deshabilita y muestra el progreso', () => {
       mockedUseCreateDocumentSignatures.mockReturnValue({
         mutate,

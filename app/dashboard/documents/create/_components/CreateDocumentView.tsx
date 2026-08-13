@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
@@ -12,6 +13,7 @@ import DocumentConfigurationSection from './DocumentConfigurationSection';
 import DocumentParticipantsSection from './DocumentParticipantsSection';
 import DocumentSignaturePlacementSection from './DocumentSignaturePlacementSection';
 import CreatedDocumentsSection from './CreatedDocumentsSection';
+import DocumentSentDialog from './DocumentSentDialog';
 import { Form } from '@/components/form/form';
 
 interface CreateDocumentViewProps {
@@ -41,10 +43,16 @@ export default function CreateDocumentView({
   trackDocumentsCount = true,
   showCreatedDocuments = true,
 }: CreateDocumentViewProps = {}) {
+  const [isSentDialogOpen, setIsSentDialogOpen] = useState(false);
   const fileSelection = useDocumentFileSelection();
   const createDocumentForm = useCreateDocumentForm({
     file: fileSelection.file,
-    onSubmitted: fileSelection.clear,
+    // `onSubmitted` ya significa "el envío salió bien" (limpia el archivo cargado), así que es
+    // el punto natural para abrir la confirmación sin cambiar el contrato de los hooks.
+    onSubmitted: () => {
+      fileSelection.clear();
+      setIsSentDialogOpen(true);
+    },
   });
   const createdDocuments = useCreatedDocuments({ trackDocumentsCount });
 
@@ -118,6 +126,11 @@ export default function CreateDocumentView({
         filters={createdDocuments.filters}
         onFiltersChange={createdDocuments.handleFiltersChange}
         onPageChange={createdDocuments.setPage}
+      />
+
+      <DocumentSentDialog
+        open={isSentDialogOpen}
+        onOpenChange={setIsSentDialogOpen}
       />
     </PageContainer>
   );
