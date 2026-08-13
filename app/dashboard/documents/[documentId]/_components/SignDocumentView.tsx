@@ -327,10 +327,10 @@ export default function SignDocumentView({
                 !document.verificationConfirmed && (
                   <div className="flex flex-col gap-2 rounded-lg border border-border p-4">
                     <p className="text-sm font-medium text-foreground">
-                      Este documento requiere verificación
+                      Autoriza tu firma con código de validación
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Solicita y valida tu código antes de firmar.
+                      Te enviaremos un código para validar tu firma
                     </p>
                     {codeEmailDelivered === false && (
                       <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
@@ -353,7 +353,7 @@ export default function SignDocumentView({
                       >
                         {requestVerificationCodeMutation.isPending
                           ? 'Enviando código...'
-                          : 'Solicitar código de verificación'}
+                          : 'Validar mi firma'}
                       </Button>
                     ) : (
                       <>

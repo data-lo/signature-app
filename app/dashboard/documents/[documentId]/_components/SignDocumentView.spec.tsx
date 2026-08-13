@@ -365,9 +365,16 @@ describe('SignDocumentView', () => {
       screen.queryByRole('button', { name: /continuar a firmar/i }),
     ).not.toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole('button', { name: /solicitar código de verificación/i }),
-    );
+    // Los textos de la tarjeta los define producto (ver historia "Actualizar la tarjeta OTP en
+    // Documentos por firmar"): se fijan aquí para que un refactor no los revierta en silencio.
+    expect(
+      screen.getByText('Autoriza tu firma con código de validación'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Te enviaremos un código para validar tu firma'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /validar mi firma/i }));
     expect(requestCodeMutate).toHaveBeenCalled();
 
     await user.type(
@@ -405,7 +412,7 @@ describe('SignDocumentView', () => {
     renderWithProviders(<SignDocumentView documentId="doc-1" />);
 
     await user.click(
-      screen.getByRole('button', { name: /solicitar código de verificación/i }),
+      screen.getByRole('button', { name: /validar mi firma/i }),
     );
 
     expect(
