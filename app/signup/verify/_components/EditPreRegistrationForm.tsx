@@ -1,19 +1,21 @@
 'use client';
 
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { FieldGroup, FieldError } from '@/components/ui/field';
+import { FieldGroup } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { Form } from '@/components/form/form';
 import { getErrorMessage } from '@/lib/error-handler';
-import { updatePreRegistrationRequest } from '../../_requests';
+import { useUpdatePreRegistration } from '../_hooks/useUpdatePreRegistration';
 import {
   editPreRegistrationSchema,
   type EditPreRegistrationFormValues,
   type EditPreRegistrationValues,
 } from '../_schemas';
+
+const UPDATE_ERROR_MESSAGE =
+  'No se pudieron actualizar tus datos. Intenta de nuevo.';
 
 interface EditPreRegistrationFormProps {
   /** Correo con el que se hizo el registro; identifica el pre-registro a corregir. */
@@ -37,11 +39,11 @@ export default function EditPreRegistrationForm({
   onUpdated,
   onCancel,
 }: EditPreRegistrationFormProps) {
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const updatePreRegistration = useUpdatePreRegistration();
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<
     EditPreRegistrationFormValues,
@@ -52,24 +54,30 @@ export default function EditPreRegistrationForm({
     defaultValues: { email: currentEmail },
   });
 
+  /**
+   * El error del servidor se asigna al campo `email` en vez de guardarse en un estado propio: los
+   * fallos reales de este endpoint hablan de ese campo ("ya existe un usuario con ese correo"),
+   * así que el mensaje tiene que aparecer junto al input que hay que corregir. Además de moverlo
+   * de lugar, eso lo vuelve accesible —`TextField` marca el input con `aria-invalid` y asocia el
+   * mensaje— y hace que RHF lo limpie solo en el siguiente envío, sin tener que acordarse de
+   * resetearlo a mano.
+   *
+   * `mutateAsync` y no `mutate` porque el resultado se necesita acá: `onUpdated` solo debe correr
+   * si la corrección se guardó, y el `catch` es justamente lo que traduce el fallo al formulario.
+   */
   async function onSubmit(values: EditPreRegistrationValues) {
-    setSubmitError(null);
-    setIsSaving(true);
     try {
-      const result = await updatePreRegistrationRequest({
+      const result = await updatePreRegistration.mutateAsync({
         currentEmail,
         ...values,
       });
       onUpdated({ email: result.email, maskedEmail: result.maskedEmail });
     } catch (error) {
-      setSubmitError(
-        getErrorMessage(
-          error,
-          'No se pudieron actualizar tus datos. Intenta de nuevo.',
-        ),
+      setError(
+        'email',
+        { type: 'server', message: getErrorMessage(error, UPDATE_ERROR_MESSAGE) },
+        { shouldFocus: true },
       );
-    } finally {
-      setIsSaving(false);
     }
   }
 
@@ -129,17 +137,21 @@ export default function EditPreRegistrationForm({
           {...register('rfc')}
         />
 
-        {submitError && <FieldError>{submitError}</FieldError>}
-
-        <Button type="submit" disabled={isSaving} className="w-full">
-          {isSaving ? 'Guardando...' : 'Guardar y enviar código'}
+        <Button
+          type="submit"
+          disabled={updatePreRegistration.isPending}
+          className="w-full"
+        >
+          {updatePreRegistration.isPending
+            ? 'Guardando...'
+            : 'Guardar y enviar código'}
         </Button>
 
         <Button
           type="button"
           variant="ghost"
           className="w-full"
-          disabled={isSaving}
+          disabled={updatePreRegistration.isPending}
           onClick={onCancel}
         >
           Cancelar

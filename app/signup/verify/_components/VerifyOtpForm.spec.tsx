@@ -237,7 +237,12 @@ describe('VerifyOtpForm', () => {
       expect(mockedUpdatePreRegistrationRequest).not.toHaveBeenCalled();
     });
 
-    it('muestra el error del backend cuando el correo nuevo ya está tomado', async () => {
+    /**
+     * El error del backend se asigna al campo `email` (RHF `setError`) en vez de vivir en un
+     * estado propio del componente: casi todo lo que puede fallar acá habla de ese campo, así que
+     * el mensaje va junto al input que hay que corregir y el input queda marcado como inválido.
+     */
+    it('muestra el error del backend en el campo del correo, no como un aviso suelto', async () => {
       mockedUpdatePreRegistrationRequest.mockRejectedValue({
         response: {
           data: {
@@ -261,6 +266,52 @@ describe('VerifyOtpForm', () => {
           /ya existe un usuario registrado con ese correo/i,
         ),
       ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByLabelText(/correo electrónico/i)).toHaveAttribute(
+          'aria-invalid',
+          'true',
+        ),
+      );
+    });
+
+    it('el error del servidor se limpia al reintentar: no queda pegado del intento anterior', async () => {
+      mockedUpdatePreRegistrationRequest.mockRejectedValueOnce({
+        response: {
+          data: { message: 'Ya existe un usuario registrado con ese correo' },
+        },
+      });
+      const user = await openEditForm();
+
+      await user.type(
+        screen.getByLabelText(/contraseña de tu registro/i),
+        'SuperSecret123',
+      );
+      await user.click(
+        screen.getByRole('button', { name: /guardar y enviar código/i }),
+      );
+      expect(
+        await screen.findByText(/ya existe un usuario registrado/i),
+      ).toBeInTheDocument();
+
+      mockedUpdatePreRegistrationRequest.mockResolvedValue({
+        userId: 'user-1',
+        email: 'ana@empresa.com.mx',
+        maskedEmail: 'a***a@empresa.com.mx',
+        isNewPreRegistration: false,
+      });
+      const emailInput = screen.getByLabelText(/correo electrónico/i);
+      await user.clear(emailInput);
+      await user.type(emailInput, 'ana@empresa.com.mx');
+      await user.click(
+        screen.getByRole('button', { name: /guardar y enviar código/i }),
+      );
+
+      expect(
+        await screen.findByText(/enviamos un código nuevo a a\*\*\*a@empresa/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/ya existe un usuario registrado/i),
+      ).not.toBeInTheDocument();
     });
 
     it('cancelar regresa a la pantalla del código sin tocar el contexto', async () => {
