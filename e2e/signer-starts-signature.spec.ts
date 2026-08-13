@@ -39,7 +39,7 @@ test.describe('Firmante único invitado', () => {
     await openDocument(page, documentId);
     expect(await dismissDialogIfPresent(page)).toBe(true);
 
-    // Regresión: al cerrar el diálogo la pantalla quedaba con "Solicitar código de verificación"
+    // Regresión: al cerrar el diálogo la pantalla quedaba con "Validar mi firma"
     // y "Rechazar documento" inertes y ninguna forma de avanzar.
     await expect(
       page.getByText(/tu firma digital simple, esta debe estar configurada/i),
@@ -47,7 +47,7 @@ test.describe('Firmante único invitado', () => {
 
     // Las acciones de firma siguen bloqueadas (el backend exige rúbrica/INE en archivo)...
     await expect(
-      page.getByRole('button', { name: /solicitar código de verificación/i }),
+      page.getByRole('button', { name: /validar mi firma/i }),
     ).toBeDisabled();
     await expect(page.getByRole('button', { name: /rechazar documento/i })).toBeDisabled();
 
@@ -75,7 +75,7 @@ test.describe('Firmante único invitado', () => {
     await openDocument(page, documentId);
 
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await page.getByRole('button', { name: /solicitar código de verificación/i }).click();
+    await page.getByRole('button', { name: /validar mi firma/i }).click();
 
     const code = await expect
       .poll(() => latestSigningCode(documentId), { timeout: 15_000 })
