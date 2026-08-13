@@ -33,6 +33,9 @@ export type CreateDocumentSignaturesFormValues = z.infer<
 /** Estado inicial del formulario y estado al que vuelve tras un envío exitoso. */
 export const CREATE_DOCUMENT_DEFAULT_VALUES: CreateDocumentSignaturesFormValues =
   {
+    // Firma simple por defecto: es el flujo que no le exige nada extra al firmante (la avanzada
+    // le pide su .cer/.key de e.firma al momento de firmar), así que se elige explícitamente.
+    signatureType: 'SIMPLE',
     requiresApproval: false,
     includeMeAsSigner: false,
     requiresOrder: false,

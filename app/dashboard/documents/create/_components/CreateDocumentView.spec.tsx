@@ -71,6 +71,20 @@ async function addSigner(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^email/i), 'juan.perez@mail.com');
 }
 
+/**
+ * jsdom no dispara los PointerEvent que @base-ui/react usa para abrir el Select con click; el
+ * teclado (Enter abre, click en la opción cierra y selecciona) sí dispara los mismos handlers
+ * (mismo camino que usa `InviteMemberModal.spec.tsx`).
+ */
+async function selectSignatureType(
+  user: ReturnType<typeof userEvent.setup>,
+  optionName: RegExp,
+) {
+  screen.getByRole('combobox', { name: /tipo de firma/i }).focus();
+  await user.keyboard('{Enter}');
+  await user.click(screen.getByRole('option', { name: optionName }));
+}
+
 describe('CreateDocumentView', () => {
   const mutate = jest.fn();
 
@@ -185,7 +199,7 @@ describe('CreateDocumentView', () => {
   });
 
   describe('envío', () => {
-    it('agrega un firmante SIMPLE y envía el payload con los datos correctos', async () => {
+    it('agrega un firmante y envía el payload con firma simple (el tipo por defecto)', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -198,16 +212,32 @@ describe('CreateDocumentView', () => {
         expect.objectContaining({
           fileName: 'contrato.pdf',
           requiresApproval: false,
+          signatureType: 'SIMPLE',
           collaborators: [
             expect.objectContaining({
               collaboratorType: 'SIGNER',
               firstName: 'Juan',
               lastName: 'Pérez',
               email: 'juan.perez@mail.com',
-              signatureType: 'SIMPLE',
             }),
           ],
         }),
+        expect.anything(),
+      );
+    });
+
+    it('historia "Selección de tipo de firma": al elegir e.firma, el tipo viaja una sola vez para todo el documento', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma electrónica avanzada/i);
+
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({ signatureType: 'ADVANCED' }),
         expect.anything(),
       );
     });
@@ -258,25 +288,48 @@ describe('CreateDocumentView', () => {
     });
   });
 
-  describe('validaciones y errores', () => {
-    it('al marcar "firma avanzada" pide RFC; sin RFC no envía el formulario y el error sale junto al campo', async () => {
+  describe('tipo de firma', () => {
+    it('el firmante ya no elige su propio tipo de firma: el checkbox por firmante desapareció', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
-      await selectFile(user);
       await addSigner(user);
 
-      await user.click(screen.getByRole('checkbox', { name: /firma avanzada/i }));
-      expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
-
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
-
-      expect(mutate).not.toHaveBeenCalled();
       expect(
-        screen.getByText(/el rfc es obligatorio para firma avanzada/i),
+        screen.queryByRole('checkbox', { name: /firma avanzada/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('el flujo de firma avanzada no pide RFC, y habilita el 2FA opcional por firmante', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await addSigner(user);
+      // Con firma simple: sin RFC y sin control de 2FA (se fuerza a true de forma oculta).
+      expect(screen.queryByLabelText(/^rfc/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('checkbox', { name: /código de verificación/i }),
+      ).not.toBeInTheDocument();
+
+      await selectSignatureType(user, /firma electrónica avanzada/i);
+
+      expect(screen.queryByLabelText(/^rfc/i)).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('checkbox', { name: /código de verificación/i }),
       ).toBeInTheDocument();
     });
 
+    it('el espectador sigue siendo el único participante al que se le pide RFC', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await user.click(screen.getByRole('button', { name: /espectador/i }));
+
+      expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('validaciones y errores', () => {
     it('sin ningún firmante, muestra el error general de la sección de participantes y no envía', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);

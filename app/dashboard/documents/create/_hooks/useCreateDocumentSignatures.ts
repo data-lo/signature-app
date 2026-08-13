@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { createDocumentSignaturesRequest } from '../_requests';
 import {
-  computeRequiresDifferentSignatures,
+  toRequiresDifferentSignatures,
   toCollaboratorPayloads,
 } from '../_mappers/collaborator-payload.mapper';
 import type { CreateDocumentSignaturesInput } from '../_interfaces/create-document-signatures-request.interface';
@@ -31,14 +31,20 @@ export function useCreateDocumentSignatures() {
       fileName,
       requiresApproval,
       requiresOrder,
+      signatureType,
       collaborators,
     }: CreateDocumentSignaturesInput) =>
       createDocumentSignaturesRequest({
         file,
-        documentData: { fileName, requiresApproval, isSequential: requiresOrder },
-        collaborators: toCollaboratorPayloads(collaborators),
+        documentData: {
+          fileName,
+          requiresApproval,
+          isSequential: requiresOrder,
+          signatureType,
+        },
+        collaborators: toCollaboratorPayloads(collaborators, signatureType),
         requiresDifferentSignatures:
-          computeRequiresDifferentSignatures(collaborators),
+          toRequiresDifferentSignatures(signatureType),
       }),
     onSuccess: () => {
       toast.success('Documento enviado a firma correctamente');
