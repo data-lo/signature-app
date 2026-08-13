@@ -51,6 +51,7 @@ function Harness({
   const { control, getValues, setValue } =
     useForm<CreateDocumentSignaturesFormValues>({
       defaultValues: {
+        signatureType: 'SIMPLE',
         requiresApproval: false,
         includeMeAsSigner: false,
         requiresOrder: false,
@@ -60,8 +61,6 @@ function Harness({
             firstName: 'Ana',
             lastName: 'Gómez',
             email: 'ana@correo.com',
-            signatureType: 'SIMPLE',
-            rfc: null,
             requiresTwoFactorAuth: true,
             signatures: [
               { id: 'sig-1', page: 1, xRatio: 0.1, yRatio: 0.1, widthRatio: 0.2, heightRatio: 0.08 },
