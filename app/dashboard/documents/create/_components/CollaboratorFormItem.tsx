@@ -27,10 +27,15 @@ interface CollaboratorFormItemProps {
  * Un bloque del arreglo unificado `collaborators` (ver historia "Frontend: Carga de Documentos
  * y Configuración de Firmantes") — el mismo componente renderiza SIGNER y VIEWER, mostrando
  * solo los campos que aplican a cada uno:
- *  - SIGNER: nombre/apellido/email siempre; checkbox "¿firma avanzada?" que revela RFC
- *    (obligatorio) y el checkbox de 2FA (interactivo) cuando está activo; si no, RFC
- *    desaparece y 2FA se fuerza a true sin mostrarse (ver `_mappers/`).
+ *  - SIGNER: nombre/apellido/email siempre; el checkbox de 2FA solo cuando el documento exige
+ *    firma avanzada — con firma simple, 2FA se fuerza a true sin mostrarse (ver `_mappers/`).
  *  - VIEWER: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
+ *
+ * Historia "Selección de tipo de firma al crear documentos": el tipo de firma ya no se elige por
+ * firmante (era un checkbox acá) sino una sola vez para todo el documento — este componente solo
+ * lo observa, en `signatureType` de la raíz del formulario, para decidir si el 2FA es opcional. El
+ * RFC dejó de pedirse a los firmantes avanzados: el flujo de e.firma lo obtiene del certificado al
+ * momento de firmar.
  *
  * Los campos se arman desde `_config/collaborator-fields.config.ts` y cada uno resuelve su
  * propio error con `useController` (dentro de `FormInput`), así que este componente ya no
@@ -47,14 +52,11 @@ export default function CollaboratorFormItem({
     control,
     name: `collaborators.${index}.collaboratorType`,
   });
-  const signatureType = useWatch({
-    control,
-    name: `collaborators.${index}.signatureType` as `collaborators.${number}.signatureType`,
-  });
+  const signatureType = useWatch({ control, name: 'signatureType' });
 
   const isSigner = collaboratorType === 'SIGNER';
   const isAdvanced = isSigner && signatureType === 'ADVANCED';
-  const showRfc = isAdvanced || collaboratorType === 'VIEWER';
+  const showRfc = collaboratorType === 'VIEWER';
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -116,16 +118,6 @@ export default function CollaboratorFormItem({
         placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
         required={COLLABORATOR_EMAIL_FIELD.required}
       />
-
-      {isSigner && (
-        <FormCheckbox
-          control={control}
-          name={`collaborators.${index}.signatureType`}
-          label="¿Requiere firma avanzada (FIEL)?"
-          checkedValue="ADVANCED"
-          uncheckedValue="SIMPLE"
-        />
-      )}
 
       {showRfc && (
         <FormInput

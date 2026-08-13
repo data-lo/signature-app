@@ -16,6 +16,7 @@ function formValues(
   overrides: Partial<CreateDocumentSignaturesFormValues> = {},
 ): CreateDocumentSignaturesFormValues {
   return {
+    signatureType: 'SIMPLE',
     requiresApproval: false,
     requiresOrder: false,
     includeMeAsSigner: false,
@@ -25,14 +26,12 @@ function formValues(
 }
 
 describe('buildSelfSigner', () => {
-  it('autocompleta al usuario en sesión como firmante SIMPLE con 2FA y sin firmas colocadas', () => {
+  it('autocompleta al usuario en sesión como firmante con 2FA, sin firmas colocadas y sin rfc (firma con el tipo del documento)', () => {
     expect(buildSelfSigner(CURRENT_USER)).toEqual({
       collaboratorType: 'SIGNER',
       firstName: 'Creador',
       lastName: 'Uno',
       email: 'creador@correo.com',
-      signatureType: 'SIMPLE',
-      rfc: 'CRUN800101ABC',
       requiresTwoFactorAuth: true,
       signatures: [],
     });
