@@ -6,12 +6,15 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 
 /**
- * "Incluirme como firmante" (ver historia): al activarlo, el usuario en sesión se agrega como
- * SIGNER autocompletado al enviar (ver `_mappers/submission-collaborators.mapper.ts`) sin
- * pedirle que escriba sus datos otra vez. Este componente solo es el checkbox + la leyenda de
- * contexto ("firmas en representación de...") — necesita saber si la cuenta activa es PERSONAL
- * u ORGANIZATION para redactarla, tomado de useAuthStore (mismo store que ya gobierna el
- * selector de cuenta activa en el resto de la app).
+ * "Incluirme como firmante" (ver historia): al activarlo, el usuario en sesión aparece de
+ * inmediato como una tarjeta SIGNER autocompletada en la lista de participantes, y al desactivarlo
+ * esa tarjeta se quita. Este componente es solo el control visual: el alta y la baja las hace
+ * `CollaboratorsFieldArray`, que es el dueño del arreglo `collaborators` (ver
+ * `_mappers/self-signer.mapper.ts` para las reglas).
+ *
+ * Lo único propio de acá es la leyenda de contexto ("firmas en representación de...") — necesita
+ * saber si la cuenta activa es PERSONAL u ORGANIZATION para redactarla, tomado de useAuthStore
+ * (mismo store que ya gobierna el selector de cuenta activa en el resto de la app).
  */
 export default function IncludeMeAsSignerField({
   control,

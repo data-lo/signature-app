@@ -16,6 +16,8 @@ export {
   emptySigner,
   emptyViewer,
   countSigners,
+  isSelfSigner,
+  findSelfSignerIndex,
   type SignerFormValues,
   type ViewerFormValues,
   type CollaboratorFormValues,

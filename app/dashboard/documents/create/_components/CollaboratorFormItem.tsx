@@ -17,6 +17,13 @@ interface CollaboratorFormItemProps {
   index: number;
   control: Control<CreateDocumentSignaturesFormValues>;
   onRemove: () => void;
+  /**
+   * Es la tarjeta del usuario en sesión, creada por "Incluirme como firmante". Sus datos salen
+   * del perfil, no se capturan: se muestran en solo lectura para que se vean (el criterio de la
+   * historia es que la tarjeta muestre los datos disponibles) sin sugerir que editarlos acá
+   * cambiaría algo — el perfil se edita en su propia pantalla.
+   */
+  isSelf?: boolean;
   /** Posición secuencial (1-based) — solo se pasa cuando "Requiere firmas en orden" está activo. */
   orderIndex?: number;
   /** Solo se pasa junto con `orderIndex`, cuando el reordenamiento por Drag and Drop está activo. */
@@ -45,6 +52,7 @@ export default function CollaboratorFormItem({
   index,
   control,
   onRemove,
+  isSelf = false,
   orderIndex,
   dragHandleProps,
 }: CollaboratorFormItemProps) {
@@ -84,13 +92,20 @@ export default function CollaboratorFormItem({
           <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             {isSigner ? 'Firmante' : 'Espectador'}
           </span>
+          {isSelf && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-900 uppercase dark:bg-emerald-950 dark:text-emerald-200">
+              Tú
+            </span>
+          )}
         </div>
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
           onClick={onRemove}
-          aria-label="Quitar participante"
+          aria-label={
+            isSelf ? 'Quitarme como firmante' : 'Quitar participante'
+          }
         >
           <X className="size-3.5" />
         </Button>
@@ -106,6 +121,7 @@ export default function CollaboratorFormItem({
             type={field.type}
             placeholder={field.placeholder}
             required={field.required}
+            disabled={isSelf}
           />
         ))}
       </div>
@@ -117,6 +133,7 @@ export default function CollaboratorFormItem({
         type={COLLABORATOR_EMAIL_FIELD.type}
         placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
         required={COLLABORATOR_EMAIL_FIELD.required}
+        disabled={isSelf}
       />
 
       {showRfc && (
