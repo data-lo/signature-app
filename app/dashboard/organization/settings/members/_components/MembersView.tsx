@@ -8,6 +8,7 @@ import { useUpdateMemberRole } from '../_hooks/useUpdateMemberRole';
 import { useRemoveMember } from '../_hooks/useRemoveMember';
 import { useUpdateMemberPermissions } from '../_hooks/useUpdateMemberPermissions';
 import MembersTable from './MembersTable';
+import InviteMemberModal from './InviteMemberModal';
 import EditRoleModal from './EditRoleModal';
 import RemoveMemberDialog from './RemoveMemberDialog';
 import ConfigureMemberPermissionsModal from './ConfigureMemberPermissionsModal';
@@ -78,11 +79,21 @@ export default function MembersView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-lg font-semibold">Miembros</h1>
-        <p className="text-sm text-muted-foreground">
-          Administra los miembros de tu organización, sus roles y su acceso.
-        </p>
+      {/*
+        "Invitar miembro" vive acá desde la historia "Reubicar botón Invitar miembro" (antes
+        estaba en la pantalla de creación de documento): dar de alta a alguien es parte de
+        administrar el equipo, no de armar un documento. Al quedar dentro de esta vista hereda
+        además sus dos guardas — cuenta de tipo ORGANIZATION y rol de administrador—, que es lo
+        que el backend ya exigía para `POST /organizations/invite`.
+      */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-semibold">Miembros</h1>
+          <p className="text-sm text-muted-foreground">
+            Administra los miembros de tu organización, sus roles y su acceso.
+          </p>
+        </div>
+        <InviteMemberModal />
       </div>
 
       {membersLoading ? (

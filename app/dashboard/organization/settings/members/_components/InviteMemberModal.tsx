@@ -20,10 +20,7 @@ import { FormSelect } from '@/components/form/form-select';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useInviteMember } from '../_hooks/useInviteMember';
-import {
-  inviteMemberSchema,
-  type InviteMemberFormValues,
-} from '../_invite-member-schema';
+import { inviteMemberSchema, type InviteMemberFormValues } from '../_schemas';
 import { Form } from '@/components/form/form';
 
 export default function InviteMemberModal() {

@@ -200,4 +200,55 @@ describe('MembersView', () => {
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });
+
+  /**
+   * Historia "Reubicar botón Invitar miembro": el botón vivía en la pantalla de creación de
+   * documento y se centralizó acá. El comportamiento del formulario en sí lo cubre
+   * `InviteMemberModal.spec.tsx`; estas pruebas verifican que quede montado en esta sección y que
+   * herede sus guardas de acceso.
+   */
+  describe('"Invitar miembro"', () => {
+    const inviteButton = () =>
+      screen.queryByRole('button', { name: /invitar miembro/i });
+
+    it('se ofrece desde esta sección', () => {
+      renderWithProviders(<MembersView />);
+
+      expect(inviteButton()).toBeInTheDocument();
+    });
+
+    it('abre el formulario de invitación con los roles del sistema', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<MembersView />);
+
+      await user.click(inviteButton() as HTMLElement);
+
+      expect(
+        await screen.findByText(/ingresa el correo del nuevo miembro/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('textbox', { name: /correo electrónico/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /rol/i })).toBeInTheDocument();
+    });
+
+    // Invitar exige ser ADMIN/OWNER en el backend (`POST /organizations/invite`); al vivir dentro
+    // de esta vista, el botón queda detrás de la misma guarda en vez de depender de la suya.
+    it('no se ofrece si el usuario no es ADMIN de la organización', () => {
+      mockedUseIsOrganizationAdmin.mockReturnValue({
+        isAdmin: false,
+        isLoading: false,
+      });
+      renderWithProviders(<MembersView />);
+
+      expect(inviteButton()).not.toBeInTheDocument();
+    });
+
+    it('no se ofrece en una cuenta personal', () => {
+      useAuthStore.setState({ activeAccount: PERSONAL_ACCOUNT });
+      renderWithProviders(<MembersView />);
+
+      expect(inviteButton()).not.toBeInTheDocument();
+    });
+  });
 });
