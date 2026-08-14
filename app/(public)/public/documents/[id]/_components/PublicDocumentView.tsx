@@ -1,10 +1,20 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DocumentStatus } from '@/lib/enums/document';
 import { usePublicDocument } from '../_hooks/usePublicDocument';
-import PublicPdfViewer from './PublicPdfViewer';
+
+// react-pdf necesita el DOM (`DOMMatrix`), así que se carga solo en cliente igual que los demás
+// visores del proyecto. Con un `import` estático, pdfjs se evaluaba durante el SSR de esta página
+// —que ocurre aunque el componente sea 'use client'— y reventaba con `ReferenceError: DOMMatrix is
+// not defined` ANTES de renderizar nada: la ruta devolvía 500 para cualquier documento, incluso
+// para los estatus que ni siquiera llegan a montar el visor. Importa porque esta es la página a la
+// que apunta el QR impreso en la hoja de firmas de cada documento firmado.
+const PublicPdfViewer = dynamic(() => import('./PublicPdfViewer'), {
+  ssr: false,
+});
 
 const IN_PROGRESS_STATUSES: DocumentStatus[] = [
   DocumentStatus.Pending,

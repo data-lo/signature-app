@@ -50,7 +50,10 @@ describe('PublicDocumentView', () => {
     expect(screen.getByText(/documento no encontrado/i)).toBeInTheDocument();
   });
 
-  it('status SIGNED: renderiza el visor con la secureUrl devuelta por el backend', () => {
+  // `findByText` y no `getByText`: el visor se carga con `dynamic(..., { ssr: false })` —react-pdf
+  // necesita el DOM y con un import estático reventaba el SSR de la página—, así que aparece un
+  // tick después del primer render. El encabezado sí es síncrono.
+  it('status SIGNED: renderiza el visor con la secureUrl devuelta por el backend', async () => {
     mockedUsePublicDocument.mockReturnValue({
       data: buildData({ status: DocumentStatus.Signed }),
       isLoading: false,
@@ -60,7 +63,7 @@ describe('PublicDocumentView', () => {
     renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
     expect(
-      screen.getByText(
+      await screen.findByText(
         'PublicPdfViewer file=https://minio/signed-documents/doc-1',
       ),
     ).toBeInTheDocument();
