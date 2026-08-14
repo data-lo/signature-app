@@ -19,6 +19,7 @@ import {
 import { verifyOtpRequest, resendOtpRequest } from '../../_requests';
 import { verifyOtpSchema, type VerifyOtpFormValues } from '../_schemas';
 import { Form } from '@/components/form/form';
+import EditPreRegistrationForm from './EditPreRegistrationForm';
 
 type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -31,6 +32,8 @@ export default function VerifyOtpForm() {
   const [resendState, setResendState] = useState<ResendState>('idle');
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [updatedNotice, setUpdatedNotice] = useState<string | null>(null);
 
   const {
     register,
@@ -62,7 +65,10 @@ export default function VerifyOtpForm() {
       window.location.href = '/dashboard/documents/create';
     } catch (error) {
       setVerifyError(
-        getErrorMessage(error, 'No se pudo verificar el código. Intenta de nuevo.'),
+        getErrorMessage(
+          error,
+          'No se pudo verificar el código. Intenta de nuevo.',
+        ),
       );
       setIsVerifying(false);
     }
@@ -87,8 +93,46 @@ export default function VerifyOtpForm() {
     }
   }
 
+  /** Tras corregir los datos, el correo pendiente de verificar puede ser otro. */
+  function handleUpdated(result: { email: string; maskedEmail: string }) {
+    const nextContext: PendingRegistrationContext = {
+      email: result.email,
+      maskedEmail: result.maskedEmail,
+      isNewPreRegistration: false,
+    };
+    setPendingRegistrationContext(nextContext);
+    setContext(nextContext);
+    setIsEditing(false);
+    setResendState('idle');
+    setVerifyError(null);
+    setUpdatedNotice(
+      `Actualizamos tus datos y enviamos un código nuevo a ${result.maskedEmail}.`,
+    );
+  }
+
   if (!isReady || !context) {
     return null;
+  }
+
+  if (isEditing) {
+    return (
+      <Card className="max-w-md w-full">
+        <CardHeader>
+          <CardTitle>Corrige tus datos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Si te equivocaste al escribir tu correo, corrígelo aquí y te
+            enviaremos un código nuevo a la dirección correcta.
+          </p>
+          <EditPreRegistrationForm
+            currentEmail={context.email}
+            onUpdated={handleUpdated}
+            onCancel={() => setIsEditing(false)}
+          />
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -97,6 +141,12 @@ export default function VerifyOtpForm() {
         <CardTitle>Verifica tu correo</CardTitle>
       </CardHeader>
       <CardContent>
+        {updatedNotice && (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+            {updatedNotice}
+          </div>
+        )}
+
         {!context.isNewPreRegistration && (
           <div className="mb-4 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-4 py-2 text-sm dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900">
             Ya existía una solicitud de registro pendiente para esta CURP. Te
@@ -136,6 +186,21 @@ export default function VerifyOtpForm() {
               className="w-full"
             >
               {resendState === 'sending' ? 'Reenviando...' : 'Reenviar código'}
+            </Button>
+
+            {/* Salida para el correo con un error de dedo: reenviar el código no sirve de nada
+                si la dirección no existe, y volver a registrarse tampoco (el CURP ya está
+                tomado por este mismo pre-registro). */}
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setUpdatedNotice(null);
+                setIsEditing(true);
+              }}
+            >
+              ¿El correo está mal? Corrige tus datos
             </Button>
 
             {resendState === 'sent' && (
