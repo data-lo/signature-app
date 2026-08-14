@@ -42,6 +42,11 @@ export default function EditRoleModal({
     setRoleId(member?.role?.id ?? null);
   }, [member]);
 
+  const roleOptions = (roles ?? []).map((role) => ({
+    value: role.id,
+    label: role.name,
+  }));
+
   function handleConfirm() {
     if (!member || !roleId) return;
     onConfirm(member.accountId, roleId);
@@ -60,7 +65,15 @@ export default function EditRoleModal({
 
         <Field>
           <FieldLabel htmlFor="edit-role-select">Rol</FieldLabel>
-          <Select value={roleId} onValueChange={(value) => setRoleId(value)}>
+          {/*
+            `items` hace que el trigger muestre el NOMBRE del rol y no su id: sin esta prop,
+            `<Select.Value>` renderiza el valor crudo — acá, el UUID del rol.
+          */}
+          <Select
+            items={roleOptions}
+            value={roleId}
+            onValueChange={(value) => setRoleId(value)}
+          >
             <SelectTrigger id="edit-role-select" className="w-full">
               <SelectValue
                 placeholder={rolesLoading ? 'Cargando roles...' : 'Selecciona un rol'}
