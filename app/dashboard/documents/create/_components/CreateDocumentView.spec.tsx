@@ -119,19 +119,23 @@ describe('CreateDocumentView', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('con el archivo cargado: se habilita el envío y la sección de ubicación de firmas', async () => {
+    it('con el archivo cargado: se habilita la sección de ubicación de firmas (el envío además exige un firmante)', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
 
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeDisabled();
       await waitFor(() =>
         expect(
           screen.getByText(/panel de ubicación de firmas/i),
         ).toBeInTheDocument(),
       );
       expect(screen.queryByText(MISSING_FILE_MESSAGE)).not.toBeInTheDocument();
+
+      await addSigner(user);
+
+      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeEnabled();
     });
 
     it('mientras el archivo se procesa: no se puede enviar y la ubicación de firmas muestra el estado de carga', async () => {
@@ -139,6 +143,7 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
+      await addSigner(user);
       await user.click(
         screen.getByRole('button', { name: /simular archivo procesándose/i }),
       );
@@ -169,6 +174,128 @@ describe('CreateDocumentView', () => {
       expect(
         screen.queryByRole('button', { name: /filtrar/i }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Solicitud de firma con acordeones independientes y resumen fijo": las tres
+   * secciones se abren y editan en cualquier momento (ninguna se bloquea por el estado de las
+   * otras), el encabezado resume lo que contiene cuando está contraído, y el resumen + el botón
+   * viven fijos debajo.
+   */
+  describe('acordeones', () => {
+    function trigger(name: RegExp) {
+      return screen.getByRole('button', { name });
+    }
+
+    it('arranca con las tres secciones abiertas y todas se pueden contraer y volver a abrir', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      expect(
+        screen.getByRole('button', { name: /seleccionar archivo de prueba/i }),
+      ).toBeVisible();
+      expect(screen.getByRole('combobox', { name: /tipo de firma/i })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^firmante$/i })).toBeVisible();
+
+      // Contraída, la sección deja de ser alcanzable (el panel queda `hidden`, no solo atenuado).
+      await user.click(trigger(/cargar documento/i));
+      expect(
+        screen.queryByRole('button', { name: /seleccionar archivo de prueba/i }),
+      ).not.toBeInTheDocument();
+      // Contraer una sección no toca a las demás.
+      expect(screen.getByRole('combobox', { name: /tipo de firma/i })).toBeVisible();
+
+      await user.click(trigger(/cargar documento/i));
+      expect(
+        screen.getByRole('button', { name: /seleccionar archivo de prueba/i }),
+      ).toBeVisible();
+    });
+
+    it('la palomita verde aparece en cada sección cuando queda configurada', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      // El tipo de firma trae un valor por defecto (firma simple), así que esa sección nace lista.
+      expect(
+        screen.getByRole('img', { name: /configurar firma: sección completa/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('img', { name: /cargar documento: sección completa/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('img', {
+          name: /añadir participantes: sección completa/i,
+        }),
+      ).not.toBeInTheDocument();
+
+      await selectFile(user);
+      await addSigner(user);
+
+      expect(
+        screen.getByRole('img', { name: /cargar documento: sección completa/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('img', {
+          name: /añadir participantes: sección completa/i,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it('el encabezado contraído resume lo que contiene la sección', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await user.click(screen.getByRole('button', { name: /espectador/i }));
+
+      await user.click(trigger(/cargar documento/i));
+      expect(trigger(/cargar documento/i)).toHaveTextContent('contrato.pdf');
+
+      await user.click(trigger(/añadir participantes/i));
+      expect(trigger(/añadir participantes/i)).toHaveTextContent(
+        '1 firmante · 1 espectador',
+      );
+
+      await user.click(trigger(/configurar firma/i));
+      expect(trigger(/configurar firma/i)).toHaveTextContent('Firma simple');
+    });
+
+    it('el resumen fijo se actualiza al cambiar documento, configuración y participantes', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      const summary = screen.getByRole('region', {
+        name: /resumen de la solicitud/i,
+      });
+
+      expect(summary).toHaveTextContent(/documento\s*Pendiente/i);
+      expect(summary).toHaveTextContent(/páginas\s*Pendiente/i);
+      expect(summary).toHaveTextContent(/firmantes\s*Pendiente/i);
+      expect(summary).toHaveTextContent(/espectadores\s*0 espectadores/i);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma electrónica avanzada/i);
+
+      expect(summary).toHaveTextContent('contrato.pdf');
+      expect(summary).toHaveTextContent('1 firmante');
+      expect(summary).toHaveTextContent('Firma electrónica avanzada (e.firma)');
+    });
+
+    it('el resumen y el botón siguen visibles aunque las tres secciones estén contraídas', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await user.click(trigger(/cargar documento/i));
+      await user.click(trigger(/configurar firma/i));
+      await user.click(trigger(/añadir participantes/i));
+
+      expect(
+        screen.getByRole('region', { name: /resumen de la solicitud/i }),
+      ).toBeVisible();
+      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeVisible();
     });
   });
 
@@ -410,19 +537,15 @@ describe('CreateDocumentView', () => {
   });
 
   describe('validaciones y errores', () => {
-    it('sin ningún firmante, muestra el error general de la sección de participantes y no envía', async () => {
+    it('sin ningún firmante el envío queda deshabilitado, así que no hay forma de mandar la solicitud incompleta', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
       await user.click(screen.getByRole('button', { name: /^firmar$/i }));
 
+      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeDisabled();
       expect(mutate).not.toHaveBeenCalled();
-      // Se distingue del texto de ayuda de la lista vacía ("Agrega al menos un firmante para
-      // continuar") por ser un error anunciado: la sección lo publica con role="alert".
-      expect(await screen.findByRole('alert')).toHaveTextContent(
-        /agrega al menos un firmante, o marca/i,
-      );
     });
 
     it('muestra el mensaje de error del backend cuando la mutación falla', () => {

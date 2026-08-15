@@ -31,6 +31,8 @@ interface SignaturePlacementFieldProps {
   control: Control<CreateDocumentSignaturesFormValues>;
   getValues: UseFormGetValues<CreateDocumentSignaturesFormValues>;
   setValue: UseFormSetValue<CreateDocumentSignaturesFormValues>;
+  /** Se limita a reenviar el conteo del visor hacia la pantalla (ver `useDocumentFileSelection`). */
+  onPageCountChange?: (pageCount: number) => void;
 }
 
 const REJECT_FLASH_MS = 350;
@@ -60,6 +62,7 @@ export default function SignaturePlacementField({
   control,
   getValues,
   setValue,
+  onPageCountChange,
 }: SignaturePlacementFieldProps) {
   const collaborators = useWatch({ control, name: 'collaborators' });
   const [activeDrag, setActiveDrag] = useState<SignatureDragPayload | null>(
@@ -232,6 +235,7 @@ export default function SignaturePlacementField({
             rejectedId={rejectedId}
             rejectionNonce={rejectionNonce}
             onDeleteBox={handleDeleteBox}
+            onPageCountChange={onPageCountChange}
           />
         </div>
       </div>

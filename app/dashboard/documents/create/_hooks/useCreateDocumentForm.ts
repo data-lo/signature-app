@@ -7,6 +7,7 @@ import { getErrorMessage } from '@/lib/error-handler';
 import {
   createDocumentSignaturesSchema,
   countSigners,
+  countViewers,
   CREATE_DOCUMENT_DEFAULT_VALUES,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
@@ -49,6 +50,12 @@ export function useCreateDocumentForm({
     control: form.control,
     name: 'collaborators',
   });
+  // El resumen fijo y el encabezado del acordeón de configuración muestran el tipo elegido, así
+  // que se observa acá (una sola suscripción) en vez de que cada consumidor mire el formulario.
+  const signatureType = useWatch({
+    control: form.control,
+    name: 'signatureType',
+  });
 
   function onValidSubmit(values: CreateDocumentSignaturesFormValues) {
     // Guarda redundante con `sections.submission.isEnabled` (el botón está deshabilitado sin
@@ -85,6 +92,10 @@ export function useCreateDocumentForm({
     handleSubmit: form.handleSubmit(onValidSubmit),
     /** Cuántos firmantes hay hoy en el formulario (gobierna el orden de firma). */
     signerCount: countSigners(collaborators),
+    /** Cuántos espectadores hay hoy en el formulario (solo informativo: alimenta el resumen). */
+    viewerCount: countViewers(collaborators),
+    /** Tipo de firma elegido para todo el documento (ver `SignatureTypeField`). */
+    signatureType,
     /** Error general de la sección de participantes (no pertenece a ningún campo). */
     participantsErrorMessage: getParticipantsErrorMessage(
       form.formState.errors,

@@ -18,6 +18,13 @@ export interface CreateDocumentSectionsParams {
   isFileLoading: boolean;
   /** Error general de la sección de participantes (p. ej. "agrega al menos un firmante"). */
   participantsErrorMessage?: string;
+  /**
+   * Las tres secciones de la solicitud están completas (ver `_section-progress.ts`): documento
+   * cargado, tipo de firma elegido y al menos un firmante. Es el único requisito del envío —
+   * ninguna sección se bloquea entre sí, así que el usuario puede llenarlas en el orden que
+   * quiera y el botón se habilita cuando ya no falta nada.
+   */
+  isReadyToSubmit: boolean;
   /** La mutación de envío a firma está en curso. */
   isSubmitting: boolean;
   /** Error devuelto por la mutación de envío a firma. */
@@ -42,6 +49,7 @@ export function buildCreateDocumentSections({
   hasFile,
   isFileLoading,
   participantsErrorMessage,
+  isReadyToSubmit,
   isSubmitting,
   submitErrorMessage,
   showCreatedDocuments,
@@ -99,12 +107,13 @@ export function buildCreateDocumentSections({
         : undefined,
     },
 
-    // Envío: exige un PDF utilizable y que no haya otro envío en curso. `isFileLoading` cuenta
-    // como "todavía no utilizable" para no mandar el archivo anterior mientras se reemplaza.
-    // Se modela como sección (y no como un booleano suelto) para que el botón, su estado de
-    // carga y el error del backend se lean del mismo lugar que el resto de la pantalla.
+    // Envío: exige que las tres secciones estén completas (ver `_section-progress.ts`, que ya
+    // trata un archivo a medio procesar como "todavía no cargado", para no mandar el anterior
+    // mientras se reemplaza) y que no haya otro envío en curso. Se modela como sección (y no
+    // como un booleano suelto) para que el botón, su estado de carga y el error del backend se
+    // lean del mismo lugar que el resto de la pantalla.
     submission: {
-      isEnabled: hasUsableFile && !isSubmitting,
+      isEnabled: isReadyToSubmit && !isSubmitting,
       isLoading: isSubmitting,
       hasError: Boolean(submitErrorMessage),
       errorMessage: submitErrorMessage,

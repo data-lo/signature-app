@@ -87,6 +87,13 @@ export function countSigners(collaborators: CollaboratorFormValues[]): number {
   ).length;
 }
 
+/** Contraparte de `countSigners` para el resumen de la solicitud (ver `_section-progress.ts`). */
+export function countViewers(collaborators: CollaboratorFormValues[]): number {
+  return collaborators.filter(
+    (collaborator) => collaborator.collaboratorType === 'VIEWER',
+  ).length;
+}
+
 /** Es el firmante que representa al usuario en sesión (no uno capturado a mano). */
 export function isSelfSigner(collaborator: CollaboratorFormValues): boolean {
   return collaborator.collaboratorType === 'SIGNER' && collaborator.isSelf;

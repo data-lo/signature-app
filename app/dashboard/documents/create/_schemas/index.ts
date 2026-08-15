@@ -16,6 +16,7 @@ export {
   emptySigner,
   emptyViewer,
   countSigners,
+  countViewers,
   isSelfSigner,
   findSelfSignerIndex,
   type SignerFormValues,
