@@ -146,9 +146,15 @@ describe('MembersView', () => {
 
     expect(await screen.findByText(/selecciona el nuevo rol/i)).toBeInTheDocument();
 
-    screen.getByRole('combobox', { name: /rol/i }).focus();
+    const roleSelect = screen.getByRole('combobox', { name: /rol/i });
+    roleSelect.focus();
     await user.keyboard('{Enter}');
     await user.click(screen.getByRole('option', { name: 'ADMIN' }));
+
+    // El selector muestra el NOMBRE del rol, no su id: sin la prop `items` del Select,
+    // `<Select.Value>` renderiza el valor crudo y acá se veía el UUID del rol.
+    expect(roleSelect).toHaveTextContent('ADMIN');
+    expect(roleSelect).not.toHaveTextContent('admin-role-1');
 
     await user.click(screen.getByRole('button', { name: /guardar/i }));
 

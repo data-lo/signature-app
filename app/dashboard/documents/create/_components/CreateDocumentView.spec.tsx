@@ -242,6 +242,33 @@ describe('CreateDocumentView', () => {
       );
     });
 
+    /**
+     * Historia "Mostrar la etiqueta correcta del tipo de firma seleccionado": el trigger mostraba
+     * el valor interno de la opción ("ADVANCED") en vez de su texto legible. Se afirma sobre las
+     * dos caras del mismo hecho — lo que se ve y lo que se envía — porque la etiqueta es solo
+     * presentación: si el formulario empezara a guardar el texto legible, el backend recibiría un
+     * tipo de firma que no existe.
+     */
+    it('historia "Etiqueta del tipo de firma": el selector muestra el texto legible y sigue enviando el valor interno', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma electrónica avanzada/i);
+
+      const trigger = screen.getByRole('combobox', { name: /tipo de firma/i });
+      expect(trigger).toHaveTextContent('Firma electrónica avanzada (e.firma)');
+      expect(trigger).not.toHaveTextContent('ADVANCED');
+
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({ signatureType: 'ADVANCED' }),
+        expect.anything(),
+      );
+    });
+
     it('incluirme como firmante agrega al usuario en sesión sin pedir un firmante manual', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);

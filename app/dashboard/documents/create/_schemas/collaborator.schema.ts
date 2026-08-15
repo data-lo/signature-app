@@ -31,6 +31,12 @@ export const signerSchema = z.object({
   // contra `CreateDocumentSignaturesFormValues`. Todo lugar que arma un SignerFormValues
   // (`emptySigner`, `buildSelfSigner`) ya manda `signatures` explícito.
   signatures: z.array(signaturePositionSchema),
+  // Marca al firmante que representa al usuario en sesión, agregado por "Incluirme como
+  // firmante". Es lo que permite ubicarlo para quitarlo al desmarcar y no duplicarlo si la opción
+  // se marca más de una vez (ver `_mappers/self-signer.mapper.ts`). No viaja al backend: el
+  // payload se arma campo por campo en `toCollaboratorPayload`, donde este no aparece — para el
+  // servidor el creador es un firmante más. Sin `.default()`, por la misma razón que `signatures`.
+  isSelf: z.boolean(),
 });
 
 /** El RFC sobrevive solo acá: un espectador no firma, así que no hay certificado del que leerlo. */
@@ -60,6 +66,7 @@ export function emptySigner(): SignerFormValues {
     email: '',
     requiresTwoFactorAuth: true,
     signatures: [],
+    isSelf: false,
   };
 }
 
@@ -78,4 +85,20 @@ export function countSigners(collaborators: CollaboratorFormValues[]): number {
   return collaborators.filter(
     (collaborator) => collaborator.collaboratorType === 'SIGNER',
   ).length;
+}
+
+/** Es el firmante que representa al usuario en sesión (no uno capturado a mano). */
+export function isSelfSigner(collaborator: CollaboratorFormValues): boolean {
+  return collaborator.collaboratorType === 'SIGNER' && collaborator.isSelf;
+}
+
+/**
+ * Posición del firmante propio dentro de la lista, o -1 si no está. Único criterio de "¿ya está
+ * agregado?": lo consultan tanto la decisión de sincronización como la UI, para que no puedan
+ * discrepar sobre qué tarjeta es la del usuario en sesión.
+ */
+export function findSelfSignerIndex(
+  collaborators: CollaboratorFormValues[],
+): number {
+  return collaborators.findIndex(isSelfSigner);
 }

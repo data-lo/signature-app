@@ -10,7 +10,6 @@ import {
   CREATE_DOCUMENT_DEFAULT_VALUES,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
-import { buildSubmissionCollaborators } from '../_mappers/submission-collaborators.mapper';
 import {
   useCreateDocumentSignatures,
   CREATE_DOCUMENT_ERROR_MESSAGE,
@@ -64,10 +63,11 @@ export function useCreateDocumentForm({
         requiresApproval: values.requiresApproval,
         requiresOrder: values.requiresOrder,
         signatureType: values.signatureType,
-        collaborators: buildSubmissionCollaborators(
-          values,
-          currentUserQuery.data,
-        ),
+        // Sin composición extra: desde la historia "Crear y eliminar automáticamente el
+        // participante Usuario firmante", el creador que marcó "Incluirme como firmante" ya es
+        // una tarjeta más dentro de `collaborators` (la agrega `CollaboratorsFieldArray`), así que
+        // agregarlo acá otra vez lo mandaría duplicado.
+        collaborators: values.collaborators,
       },
       {
         onSuccess: () => {
