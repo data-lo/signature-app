@@ -13,10 +13,6 @@ jest.mock('./OnboardingBanner', () => ({
   __esModule: true,
   default: () => <div>OnboardingBanner</div>,
 }));
-jest.mock('./InviteMemberModal', () => ({
-  __esModule: true,
-  default: () => <div>InviteMemberModal</div>,
-}));
 
 const mockedUseOnboardingReady = useOnboardingReady as jest.Mock;
 
@@ -60,5 +56,22 @@ describe('CreateDocumentGuard', () => {
     expect(
       screen.getByText('CreateDocumentView (trackDocumentsCount=true)'),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * Historia "Reubicar botón Invitar miembro": la gestión de usuarios del equipo se centralizó en
+   * /dashboard/organization/settings/members, así que crear un documento ya no ofrece ese atajo.
+   * Se afirma sin mockear nada: si alguien vuelve a montar el modal acá, esta prueba lo detecta
+   * (un mock lo escondería detrás de un texto de reemplazo).
+   */
+  it('no ofrece "Invitar miembro": esa acción vive en Administrar miembros', () => {
+    mockedUseOnboardingReady.mockReturnValue({ isLoading: false, isReady: true });
+
+    render(<CreateDocumentGuard />);
+
+    expect(
+      screen.queryByRole('button', { name: /invitar miembro/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/invitar miembro/i)).not.toBeInTheDocument();
   });
 });
