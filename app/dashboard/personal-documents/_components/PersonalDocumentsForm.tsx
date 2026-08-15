@@ -51,9 +51,15 @@ export default function PersonalDocumentsForm() {
       onSubmit={handleSubmit((values) => uploadMutation.mutate(values))}
     >
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/*
+          Sin la etiqueta "(opcional)" en el título: en el estado inicial vacío de "Identidad y
+          firma" el encabezado de la sección ya explica que la INE se puede agregar después (ver
+          `IdentitySignatureView`), así que repetirlo en la tarjeta solo agregaba ruido. Que la
+          INE no sea obligatoria sigue siendo cierto y sigue viviendo donde se hace cumplir: el
+          esquema (`_schemas.ts`) solo exige la firma, y el botón de guardar no la espera.
+        */}
         <PersonalDocumentCard
           config={INE_DOCUMENT}
-          optional
           storedUrl={null}
           pendingFile={ineFile}
           error={errors.ineFile?.message}
