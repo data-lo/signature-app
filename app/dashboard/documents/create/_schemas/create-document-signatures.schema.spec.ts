@@ -86,7 +86,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['collaborators', 0, 'email']);
   });
 
-  it('rechaza si no hay ningún firmante manual ni "incluirme como firmante"', () => {
+  it('rechaza si solo hay espectadores', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([viewer()]),
     );
@@ -102,9 +102,23 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].message).toMatch(/al menos un firmante/i);
   });
 
-  it('acepta sin firmante manual si "incluirme como firmante" está activo', () => {
+  /**
+   * Antes bastaba con el checkbox marcado para dar por válido el formulario, porque el firmante
+   * "yo" no existía hasta el envío. Desde la historia "Crear y eliminar automáticamente el
+   * participante Usuario firmante" esa tarjeta es un SIGNER más del arreglo, así que la regla
+   * cuenta el arreglo y nada más: lo que se valida es lo que se ve en pantalla.
+   */
+  it('el checkbox por sí solo no alcanza: lo que cuenta es la tarjeta ya agregada al arreglo', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([], true),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('acepta cuando la tarjeta del usuario en sesión es el único firmante', () => {
+    const result = createDocumentSignaturesSchema.safeParse(
+      formValues([signer({ isSelf: true })], true),
     );
 
     expect(result.success).toBe(true);
