@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { FieldGroup } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { Form } from '@/components/form/form';
+import { formatPersonName } from '@/lib/format-person-name';
 import { getErrorMessage } from '@/lib/error-handler';
 import { useUpdatePreRegistration } from '../_hooks/useUpdatePreRegistration';
 import {
@@ -43,6 +44,7 @@ export default function EditPreRegistrationForm({
   const {
     register,
     handleSubmit,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<
@@ -111,14 +113,20 @@ export default function EditPreRegistrationForm({
           id="edit-firstName"
           label="Nombre(s)"
           error={errors.firstName}
-          {...register('firstName')}
+          {...register('firstName', {
+            onBlur: (event) =>
+              setValue('firstName', formatPersonName(event.target.value)),
+          })}
         />
 
         <TextField
           id="edit-lastName"
           label="Apellidos"
           error={errors.lastName}
-          {...register('lastName')}
+          {...register('lastName', {
+            onBlur: (event) =>
+              setValue('lastName', formatPersonName(event.target.value)),
+          })}
         />
 
         <TextField

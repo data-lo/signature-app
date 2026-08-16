@@ -13,6 +13,7 @@ import { getErrorMessage } from '@/lib/error-handler';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
 import { useRegister } from '../_hooks/useRegister';
 import { Form } from '@/components/form/form';
+import { formatPersonName } from '@/lib/format-person-name';
 
 interface SignupFormProps {
   /** Prellenado cuando se llega desde /join con un RFC nuevo (ver Escenario 4 de la historia). */
@@ -74,7 +75,10 @@ export default function SignupForm({
               label="Nombre(s)"
               autoComplete="given-name"
               error={errors.firstName}
-              {...registerField('firstName')}
+              {...registerField('firstName', {
+                onBlur: (event) =>
+                  setValue('firstName', formatPersonName(event.target.value)),
+              })}
             />
 
             <TextField
@@ -82,7 +86,10 @@ export default function SignupForm({
               label="Apellidos"
               autoComplete="family-name"
               error={errors.lastName}
-              {...registerField('lastName')}
+              {...registerField('lastName', {
+                onBlur: (event) =>
+                  setValue('lastName', formatPersonName(event.target.value)),
+              })}
             />
 
             <TextField

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { Accordion } from '@/components/ui/accordion';
@@ -41,15 +42,8 @@ const UPLOAD_SECTION = 'upload';
 const CONFIGURATION_SECTION = 'configuration';
 const PARTICIPANTS_SECTION = 'participants';
 
-/**
- * Arrancan los tres abiertos: el formulario completo se ve de un vistazo y ninguna sección
- * espera a que otra se complete para poder editarse. El usuario contrae las que ya resolvió.
- */
-const ALL_SECTIONS = [
-  UPLOAD_SECTION,
-  CONFIGURATION_SECTION,
-  PARTICIPANTS_SECTION,
-];
+/** Al entrar, el primer paso concentra la atención: cargar el documento. */
+const DEFAULT_OPEN_SECTIONS = [UPLOAD_SECTION];
 
 /**
  * Pantalla de carga y configuración de un documento para enviarlo a firma. Su responsabilidad es
@@ -59,18 +53,19 @@ const ALL_SECTIONS = [
  * sección (`buildCreateDocumentSections`) y cuánto lleva configurado la solicitud
  * (`buildCreateDocumentProgress`).
  *
- * Las tres secciones viven en acordeones independientes: se abren y editan en cualquier momento y
- * en cualquier orden — ninguna se bloquea por el estado de las demás. Lo único que depende de
- * todas es el botón "Firmar", que se habilita cuando ya no falta nada. El resumen y ese botón se
- * muestran de forma fija debajo de los acordeones, así que el usuario ve qué eligió sin tener que
- * volver a abrir una sección.
+ * Las tres secciones se pueden editar en cualquier orden, con un solo panel expandido a la vez.
+ * Lo único que depende de todas es el botón "Firmar", que se habilita cuando ya no falta nada.
+ * El resumen y ese botón se muestran de forma fija debajo de los acordeones, así que el usuario
+ * ve qué eligió sin tener que volver a abrir una sección.
  */
 export default function CreateDocumentView({
   trackDocumentsCount = true,
   showCreatedDocuments = true,
 }: CreateDocumentViewProps = {}) {
   const [isSentDialogOpen, setIsSentDialogOpen] = useState(false);
-  const [openSections, setOpenSections] = useState<string[]>(ALL_SECTIONS);
+  const [openSections, setOpenSections] = useState<string[]>(
+    DEFAULT_OPEN_SECTIONS,
+  );
   const fileSelection = useDocumentFileSelection();
   const createDocumentForm = useCreateDocumentForm({
     file: fileSelection.file,
@@ -80,6 +75,7 @@ export default function CreateDocumentView({
       fileSelection.clear();
       setIsSentDialogOpen(true);
     },
+    onInvalid: () => setOpenSections([PARTICIPANTS_SECTION]),
   });
   const createdDocuments = useCreatedDocuments({ trackDocumentsCount });
 
@@ -110,7 +106,7 @@ export default function CreateDocumentView({
   return (
     <PageContainer>
       <h1 className="text-base font-semibold text-foreground">
-        Prepara un documento para solicitar que sea firmado
+        Solicita la firma de tu documento
       </h1>
 
       <Form
@@ -119,6 +115,7 @@ export default function CreateDocumentView({
       >
         <div className="flex flex-col gap-4">
           <Accordion
+            multiple={false}
             value={openSections}
             onValueChange={(value) => setOpenSections(value as string[])}
           >
@@ -149,7 +146,6 @@ export default function CreateDocumentView({
               <DocumentConfigurationSection
                 state={sections.configuration}
                 control={createDocumentForm.form.control}
-                signerCount={createDocumentForm.signerCount}
               />
             </DocumentSectionAccordionItem>
 
@@ -175,7 +171,10 @@ export default function CreateDocumentView({
             className="w-full"
             disabled={!sections.submission.isEnabled}
           >
-            {sections.submission.isLoading ? 'Enviando a firma...' : 'Firmar'}
+            <Send aria-hidden />
+            {sections.submission.isLoading
+              ? 'Enviando solicitud...'
+              : 'Enviar solicitud de firma'}
           </Button>
 
           {sections.submission.hasError && (

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2 } from 'lucide-react';
+import { ThumbsUp } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,12 +33,9 @@ export default function DocumentSentDialog({
 }: DocumentSentDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:max-w-xl">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <CheckCircle2 className="size-5 text-emerald-500" />
-            Documento enviado a firma
-          </AlertDialogTitle>
+          <AlertDialogTitle>Solicitud de firma enviada</AlertDialogTitle>
           {/* `render` cambia el <p> por defecto por un <div>: el mensaje son varios párrafos y
               anidarlos dentro de un <p> daría HTML inválido. */}
           <AlertDialogDescription
@@ -46,21 +43,21 @@ export default function DocumentSentDialog({
             className="flex flex-col gap-2"
           >
             <p>
-              El documento se envió correctamente a los usuarios asignados para
-              su firma.
+              Tu solicitud de firma se envió correctamente.
             </p>
             <p>
-              Te enviaremos una notificación por correo cuando el proceso se
-              complete.
+              Los participantes recibirán una invitación para revisar y firmar
+              el documento. Te notificaremos por correo cuando el proceso
+              finalice.
             </p>
             <p>
-              Mientras tanto, puedes consultar su estado en{' '}
+              Consulta el estado de tu solicitud en{' '}
               {/* El estilo de enlace del componente solo alcanza a los hijos directos de la
                   descripción, y aquí el <a> va dentro de un <p>: se aplica a mano para que se
                   vea como enlace y no como texto plano. */}
               <Link
                 href={DOCUMENTS_SECTIONS.sent.href}
-                className="font-medium text-foreground underline underline-offset-3"
+                className="font-medium text-emerald-600 hover:underline hover:underline-offset-3 dark:text-emerald-400"
               >
                 {DOCUMENTS_SECTIONS.sent.label}
               </Link>
@@ -70,7 +67,10 @@ export default function DocumentSentDialog({
         </AlertDialogHeader>
 
         <AlertDialogFooter>
-          <AlertDialogAction>Entendido</AlertDialogAction>
+          <AlertDialogAction>
+            <ThumbsUp aria-hidden />
+            Entendido
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

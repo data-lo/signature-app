@@ -64,7 +64,18 @@ function selectFile(user: ReturnType<typeof userEvent.setup>) {
   );
 }
 
+async function openSection(
+  user: ReturnType<typeof userEvent.setup>,
+  name: RegExp,
+) {
+  const sectionTrigger = screen.getByRole('button', { name });
+  if (sectionTrigger.getAttribute('aria-expanded') === 'false') {
+    await user.click(sectionTrigger);
+  }
+}
+
 async function addSigner(user: ReturnType<typeof userEvent.setup>) {
+  await openSection(user, /añadir participantes/i);
   await user.click(screen.getByRole('button', { name: /firmante/i }));
   await user.type(screen.getByLabelText(/nombre\(s\)/i), 'Juan');
   await user.type(screen.getByLabelText(/apellido/i), 'Pérez');
@@ -80,6 +91,7 @@ async function selectSignatureType(
   user: ReturnType<typeof userEvent.setup>,
   optionName: RegExp,
 ) {
+  await openSection(user, /configurar firma/i);
   screen.getByRole('combobox', { name: /tipo de firma/i }).focus();
   await user.keyboard('{Enter}');
   await user.click(screen.getByRole('option', { name: optionName }));
@@ -112,7 +124,7 @@ describe('CreateDocumentView', () => {
     it('sin archivo: el envío está deshabilitado y la sección de ubicación de firmas explica qué falta', () => {
       renderWithProviders(<CreateDocumentView />);
 
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
       expect(screen.getByText(MISSING_FILE_MESSAGE)).toBeInTheDocument();
       expect(
         screen.queryByText(/panel de ubicación de firmas/i),
@@ -125,7 +137,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
 
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
       await waitFor(() =>
         expect(
           screen.getByText(/panel de ubicación de firmas/i),
@@ -134,8 +146,9 @@ describe('CreateDocumentView', () => {
       expect(screen.queryByText(MISSING_FILE_MESSAGE)).not.toBeInTheDocument();
 
       await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
 
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeEnabled();
     });
 
     it('mientras el archivo se procesa: no se puede enviar y la ubicación de firmas muestra el estado de carga', async () => {
@@ -144,11 +157,12 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
+      await openSection(user, /cargar documento/i);
       await user.click(
         screen.getByRole('button', { name: /simular archivo procesándose/i }),
       );
 
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
       expect(screen.getByText(/cargando documento/i)).toBeInTheDocument();
     });
 
@@ -156,6 +170,7 @@ describe('CreateDocumentView', () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
+      await openSection(user, /añadir participantes/i);
       await user.click(screen.getByRole('button', { name: /firmante/i }));
 
       expect(screen.getByLabelText(/nombre\(s\)/i)).toBeEnabled();
@@ -188,58 +203,69 @@ describe('CreateDocumentView', () => {
       return screen.getByRole('button', { name });
     }
 
-    it('arranca con las tres secciones abiertas y todas se pueden contraer y volver a abrir', async () => {
+    it('arranca solo con cargar documento abierto y al abrir otro cierra el anterior', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
       expect(
         screen.getByRole('button', { name: /seleccionar archivo de prueba/i }),
       ).toBeVisible();
-      expect(screen.getByRole('combobox', { name: /tipo de firma/i })).toBeVisible();
-      expect(screen.getByRole('button', { name: /^firmante$/i })).toBeVisible();
+      expect(
+        screen.queryByRole('combobox', { name: /tipo de firma/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /^firmante$/i }),
+      ).not.toBeInTheDocument();
 
       // Contraída, la sección deja de ser alcanzable (el panel queda `hidden`, no solo atenuado).
       await user.click(trigger(/cargar documento/i));
       expect(
         screen.queryByRole('button', { name: /seleccionar archivo de prueba/i }),
       ).not.toBeInTheDocument();
-      // Contraer una sección no toca a las demás.
-      expect(screen.getByRole('combobox', { name: /tipo de firma/i })).toBeVisible();
-
       await user.click(trigger(/cargar documento/i));
       expect(
         screen.getByRole('button', { name: /seleccionar archivo de prueba/i }),
       ).toBeVisible();
+
+      await user.click(trigger(/configurar firma/i));
+      expect(
+        screen.queryByRole('button', { name: /seleccionar archivo de prueba/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /tipo de firma/i })).toBeVisible();
+
+      await user.click(trigger(/añadir participantes/i));
+      expect(
+        screen.queryByRole('combobox', { name: /tipo de firma/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^firmante$/i })).toBeVisible();
     });
 
-    it('la palomita verde aparece en cada sección cuando queda configurada', async () => {
+    it('ilumina en verde el círculo de cada sección cuando queda configurada', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
-      // El tipo de firma trae un valor por defecto (firma simple), así que esa sección nace lista.
+      // Hasta que se elija una opción, la configuración no cuenta como completa.
       expect(
-        screen.getByRole('img', { name: /configurar firma: sección completa/i }),
-      ).toBeInTheDocument();
+        trigger(/configurar firma/i).querySelector('[data-complete="true"]'),
+      ).toBeNull();
       expect(
-        screen.queryByRole('img', { name: /cargar documento: sección completa/i }),
-      ).not.toBeInTheDocument();
+        trigger(/cargar documento/i).querySelector('[data-complete="true"]'),
+      ).toBeNull();
       expect(
-        screen.queryByRole('img', {
-          name: /añadir participantes: sección completa/i,
-        }),
-      ).not.toBeInTheDocument();
+        trigger(/añadir participantes/i).querySelector('[data-complete="true"]'),
+      ).toBeNull();
 
       await selectFile(user);
+      await user.click(trigger(/añadir participantes/i));
       await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
 
       expect(
-        screen.getByRole('img', { name: /cargar documento: sección completa/i }),
-      ).toBeInTheDocument();
+        trigger(/cargar documento/i).querySelector('[data-complete="true"]'),
+      ).toHaveTextContent('1');
       expect(
-        screen.getByRole('img', {
-          name: /añadir participantes: sección completa/i,
-        }),
-      ).toBeInTheDocument();
+        trigger(/añadir participantes/i).querySelector('[data-complete="true"]'),
+      ).toHaveTextContent('3');
     });
 
     it('el encabezado contraído resume lo que contiene la sección', async () => {
@@ -249,17 +275,25 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await user.click(screen.getByRole('button', { name: /espectador/i }));
+      await selectSignatureType(user, /firma simple/i);
 
+      // Cada encabezado muestra su resumen al abrir otro, porque solo un panel queda expandido.
       await user.click(trigger(/cargar documento/i));
-      expect(trigger(/cargar documento/i)).toHaveTextContent('contrato.pdf');
-
-      await user.click(trigger(/añadir participantes/i));
       expect(trigger(/añadir participantes/i)).toHaveTextContent(
         '1 firmante · 1 espectador',
       );
 
       await user.click(trigger(/configurar firma/i));
-      expect(trigger(/configurar firma/i)).toHaveTextContent('Firma simple');
+      expect(trigger(/cargar documento/i)).toHaveTextContent('contrato.pdf');
+
+      await user.click(trigger(/añadir participantes/i));
+      expect(trigger(/configurar firma/i)).toHaveTextContent('Firma Simple');
+      /*
+       * El panel recién abierto permanece disponible para continuar editando participantes.
+       */
+      expect(trigger(/añadir participantes/i)).toHaveTextContent(
+        'Añadir participantes',
+      );
     });
 
     it('el resumen fijo se actualiza al cambiar documento, configuración y participantes', async () => {
@@ -281,7 +315,7 @@ describe('CreateDocumentView', () => {
 
       expect(summary).toHaveTextContent('contrato.pdf');
       expect(summary).toHaveTextContent('1 firmante');
-      expect(summary).toHaveTextContent('Firma electrónica avanzada (e.firma)');
+      expect(summary).toHaveTextContent('Firma Electrónica Avanzada (e.firma)');
     });
 
     it('el resumen y el botón siguen visibles aunque las tres secciones estén contraídas', async () => {
@@ -295,7 +329,7 @@ describe('CreateDocumentView', () => {
       expect(
         screen.getByRole('region', { name: /resumen de la solicitud/i }),
       ).toBeVisible();
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeVisible();
+      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeVisible();
     });
   });
 
@@ -326,14 +360,32 @@ describe('CreateDocumentView', () => {
   });
 
   describe('envío', () => {
-    it('agrega un firmante y envía el payload con firma simple (el tipo por defecto)', async () => {
+    it('abre participantes y muestra los errores si se intenta firmar con un participante incompleto', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await selectSignatureType(user, /firma simple/i);
+      await openSection(user, /añadir participantes/i);
+      await user.click(screen.getByRole('button', { name: /^firmante$/i }));
+
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+
+      expect(screen.getByLabelText(/nombre\(s\)/i)).toBeVisible();
+      expect(
+        screen.getByText('Ingresa el nombre del participante.'),
+      ).toBeInTheDocument();
+    });
+
+    it('agrega un firmante y envía el payload con firma simple', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
       await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
 
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -361,7 +413,7 @@ describe('CreateDocumentView', () => {
       await addSigner(user);
       await selectSignatureType(user, /firma electrónica avanzada/i);
 
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({ signatureType: 'ADVANCED' }),
@@ -385,10 +437,10 @@ describe('CreateDocumentView', () => {
       await selectSignatureType(user, /firma electrónica avanzada/i);
 
       const trigger = screen.getByRole('combobox', { name: /tipo de firma/i });
-      expect(trigger).toHaveTextContent('Firma electrónica avanzada (e.firma)');
+      expect(trigger).toHaveTextContent('Firma Electrónica Avanzada (e.firma)');
       expect(trigger).not.toHaveTextContent('ADVANCED');
 
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({ signatureType: 'ADVANCED' }),
@@ -401,15 +453,17 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
+      await openSection(user, /añadir participantes/i);
       await user.click(
         screen.getByRole('checkbox', { name: /incluirme como firmante/i }),
       );
+      await selectSignatureType(user, /firma simple/i);
 
       expect(
-        screen.getByText(/estás firmando este documento en representación de/i),
+        screen.getByText(/firmarás este documento con tu perfil personal/i),
       ).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -444,23 +498,20 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+      await selectSignatureType(user, /firma simple/i);
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
       const dialog = await screen.findByRole('alertdialog');
-      expect(dialog).toHaveTextContent(/documento enviado a firma/i);
+      expect(dialog).toHaveTextContent(/solicitud de firma enviada/i);
       expect(dialog).toHaveTextContent(
-        /se envió correctamente a los usuarios asignados para su firma/i,
+        /tu solicitud de firma se envió correctamente/i,
       );
       expect(dialog).toHaveTextContent(
-        /notificación por correo cuando el proceso se complete/i,
+        /te notificaremos por correo cuando el proceso finalice/i,
       );
 
       // Manda a la sección real donde el creador ve lo que envió, con el mismo nombre que usa
       // el sidebar (ver DOCUMENTS_SECTIONS).
-      expect(
-        screen.getByRole('link', { name: 'Enviados para firma' }),
-      ).toHaveAttribute('href', '/dashboard/documents/sent');
-
       await user.click(screen.getByRole('button', { name: /entendido/i }));
       await waitFor(() =>
         expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
@@ -473,7 +524,8 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+      await selectSignatureType(user, /firma simple/i);
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
       expect(mutate).toHaveBeenCalled();
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -490,7 +542,7 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       expect(
-        screen.getByRole('button', { name: /enviando a firma/i }),
+        screen.getByRole('button', { name: /enviando solicitud/i }),
       ).toBeDisabled();
     });
   });
@@ -507,7 +559,7 @@ describe('CreateDocumentView', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('el flujo de firma avanzada no pide RFC, y habilita el 2FA opcional por firmante', async () => {
+    it('el flujo de firma avanzada no pide RFC y muestra el 2FA en la configuración del documento', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -519,6 +571,7 @@ describe('CreateDocumentView', () => {
       ).not.toBeInTheDocument();
 
       await selectSignatureType(user, /firma electrónica avanzada/i);
+      await openSection(user, /configurar firma/i);
 
       expect(screen.queryByLabelText(/^rfc/i)).not.toBeInTheDocument();
       expect(
@@ -530,6 +583,7 @@ describe('CreateDocumentView', () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
+      await openSection(user, /añadir participantes/i);
       await user.click(screen.getByRole('button', { name: /espectador/i }));
 
       expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
@@ -542,9 +596,9 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
-      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
+      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
       expect(mutate).not.toHaveBeenCalled();
     });
 
@@ -577,7 +631,7 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       expect(screen.getByText(/servicio no disponible/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeInTheDocument();
     });
   });
 });

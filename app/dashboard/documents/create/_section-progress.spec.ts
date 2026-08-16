@@ -91,7 +91,7 @@ describe('buildCreateDocumentProgress', () => {
 
       expect(progress.configuration.isComplete).toBe(true);
       expect(progress.configuration.collapsedSummary).toBe(
-        'Firma electrónica avanzada (e.firma)',
+        'Firma Electrónica Avanzada (e.firma)',
       );
     });
   });
@@ -139,7 +139,7 @@ describe('buildCreateDocumentProgress', () => {
       expect(progress.summary).toEqual({
         documentName: 'contrato.pdf',
         pageCount: '3 páginas',
-        signatureType: 'Firma electrónica avanzada (e.firma)',
+        signatureType: 'Firma Electrónica Avanzada (e.firma)',
         signerCount: '2 firmantes',
         viewerCount: '1 espectador',
       });

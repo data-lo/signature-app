@@ -9,16 +9,16 @@ import type { DocumentSignatureType } from '../_schemas';
  * el tipo ya elegido (ver `_section-progress.ts`).
  */
 export const SIGNATURE_TYPE_LABELS: Record<DocumentSignatureType, string> = {
-  SIMPLE: 'Firma simple',
-  ADVANCED: 'Firma electrónica avanzada (e.firma)',
+  SIMPLE: 'Firma Simple',
+  ADVANCED: 'Firma Electrónica Avanzada (e.firma)',
 };
 
 export const SIGNATURE_TYPE_DESCRIPTIONS: Record<DocumentSignatureType, string> =
   {
     SIMPLE:
-      'Cada firmante confirma con su rúbrica registrada y un código de verificación enviado por correo.',
+      'Cada firmante firma con su firma digital registrada en formato PNG y un código de verificación enviado por correo.',
     ADVANCED:
-      'Cada firmante deberá cargar su certificado (.cer), su llave privada (.key) y la contraseña de su e.firma del SAT al momento de firmar.',
+      'Al firmar, cada firmante deberá cargar su certificado (.cer), su llave privada (.key) y la contraseña de su e.firma del SAT.',
   };
 
 export const SIGNATURE_TYPE_OPTIONS: {

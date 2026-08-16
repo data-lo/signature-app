@@ -80,5 +80,6 @@ export interface CreateDocumentSignaturesInput {
   requiresApproval: boolean;
   requiresOrder: boolean;
   signatureType: DocumentSignatureType;
+  requiresTwoFactorAuth: boolean;
   collaborators: CollaboratorFormValues[];
 }

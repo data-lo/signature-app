@@ -2,6 +2,7 @@
 
 import { useWatch, type Control } from 'react-hook-form';
 import { FormSelect } from '@/components/form/form-select';
+import { FormCheckbox } from '@/components/form/form-checkbox';
 import {
   SIGNATURE_TYPE_DESCRIPTIONS,
   SIGNATURE_TYPE_OPTIONS,
@@ -22,15 +23,27 @@ export default function SignatureTypeField({
   const signatureType = useWatch({ control, name: 'signatureType' });
 
   return (
-    <FormSelect
-      control={control}
-      name="signatureType"
-      id="signatureType"
-      label="Tipo de firma"
-      required
-      options={SIGNATURE_TYPE_OPTIONS}
-      placeholder="Selecciona el tipo de firma"
-      description={SIGNATURE_TYPE_DESCRIPTIONS[signatureType] ?? undefined}
-    />
+    <>
+      <FormSelect
+        control={control}
+        name="signatureType"
+        id="signatureType"
+        label="Tipo de firma"
+        options={SIGNATURE_TYPE_OPTIONS}
+        placeholder="Selecciona una opción"
+        description={
+          signatureType
+            ? SIGNATURE_TYPE_DESCRIPTIONS[signatureType]
+            : undefined
+        }
+      />
+      {signatureType === 'ADVANCED' && (
+        <FormCheckbox
+          control={control}
+          name="requiresTwoFactorAuth"
+          label="Código de verificación (2FA)"
+        />
+      )}
+    </>
   );
 }

@@ -28,10 +28,8 @@ export default function IncludeMeAsSignerField({
   const activeEntry = accountsList.find(
     (entry) => entry.id === activeAccount?.id,
   );
-  const contextLabel =
-    activeAccount?.accountType === 'ORGANIZATION'
-      ? (activeEntry?.organizationName ?? 'tu organización')
-      : 'tu perfil personal';
+  const isOrganization = activeAccount?.accountType === 'ORGANIZATION';
+  const organizationName = activeEntry?.organizationName ?? 'tu organización';
 
   return (
     <FormCheckbox
@@ -41,10 +39,14 @@ export default function IncludeMeAsSignerField({
       label="Incluirme como firmante"
       description={
         includeMeAsSigner ? (
-          <>
-            Estás firmando este documento en representación de{' '}
-            <strong>{contextLabel}</strong>.
-          </>
+          isOrganization ? (
+            <>
+              Firmarás este documento en nombre de{' '}
+              <strong>{organizationName}</strong>.
+            </>
+          ) : (
+            'Firmarás este documento con tu perfil personal.'
+          )
         ) : undefined
       }
     />
