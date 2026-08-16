@@ -82,19 +82,21 @@ describe('toCollaboratorPayload', () => {
     ]);
   });
 
-  it('un documento SIMPLE fuerza requiresTwoFactorAuth=true aunque el form tenga false', () => {
+  it('un documento SIMPLE fuerza requiresTwoFactorAuth=true', () => {
     const payload = toCollaboratorPayload(
-      signer({ requiresTwoFactorAuth: false }),
+      signer(),
       'SIMPLE',
     );
 
     expect(payload.requiresTwoFactorAuth).toBe(true);
   });
 
-  it('un documento ADVANCED respeta el valor explícito de requiresTwoFactorAuth', () => {
+  it('un documento ADVANCED aplica la configuración única de requiresTwoFactorAuth', () => {
     const payload = toCollaboratorPayload(
-      signer({ requiresTwoFactorAuth: false }),
+      signer(),
       'ADVANCED',
+      0,
+      false,
     );
 
     expect(payload.requiresTwoFactorAuth).toBe(false);
@@ -133,6 +135,7 @@ describe('toCollaboratorPayloads', () => {
         signer({ email: 'tercero@mail.com' }),
       ],
       'SIMPLE',
+      true,
     );
 
     expect(payloads.map((payload) => payload.orderIndex)).toEqual([0, 1, 2]);

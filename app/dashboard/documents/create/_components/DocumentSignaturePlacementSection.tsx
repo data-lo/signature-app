@@ -24,6 +24,8 @@ interface DocumentSignaturePlacementSectionProps {
   control: Control<CreateDocumentSignaturesFormValues>;
   getValues: UseFormGetValues<CreateDocumentSignaturesFormValues>;
   setValue: UseFormSetValue<CreateDocumentSignaturesFormValues>;
+  /** Páginas del PDF ya renderizado, para el encabezado del acordeón y el resumen de la solicitud. */
+  onPageCountChange?: (pageCount: number) => void;
 }
 
 /**
@@ -41,14 +43,18 @@ export default function DocumentSignaturePlacementSection({
   control,
   getValues,
   setValue,
+  onPageCountChange,
 }: DocumentSignaturePlacementSectionProps) {
   return (
     <section
       data-slot="form-section"
       aria-busy={state.isLoading || undefined}
       aria-disabled={!state.isEnabled || undefined}
+      className="lg:sticky lg:top-4"
     >
-      <Card className="h-[640px] overflow-hidden p-0">
+      {/* Sin la tarjeta exterior que antes envolvía toda la pantalla, la vista previa puede
+          ocupar el alto disponible en pantallas grandes en vez de una altura fija. */}
+      <Card className="h-[640px] overflow-hidden p-0 lg:h-[calc(100dvh-8rem)] lg:min-h-[640px]">
         <CardContent className="h-full p-0">
           {state.isLoading ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -65,6 +71,7 @@ export default function DocumentSignaturePlacementSection({
               control={control}
               getValues={getValues}
               setValue={setValue}
+              onPageCountChange={onPageCountChange}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">

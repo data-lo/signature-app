@@ -74,7 +74,7 @@ export default function SignatureBox({
         // caja ya colocada requieren que el evento de puntero aterrice en este nodo, y el
         // `.textLayer` lo interceptaba primero. z-10 lo deja por encima tanto del textLayer (2)
         // como del annotationLayer (3, ver AnnotationLayer.css).
-        'absolute z-10 flex touch-none cursor-grab items-center justify-center rounded border-2 bg-white/90 text-center text-[10px] leading-tight font-semibold text-foreground uppercase select-none',
+        'absolute z-10 flex touch-none cursor-grab items-center justify-center rounded border-2 bg-white/90 text-center text-[10px] leading-tight font-semibold text-foreground select-none',
         colorClassName,
         isDragging && 'opacity-0',
         isRejected && 'animate-signature-reject border-destructive',

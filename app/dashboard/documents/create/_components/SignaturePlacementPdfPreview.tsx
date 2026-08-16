@@ -20,6 +20,12 @@ interface SignaturePlacementPdfPreviewProps {
   rejectedId: string | null;
   rejectionNonce: number;
   onDeleteBox: (collaboratorIndex: number, signatureId: string) => void;
+  /**
+   * Publica las páginas del documento hacia afuera (encabezado del acordeón y resumen de la
+   * solicitud). Este componente ya parsea el PDF para renderizarlo, así que es el único lugar
+   * donde ese dato existe sin volver a leer y decodificar el archivo.
+   */
+  onPageCountChange?: (pageCount: number) => void;
 }
 
 /**
@@ -35,6 +41,7 @@ function SignaturePlacementPdfPreview({
   rejectedId,
   rejectionNonce,
   onDeleteBox,
+  onPageCountChange,
 }: SignaturePlacementPdfPreviewProps) {
   const [numPages, setNumPages] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,7 +80,10 @@ function SignaturePlacementPdfPreview({
     >
       <Document
         file={file}
-        onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+        onLoadSuccess={({ numPages }) => {
+          setNumPages(numPages);
+          onPageCountChange?.(numPages);
+        }}
         loading={
           <p className="mt-20 text-sm text-muted-foreground">
             Cargando documento...

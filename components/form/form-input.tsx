@@ -22,6 +22,8 @@ export interface FormInputProps<TFieldValues extends FieldValues>
   description?: ReactNode;
   /** Clases del contenedor (el campo completo); `className` sigue aplicando al `<input>`. */
   containerClassName?: string;
+  /** Normaliza el valor al salir del campo, p. ej. para nombres propios. */
+  normalizeOnBlur?: (value: string) => string;
 }
 
 /**
@@ -41,6 +43,7 @@ export function FormInput<TFieldValues extends FieldValues>({
   required,
   description,
   containerClassName,
+  normalizeOnBlur,
   id,
   ...inputProps
 }: FormInputProps<TFieldValues>) {
@@ -65,7 +68,13 @@ export function FormInput<TFieldValues extends FieldValues>({
         // el RFC, que es `nullable`) haría que el input pasara de no controlado a controlado.
         value={field.value == null ? '' : String(field.value)}
         onChange={field.onChange}
-        onBlur={field.onBlur}
+        onBlur={() => {
+          field.onBlur();
+          if (normalizeOnBlur) {
+            const normalized = normalizeOnBlur(String(field.value ?? ''));
+            if (normalized !== field.value) field.onChange(normalized);
+          }
+        }}
         ref={field.ref}
         disabled={field.disabled ?? inputProps.disabled}
         aria-invalid={fieldState.error ? true : undefined}

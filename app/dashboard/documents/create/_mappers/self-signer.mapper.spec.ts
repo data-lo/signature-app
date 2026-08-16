@@ -25,13 +25,12 @@ function sync(
 }
 
 describe('buildSelfSigner', () => {
-  it('autocompleta al usuario en sesión como firmante con 2FA, sin firmas colocadas y sin rfc (firma con el tipo del documento)', () => {
+  it('autocompleta al usuario en sesión como firmante, sin firmas colocadas ni rfc', () => {
     expect(buildSelfSigner(CURRENT_USER)).toEqual({
       collaboratorType: 'SIGNER',
       firstName: 'Creador',
       lastName: 'Uno',
       email: 'creador@correo.com',
-      requiresTwoFactorAuth: true,
       signatures: [],
       isSelf: true,
     });

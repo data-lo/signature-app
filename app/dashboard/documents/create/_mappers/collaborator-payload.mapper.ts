@@ -28,9 +28,8 @@ export function toRequiresDifferentSignatures(
 
 /**
  * Refuerza acá (no solo en el esquema de Zod) la regla de la historia: con firma simple siempre se
- * manda requiresTwoFactorAuth=true "oculto", sin importar qué haya quedado en el estado del form —
- * el checkbox de 2FA ni siquiera se renderiza en ese flujo (ver CollaboratorFormItem), así que
- * esto es la única fuente de verdad para ese caso.
+ * manda requiresTwoFactorAuth=true "oculto". En firma avanzada, la configuración única del
+ * documento se aplica a todos los firmantes.
  *
  * Un firmante nunca lleva `rfc`: el flujo avanzado lo obtiene del certificado de e.firma al firmar
  * (ver historia "Selección de tipo de firma al crear documentos"), y el simple nunca lo pidió.
@@ -39,6 +38,7 @@ export function toCollaboratorPayload(
   collaborator: CollaboratorFormValues,
   signatureType: DocumentSignatureType,
   orderIndex = 0,
+  requiresTwoFactorAuth = true,
 ): CollaboratorPayload {
   if (collaborator.collaboratorType === 'VIEWER') {
     return {
@@ -65,7 +65,7 @@ export function toCollaboratorPayload(
       heightRatio: position.heightRatio,
     })),
     requiresTwoFactorAuth:
-      signatureType === 'SIMPLE' ? true : collaborator.requiresTwoFactorAuth,
+      signatureType === 'SIMPLE' ? true : requiresTwoFactorAuth,
     orderIndex,
   };
 }
@@ -78,8 +78,14 @@ export function toCollaboratorPayload(
 export function toCollaboratorPayloads(
   collaborators: CollaboratorFormValues[],
   signatureType: DocumentSignatureType,
+  requiresTwoFactorAuth: boolean,
 ): CollaboratorPayload[] {
   return collaborators.map((collaborator, index) =>
-    toCollaboratorPayload(collaborator, signatureType, index),
+    toCollaboratorPayload(
+      collaborator,
+      signatureType,
+      index,
+      requiresTwoFactorAuth,
+    ),
   );
 }

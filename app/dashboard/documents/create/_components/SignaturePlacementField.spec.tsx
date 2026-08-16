@@ -52,6 +52,7 @@ function Harness({
     useForm<CreateDocumentSignaturesFormValues>({
       defaultValues: {
         signatureType: 'SIMPLE',
+        requiresTwoFactorAuth: true,
         requiresApproval: false,
         includeMeAsSigner: false,
         requiresOrder: false,
@@ -61,7 +62,6 @@ function Harness({
             firstName: 'Ana',
             lastName: 'Gómez',
             email: 'ana@correo.com',
-            requiresTwoFactorAuth: true,
             signatures: [
               { id: 'sig-1', page: 1, xRatio: 0.1, yRatio: 0.1, widthRatio: 0.2, heightRatio: 0.08 },
               { id: 'sig-2', page: 2, xRatio: 0.5, yRatio: 0.5, widthRatio: 0.2, heightRatio: 0.08 },
@@ -84,10 +84,21 @@ function Harness({
 }
 
 describe('SignaturePlacementField', () => {
-  it('muestra una caja por cada posición ya colocada, con el nombre del firmante en mayúsculas', () => {
+  it('muestra una caja por cada posición ya colocada, con el nombre del firmante capitalizado', () => {
     renderWithProviders(<Harness onReady={() => {}} />);
 
-    expect(screen.getAllByText('ANA GÓMEZ')).toHaveLength(2);
+    expect(screen.getAllByText('Ana Gómez')).toHaveLength(3);
+  });
+
+  it('muestra el chip del firmante con el nombre capitalizado y un ícono de pluma', () => {
+    renderWithProviders(<Harness onReady={() => {}} />);
+
+    const chip = screen
+      .getAllByRole('button', { name: /ana gómez/i })
+      .find((element) => element.getAttribute('aria-roledescription') === 'draggable');
+    expect(chip).toBeDefined();
+    expect(chip).toHaveTextContent('Ana Gómez');
+    expect(chip?.querySelector('svg')).toBeInTheDocument();
   });
 
   it('Escenario 6: al eliminar una caja específica, solo se remueve esa entrada — las demás firmas del firmante se conservan', async () => {
@@ -112,6 +123,7 @@ describe('SignaturePlacementField', () => {
         useForm<CreateDocumentSignaturesFormValues>({
           defaultValues: {
             requiresApproval: false,
+            requiresTwoFactorAuth: true,
             includeMeAsSigner: false,
             requiresOrder: false,
             collaborators: [],

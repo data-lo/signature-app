@@ -91,10 +91,9 @@ export default function CollaboratorsFieldArray({
     }
     remove(index);
   }
-  // Espejo de MIN_SIGNERS_FOR_ORDER en RequiresOrderField: sin esta misma condición aquí, el
-  // toggle podría quedar en true (estado obsoleto, antes de que su propio useEffect lo apague)
-  // mientras esta lista ya no tiene suficientes firmantes para justificar el Drag and Drop.
-  const canReorder = requiresOrder === true && countSigners(fields) > 2;
+  // El orden solo cobra sentido cuando hay al menos dos firmantes. El interruptor se puede
+  // activar desde configuración, pero los controles de arrastre aparecen hasta entonces.
+  const canReorder = requiresOrder === true && countSigners(fields) >= 2;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -144,7 +143,7 @@ export default function CollaboratorsFieldArray({
 
       {fields.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Agrega al menos un firmante para continuar.
+          Agrega al menos un firmante o inclúyete como firmante para continuar.
         </p>
       )}
 

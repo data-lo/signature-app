@@ -1,6 +1,7 @@
 'use client';
 
 import { useDraggable } from '@dnd-kit/core';
+import { PenLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SignatureDragPayload } from './resolveSignatureDrop';
 
@@ -42,6 +43,7 @@ export default function SignerChip({
         isRejected && 'animate-signature-reject border-destructive',
       )}
     >
+      <PenLine aria-hidden className="size-3 shrink-0" />
       {label}
       {placedCount > 0 && (
         <span className="flex size-4 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-semibold">

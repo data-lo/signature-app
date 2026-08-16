@@ -53,17 +53,21 @@ Rediseñado por completo respecto al flujo original de `ParticipantPicker` (ver 
 
 `CreateDocumentView` es solo composición: monta las secciones y les reparte el estado que producen los hooks especializados. **Ninguna sección decide por su cuenta si otra está habilitada** — eso lo resuelve `_section-rules.ts` (función pura, testeada) y cada sección recibe su `SectionState` (`isEnabled`/`isLoading`/`hasError`/`errorMessage`/`missingRequirementMessage`).
 
+**Las tres primeras secciones viven en acordeones independientes** (`components/ui/accordion.tsx`, sobre `@base-ui/react`, con `multiple` activado): arrancan abiertas, se contraen y se vuelven a abrir en cualquier orden, y **ninguna se bloquea por el estado de otra**. El encabezado de cada una muestra su número de paso, una palomita verde cuando ya está configurada y —solo mientras está contraída— el resumen de lo que contiene. Qué está completo, qué dice cada encabezado contraído y qué muestra el resumen lo decide `_section-progress.ts` (función pura, testeada), separada de `_section-rules.ts`: aquella responde "¿esta sección se puede usar?" y esta "¿ya está configurada?".
+
+Debajo de los acordeones, fijos: el **resumen de la solicitud** (`DocumentRequestSummary` — documento, páginas, tipo de firma, firmantes y espectadores, con "Pendiente" en lo que falte) y el botón **"Firmar"**, que se habilita solo con las tres secciones completas (PDF cargado, tipo de firma elegido y al menos un firmante) y ejecuta el mismo envío de siempre. El conteo de páginas no vuelve a leer el PDF: lo publica el visor de ubicación de firmas, que es quien ya lo tiene parseado.
+
 | Sección | Qué hace | Regla de activación |
 |---|---|---|
-| `DocumentUploadSection` | Selección del PDF (`DocumentFilePicker` → `FormFileUpload`, valida `application/pdf` ≤20MB) | Siempre habilitada: es el punto de entrada. Reporta "procesando" mientras FilePond lee el archivo |
-| `DocumentConfigurationSection` | `RequiresApprovalField` (solo cuentas ORGANIZATION) y `RequiresOrderField` (solo con >2 firmantes) | Siempre habilitada: no depende del PDF; las restricciones son de campo, con su propio contexto |
-| `DocumentParticipantsSection` | `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray`) + `IncludeMeAsSignerField`. Cada colaborador se captura como datos libres (nombre/apellido/email/RFC), con `collaboratorType` `SIGNER`/`VIEWER`; un SIGNER `ADVANCED` exige RFC y puede requerir 2FA, SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) reordena firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder` | Siempre habilitada; muestra el error general "agrega al menos un firmante" (el único que no pertenece a un campo) |
+| `DocumentUploadSection` (acordeón 1, "Cargar documento") | Selección del PDF (`DocumentFilePicker` → `FormFileUpload`, valida `application/pdf` ≤20MB) | Siempre habilitada: es el punto de entrada. Reporta "procesando" mientras FilePond lee el archivo |
+| `DocumentConfigurationSection` (acordeón 2, "Configurar firma") | `SignatureTypeField` (obligatorio), `RequiresApprovalField` (solo cuentas ORGANIZATION) y `RequiresOrderField` (solo con >2 firmantes) | Siempre habilitada: no depende del PDF; las restricciones son de campo, con su propio contexto |
+| `DocumentParticipantsSection` (acordeón 3, "Añadir participantes") | `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray`) + `IncludeMeAsSignerField`. Cada colaborador se captura como datos libres (nombre/apellido/email/RFC), con `collaboratorType` `SIGNER`/`VIEWER`; un SIGNER `ADVANCED` exige RFC y puede requerir 2FA, SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) reordena firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder` | Siempre habilitada; muestra el error general "agrega al menos un firmante" (el único que no pertenece a un campo) |
 | `DocumentSignaturePlacementSection` | `SignaturePlacementField`/`SignaturePageDropZone`/`SignatureBox` (`@dnd-kit`, `lib/signature-geometry.ts`): coloca por arrastre la posición de cada firma sobre el PDF | **Requisito duro**: un PDF completamente cargado. Sin él se muestra deshabilitada explicando qué falta |
 | `CreatedDocumentsSection` | Documentos que el usuario ya envió a firma (`GET /document?email=...`) | Solo cuando `showCreatedDocuments`; esta lista también vive en su propia ruta, `/dashboard/documents/sent` ("Enviados para firma") |
 
 La lógica vive fuera de los componentes:
 
-- `_hooks/useDocumentFileSelection` — el PDF y su estado de carga (fuera de react-hook-form: lo gobierna FilePond).
+- `_hooks/useDocumentFileSelection` — el PDF, su estado de carga y su número de páginas (fuera de react-hook-form: lo gobierna FilePond).
 - `_hooks/useCreateDocumentForm` — formulario, validación, composición de colaboradores y limpieza tras el envío; expone `currentUserQuery` y `createDocumentSignaturesMutation` como instancias con nombre.
 - `_hooks/useCreatedDocuments` — paginación, filtros, consulta del listado y publicación del conteo global.
 - `_mappers/` — `buildSubmissionCollaborators` (agrega al usuario en sesión si marcó "Incluirme como firmante") y `toCollaboratorPayloads`/`computeRequiresDifferentSignatures` (traducción al payload del backend).
@@ -410,6 +414,18 @@ Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `e
 ---
 
 ## 9. Pendientes / trabajo futuro
+
+### Resuelto en esta ronda (solicitud de firma con acordeones independientes y resumen fijo) — 2026-08-15
+
+Rediseño de `/dashboard/documents/create` sin tocar la lógica de negocio del envío (mismo payload, mismo endpoint, mismas validaciones):
+
+- **Se eliminó la tarjeta exterior** que envolvía el formulario y la vista previa: la pantalla usa el ancho completo y el visor del PDF crece con el alto disponible (`lg:h-[calc(100dvh-8rem)]`, `sticky`) en vez de quedar fijo en 640px dentro de otra tarjeta.
+- **Tres acordeones independientes** (Cargar documento / Configurar firma / Añadir participantes) con `components/ui/accordion.tsx`, nuevo, sobre el primitivo de `@base-ui/react`. Arrancan abiertos y **ninguno se bloquea por el estado de otro**. El encabezado lleva número de paso, palomita verde cuando la sección está configurada y, contraído, su resumen (nombre de archivo + páginas / tipo de firma / conteo de firmantes y espectadores).
+- **Trampa del primitivo**: `Accordion.Root` trae `multiple: false` por defecto, así que cada clic cerraba todo lo que el usuario tenía abierto — exactamente el "se bloquean entre sí" que la historia pedía evitar. El wrapper lo activa por defecto. Se detectó con una prueba de tres ítems, no a ojo: con un solo ítem el comportamiento es idéntico.
+- **Resumen fijo + botón fijo** debajo de los acordeones (`DocumentRequestSummary`): documento, páginas, tipo de firma, firmantes y espectadores, con "Pendiente" en lo que falta. "Firmar" se habilita solo con las tres secciones completas.
+- **`_section-progress.ts`** (nuevo, función pura) decide qué está completo, qué dice cada encabezado contraído y qué muestra el resumen; `_section-rules.ts` pasa a recibir `isReadyToSubmit` en vez de deducir el envío del archivo. Las etiquetas del tipo de firma salieron de `SignatureTypeField` a `_config/signature-type.config.ts`: el selector y el resumen no pueden discrepar.
+- **El número de páginas no se calcula aparte**: lo publica `SignaturePlacementPdfPreview` (`onLoadSuccess`), que ya parsea el PDF para renderizarlo — contarlas por separado significaba leer y decodificar el archivo dos veces.
+- **Pruebas**: +1 suite (`_section-progress.spec.ts`, 15 casos) y +5 casos en `CreateDocumentView.spec.tsx` (abrir/contraer independiente, palomitas, encabezados contraídos, resumen reactivo, resumen y botón visibles con todo contraído). Suite completa: **66 suites / 419 tests en verde**. En E2E, `e2e/create-document-accordions.e2e.ts` (6 pruebas) cubre lo mismo contra el stack real, incluido que el botón siga creando la solicitud (se verifica en Postgres) y que "Requiere aprobación" exista dentro de una organización y no fuera.
 
 ### Hallazgos de la auditoría E2E (Playwright + Chromium, aplicación real) — 2026-08-08
 

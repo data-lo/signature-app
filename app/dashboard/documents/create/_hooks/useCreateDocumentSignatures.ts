@@ -37,6 +37,7 @@ export function useCreateDocumentSignatures() {
       requiresApproval,
       requiresOrder,
       signatureType,
+      requiresTwoFactorAuth,
       collaborators,
     }: CreateDocumentSignaturesInput) =>
       createDocumentSignaturesRequest({
@@ -47,7 +48,11 @@ export function useCreateDocumentSignatures() {
           isSequential: requiresOrder,
           signatureType,
         },
-        collaborators: toCollaboratorPayloads(collaborators, signatureType),
+        collaborators: toCollaboratorPayloads(
+          collaborators,
+          signatureType,
+          requiresTwoFactorAuth,
+        ),
         requiresDifferentSignatures:
           toRequiresDifferentSignatures(signatureType),
       }),
