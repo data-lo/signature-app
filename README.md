@@ -76,13 +76,16 @@ Al enviar, `useCreateDocumentSignatures` hace **una sola llamada multipart**: `P
 
 ### Paso 3 — Firmar o rechazar (`/dashboard/documents/[documentId]`)
 
-1. `SignDocumentView` carga el detalle (`GET /document/:id`): PDF (`secureUrl`), lista de colaboradores con su estado, y los flags `canSign`/`canReject`/`canRequestCancellation`/`canConfirmCancellation`/`myRole`/`myStatus` que calcula el backend según el turno y rol del usuario.
+La pantalla está partida en tres capas (ver "Convenciones de estructura"): **`DocumentViewSection`** obtiene los datos y concentra estados y lógica, **`DocumentView`** solo compone la pantalla con lo que recibe por props, y las piezas visuales (`DocumentSummaryCard`, `DocumentParticipantsCard`, `DocumentSignaturePanel`, `SignatureVerificationCard`, `RejectDocumentForm`, `DocumentStatusNotices`, `ShareDocumentLinkAction`, `DocumentPreviewPanel`, `SignatureRequiredDialog`) reciben datos y callbacks y no consultan nada por su cuenta.
+
+1. `DocumentViewSection` carga el detalle (`GET /document/:id`): PDF (`secureUrl`), lista de colaboradores con su estado, y los flags `canSign`/`canReject`/`canRequestCancellation`/`canConfirmCancellation`/`myRole`/`myStatus` que calcula el backend según el turno y rol del usuario.
 2. El PDF se muestra con `PdfPreview`. Los colaboradores se listan con su estado (verde=firmado, rojo=rechazado, ámbar=pendiente).
 3. Si el documento exige verificación (`requiresVerification`/2FA), `useRequestVerificationCode`/`useVerifyCode` corren un paso previo (`POST /document/:id/verification-codes` + `/verify`) antes de habilitar la firma.
 4. Si `canSign` es `true`, el botón **"Continuar a firmar"** llama `PATCH /document/:id/sign` — la firma visual se compone en el backend a partir de la credencial guardada en el paso 1 y la posición elegida en el paso 2.
 5. "Rechazar documento" abre un textarea de motivo (mínimo 5 caracteres) y llama `PATCH /document/:id/reject`.
 6. Si no es el turno del usuario, o ya actuó, se muestra un mensaje contextual en vez de los botones de acción.
 7. **Cancelación** (misma pantalla): "Solicitar cancelación" (`canRequestCancellation`, el creador con el documento `SIGNED`) llama `PATCH /document/:id/submit-for-cancellation`; "Confirmar cancelación" (`canConfirmCancellation`, cualquier firmante con el documento en `CANCELLATION_PENDING`) llama `PATCH /document/:id/confirm-cancellation`. Ambos usan `CancellationConfirmDialog` (no `window.confirm`).
+8. **Compartir enlace** (`ShareDocumentLinkAction` + `useShareDocumentLink`): resuelve la URL del visor público (`lib/document-public-url.ts` → `<origin>/public/documents/:id`) y **la copia al portapapeles en un solo paso**, sin diálogo intermedio, confirmando con un toast "Enlace copiado". No hay llamada al backend: el enlace es determinista a partir del id y el visor público ya decide qué mostrar según el estatus. La URL se resuelve al activar la acción y no al renderizar — `window.location.origin` no existe en el render del servidor y calcularla arriba dejaría un desajuste de hidratación. Si la copia automática no es posible (`lib/clipboard.ts` devuelve `false`: sin Clipboard API y sin `execCommand`, o permiso denegado), el enlace se muestra en un campo de solo lectura para copiarlo a mano.
 
 ### Paso 3.5 — Vincular cuenta desde el correo (`/access-document`) y ver un documento firmado sin sesión (`/public/documents/[id]`)
 
@@ -204,7 +207,7 @@ app/
     │   ├── sent/                    → "/dashboard/documents/sent" — "Enviados para firma": DocumentsView type="sent" (GET /document?email=…)
     │   ├── completed/               → "/dashboard/documents/completed" — "Completados": DocumentsView type="completed" (GET /document?participantEmail=…&status=signed)
     │   ├── created/                 → ruta anterior de "Enviados para firma": solo redirect (308) a /dashboard/documents/sent
-    │   └── [documentId]/            → "/dashboard/documents/:id" — pantalla de firma real (SignDocumentView) ⭐
+    │   └── [documentId]/            → "/dashboard/documents/:id" — detalle/firma del documento (DocumentViewSection → DocumentView) ⭐
     ├── personal-documents/          → "/dashboard/personal-documents" — credencial de firma (signature/INE) + datos de contacto del onboarding
     └── plans/                       → "/dashboard/plans", "/dashboard/plans/success", "/dashboard/plans/cancel" — suscripciones Stripe
 ```
@@ -381,6 +384,7 @@ Todas las respuestas del backend siguen el sobre `{ success, message, data }` (y
 - **Manejo de errores uniforme**: los hooks de mutación repiten el patrón de castear el error a `AxiosError<{message}>` y caer a un mensaje genérico en español, mostrado con `react-hot-toast`.
 - **Consultas y mutaciones como instancias con nombre**: cuando un componente o hook usa más de un `useQuery`/`useMutation`, no se desestructuran — se asignan a una instancia descriptiva con sufijo `Query`/`Mutation` (`documentQuery.isLoading`, `createDocumentSignaturesMutation.mutate()`). Evita alias artificiales para diferenciar `data`/`error`/`isLoading`/`isPending` repetidos y deja claro a qué operación pertenece cada propiedad.
 - **Presentación separada de la lógica**: los componentes de sección (`*Section`) reciben su estado (`isEnabled`/`isLoading`/`hasError`/`errorMessage`) y solo lo dibujan; la carga de datos, las validaciones, las transformaciones y las reglas de activación viven en hooks, mappers y funciones puras (ver `documents/create` como referencia).
+- **Vista / sección / piezas** (patrón de `documents/[documentId]`, la referencia del módulo): `*View` compone la pantalla y nada más — sin `useQuery`, sin `useState`, sin reglas de negocio; `*ViewSection` es su contenedor y concentra la obtención de datos, las variables, los estados locales y los handlers, y se los pasa por props; las piezas individuales (tarjetas, paneles, formularios, acciones) reciben solo los datos y callbacks que necesitan para dibujarse, así que se prueban aisladas y se reutilizan sin arrastrar contexto. Los estados de carga/éxito/error también se dibujan en la `*View` a partir de banderas que le da la sección.
 - **Idioma**: todo el copy de UI en español; nombres de variables/funciones en inglés.
 
 ---
@@ -414,6 +418,15 @@ Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `e
 ---
 
 ## 9. Pendientes / trabajo futuro
+
+### Resuelto en esta ronda (enlace público para compartir + `DocumentView`/`DocumentViewSection`) — 2026-08-17
+
+- **`SignDocumentView` (645 líneas) se partió en tres capas** sin cambiar comportamiento: `DocumentViewSection` (datos, ~10 estados locales, 7 mutaciones, handlers), `DocumentView` (composición visual, cero lógica) y nueve piezas individuales que solo reciben props — `DocumentSummaryCard`, `DocumentParticipantsCard`, `DocumentSignaturePanel`, `SignatureVerificationCard`, `RejectDocumentForm`, `DocumentStatusNotices`, `ShareDocumentLinkAction`, `DocumentPreviewPanel`, `SignatureRequiredDialog`. `page.tsx` ahora monta la sección.
+- **Los 25 tests que ya existían se conservaron tal cual** (solo se renombró el componente bajo prueba), incluidos los que afirman la estructura del DOM del bloque de firma: que "Continuar a firmar" queda dentro del contenedor `inert` cuando falta configurar la firma simple, y que "Configurar mi firma" queda FUERA de él. Esa forma anidada se replicó a propósito en `DocumentSignaturePanel`: es el bug corregido de "la pantalla queda sin ninguna acción posible", no un detalle de maquetación.
+- **Acción "Compartir enlace"** (`ShareDocumentLinkAction` + `useShareDocumentLink`): copia la URL pública **automáticamente** al activarla —sin diálogo intermedio, a diferencia del flujo de la tabla— y confirma con "Enlace copiado". Está disponible en cualquier estatus: el visor público ya distingue entre firmado, en proceso y no disponible.
+- **`lib/clipboard.ts`** (nuevo): `copyTextToClipboard()` con respaldo `textarea` + `execCommand`. `navigator.clipboard` solo existe en contextos seguros, así que en despliegues internos servidos por IP sobre HTTP plano la acción habría quedado muerta sin avisar. Nunca lanza: devuelve `false` y quien la llama decide qué mostrar — aquí, el enlace en un campo de solo lectura para copiarlo a mano.
+- **`lib/document-public-url.ts`** (nuevo): `buildPublicDocumentUrl()`. Se resuelve al activar la acción, no al renderizar, para no dejar un desajuste de hidratación entre el HTML del servidor (ruta relativa, sin `window`) y el del cliente (URL absoluta).
+- **Tests nuevos**: `clipboard.spec.ts` (6), `document-public-url.spec.ts` (5), `ShareDocumentLinkAction.spec.tsx` (7, la pieza aislada) y 6 de integración en `DocumentViewSection.spec.tsx` (URL correcta, copiado, confirmación, respaldo manual, reintento y disponibilidad con el documento pendiente). El copiado real se prueba en `clipboard.spec.ts`; la sección mockea `@/lib/clipboard` para ejercer las dos ramas.
 
 ### Resuelto en esta ronda (solicitud de firma con acordeones independientes y resumen fijo) — 2026-08-15
 
