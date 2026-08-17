@@ -35,6 +35,7 @@ function formValues(
 ) {
   return {
     signatureType,
+    requiresTwoFactorAuth: true,
     requiresApproval: false,
     requiresOrder: false,
     includeMeAsSigner,

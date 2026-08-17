@@ -31,6 +31,8 @@ interface SignaturePlacementFieldProps {
   control: Control<CreateDocumentSignaturesFormValues>;
   getValues: UseFormGetValues<CreateDocumentSignaturesFormValues>;
   setValue: UseFormSetValue<CreateDocumentSignaturesFormValues>;
+  /** Se limita a reenviar el conteo del visor hacia la pantalla (ver `useDocumentFileSelection`). */
+  onPageCountChange?: (pageCount: number) => void;
 }
 
 const REJECT_FLASH_MS = 350;
@@ -47,6 +49,17 @@ function colorFor(collaboratorIndex: number): string {
   return CHIP_COLORS[collaboratorIndex % CHIP_COLORS.length];
 }
 
+function formatSignerName(name: string): string {
+  return name
+    .trim()
+    .toLocaleLowerCase('es-MX')
+    .split(/\s+/)
+    .map((part) =>
+      `${part.charAt(0).toLocaleUpperCase('es-MX')}${part.slice(1)}`,
+    )
+    .join(' ');
+}
+
 /**
  * Orquestador de la historia "Ubicación de firmas por usuario": un único DndContext (aparte del
  * que ya usa CollaboratorsFieldArray.tsx para reordenar la lista — árboles independientes, sin
@@ -60,6 +73,7 @@ export default function SignaturePlacementField({
   control,
   getValues,
   setValue,
+  onPageCountChange,
 }: SignaturePlacementFieldProps) {
   const collaborators = useWatch({ control, name: 'collaborators' });
   const [activeDrag, setActiveDrag] = useState<SignatureDragPayload | null>(
@@ -84,7 +98,9 @@ export default function SignaturePlacementField({
     collaborators.forEach((collaborator, index) => {
       if (collaborator.collaboratorType !== 'SIGNER') return;
 
-      const displayName = `${collaborator.firstName} ${collaborator.lastName}`.trim();
+      const displayName = formatSignerName(
+        `${collaborator.firstName} ${collaborator.lastName}`,
+      );
       signers.push({
         collaboratorIndex: index,
         label: displayName || `Firmante ${index + 1}`,
@@ -92,7 +108,7 @@ export default function SignaturePlacementField({
         placedCount: collaborator.signatures.length,
       });
 
-      const upperLabel = (displayName || `Firmante ${index + 1}`).toUpperCase();
+      const signatureLabel = displayName || `Firmante ${index + 1}`;
       for (const position of collaborator.signatures) {
         const boxesOnPage = boxesByPage.get(position.page) ?? [];
         boxesOnPage.push({
@@ -103,7 +119,7 @@ export default function SignaturePlacementField({
           yRatio: position.yRatio,
           widthRatio: position.widthRatio,
           heightRatio: position.heightRatio,
-          label: upperLabel,
+          label: signatureLabel,
           colorClassName: colorFor(index),
         });
         boxesByPage.set(position.page, boxesOnPage);
@@ -232,6 +248,7 @@ export default function SignaturePlacementField({
             rejectedId={rejectedId}
             rejectionNonce={rejectionNonce}
             onDeleteBox={handleDeleteBox}
+            onPageCountChange={onPageCountChange}
           />
         </div>
       </div>
@@ -247,7 +264,7 @@ export default function SignaturePlacementField({
         {activeDrag ? (
           <div
             className={cn(
-              'flex items-center justify-center rounded border-2 bg-white/90 px-2 py-1 text-[10px] font-semibold uppercase',
+              'flex items-center justify-center rounded border-2 bg-white/90 px-2 py-1 text-[10px] font-semibold',
               colorFor(activeDrag.collaboratorIndex),
             )}
           >

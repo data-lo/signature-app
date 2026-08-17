@@ -7,6 +7,7 @@ import { getErrorMessage } from '@/lib/error-handler';
 import {
   createDocumentSignaturesSchema,
   countSigners,
+  countViewers,
   CREATE_DOCUMENT_DEFAULT_VALUES,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
@@ -20,6 +21,8 @@ interface UseCreateDocumentFormParams {
   file: File | null;
   /** Se ejecuta tras un envío exitoso, para limpiar la selección de archivo. */
   onSubmitted: () => void;
+  /** Abre la sección que contiene los errores cuando la validación del formulario falla. */
+  onInvalid?: () => void;
 }
 
 /**
@@ -35,6 +38,7 @@ interface UseCreateDocumentFormParams {
 export function useCreateDocumentForm({
   file,
   onSubmitted,
+  onInvalid,
 }: UseCreateDocumentFormParams) {
   const currentUserQuery = useCurrentUser();
   const createDocumentSignaturesMutation = useCreateDocumentSignatures();
@@ -49,12 +53,18 @@ export function useCreateDocumentForm({
     control: form.control,
     name: 'collaborators',
   });
+  // El resumen fijo y el encabezado del acordeón de configuración muestran el tipo elegido, así
+  // que se observa acá (una sola suscripción) en vez de que cada consumidor mire el formulario.
+  const signatureType = useWatch({
+    control: form.control,
+    name: 'signatureType',
+  });
 
   function onValidSubmit(values: CreateDocumentSignaturesFormValues) {
     // Guarda redundante con `sections.submission.isEnabled` (el botón está deshabilitado sin
     // archivo): la validación del esquema no cubre el archivo, así que el envío se protege
     // también acá y no depende de que la UI haya deshabilitado el botón.
-    if (!file) return;
+    if (!file || !values.signatureType) return;
 
     createDocumentSignaturesMutation.mutate(
       {
@@ -63,6 +73,7 @@ export function useCreateDocumentForm({
         requiresApproval: values.requiresApproval,
         requiresOrder: values.requiresOrder,
         signatureType: values.signatureType,
+        requiresTwoFactorAuth: values.requiresTwoFactorAuth,
         // Sin composición extra: desde la historia "Crear y eliminar automáticamente el
         // participante Usuario firmante", el creador que marcó "Incluirme como firmante" ya es
         // una tarjeta más dentro de `collaborators` (la agrega `CollaboratorsFieldArray`), así que
@@ -82,9 +93,13 @@ export function useCreateDocumentForm({
     form,
     currentUserQuery,
     createDocumentSignaturesMutation,
-    handleSubmit: form.handleSubmit(onValidSubmit),
+    handleSubmit: form.handleSubmit(onValidSubmit, onInvalid),
     /** Cuántos firmantes hay hoy en el formulario (gobierna el orden de firma). */
     signerCount: countSigners(collaborators),
+    /** Cuántos espectadores hay hoy en el formulario (solo informativo: alimenta el resumen). */
+    viewerCount: countViewers(collaborators),
+    /** Tipo de firma elegido para todo el documento (ver `SignatureTypeField`). */
+    signatureType: signatureType ?? undefined,
     /** Error general de la sección de participantes (no pertenece a ningún campo). */
     participantsErrorMessage: getParticipantsErrorMessage(
       form.formState.errors,

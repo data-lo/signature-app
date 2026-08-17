@@ -7,8 +7,8 @@ import {
 
 /**
  * "Incluirme como firmante": el usuario en sesión se convierte en un SIGNER autocompletado con
- * sus datos de perfil y 2FA activo. Firma con el tipo que se eligió para el documento, igual que
- * cualquier otro firmante — no lo declara acá.
+ * sus datos de perfil. Firma con el tipo y la configuración de 2FA del documento, igual que
+ * cualquier otro firmante — no los declara acá.
  *
  * `isSelf: true` es lo que lo distingue de un firmante capturado a mano: sin esa marca no habría
  * forma de saber cuál de las tarjetas hay que quitar al desmarcar la opción.
@@ -19,7 +19,6 @@ export function buildSelfSigner(currentUser: CurrentUser): SignerFormValues {
     firstName: currentUser.firstName,
     lastName: currentUser.lastName,
     email: currentUser.email,
-    requiresTwoFactorAuth: true,
     signatures: [],
     isSelf: true,
   };

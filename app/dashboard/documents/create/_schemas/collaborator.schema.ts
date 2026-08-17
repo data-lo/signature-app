@@ -1,13 +1,23 @@
 import { z } from 'zod';
 import { signaturePositionSchema } from './signature-position.schema';
 
-const nameField = z.string().trim().min(1, { message: 'Requerido' });
+const firstNameField = z
+  .string()
+  .trim()
+  .min(1, { message: 'Ingresa el nombre del participante.' });
+const lastNameField = z
+  .string()
+  .trim()
+  .min(1, { message: 'Ingresa el apellido del participante.' });
 const emailField = z
   .string()
   .trim()
-  .min(1, { message: 'Requerido' })
-  .email({ message: 'Correo inválido' });
-const rfcField = z.string().trim().min(1, { message: 'El RFC es obligatorio' });
+  .min(1, { message: 'Ingresa el correo electrónico del participante.' })
+  .email({ message: 'Ingresa un correo electrónico válido.' });
+const rfcField = z
+  .string()
+  .trim()
+  .min(1, { message: 'Ingresa el RFC del espectador.' });
 
 /**
  * Un firmante NO declara su propio tipo de firma ni su RFC (ver historia "Selección de tipo de
@@ -18,12 +28,9 @@ const rfcField = z.string().trim().min(1, { message: 'El RFC es obligatorio' });
  */
 export const signerSchema = z.object({
   collaboratorType: z.literal('SIGNER'),
-  firstName: nameField,
-  lastName: nameField,
+  firstName: firstNameField,
+  lastName: lastNameField,
   email: emailField,
-  // Solo tiene efecto real cuando el documento es ADVANCED — para SIMPLE el formulario lo
-  // fuerza a true y oculta el control (ver CollaboratorFormItem).
-  requiresTwoFactorAuth: z.boolean(),
   // Ubicaciones de firma colocadas por arrastre sobre el PDF (ver historia "Ubicación de
   // firmas por usuario") — un arreglo vacío es válido: el firmante firma sin estampado visual.
   // Sin `.default()` a propósito: con `.default()` el input/output del schema divergen
@@ -42,8 +49,8 @@ export const signerSchema = z.object({
 /** El RFC sobrevive solo acá: un espectador no firma, así que no hay certificado del que leerlo. */
 export const viewerSchema = z.object({
   collaboratorType: z.literal('VIEWER'),
-  firstName: nameField,
-  lastName: nameField,
+  firstName: firstNameField,
+  lastName: lastNameField,
   email: emailField,
   rfc: rfcField,
 });
@@ -64,7 +71,6 @@ export function emptySigner(): SignerFormValues {
     firstName: '',
     lastName: '',
     email: '',
-    requiresTwoFactorAuth: true,
     signatures: [],
     isSelf: false,
   };
@@ -84,6 +90,13 @@ export function emptyViewer(): ViewerFormValues {
 export function countSigners(collaborators: CollaboratorFormValues[]): number {
   return collaborators.filter(
     (collaborator) => collaborator.collaboratorType === 'SIGNER',
+  ).length;
+}
+
+/** Contraparte de `countSigners` para el resumen de la solicitud (ver `_section-progress.ts`). */
+export function countViewers(collaborators: CollaboratorFormValues[]): number {
+  return collaborators.filter(
+    (collaborator) => collaborator.collaboratorType === 'VIEWER',
   ).length;
 }
 

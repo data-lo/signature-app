@@ -4,7 +4,7 @@ import { useWatch, type Control } from 'react-hook-form';
 import { GripVertical, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormInput } from '@/components/form/form-input';
-import { FormCheckbox } from '@/components/form/form-checkbox';
+import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
   COLLABORATOR_NAME_FIELDS,
@@ -34,13 +34,12 @@ interface CollaboratorFormItemProps {
  * Un bloque del arreglo unificado `collaborators` (ver historia "Frontend: Carga de Documentos
  * y Configuración de Firmantes") — el mismo componente renderiza SIGNER y VIEWER, mostrando
  * solo los campos que aplican a cada uno:
- *  - SIGNER: nombre/apellido/email siempre; el checkbox de 2FA solo cuando el documento exige
- *    firma avanzada — con firma simple, 2FA se fuerza a true sin mostrarse (ver `_mappers/`).
+ *  - SIGNER: nombre/apellido/email siempre; la configuración de 2FA aplica a todo el documento
+ *    y se decide en la segunda sección.
  *  - VIEWER: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
  *
  * Historia "Selección de tipo de firma al crear documentos": el tipo de firma ya no se elige por
- * firmante (era un checkbox acá) sino una sola vez para todo el documento — este componente solo
- * lo observa, en `signatureType` de la raíz del formulario, para decidir si el 2FA es opcional. El
+ * firmante (era un checkbox acá) sino una sola vez para todo el documento. El
  * RFC dejó de pedirse a los firmantes avanzados: el flujo de e.firma lo obtiene del certificado al
  * momento de firmar.
  *
@@ -60,10 +59,7 @@ export default function CollaboratorFormItem({
     control,
     name: `collaborators.${index}.collaboratorType`,
   });
-  const signatureType = useWatch({ control, name: 'signatureType' });
-
   const isSigner = collaboratorType === 'SIGNER';
-  const isAdvanced = isSigner && signatureType === 'ADVANCED';
   const showRfc = collaboratorType === 'VIEWER';
 
   return (
@@ -89,11 +85,11 @@ export default function CollaboratorFormItem({
               {orderIndex}
             </span>
           )}
-          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground">
             {isSigner ? 'Firmante' : 'Espectador'}
           </span>
           {isSelf && (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-900 uppercase dark:bg-emerald-950 dark:text-emerald-200">
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
               Tú
             </span>
           )}
@@ -120,7 +116,7 @@ export default function CollaboratorFormItem({
             label={field.label}
             type={field.type}
             placeholder={field.placeholder}
-            required={field.required}
+            normalizeOnBlur={formatPersonName}
             disabled={isSelf}
           />
         ))}
@@ -132,7 +128,6 @@ export default function CollaboratorFormItem({
         label={COLLABORATOR_EMAIL_FIELD.label}
         type={COLLABORATOR_EMAIL_FIELD.type}
         placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
-        required={COLLABORATOR_EMAIL_FIELD.required}
         disabled={isSelf}
       />
 
@@ -143,17 +138,9 @@ export default function CollaboratorFormItem({
           label={COLLABORATOR_RFC_FIELD.label}
           type={COLLABORATOR_RFC_FIELD.type}
           placeholder={COLLABORATOR_RFC_FIELD.placeholder}
-          required={COLLABORATOR_RFC_FIELD.required}
         />
       )}
 
-      {isAdvanced && (
-        <FormCheckbox
-          control={control}
-          name={`collaborators.${index}.requiresTwoFactorAuth`}
-          label="Código de verificación (2FA)"
-        />
-      )}
     </div>
   );
 }

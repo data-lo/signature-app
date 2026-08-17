@@ -17,13 +17,13 @@ export type DocumentSignatureType = (typeof DOCUMENT_SIGNATURE_TYPES)[number];
  * booleanas no tienen validación propia — sus restricciones reales son contextuales y se resuelven
  * donde se conoce el contexto:
  *  - `requiresApproval` solo aplica a cuentas ORGANIZATION (ver `RequiresApprovalField`).
- *  - `requiresOrder` solo aplica con más de 2 firmantes (ver `RequiresOrderField`).
+ *  - `requiresOrder` solo se puede ordenar visualmente con dos o más firmantes.
  *  - `includeMeAsSigner` participa de la regla cruzada del esquema compuesto.
  */
 export const documentConfigurationSchema = z.object({
-  signatureType: z.enum(DOCUMENT_SIGNATURE_TYPES, {
-    message: 'Selecciona el tipo de firma',
-  }),
+  signatureType: z.enum(DOCUMENT_SIGNATURE_TYPES).nullable(),
+  /** Aplica a todos los firmantes cuando el documento usa firma avanzada. */
+  requiresTwoFactorAuth: z.boolean(),
   requiresApproval: z.boolean(),
   includeMeAsSigner: z.boolean(),
   requiresOrder: z.boolean(),

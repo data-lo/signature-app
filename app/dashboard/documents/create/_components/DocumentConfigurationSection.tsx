@@ -11,8 +11,6 @@ import SignatureTypeField from './SignatureTypeField';
 interface DocumentConfigurationSectionProps {
   state: SectionState;
   control: Control<CreateDocumentSignaturesFormValues>;
-  /** Gobierna si se puede exigir un orden de firma (ver `RequiresOrderField`). */
-  signerCount: number;
 }
 
 /**
@@ -27,7 +25,6 @@ interface DocumentConfigurationSectionProps {
 export default function DocumentConfigurationSection({
   state,
   control,
-  signerCount,
 }: DocumentConfigurationSectionProps) {
   return (
     <FormSection
@@ -40,7 +37,7 @@ export default function DocumentConfigurationSection({
     >
       <SignatureTypeField control={control} />
       <RequiresApprovalField control={control} />
-      <RequiresOrderField control={control} signerCount={signerCount} />
+      <RequiresOrderField control={control} />
     </FormSection>
   );
 }
