@@ -71,6 +71,24 @@ describe('IdentitySignatureView', () => {
     expect(screen.getByText('Dropzone de signatureFile')).toBeInTheDocument();
   });
 
+  /**
+   * La etiqueta "(opcional)" colgaba del título de la tarjeta de la INE en el estado inicial
+   * vacío. Se quitó de esa vista sin tocar el flujo: la INE sigue sin ser obligatoria (lo exige
+   * el esquema, no la etiqueta) y las dos tarjetas siguen ofreciendo su carga.
+   */
+  it('sin documentos: no muestra la etiqueta "(opcional)" y conserva la carga de ambos documentos', () => {
+    mockUser({ signature: null, officialFile: null });
+
+    renderWithProviders(<IdentitySignatureView />);
+
+    expect(screen.queryByText(/\(opcional\)/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Dropzone de ineFile')).toBeInTheDocument();
+    expect(screen.getByText('Dropzone de signatureFile')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /guardar documentos/i }),
+    ).toBeInTheDocument();
+  });
+
   it('con un documento: previsualiza el guardado y deja cargar el que falta', () => {
     mockUser({ signature: null, officialFile: INE });
 
