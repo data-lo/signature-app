@@ -102,7 +102,21 @@ Cada sección del módulo tiene su propia ruta y su propio `page.tsx`, pero **un
 
 Nombres, rutas, iconos y la configuración de consulta de cada sección viven en **`documents/_config/sections.ts`** (`DOCUMENTS_SECTIONS`, `DOCUMENTS_NAV_SECTIONS`, `DOCUMENTS_LIST_CONFIG`), la fuente única que consumen `AppSidebar`, `DashboardBreadcrumbs` y los `page.tsx` — el nombre del sidebar y el del breadcrumb no pueden divergir. "Documentos" es solo un **agrupador**: no tiene página propia y se muestra sin enlace en el breadcrumb; el último nivel es siempre la página actual y no es interactivo.
 
-Todas las secciones ofrecen filtros por nombre, participante, estado y fechas (y un toggle "solo mi turno" en las secciones de participante). Para documentos firmados, un ícono abre `DocumentPreviewDialog` con el PDF final. Para documentos firmados, en cancelación pendiente o cancelados, un botón "Ver detalle" navega a `/dashboard/documents/:id`, donde `SignDocumentView` decide qué mostrar según los flags de arriba.
+Todas las secciones ofrecen filtros por nombre, participante, estado y fechas (y un toggle "solo mi turno" en las secciones de participante).
+
+**Estructura de la tabla (idéntica en las tres secciones, `DocumentsTable`):**
+
+| Columna | Contenido |
+|---|---|
+| Documento | Nombre del archivo, con el punto de color del estatus cuando aplica |
+| Creado por | Nombre de quien lo creó y, debajo en gris claro, su RFC (`creatorRfc`; se omite si aún no lo registró) |
+| Creado el | Fecha legible y contextual — "Domingo 15 de marzo, 11:55 PM" (`lib/format-datetime.ts`) |
+| Estado de firma | Estatus actual del documento |
+| Acciones | Botón de tres puntos por fila (`DocumentRowActions`) |
+
+Las acciones por documento se concentran en ese menú, con ícono y texto: **Descargar** (misma `useDownloadDocument` de siempre), **Ver detalle** (navega a `/dashboard/documents/:id`, donde `SignDocumentView` decide qué mostrar según los flags de arriba), **Previsualizar** (solo documentos firmados: abre `DocumentPreviewDialog` con el PDF final) y **Compartir**. La única acción que conserva botón propio es **FIRMAR**, por ser la acción primaria de "Por firmar".
+
+**Compartir** (`ShareDocumentDialog`) no llama al backend: arma el enlace del visor público a partir del id (`lib/document-public-url.ts` → `<origin>/public/documents/:id`, la única vista consultable sin sesión), lo muestra en un campo de solo lectura y lo copia al portapapeles con confirmación "Enlace copiado". El origen sale de `window.location.origin` porque el frontend no publica ninguna base URL propia al cliente. Qué se ve al abrir el enlace lo sigue decidiendo el backend según el estatus (`GET /document/public/:id`).
 
 **Rutas anteriores (solo redirigen, para no romper bookmarks):** `/dashboard/documents` → `/dashboard/documents/to-sign` (o `/completed` si traía `?status=signed`, que era como se distinguían ambas secciones antes) y `/dashboard/documents/created` → `/dashboard/documents/sent` (308).
 
@@ -414,6 +428,15 @@ Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `e
 ---
 
 ## 9. Pendientes / trabajo futuro
+
+### Resuelto en esta ronda (tablas estandarizadas de Documentos + enlace público para compartir) — 2026-08-17
+
+- **Una sola estructura de tabla en las tres secciones** (Por firmar / Enviados para firma / Completados): Documento, Creado por, Creado el, Estado de firma, Acciones (ver el detalle en la sección 2, Paso 4). Las tres ya compartían componente (`DocumentsTable`), así que el cambio fue de columnas y jerarquía visual, no de arquitectura. Se retiró la columna "Participantes" —los firmantes siguen siendo filtrables desde el panel de filtros— y "Creado" pasó de `dd/mm/aaaa` al formato legible con hora.
+- **`lib/format-datetime.ts`** (nuevo): `formatLongDateTime()` → "Domingo 15 de marzo, 11:55 PM". Se compone a mano en vez de con `Intl.DateTimeFormat('es-MX')` porque ICU devuelve "domingo, 15 de marzo, 11:55 p. m." y su salida exacta varía entre runtimes (Node del build, navegador, jsdom) — el formato de la tabla no puede depender de eso.
+- **`DocumentRowActions`** (nuevo): las acciones sueltas por fila (botón DESCARGAR, ícono de ojo, botón "Ver detalle", cada uno visible bajo condiciones distintas según el estatus) se concentraron en un menú de tres puntos con ícono y texto — Descargar, Ver detalle, Previsualizar (solo firmados) y Compartir. FIRMAR conserva botón propio por ser la acción primaria de "Por firmar". Descarga y detalle mantienen exactamente el mismo comportamiento (`useDownloadDocument`, `/dashboard/documents/:id`), incluido el estado "Descargando..." acotado al documento en curso.
+- **`ShareDocumentDialog` + `lib/document-public-url.ts`** (nuevos): "Compartir" arma `<origin>/public/documents/:id` y lo copia con confirmación "Enlace copiado". El enlace es determinista a partir del id, así que no hay endpoint nuevo ni token que emitir; el visor público ya existía y sigue siendo quien decide qué mostrar según el estatus. La copia tiene respaldo con `document.execCommand('copy')`: `navigator.clipboard` solo existe en contextos seguros y los despliegues internos por IP corren en HTTP plano.
+- **Backend (`signature-server`)**: `GET /document` ahora devuelve `creatorRfc`. El RFC no vive en `users` sino en `personal_information`, así que `findWithFilters` agrega un `leftJoinAndSelect` a `requester.personalInformation` — en el mismo query, no una consulta por documento. Llega `null` si el creador todavía no registró su RFC y la columna simplemente lo omite.
+- **Tests nuevos**: `format-datetime.spec.ts` (6), `document-public-url.spec.ts` (5), `DocumentsTable.spec.tsx` reescrito (11, incluye estructura de columnas, RFC secundario, formato de fecha, las tres acciones del menú y el flujo de copiado) y 2 en `document.service.spec.ts` del backend.
 
 ### Resuelto en esta ronda (solicitud de firma con acordeones independientes y resumen fijo) — 2026-08-15
 
