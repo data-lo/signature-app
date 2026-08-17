@@ -60,7 +60,7 @@ describe('DocumentsTable', () => {
   });
 
   describe('estructura de tabla compartida por las tres secciones', () => {
-    it('renderiza las columnas Documento / Creado por / Creado el / Estado de firma / Acciones', () => {
+    it('renderiza las columnas Documento / Creado por / Fecha de creación / Estado de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const headers = screen
@@ -70,31 +70,31 @@ describe('DocumentsTable', () => {
       expect(headers).toEqual([
         'Documento',
         'Creado por',
-        'Creado el',
+        'Fecha de creación',
         'Estado de firma',
         'Acciones',
       ]);
     });
 
-    it('muestra el RFC del creador como texto secundario debajo de su nombre', () => {
+    it('muestra el RFC del creador rotulado y como texto secundario debajo de su nombre', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       expect(screen.getByText('Creador Uno')).toBeInTheDocument();
-      expect(screen.getByText('CRUN850315HN2')).toHaveClass(
+      expect(screen.getByText(/^RFC: CRUN850315HN2$/)).toHaveClass(
         'text-muted-foreground',
       );
     });
 
-    it('omite el RFC (sin dejar hueco ni texto vacío) si el creador todavía no lo registró', () => {
+    it('omite el RFC (sin dejar hueco ni rótulo suelto) si el creador todavía no lo registró', () => {
       renderWithProviders(
         <DocumentsTable documents={[buildDoc({ creatorRfc: null })]} />,
       );
 
       expect(screen.getByText('Creador Uno')).toBeInTheDocument();
-      expect(screen.queryByText('CRUN850315HN2')).not.toBeInTheDocument();
+      expect(screen.queryByText(/RFC:/)).not.toBeInTheDocument();
     });
 
-    it('usa el formato de fecha legible y contextual en "Creado el"', () => {
+    it('usa el formato de fecha legible y contextual en "Fecha de creación"', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       expect(
@@ -113,14 +113,31 @@ describe('DocumentsTable', () => {
       const menu = await openRowMenu(user);
 
       expect(
-        within(menu).getByRole('menuitem', { name: /descargar/i }),
-      ).toBeInTheDocument();
+        within(menu)
+          .getAllByRole('menuitem')
+          .map((item) => item.textContent?.trim()),
+      ).toEqual(['Descargar', 'Ver detalle', 'Compartir']);
+    });
+
+    /**
+     * El diseño fija tres acciones también para documentos ya firmados: la previsualización en
+     * diálogo que vivía aquí se retiró porque "Ver detalle" lleva al mismo visor del PDF.
+     */
+    it('un documento firmado no agrega una cuarta acción de previsualización', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+          onViewDetail={jest.fn()}
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);
       expect(
-        within(menu).getByRole('menuitem', { name: /ver detalle/i }),
-      ).toBeInTheDocument();
-      expect(
-        within(menu).getByRole('menuitem', { name: /compartir/i }),
-      ).toBeInTheDocument();
+        within(menu).queryByRole('menuitem', { name: /previsualizar/i }),
+      ).not.toBeInTheDocument();
     });
 
     it('bug corregido: "Descargar" de un documento firmado dispara la descarga en vez de no hacer nada', async () => {

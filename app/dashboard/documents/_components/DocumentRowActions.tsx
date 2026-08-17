@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Eye,
   FileDown,
   MoreVertical,
   Share2,
@@ -22,21 +21,22 @@ interface DocumentRowActionsProps {
   /** Navegación al detalle; ausente solo si la vista contenedora no ofrece esa ruta. */
   onViewDetail?: () => void;
   onShare: () => void;
-  /** Previsualización en diálogo; solo aplica a documentos ya firmados. */
-  onPreview?: () => void;
 }
 
 /**
  * Menú de acciones por fila, idéntico en las tres secciones del módulo (Por firmar, Enviados para
  * firma, Completados): las acciones dejaron de ser botones sueltos por sección para concentrarse
  * aquí, con ícono y texto.
+ *
+ * Son exactamente tres, también para documentos ya firmados. La previsualización en diálogo que
+ * vivía aquí se retiró: "Ver detalle" lleva a `/dashboard/documents/:id`, que ya renderiza el PDF,
+ * así que era un segundo camino al mismo visor.
  */
 export default function DocumentRowActions({
   isDownloading = false,
   onDownload,
   onViewDetail,
   onShare,
-  onPreview,
 }: DocumentRowActionsProps) {
   return (
     <DropdownMenu>
@@ -60,12 +60,6 @@ export default function DocumentRowActions({
           <DropdownMenuItem onClick={onViewDetail}>
             <SquareArrowOutUpRight className="size-4" />
             Ver detalle
-          </DropdownMenuItem>
-        )}
-        {onPreview && (
-          <DropdownMenuItem onClick={onPreview}>
-            <Eye className="size-4" />
-            Previsualizar
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={onShare}>

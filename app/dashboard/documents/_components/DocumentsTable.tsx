@@ -25,7 +25,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import DocumentsFilterButton from './DocumentsFilterButton';
-import DocumentPreviewDialog from './DocumentPreviewDialog';
 import DocumentRowActions from './DocumentRowActions';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import {
@@ -108,7 +107,6 @@ export default function DocumentsTable({
   showMyTurnFilter,
   showStatusFilter,
 }: DocumentsTableProps) {
-  const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
 
@@ -124,92 +122,89 @@ export default function DocumentsTable({
           />
         </div>
       )}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <SortableHeader>Documento</SortableHeader>
-            </TableHead>
-            <TableHead>Creado por</TableHead>
-            <TableHead>
-              <SortableHeader>Creado el</SortableHeader>
-            </TableHead>
-            <TableHead>Estado de firma</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {documents.map((doc) => {
-            const isDownloading =
-              downloadMutation.isPending &&
-              downloadMutation.variables === doc.id;
+      {/* La tabla vive dentro de una tarjeta con borde y encabezado gris, igual en las tres
+          secciones; `components/ui/table` se deja intacto porque también lo usa MembersTable. */}
+      <div className="overflow-hidden rounded-xl border border-border">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow className="hover:bg-transparent">
+              <TableHead>
+                <SortableHeader>Documento</SortableHeader>
+              </TableHead>
+              <TableHead>Creado por</TableHead>
+              <TableHead>Fecha de creación</TableHead>
+              <TableHead>Estado de firma</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {documents.map((doc) => {
+              const isDownloading =
+                downloadMutation.isPending &&
+                downloadMutation.variables === doc.id;
 
-            return (
-              <TableRow key={doc.id}>
-                <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
-                  <div className="flex items-start gap-1.5">
-                    <span
-                      className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                    />
-                    <span className="min-w-0 flex-1 break-words">
-                      {doc.fileName}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span>{doc.creator}</span>
-                    {doc.creatorRfc && (
-                      <span className="text-xs text-muted-foreground">
-                        {doc.creatorRfc}
+              return (
+                <TableRow key={doc.id}>
+                  <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
+                    <div className="flex items-start gap-1.5">
+                      <span
+                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                      />
+                      <span className="min-w-0 flex-1 break-words">
+                        {doc.fileName}
                       </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {formatLongDateTime(doc.createdAt)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                    />
-                    <span>{STATUS_LABELS[doc.status]}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1">
-                    {/* La firma sigue siendo la acción primaria de "Por firmar", así que conserva
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{doc.creator}</span>
+                      {doc.creatorRfc && (
+                        <span className="text-xs text-muted-foreground">
+                          RFC: {doc.creatorRfc}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatLongDateTime(doc.createdAt)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                      />
+                      <span>{STATUS_LABELS[doc.status]}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      {/* La firma sigue siendo la acción primaria de "Por firmar", así que conserva
                         su botón propio; el resto de acciones vive en el menú de tres puntos. */}
-                    {onSignClick && doc.status === DocumentStatus.Pending && (
-                      <Button
-                        variant="brand"
-                        size="sm"
-                        onClick={() => onSignClick(doc.id)}
-                      >
-                        FIRMAR
-                      </Button>
-                    )}
-                    <DocumentRowActions
-                      isDownloading={isDownloading}
-                      onDownload={() => downloadMutation.mutate(doc.id)}
-                      onViewDetail={
-                        onViewDetail ? () => onViewDetail(doc.id) : undefined
-                      }
-                      onShare={() => setShareDoc(doc)}
-                      onPreview={
-                        doc.status === DocumentStatus.Signed
-                          ? () => setPreviewDoc(doc)
-                          : undefined
-                      }
-                    />
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                      {onSignClick && doc.status === DocumentStatus.Pending && (
+                        <Button
+                          variant="brand"
+                          size="sm"
+                          onClick={() => onSignClick(doc.id)}
+                        >
+                          FIRMAR
+                        </Button>
+                      )}
+                      <DocumentRowActions
+                        isDownloading={isDownloading}
+                        onDownload={() => downloadMutation.mutate(doc.id)}
+                        onViewDetail={
+                          onViewDetail ? () => onViewDetail(doc.id) : undefined
+                        }
+                        onShare={() => setShareDoc(doc)}
+                      />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
       <div className="mt-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -264,12 +259,6 @@ export default function DocumentsTable({
           </Button>
         </div>
       </div>
-
-      <DocumentPreviewDialog
-        documentId={previewDoc?.id ?? null}
-        fileName={previewDoc?.fileName}
-        onOpenChange={(open) => !open && setPreviewDoc(null)}
-      />
 
       <ShareDocumentDialog
         documentId={shareDoc?.id ?? null}
