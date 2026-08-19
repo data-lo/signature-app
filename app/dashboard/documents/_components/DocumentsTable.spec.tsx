@@ -1,16 +1,24 @@
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, screen } from '@/test-utils';
+import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsTable, { type DocumentListItem } from './DocumentsTable';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { DocumentStatus } from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDownloadDocument');
 jest.mock('../[documentId]/_hooks/useDocumentDetail', () => ({
-  useDocumentDetail: () => ({ data: undefined, isLoading: false, isError: false }),
+  useDocumentDetail: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 jest.mock('./PdfPreview', () => ({
   __esModule: true,
   default: () => <div>PDF preview</div>,
+}));
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: { success: jest.fn(), error: jest.fn() },
 }));
 
 const mockedUseDownloadDocument = useDownloadDocument as jest.Mock;
@@ -23,11 +31,20 @@ function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
     signers: ['Juan Pérez'],
     spectators: [],
     creator: 'Creador Uno',
+    creatorRfc: 'CRUN850315HN2',
     totalPages: 1,
     status: DocumentStatus.Signed,
-    createdAt: '2026-01-01T00:00:00.000Z',
+    createdAt: new Date(2026, 2, 15, 23, 55).toISOString(),
     ...overrides,
   };
+}
+
+/** Abre el menú de tres puntos de la única fila renderizada y devuelve su contenido. */
+async function openRowMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    screen.getByRole('button', { name: /acciones del documento/i }),
+  );
+  return screen.findByRole('menu');
 }
 
 describe('DocumentsTable', () => {
@@ -42,55 +59,195 @@ describe('DocumentsTable', () => {
     });
   });
 
-  it('bug corregido: el botón DESCARGAR de un documento firmado dispara la descarga en vez de no hacer nada', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<DocumentsTable documents={[buildDoc({ status: DocumentStatus.Signed })]} />);
+  describe('estructura de tabla compartida por las tres secciones', () => {
+    it('renderiza las columnas Documento / Creado por / Fecha de creación / Estado de firma / Acciones', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
-    await user.click(screen.getByRole('button', { name: /descargar/i }));
+      const headers = screen
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent?.trim());
 
-    expect(downloadMutate).toHaveBeenCalledWith('doc-1');
-  });
-
-  it('muestra "Descargando..." y deshabilita el botón mientras la descarga de ese documento está en curso', () => {
-    mockedUseDownloadDocument.mockReturnValue({
-      mutate: downloadMutate,
-      isPending: true,
-      variables: 'doc-1',
+      expect(headers).toEqual([
+        'Documento',
+        'Creado por',
+        'Fecha de creación',
+        'Estado de firma',
+        'Acciones',
+      ]);
     });
-    renderWithProviders(<DocumentsTable documents={[buildDoc({ status: DocumentStatus.Signed })]} />);
 
-    const button = screen.getByRole('button', { name: /descargando/i });
-    expect(button).toBeDisabled();
-  });
+    it('muestra el RFC del creador rotulado y como texto secundario debajo de su nombre', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
-  it('no deshabilita el botón de descarga de un documento distinto al que está en curso', () => {
-    mockedUseDownloadDocument.mockReturnValue({
-      mutate: downloadMutate,
-      isPending: true,
-      variables: 'otro-doc',
+      expect(screen.getByText('Creador Uno')).toBeInTheDocument();
+      expect(screen.getByText(/^RFC: CRUN850315HN2$/)).toHaveClass(
+        'text-muted-foreground',
+      );
     });
-    renderWithProviders(
-      <DocumentsTable
-        documents={[buildDoc({ id: 'doc-1', status: DocumentStatus.Signed })]}
-      />,
-    );
 
-    expect(screen.getByRole('button', { name: /^descargar/i })).not.toBeDisabled();
+    it('omite el RFC (sin dejar hueco ni rótulo suelto) si el creador todavía no lo registró', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ creatorRfc: null })]} />,
+      );
+
+      expect(screen.getByText('Creador Uno')).toBeInTheDocument();
+      expect(screen.queryByText(/RFC:/)).not.toBeInTheDocument();
+    });
+
+    it('usa el formato de fecha legible y contextual en "Fecha de creación"', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(
+        screen.getByText('Domingo 15 de marzo, 11:55 PM'),
+      ).toBeInTheDocument();
+    });
   });
 
-  it('para un documento pendiente muestra FIRMAR en vez de DESCARGAR', () => {
-    renderWithProviders(
-      <DocumentsTable
-        documents={[buildDoc({ status: DocumentStatus.Pending })]}
-        onSignClick={jest.fn()}
-      />,
-    );
+  describe('menú de acciones', () => {
+    it('concentra Descargar, Ver detalle y Compartir en el menú de tres puntos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onViewDetail={jest.fn()} />,
+      );
 
-    expect(
-      screen.getByRole('button', { name: /firmar/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /descargar/i }),
-    ).not.toBeInTheDocument();
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu)
+          .getAllByRole('menuitem')
+          .map((item) => item.textContent?.trim()),
+      ).toEqual(['Descargar', 'Ver detalle', 'Compartir']);
+    });
+
+    /**
+     * El diseño fija tres acciones también para documentos ya firmados: la previsualización en
+     * diálogo que vivía aquí se retiró porque "Ver detalle" lleva al mismo visor del PDF.
+     */
+    it('un documento firmado no agrega una cuarta acción de previsualización', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+          onViewDetail={jest.fn()}
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);
+      expect(
+        within(menu).queryByRole('menuitem', { name: /previsualizar/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('bug corregido: "Descargar" de un documento firmado dispara la descarga en vez de no hacer nada', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /descargar/i }),
+      );
+
+      expect(downloadMutate).toHaveBeenCalledWith('doc-1');
+    });
+
+    it('"Ver detalle" navega al documento', async () => {
+      const user = userEvent.setup();
+      const onViewDetail = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onViewDetail={onViewDetail} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /ver detalle/i }),
+      );
+
+      expect(onViewDetail).toHaveBeenCalledWith('doc-1');
+    });
+
+    it('muestra "Descargando..." y deshabilita la acción mientras la descarga de ese documento está en curso', async () => {
+      mockedUseDownloadDocument.mockReturnValue({
+        mutate: downloadMutate,
+        isPending: true,
+        variables: 'doc-1',
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: /descargando/i }),
+      ).toHaveAttribute('data-disabled');
+    });
+
+    it('no deshabilita la descarga de un documento distinto al que está en curso', async () => {
+      mockedUseDownloadDocument.mockReturnValue({
+        mutate: downloadMutate,
+        isPending: true,
+        variables: 'otro-doc',
+      });
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ id: 'doc-1' })]} />,
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: /^descargar/i }),
+      ).not.toHaveAttribute('data-disabled');
+    });
+
+    it('para un documento pendiente conserva FIRMAR como acción primaria junto al menú', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Pending })]}
+          onSignClick={jest.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByRole('button', { name: /^firmar$/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /acciones del documento/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('compartir', () => {
+    it('genera el enlace a la vista pública del documento y lo copia al portapapeles', async () => {
+      // `userEvent.setup()` instala su propio stub de `navigator.clipboard`, así que la copia se
+      // verifica leyendo de vuelta ese portapapeles en vez de espiar `writeText`.
+      const user = userEvent.setup();
+      const expectedUrl = `${window.location.origin}/public/documents/doc-1`;
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /compartir/i }),
+      );
+
+      const link = await screen.findByLabelText(
+        /enlace público del documento/i,
+      );
+      expect(link).toHaveValue(expectedUrl);
+
+      await user.click(screen.getByRole('button', { name: /copiar enlace/i }));
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: /enlace copiado/i }),
+        ).toBeInTheDocument(),
+      );
+      expect(await navigator.clipboard.readText()).toBe(expectedUrl);
+    });
   });
 });
