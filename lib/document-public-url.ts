@@ -1,7 +1,7 @@
 /**
  * Ruta del visor público de un documento (`app/(public)/public/documents/[id]`): la única vista del
  * proyecto que se puede consultar sin sesión, porque queda fuera del matcher de `middleware.ts`.
- * El enlace que genera la acción "Compartir enlace" apunta aquí y a ningún otro lado.
+ * El enlace que genera "Compartir" en la tabla de documentos apunta aquí y a ningún otro lado.
  */
 export function publicDocumentPath(documentId: string): string {
   return `/public/documents/${documentId}`;
