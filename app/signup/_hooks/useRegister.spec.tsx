@@ -14,6 +14,7 @@ const dto: RegisterRequestValues = {
   rfc: 'GOMA900101ABC',
   password: 'Password123!',
   confirmPassword: 'Password123!',
+  turnstileToken: '0.token-del-widget',
 };
 
 jest.mock('../_requests');
