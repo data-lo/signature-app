@@ -15,6 +15,12 @@ export interface RegisterResponseData {
 }
 
 export interface RegisterRequestValues extends RegisterFormValues {
+  /**
+   * Token de un solo uso del widget de Cloudflare Turnstile. El backend lo canjea contra
+   * Siteverify antes de crear el pre-registro; si falta o ya no sirve, responde 400 y no se crea
+   * nada (ver signature-server TurnstileService).
+   */
+  turnstileToken: string;
   /** Presente cuando el registro viene de /join (RFC nuevo) — une automáticamente al usuario recién creado a esa organización (ver signature-server AuthService.register). */
   invitationToken?: string;
 }

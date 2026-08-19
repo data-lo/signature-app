@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
+import {
+  TurnstileWidget,
+  type TurnstileWidgetHandle,
+} from '@/components/form/turnstile-widget';
 import { getPendingSignatureContext } from '@/lib/pending-signature-context';
 import { getErrorMessage } from '@/lib/error-handler';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
@@ -20,13 +24,22 @@ interface SignupFormProps {
   defaultRfc?: string;
   /** Presente cuando se llega desde /join — une automáticamente al registrarse. */
   invitationToken?: string;
+  /** Clave pública de Cloudflare Turnstile, leída en el servidor (ver `app/signup/page.tsx`). */
+  turnstileSiteKey?: string;
 }
+
+const CAPTCHA_REQUIRED_MESSAGE =
+  'Completa la verificación anti-bots para crear tu cuenta.';
 
 export default function SignupForm({
   defaultRfc,
   invitationToken,
+  turnstileSiteKey,
 }: SignupFormProps) {
   const [hasPendingSignature, setHasPendingSignature] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
   const useFormInstance = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -50,7 +63,27 @@ export default function SignupForm({
     }
   }, [setValue]);
 
-  const registerMutation = useRegister();
+  /**
+   * Un token de Turnstile solo se puede canjear una vez: si el registro falla (por el CAPTCHA o
+   * por cualquier otra cosa, como un CURP repetido), el token que ya viajó al backend queda
+   * quemado y hay que pedir un reto nuevo antes de que el usuario reintente.
+   */
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken(null);
+    turnstileRef.current?.reset();
+  }, []);
+
+  const registerMutation = useRegister({ onError: resetTurnstile });
+
+  const submitRegistration = (values: RegisterFormValues) => {
+    if (!turnstileToken) {
+      setTurnstileError(CAPTCHA_REQUIRED_MESSAGE);
+      return;
+    }
+
+    setTurnstileError(null);
+    registerMutation.mutate({ ...values, invitationToken, turnstileToken });
+  };
 
   return (
     <Card className="max-w-md w-full">
@@ -64,11 +97,7 @@ export default function SignupForm({
             firma del documento.
           </div>
         )}
-        <Form
-          onSubmit={handleSubmit((values) =>
-            registerMutation.mutate({ ...values, invitationToken }),
-          )}
-        >
+        <Form onSubmit={handleSubmit(submitRegistration)}>
           <FieldGroup>
             <TextField
               id="firstName"
@@ -134,6 +163,22 @@ export default function SignupForm({
               error={errors.confirmPassword}
               {...registerField('confirmPassword')}
             />
+
+            <TurnstileWidget
+              ref={turnstileRef}
+              siteKey={turnstileSiteKey}
+              onVerify={(token) => {
+                setTurnstileToken(token);
+                setTurnstileError(null);
+              }}
+              onExpire={() => {
+                setTurnstileToken(null);
+                setTurnstileError(CAPTCHA_REQUIRED_MESSAGE);
+              }}
+              onError={() => setTurnstileToken(null)}
+            />
+
+            {turnstileError && <FieldError>{turnstileError}</FieldError>}
 
             {registerMutation.isError && (
               <FieldError>

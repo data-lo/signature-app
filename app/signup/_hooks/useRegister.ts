@@ -7,7 +7,16 @@ import { getErrorMessage } from '@/lib/error-handler';
 import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
 import { registerRequest, type RegisterRequestValues } from '../_requests';
 
-export function useRegister() {
+interface UseRegisterOptions {
+  /**
+   * Se invoca cuando el registro falla. Existe para que el formulario reinicie el CAPTCHA: el
+   * token de Turnstile es de un solo uso, así que reintentar con el mismo lo rechazaría siempre
+   * y el usuario quedaría atorado viendo el mismo error.
+   */
+  onError?: () => void;
+}
+
+export function useRegister({ onError }: UseRegisterOptions = {}) {
   const router = useRouter();
   return useMutation({
     mutationFn: (values: RegisterRequestValues) => registerRequest(values),
@@ -31,6 +40,7 @@ export function useRegister() {
           'Ocurrió un error al crear tu cuenta. Intenta de nuevo.',
         ),
       );
+      onError?.();
     },
   });
 }
