@@ -2,7 +2,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsTable, { type DocumentListItem } from './DocumentsTable';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { DocumentStatus } from '@/lib/enums/document';
+import { DocumentStatus, SignatureType } from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDownloadDocument');
 jest.mock('../[documentId]/_hooks/useDocumentDetail', () => ({
@@ -60,7 +60,7 @@ describe('DocumentsTable', () => {
   });
 
   describe('estructura de tabla compartida por las tres secciones', () => {
-    it('renderiza las columnas Documento / Creado por / Fecha de creación / Estado de firma / Acciones', () => {
+    it('renderiza las columnas Documento / Creado por / Fecha de creación / Tipo de firma / Estado de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const headers = screen
@@ -71,6 +71,7 @@ describe('DocumentsTable', () => {
         'Documento',
         'Creado por',
         'Fecha de creación',
+        'Tipo de firma',
         'Estado de firma',
         'Acciones',
       ]);
@@ -218,6 +219,71 @@ describe('DocumentsTable', () => {
       ).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: /acciones del documento/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Mostrar tipo de firma en las tablas de documentos". El valor lo resuelve el backend
+   * a partir de los firmantes del documento; acá solo se traduce a la etiqueta de la columna.
+   */
+  describe('columna Tipo de firma', () => {
+    /** Celda de "Tipo de firma" de la única fila renderizada, por su posición en el encabezado. */
+    function signatureTypeCell(): HTMLElement {
+      const headers = screen.getAllByRole('columnheader');
+      const columnIndex = headers.findIndex(
+        (header) => header.textContent?.trim() === 'Tipo de firma',
+      );
+      expect(columnIndex).toBeGreaterThan(-1);
+
+      const [row] = screen.getAllByRole('row').slice(1);
+      return within(row).getAllByRole('cell')[columnIndex];
+    }
+
+    it('muestra "Simple" para un documento de firma simple', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ signatureType: SignatureType.Simple })]}
+        />,
+      );
+
+      expect(signatureTypeCell()).toHaveTextContent('Simple');
+    });
+
+    it('muestra "E.Firma" para un documento de firma avanzada', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ signatureType: SignatureType.Fiel })]}
+        />,
+      );
+
+      expect(signatureTypeCell()).toHaveTextContent('E.Firma');
+    });
+
+    // Documentos creados antes de que se registrara el tipo de firma: la fila se sigue viendo
+    // completa, con un guion en vez de un tipo inventado.
+    it('muestra un guion cuando el documento no tiene tipo de firma registrado', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ signatureType: null })]} />,
+      );
+
+      expect(signatureTypeCell()).toHaveTextContent('—');
+    });
+
+    // Criterio "la nueva columna no afecta la visualización, filtros ni acciones existentes".
+    it('no altera el resto de las columnas de la fila', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ signatureType: SignatureType.Fiel })]}
+        />,
+      );
+
+      const [row] = screen.getAllByRole('row').slice(1);
+      expect(within(row).getByText('contrato.pdf')).toBeInTheDocument();
+      expect(within(row).getByText('Creador Uno')).toBeInTheDocument();
+      expect(within(row).getByText('Firmado por todos')).toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: /acciones del documento/i }),
       ).toBeInTheDocument();
     });
   });

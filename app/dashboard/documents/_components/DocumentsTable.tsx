@@ -33,7 +33,7 @@ import {
 } from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { formatLongDateTime } from '@/lib/format-datetime';
-import { DocumentStatus } from '@/lib/enums/document';
+import { DocumentStatus, SignatureType } from '@/lib/enums/document';
 
 export interface DocumentListItem {
   id: string;
@@ -46,6 +46,12 @@ export interface DocumentListItem {
   creatorRfc?: string | null;
   totalPages: number;
   status: DocumentStatus;
+  /**
+   * Tipo de firma con el que se firma el documento. Es una decisión del documento —el backend lo
+   * copia igual a todos sus firmantes al crearlo— y lo resuelve el listado a partir de ellos.
+   * Null en los documentos del endpoint antiguo, que nunca asignó tipo.
+   */
+  signatureType?: SignatureType | null;
   createdAt: string;
 }
 
@@ -57,6 +63,16 @@ const STATUS_LABELS: Record<DocumentStatus, string> = {
   [DocumentStatus.Expired]: 'Expirado',
   [DocumentStatus.CancellationPending]: 'Cancelación pendiente',
   [DocumentStatus.Cancelled]: 'Cancelado',
+};
+
+/**
+ * Etiquetas cortas a propósito: la tabla ya es ancha y esta columna solo distingue entre los dos
+ * tipos. Los nombres largos ("Firma Electrónica Avanzada (e.firma)") viven en el formulario de
+ * creación, donde el usuario está eligiendo y necesita la descripción completa.
+ */
+const SIGNATURE_TYPE_LABELS: Record<SignatureType, string> = {
+  [SignatureType.Simple]: 'Simple',
+  [SignatureType.Fiel]: 'E.Firma',
 };
 
 const STATUS_DOT: Record<DocumentStatus, string> = {
@@ -133,6 +149,7 @@ export default function DocumentsTable({
               </TableHead>
               <TableHead>Creado por</TableHead>
               <TableHead>Fecha de creación</TableHead>
+              <TableHead>Tipo de firma</TableHead>
               <TableHead>Estado de firma</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -167,6 +184,15 @@ export default function DocumentsTable({
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {formatLongDateTime(doc.createdAt)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {doc.signatureType ? (
+                      SIGNATURE_TYPE_LABELS[doc.signatureType]
+                    ) : (
+                      // Documento anterior a que el tipo de firma se registrara: un guion dice
+                      // "no se sabe", que es la verdad; suponer "Simple" sería inventar.
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
