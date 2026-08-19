@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event';
 import toast from 'react-hot-toast';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
-import SignDocumentView from './SignDocumentView';
+import DocumentViewSection from './DocumentViewSection';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
 import { useSignDocument } from '../_hooks/useSignDocument';
@@ -11,6 +11,7 @@ import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
 import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
 import { useVerifyCode } from '../_hooks/useVerifyCode';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { copyTextToClipboard } from '@/lib/clipboard';
 import type { AuthUser } from '@/lib/store/types/auth-store.types';
 import type { DocumentDetail } from '../_requests';
 import {
@@ -60,7 +61,11 @@ jest.mock('react-hot-toast', () => ({
   __esModule: true,
   default: Object.assign(jest.fn(), { success: jest.fn(), error: jest.fn() }),
 }));
+// El copiado real (Clipboard API y su respaldo con execCommand) se prueba en lib/clipboard.spec.ts;
+// aquí solo interesa cómo reacciona la sección según haya copiado o no.
+jest.mock('@/lib/clipboard');
 
+const mockedCopyTextToClipboard = copyTextToClipboard as jest.Mock;
 const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
 const mockedUseDocumentFileUrl = useDocumentFileUrl as jest.Mock;
 const mockedUseSignDocument = useSignDocument as jest.Mock;
@@ -75,9 +80,7 @@ const mockedToast = toast as unknown as jest.Mock & {
   success: jest.Mock;
 };
 
-function baseDocument(
-  overrides: Partial<DocumentDetail> = {},
-): DocumentDetail {
+function baseDocument(overrides: Partial<DocumentDetail> = {}): DocumentDetail {
   return {
     id: 'doc-1',
     fileName: 'contrato.pdf',
@@ -158,7 +161,7 @@ function mockGeolocationUnsupported() {
   });
 }
 
-describe('SignDocumentView', () => {
+describe('DocumentViewSection', () => {
   const signMutate = jest.fn();
   const rejectMutate = jest.fn();
   const requestCancellationMutate = jest.fn();
@@ -172,6 +175,7 @@ describe('SignDocumentView', () => {
     mockedToast.mockClear();
     mockedToast.error.mockClear();
     mockedToast.success.mockClear();
+    mockedCopyTextToClipboard.mockReset().mockResolvedValue(true);
     mockGeolocationSuccess();
     useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
 
@@ -200,7 +204,11 @@ describe('SignDocumentView', () => {
       isPending: false,
     });
     mockedUseDocumentFileUrl.mockReturnValue({
-      data: { fileId: 'obj-1', secureUrl: 'https://minio/file', expiresIn: 86400 },
+      data: {
+        fileId: 'obj-1',
+        secureUrl: 'https://minio/file',
+        expiresIn: 86400,
+      },
       isLoading: false,
       isError: false,
       isFetching: false,
@@ -215,7 +223,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     await user.click(
       screen.getByRole('button', { name: /continuar a firmar/i }),
@@ -230,11 +238,9 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
-    expect(
-      screen.getByText(/solicitaremos tu ubicación/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/solicitaremos tu ubicación/i)).toBeInTheDocument();
   });
 
   it('al confirmar la firma, solicita la geolocalización y la envía junto con la firma', async () => {
@@ -244,7 +250,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     await user.click(
       screen.getByRole('button', { name: /continuar a firmar/i }),
@@ -282,37 +288,36 @@ describe('SignDocumentView', () => {
       mockGeolocationUnsupported,
       /tu navegador no permite compartir ubicación/i,
     ],
-  ])('si %s: NO firma y explica por qué está bloqueado', async (
-    _caso,
-    mockGeo,
-    expectedReason,
-  ) => {
-    mockGeo();
-    mockedUseDocumentDetail.mockReturnValue({
-      data: baseDocument({ canSign: true, canReject: true }),
-      isLoading: false,
-      isError: false,
-    });
-    const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+  ])(
+    'si %s: NO firma y explica por qué está bloqueado',
+    async (_caso, mockGeo, expectedReason) => {
+      mockGeo();
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ canSign: true, canReject: true }),
+        isLoading: false,
+        isError: false,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
-    await user.click(
-      screen.getByRole('button', { name: /continuar a firmar/i }),
-    );
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
 
-    await waitFor(() =>
-      expect(mockedToast.error).toHaveBeenCalledWith(
-        expect.stringMatching(expectedReason),
-      ),
-    );
-    expect(signMutate).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(mockedToast.error).toHaveBeenCalledWith(
+          expect.stringMatching(expectedReason),
+        ),
+      );
+      expect(signMutate).not.toHaveBeenCalled();
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(expectedReason);
-    expect(
-      screen.getByRole('button', { name: /reintentar con ubicación/i }),
-    ).toBeInTheDocument();
-  });
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(expectedReason);
+      expect(
+        screen.getByRole('button', { name: /reintentar con ubicación/i }),
+      ).toBeInTheDocument();
+    },
+  );
 
   it('no reutiliza una posición cacheada: cada intento de firma pide una lectura fresca', async () => {
     mockedUseDocumentDetail.mockReturnValue({
@@ -321,7 +326,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     await user.click(
       screen.getByRole('button', { name: /continuar a firmar/i }),
@@ -359,7 +364,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.queryByRole('button', { name: /continuar a firmar/i }),
@@ -383,10 +388,7 @@ describe('SignDocumentView', () => {
     );
     await user.click(screen.getByRole('button', { name: /verificar código/i }));
 
-    expect(verifyCodeMutate).toHaveBeenCalledWith(
-      '123456',
-      expect.anything(),
-    );
+    expect(verifyCodeMutate).toHaveBeenCalledWith('123456', expect.anything());
   });
 
   it('bug corregido: si el correo del código no se pudo enviar, la pantalla igual avanza al campo del código y avisa que no llegó (antes el 500 dejaba al firmante encerrado)', async () => {
@@ -397,7 +399,10 @@ describe('SignDocumentView', () => {
       mutate: requestCodeMutate,
       isPending: false,
     });
-    mockedUseVerifyCode.mockReturnValue({ mutate: jest.fn(), isPending: false });
+    mockedUseVerifyCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -409,11 +414,9 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
-    await user.click(
-      screen.getByRole('button', { name: /validar mi firma/i }),
-    );
+    await user.click(screen.getByRole('button', { name: /validar mi firma/i }));
 
     expect(
       screen.getByPlaceholderText(/código de verificación/i),
@@ -437,7 +440,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
 
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.queryByRole('dialog', { name: /firma no configurada/i }),
@@ -460,7 +463,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     // Firmar sigue bloqueado hasta validar el código...
     expect(
@@ -489,7 +492,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
 
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.queryByRole('button', { name: /rechazar documento/i }),
@@ -507,7 +510,7 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.getByRole('button', { name: /continuar a firmar/i }),
@@ -521,7 +524,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     await user.click(
       screen.getByRole('button', { name: /rechazar documento/i }),
@@ -546,7 +549,7 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.getByText(
@@ -577,7 +580,7 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     // Se cierra el diálogo, que es justo lo que dejaba al firmante encerrado.
     await user.keyboard('{Escape}');
@@ -604,7 +607,7 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.getAllByText(
@@ -629,7 +632,7 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(
@@ -648,7 +651,7 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.queryByText(/esta debe estar configurada/i),
@@ -671,7 +674,7 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.getByText(/aún no es tu turno para firmar este documento/i),
@@ -690,7 +693,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     await user.click(
       screen.getByRole('button', { name: /solicitar cancelación/i }),
@@ -713,7 +716,7 @@ describe('SignDocumentView', () => {
       isError: false,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     await user.click(
       screen.getByRole('button', { name: /confirmar cancelación/i }),
@@ -739,7 +742,7 @@ describe('SignDocumentView', () => {
       isFetching: true,
       refetch: jest.fn(),
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(screen.getByText(/cargando documento/i)).toBeInTheDocument();
     expect(screen.queryByText(/pdf preview/i)).not.toBeInTheDocument();
@@ -760,7 +763,7 @@ describe('SignDocumentView', () => {
       refetch: refetchFileUrl,
     });
     const user = userEvent.setup();
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
     expect(
       screen.getByText(/no se pudo cargar el archivo del documento/i),
@@ -777,9 +780,11 @@ describe('SignDocumentView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<SignDocumentView documentId="doc-1" />);
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
-    expect(screen.getByText('PDF preview: https://minio/file')).toBeInTheDocument();
+    expect(
+      screen.getByText('PDF preview: https://minio/file'),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/stale-detail-url/i)).not.toBeInTheDocument();
   });
 
@@ -794,7 +799,7 @@ describe('SignDocumentView', () => {
         isLoading: false,
         isError: false,
       });
-      return renderWithProviders(<SignDocumentView documentId="doc-1" />);
+      return renderWithProviders(<DocumentViewSection documentId="doc-1" />);
     }
 
     it('al hacer clic en "Continuar a firmar" abre el diálogo de e.firma en vez de firmar directamente', async () => {
@@ -883,6 +888,117 @@ describe('SignDocumentView', () => {
         screen.queryByText(/firma electrónica avanzada \(e\.firma\)/i),
       ).not.toBeInTheDocument();
       expect(signMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('compartir el enlace público', () => {
+    const PUBLIC_URL = `${window.location.origin}/public/documents/doc-1`;
+
+    function renderSignedDocument() {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ status: DocumentStatus.Signed }),
+        isLoading: false,
+        isError: false,
+      });
+      return renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+    }
+
+    it('genera la URL de la vista pública del documento y la copia al portapapeles', async () => {
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      await waitFor(() =>
+        expect(mockedCopyTextToClipboard).toHaveBeenCalledWith(PUBLIC_URL),
+      );
+    });
+
+    it('la URL apunta al visor público y no a la ruta autenticada del documento', async () => {
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      await waitFor(() => expect(mockedCopyTextToClipboard).toHaveBeenCalled());
+      const [copiedUrl] = mockedCopyTextToClipboard.mock.calls[0];
+      expect(copiedUrl).toContain('/public/documents/doc-1');
+      expect(copiedUrl).not.toContain('/dashboard');
+    });
+
+    it('avisa al usuario que el enlace se copió correctamente', async () => {
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      await waitFor(() =>
+        expect(mockedToast.success).toHaveBeenCalledWith('Enlace copiado'),
+      );
+      expect(
+        await screen.findByRole('button', { name: /enlace copiado/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('si la copia automática falla, ofrece el enlace para copiarlo manualmente', async () => {
+      mockedCopyTextToClipboard.mockResolvedValue(false);
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      const field = await screen.findByLabelText(
+        /enlace público del documento/i,
+      );
+      expect(field).toHaveValue(PUBLIC_URL);
+      expect(mockedToast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/cópialo manualmente/i),
+      );
+    });
+
+    it('tras un fallo, reintentar la copia vuelve a intentarlo y confirma si esta vez sí copió', async () => {
+      mockedCopyTextToClipboard.mockResolvedValueOnce(false);
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+      await screen.findByRole('button', { name: /reintentar copia/i });
+
+      mockedCopyTextToClipboard.mockResolvedValue(true);
+      await user.click(
+        screen.getByRole('button', { name: /reintentar copia/i }),
+      );
+
+      expect(
+        await screen.findByRole('button', { name: /enlace copiado/i }),
+      ).toBeInTheDocument();
+      // El respaldo manual desaparece al lograrse la copia: ya no hay nada que copiar a mano.
+      expect(
+        screen.queryByLabelText(/enlace público del documento/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('la acción está disponible aunque el documento siga pendiente de firma', () => {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ status: DocumentStatus.Pending, canSign: true }),
+        isLoading: false,
+        isError: false,
+      });
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      ).toBeInTheDocument();
     });
   });
 });
