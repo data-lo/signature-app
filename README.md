@@ -90,7 +90,11 @@ La pantalla está partida en tres capas (ver "Convenciones de estructura"): **`D
 ### Paso 3.5 — Vincular cuenta desde el correo (`/access-document`) y ver un documento firmado sin sesión (`/public/documents/[id]`)
 
 - **`/access-document`**: entry point del link que llega por correo a un colaborador invitado solo por email (sin `userId`/cuenta todavía). Guarda el contexto (`docId`/`collabId`/`email`) en `localStorage` (`lib/pending-signature-context.ts`) y, si hay sesión activa, llama `PATCH /document/:id/link-collaborator` para vincular al colaborador con la cuenta ya logueada; si no hay sesión, redirige a `/login` (o registro) y retoma el contexto guardado después.
-- **`/public/documents/[id]`** (route group `(public)`, fuera del middleware de auth): visor de solo lectura del PDF final vía `GET /document/public/:id` — solo responde si el documento está `SIGNED`, sin JWT.
+- **`/public/documents/[id]`** (route group `(public)`, fuera del middleware de auth): **vista pública de verificación** del documento vía `GET /document/public/:id`, sin JWT. Qué se muestra lo decide `isCompleted`, que resuelve el backend — la UI nunca decide por su cuenta si hay evidencia que publicar:
+  - **Pendiente**: aviso de advertencia, nombre del documento y nombres de los firmantes. Nada más: ni estatus individual, ni evidencia, ni constancia, ni descargas, ni el archivo. Para los estatus terminales (rechazado/cancelado/expirado) el aviso dice que ya no se completará, en vez de "aún no".
+  - **Completado**: aviso de éxito y cinco secciones — información del documento (id, nombre, hash, páginas, creador), constancia de conservación NOM-151, evidencia **por firmante según su tipo de firma** (`SignerEvidenceCard`: la simple muestra OTP; la avanzada, número de serie del certificado y firma electrónica — nunca los del otro tipo), descargas del sello (`SealDownloads`), y el visor del PDF final.
+  - El texto legal de cada firma ("Sustentada") **no se escribe en el frontend**: llega en `legalBacking` desde el backend, que es la misma constante que se estampa en la hoja de firmas del PDF. `InfoRow` oculta el renglón entero cuando el valor llega en `null`, que es lo que hace que los campos exclusivos de un tipo no aparezcan para el otro.
+  - Las descargas son enlaces `<a download>` directos a `/api/document/public/:id/seal/:artifact`: el backend responde con `Content-Disposition: attachment` y la ruta es pública, así que no hace falta pasar por axios ni por su interceptor de token. El artefacto `canonical` se rotula **"Cadena canónica"** y no "XML canónico": lo que Seal Service sella no es XML sino una cadena con longitudes al frente, y se descarga como `.txt`.
 
 ### Paso 4 — Consultar documentos (`/dashboard/documents/to-sign`, `/sent`, `/completed`)
 
@@ -202,7 +206,7 @@ app/
 ├── forgot-password/              → "/forgot-password" — ForgotPasswordWizard, 3 pasos sin cambiar de URL (email → OTP → nueva contraseña)
 ├── join/                         → "/join" — aceptar invitación a una organización (JoinView/JoinExistingUser/RfcForm)
 ├── access-document/              → "/access-document" — entry point del link de correo de firma; vincula el colaborador a la sesión activa o redirige a /login
-├── (public)/public/documents/[id]/ → "/public/documents/:id" — visor de PDF firmado sin sesión (GET /document/public/:id), fuera del middleware de auth
+├── (public)/public/documents/[id]/ → "/public/documents/:id" — vista pública de verificación sin sesión (GET /document/public/:id), fuera del middleware de auth
 ├── _components/
 │   ├── AppSidebar.tsx             → navegación del dashboard (reemplaza al viejo DashboardNavbar) + AccountSwitcher en el footer
 │   ├── AccountSwitcher.tsx
