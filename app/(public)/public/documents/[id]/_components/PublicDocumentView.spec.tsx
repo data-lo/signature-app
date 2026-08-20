@@ -1,8 +1,11 @@
-import { renderWithProviders, screen } from '@/test-utils';
+import { renderWithProviders, screen, within } from '@/test-utils';
 import PublicDocumentView from './PublicDocumentView';
 import { usePublicDocument } from '../_hooks/usePublicDocument';
-import { DocumentStatus } from '@/lib/enums/document';
-import type { PublicDocumentView as PublicDocumentViewData } from '../_requests';
+import { DocumentStatus, SignatureType } from '@/lib/enums/document';
+import type {
+  PublicDocumentView as PublicDocumentViewData,
+  PublicSigner,
+} from '../_requests';
 
 jest.mock('../_hooks/usePublicDocument');
 jest.mock('./PublicPdfViewer', () => ({
@@ -12,17 +15,102 @@ jest.mock('./PublicPdfViewer', () => ({
 
 const mockedUsePublicDocument = usePublicDocument as jest.Mock;
 
-function buildData(
+function buildSigner(overrides: Partial<PublicSigner> = {}): PublicSigner {
+  return {
+    id: 'collab-1',
+    name: 'Isaay Sosa',
+    signatureType: SignatureType.Simple,
+    signatureTypeLabel: 'Digital Simple',
+    legalBacking:
+      'Firma Electrónica Simple (Arts. 89, 90 y 93 del Código de Comercio)',
+    ipAddress: '187.190.12.4',
+    signedAt: '2026-03-15T23:55:00.000Z',
+    geoLocation: '19.4326, -99.1332',
+    otpCode: '482915',
+    certificateSerialNumber: null,
+    electronicSignature: null,
+    ...overrides,
+  };
+}
+
+/** Documento pendiente: el backend manda solo nombres, todo lo demás en null. */
+function buildPending(
+  overrides: Partial<PublicDocumentViewData> = {},
+): PublicDocumentViewData {
+  return {
+    id: 'doc-1',
+    fileName: 'contrato.pdf',
+    status: DocumentStatus.Pending,
+    isCompleted: false,
+    secureUrl: null,
+    expiresIn: null,
+    hash: null,
+    totalPages: null,
+    createdBy: null,
+    conservationRecord: null,
+    signers: [
+      {
+        id: 'collab-1',
+        name: 'Isaay Sosa',
+        signatureType: null,
+        signatureTypeLabel: '',
+        legalBacking: '',
+        ipAddress: '',
+        signedAt: null,
+        geoLocation: null,
+        otpCode: null,
+        certificateSerialNumber: null,
+        electronicSignature: null,
+      },
+      {
+        id: 'collab-2',
+        name: 'María López',
+        signatureType: null,
+        signatureTypeLabel: '',
+        legalBacking: '',
+        ipAddress: '',
+        signedAt: null,
+        geoLocation: null,
+        otpCode: null,
+        certificateSerialNumber: null,
+        electronicSignature: null,
+      },
+    ],
+    downloads: { nom151: false, timestamp: false, canonical: false },
+    ...overrides,
+  };
+}
+
+function buildCompleted(
   overrides: Partial<PublicDocumentViewData> = {},
 ): PublicDocumentViewData {
   return {
     id: 'doc-1',
     fileName: 'contrato.pdf',
     status: DocumentStatus.Signed,
-    secureUrl: 'https://minio/signed-documents/doc-1',
+    isCompleted: true,
+    secureUrl: 'https://minio/finalized-documents/doc-1',
     expiresIn: 86400,
+    hash: 'hash-firmado-abc123',
+    totalPages: 12,
+    createdBy: 'creador@correo.com',
+    conservationRecord: {
+      tsaCertificate: null,
+      serialNumber: null,
+      issuedAt: '2026-03-15T23:55:00.000Z',
+    },
+    signers: [buildSigner()],
+    downloads: { nom151: true, timestamp: true, canonical: true },
     ...overrides,
   };
+}
+
+function mockData(data: PublicDocumentViewData | undefined) {
+  mockedUsePublicDocument.mockReturnValue({
+    data,
+    isLoading: false,
+    isError: false,
+  });
 }
 
 describe('PublicDocumentView', () => {
@@ -50,81 +138,290 @@ describe('PublicDocumentView', () => {
     expect(screen.getByText(/documento no encontrado/i)).toBeInTheDocument();
   });
 
-  // `findByText` y no `getByText`: el visor se carga con `dynamic(..., { ssr: false })` —react-pdf
-  // necesita el DOM y con un import estático reventaba el SSR de la página—, así que aparece un
-  // tick después del primer render. El encabezado sí es síncrono.
-  it('status SIGNED: renderiza el visor con la secureUrl devuelta por el backend', async () => {
-    mockedUsePublicDocument.mockReturnValue({
-      data: buildData({ status: DocumentStatus.Signed }),
-      isLoading: false,
-      isError: false,
-    });
-
-    renderWithProviders(<PublicDocumentView documentId="doc-1" />);
-
-    expect(
-      await screen.findByText(
-        'PublicPdfViewer file=https://minio/signed-documents/doc-1',
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText('contrato.pdf')).toBeInTheDocument();
-  });
-
-  it.each([
-    DocumentStatus.Pending,
-    DocumentStatus.Created,
-    DocumentStatus.CancellationPending,
-  ])(
-    'status %s: muestra "El documento se encuentra en proceso." y no renderiza el visor',
-    (status) => {
-      mockedUsePublicDocument.mockReturnValue({
-        data: buildData({ status, secureUrl: null, expiresIn: null }),
-        isLoading: false,
-        isError: false,
-      });
+  /**
+   * Documento a medio firmar: aviso, nombre del documento y nombres de los firmantes. Nada más —
+   * ni estatus individual, ni evidencia, ni constancia, ni descargas. Esta URL no pide sesión, así
+   * que lo que NO se muestra es tan parte de la historia como lo que sí.
+   */
+  describe('documento pendiente de firmas', () => {
+    it('muestra la alerta de advertencia, el nombre del documento y los firmantes', () => {
+      mockData(buildPending());
 
       renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
       expect(
-        screen.getByText('El documento se encuentra en proceso.'),
+        screen.getByText('Este documento aún no se ha completado de firmar.'),
       ).toBeInTheDocument();
-      expect(screen.queryByText(/PublicPdfViewer/)).not.toBeInTheDocument();
-    },
-  );
+      expect(screen.getByRole('status')).toHaveAttribute(
+        'data-variant',
+        'warning',
+      );
+      expect(screen.getByText('contrato.pdf')).toBeInTheDocument();
+      expect(screen.getByText('Isaay Sosa')).toBeInTheDocument();
+      expect(screen.getByText('María López')).toBeInTheDocument();
+      // Por rol y no por texto: los títulos de sección tienen que ser encabezados de verdad.
+      // Es una pantalla de consulta que se abre desde el teléfono tras escanear un QR, y sin
+      // encabezados un lector de pantalla no puede saltar entre secciones.
+      expect(
+        screen.getByRole('heading', { name: /firmantes requeridos/i }),
+      ).toBeInTheDocument();
+    });
 
-  it.each([
-    DocumentStatus.Rejected,
-    DocumentStatus.Expired,
-    DocumentStatus.Cancelled,
-  ])(
-    'status %s: muestra "El documento no está disponible para su consulta." y no renderiza el visor',
-    (status) => {
-      mockedUsePublicDocument.mockReturnValue({
-        data: buildData({ status, secureUrl: null, expiresIn: null }),
-        isLoading: false,
-        isError: false,
-      });
+    it('no muestra evidencia, información de PSC, descargas ni el visor', () => {
+      mockData(buildPending());
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(screen.queryByText(/^hash$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^ip$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^sustentada$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/nom-151/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: /constancia nom-151/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/PublicPdfViewer/)).not.toBeInTheDocument();
+    });
+
+    /**
+     * Un documento rechazado/cancelado/expirado tampoco está completado, pero ya nunca lo va a
+     * estar: el aviso no debe dejar a quien consulta esperando una firma que no va a llegar.
+     */
+    it.each([
+      [DocumentStatus.Rejected, /lo rechazó/i],
+      [DocumentStatus.Cancelled, /fue cancelado/i],
+      [DocumentStatus.Expired, /venció su fecha límite/i],
+    ])('status %s: el aviso dice que ya no se completará', (status, matcher) => {
+      mockData(buildPending({ status }));
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(screen.getByText(matcher)).toBeInTheDocument();
+      expect(
+        screen.queryByText('Este documento aún no se ha completado de firmar.'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('documento completado', () => {
+    it('muestra la alerta de éxito y la información del documento', () => {
+      mockData(buildCompleted());
 
       renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
       expect(
         screen.getByText(
-          'El documento no está disponible para su consulta.',
+          'Este documento ha sido firmado por todos sus participantes.',
         ),
       ).toBeInTheDocument();
-      expect(screen.queryByText(/PublicPdfViewer/)).not.toBeInTheDocument();
-    },
-  );
-
-  it('bug de datos inconsistentes: status SIGNED pero secureUrl null (no debería pasar, el backend lo garantiza) no renderiza el visor', () => {
-    mockedUsePublicDocument.mockReturnValue({
-      data: buildData({ status: DocumentStatus.Signed, secureUrl: null }),
-      isLoading: false,
-      isError: false,
+      expect(screen.getByRole('status')).toHaveAttribute(
+        'data-variant',
+        'success',
+      );
+      // Mismo criterio que en el panel de pendiente: las cinco secciones son encabezados.
+      for (const titulo of [
+        /información del documento/i,
+        /constancia de conservación \(nom-151\)/i,
+        /^firmantes$/i,
+        /descargas disponibles/i,
+      ]) {
+        expect(screen.getByRole('heading', { name: titulo })).toBeInTheDocument();
+      }
+      expect(screen.getByText('doc-1')).toBeInTheDocument();
+      expect(screen.getByText('hash-firmado-abc123')).toBeInTheDocument();
+      expect(screen.getByText('12')).toBeInTheDocument();
+      expect(screen.getByText('creador@correo.com')).toBeInTheDocument();
     });
 
-    renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+    // `findByText`: el visor se carga con `dynamic(..., { ssr: false })` —react-pdf necesita el
+    // DOM y con un import estático reventaba el SSR de la página—, así que aparece un tick después
+    // del primer render.
+    it('renderiza el visor con la secureUrl devuelta por el backend', async () => {
+      mockData(buildCompleted());
 
-    expect(screen.queryByText(/PublicPdfViewer/)).not.toBeInTheDocument();
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(
+        await screen.findByText(
+          'PublicPdfViewer file=https://minio/finalized-documents/doc-1',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('bug de datos inconsistentes: completado pero sin secureUrl no renderiza el visor', () => {
+      mockData(buildCompleted({ secureUrl: null }));
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(screen.queryByText(/PublicPdfViewer/)).not.toBeInTheDocument();
+    });
+
+    describe('constancia de conservación (NOM-151)', () => {
+      it('muestra la fecha de emisión y omite los renglones que el PSC no expone', () => {
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(screen.getByText(/fecha de emisión/i)).toBeInTheDocument();
+        // tsaCertificate y serialNumber llegan en null: el renglón entero no se pinta.
+        expect(
+          screen.queryByText(/certificado \(tsa\)/i),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/número de serie$/i)).not.toBeInTheDocument();
+      });
+
+      it('sin constancia: lo dice en vez de dejar la sección vacía', () => {
+        mockData(buildCompleted({ conservationRecord: null }));
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          screen.getByText(
+            /no cuenta con una constancia de conservación emitida por un psc/i,
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe('evidencia según el tipo de firma', () => {
+      it('firma simple: muestra OTP y oculta los campos de la firma avanzada', () => {
+        mockData(buildCompleted({ signers: [buildSigner()] }));
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        const card = screen.getByText('Isaay Sosa').closest('[data-slot="signer-evidence"]');
+        const evidence = within(card as HTMLElement);
+
+        expect(evidence.getByText('Digital Simple')).toBeInTheDocument();
+        expect(evidence.getByText(/otp code/i)).toBeInTheDocument();
+        expect(evidence.getByText('482915')).toBeInTheDocument();
+        expect(evidence.getByText(/arts\. 89, 90 y 93/i)).toBeInTheDocument();
+
+        expect(
+          evidence.queryByText(/número de serie del certificado/i),
+        ).not.toBeInTheDocument();
+        expect(
+          evidence.queryByText(/^firma electrónica$/i),
+        ).not.toBeInTheDocument();
+      });
+
+      it('firma avanzada: muestra certificado y firma electrónica, y oculta el OTP', () => {
+        mockData(
+          buildCompleted({
+            signers: [
+              buildSigner({
+                id: 'collab-2',
+                name: 'MANUEL BALDERRAMA CHAVEZ',
+                signatureType: SignatureType.Fiel,
+                signatureTypeLabel: 'Firma Electronica Avanzada',
+                legalBacking:
+                  'Certificado emitido por el Sistema de Administración Tributaria PSC (Art. 97 del Código de Comercio)',
+                otpCode: null,
+                certificateSerialNumber: '00001000000512345678',
+                electronicSignature: 'MEUCIQDf-firma-base64',
+              }),
+            ],
+          }),
+        );
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        const card = screen
+          .getByText('MANUEL BALDERRAMA CHAVEZ')
+          .closest('[data-slot="signer-evidence"]');
+        const evidence = within(card as HTMLElement);
+
+        expect(
+          evidence.getByText('Firma Electronica Avanzada'),
+        ).toBeInTheDocument();
+        expect(
+          evidence.getByText('00001000000512345678'),
+        ).toBeInTheDocument();
+        expect(
+          evidence.getByText('MEUCIQDf-firma-base64'),
+        ).toBeInTheDocument();
+        expect(evidence.getByText(/art\. 97/i)).toBeInTheDocument();
+
+        expect(evidence.queryByText(/otp code/i)).not.toBeInTheDocument();
+      });
+
+      it('con varios firmantes de distinto tipo, cada tarjeta muestra lo suyo', () => {
+        mockData(
+          buildCompleted({
+            signers: [
+              buildSigner(),
+              buildSigner({
+                id: 'collab-2',
+                name: 'María López',
+                signatureType: SignatureType.Fiel,
+                signatureTypeLabel: 'Firma Electronica Avanzada',
+                otpCode: null,
+                certificateSerialNumber: '00001000000598765432',
+                electronicSignature: 'otra-firma-base64',
+              }),
+            ],
+          }),
+        );
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          document.querySelectorAll('[data-slot="signer-evidence"]'),
+        ).toHaveLength(2);
+        expect(screen.getByText('482915')).toBeInTheDocument();
+        expect(screen.getByText('00001000000598765432')).toBeInTheDocument();
+      });
+    });
+
+    describe('descargas disponibles', () => {
+      it('ofrece los tres artefactos apuntando a la ruta pública del backend', () => {
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          screen.getByRole('link', { name: /constancia nom-151/i }),
+        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/nom151');
+        expect(
+          screen.getByRole('link', { name: /sello de tiempo/i }),
+        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/timestamp');
+        expect(
+          screen.getByRole('link', { name: /cadena canónica/i }),
+        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/canonical');
+      });
+
+      it('solo ofrece los artefactos que el backend confirmó que existen', () => {
+        mockData(
+          buildCompleted({
+            downloads: { nom151: false, timestamp: true, canonical: false },
+          }),
+        );
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          screen.getByRole('link', { name: /sello de tiempo/i }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole('link', { name: /constancia nom-151/i }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('link', { name: /cadena canónica/i }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('sin ningún artefacto, lo dice en vez de dejar la sección vacía', () => {
+        mockData(
+          buildCompleted({
+            downloads: { nom151: false, timestamp: false, canonical: false },
+          }),
+        );
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          screen.getByText(/no tiene constancia de conservación descargable/i),
+        ).toBeInTheDocument();
+      });
+    });
   });
 });
