@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * SIN USO fuera de `PersonalDocumentsForm`, que a su vez ya no lo monta ninguna ruta (ver la
+ * nota en ese archivo).
+ *
+ * El alta de firma del flujo vigente es `identity/_hooks/useUploadSignatureImage`, que llama al
+ * mismo endpoint pero sin INE, invalida además el estado de la credencial y NO redirige: la
+ * pantalla de identidad se queda mostrando el resultado. Este hook redirige a
+ * /dashboard/documents/create, comportamiento del onboarding anterior.
+ */
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
