@@ -63,15 +63,8 @@ const STATIC_CRUMBS: Record<string, Crumb[]> = {
     },
     { label: 'Identidad y firma' },
   ],
-  '/dashboard/plans': [{ label: 'Suscripciones' }],
-  '/dashboard/plans/cancel': [
-    { label: 'Suscripciones', href: '/dashboard/plans' },
-    { label: 'Cancelación' },
-  ],
-  '/dashboard/plans/success': [
-    { label: 'Suscripciones', href: '/dashboard/plans' },
-    { label: 'Confirmación' },
-  ],
+  '/dashboard/plans': [{ label: 'Planes' }],
+  '/dashboard/subscriptions': [{ label: 'Suscripciones' }],
 };
 
 const DOCUMENT_DETAIL_PATTERN = /^\/dashboard\/documents\/([^/]+)$/;

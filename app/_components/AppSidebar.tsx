@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   FileSignature,
   CreditCard,
+  ReceiptText,
   User,
   IdCard,
   Users,
@@ -69,10 +70,16 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Pagos',
     items: [
       {
-        label: 'Suscripciones',
+        label: 'Planes',
         href: '/dashboard/plans',
         icon: CreditCard,
         isActive: (pathname) => pathname.startsWith('/dashboard/plans'),
+      },
+      {
+        label: 'Suscripciones',
+        href: '/dashboard/subscriptions',
+        icon: ReceiptText,
+        isActive: (pathname) => pathname.startsWith('/dashboard/subscriptions'),
       },
     ],
   },
