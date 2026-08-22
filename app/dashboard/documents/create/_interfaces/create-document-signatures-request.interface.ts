@@ -1,4 +1,7 @@
-import type { CollaboratorFormValues } from '../_schemas';
+import type {
+  CollaboratorFormValues,
+  DocumentSignatureType,
+} from '../_schemas';
 
 /**
  * Contratos de SOLICITUD de `POST /api/v1/documents/signatures`. Se mantienen separados de los
@@ -8,8 +11,13 @@ import type { CollaboratorFormValues } from '../_schemas';
  * arrastrara al backend y viceversa. La traducción entre ambos mundos vive en `_mappers/`.
  */
 
-/** Cómo distinguir el tipo de firma exigido al conjunto de firmantes del documento. */
-export type RequiresDifferentSignatures = 'SIMPLE' | 'FIEL' | 'MIX';
+/**
+ * Espejo de `documentData.signatureType` con el vocabulario del dominio del backend (FIEL en vez
+ * de ADVANCED). Ya no admite `MIX`: desde la historia "Selección de tipo de firma al crear
+ * documentos" el tipo es uno solo por documento, así que "firmas distintas" no es un estado
+ * alcanzable. El backend rechaza el payload si este campo contradice a `documentData.signatureType`.
+ */
+export type RequiresDifferentSignatures = 'SIMPLE' | 'FIEL';
 
 /** Forma exacta que espera el backend por cada ubicación de firma (ver SignaturePositionDto). */
 export interface SignaturePositionPayload {
@@ -21,14 +29,17 @@ export interface SignaturePositionPayload {
   heightRatio: number;
 }
 
-/** Forma exacta que espera el backend por cada colaborador (campo `collaborators`). */
+/**
+ * Forma exacta que espera el backend por cada colaborador (campo `collaborators`). Sin
+ * `signatureType`: lo define el documento entero (`DocumentDataPayload.signatureType`). `rfc` solo
+ * viaja para VIEWER — a los firmantes ya no se les pide en ningún flujo.
+ */
 export interface CollaboratorPayload {
   collaboratorType: 'SIGNER' | 'VIEWER';
   firstName: string;
   lastName: string;
   email: string;
   rfc?: string | null;
-  signatureType?: 'SIMPLE' | 'ADVANCED';
   signatures?: SignaturePositionPayload[];
   requiresTwoFactorAuth?: boolean;
   /**
@@ -45,6 +56,8 @@ export interface DocumentDataPayload {
   requiresApproval: boolean;
   /** Espejo de `requiresOrder` del formulario, con el nombre que usa el backend. */
   isSequential: boolean;
+  /** Tipo de firma exigido a TODOS los firmantes del documento — única fuente de verdad del flujo. */
+  signatureType: DocumentSignatureType;
 }
 
 /** Solicitud completa que arma `createDocumentSignaturesRequest` (un solo multipart). */
@@ -66,5 +79,7 @@ export interface CreateDocumentSignaturesInput {
   fileName: string;
   requiresApproval: boolean;
   requiresOrder: boolean;
+  signatureType: DocumentSignatureType;
+  requiresTwoFactorAuth: boolean;
   collaborators: CollaboratorFormValues[];
 }

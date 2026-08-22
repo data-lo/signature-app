@@ -7,6 +7,7 @@ import {
   SigningCredentialStatus,
 } from '@/lib/enums/identity';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { SIGNATURE_DOCUMENT } from '../../_config/personal-documents.config';
 import {
   getCurrentIdentityVerificationRequest,
   startDiditVerificationRequest,
@@ -202,7 +203,10 @@ describe('IdentitySignatureView', () => {
     expect(
       await screen.findByText(/identidad validada por didit/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/firma png · paso 2 de 2/i)).toBeInTheDocument();
+    // El paso 2 se dibuja con la tarjeta de documento personal de la sección, así que su título
+    // es la etiqueta de SIGNATURE_DOCUMENT y no un rótulo propio de esta pantalla.
+    expect(screen.getByText(SIGNATURE_DOCUMENT.label)).toBeInTheDocument();
+    expect(screen.getByText(/selecciona el archivo/i)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /guardar mi firma/i }),
     ).toBeInTheDocument();

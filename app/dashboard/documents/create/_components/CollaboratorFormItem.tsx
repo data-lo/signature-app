@@ -4,7 +4,7 @@ import { useWatch, type Control } from 'react-hook-form';
 import { GripVertical, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormInput } from '@/components/form/form-input';
-import { FormCheckbox } from '@/components/form/form-checkbox';
+import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
   COLLABORATOR_NAME_FIELDS,
@@ -17,6 +17,13 @@ interface CollaboratorFormItemProps {
   index: number;
   control: Control<CreateDocumentSignaturesFormValues>;
   onRemove: () => void;
+  /**
+   * Es la tarjeta del usuario en sesión, creada por "Incluirme como firmante". Sus datos salen
+   * del perfil, no se capturan: se muestran en solo lectura para que se vean (el criterio de la
+   * historia es que la tarjeta muestre los datos disponibles) sin sugerir que editarlos acá
+   * cambiaría algo — el perfil se edita en su propia pantalla.
+   */
+  isSelf?: boolean;
   /** Posición secuencial (1-based) — solo se pasa cuando "Requiere firmas en orden" está activo. */
   orderIndex?: number;
   /** Solo se pasa junto con `orderIndex`, cuando el reordenamiento por Drag and Drop está activo. */
@@ -27,10 +34,14 @@ interface CollaboratorFormItemProps {
  * Un bloque del arreglo unificado `collaborators` (ver historia "Frontend: Carga de Documentos
  * y Configuración de Firmantes") — el mismo componente renderiza SIGNER y VIEWER, mostrando
  * solo los campos que aplican a cada uno:
- *  - SIGNER: nombre/apellido/email siempre; checkbox "¿firma avanzada?" que revela RFC
- *    (obligatorio) y el checkbox de 2FA (interactivo) cuando está activo; si no, RFC
- *    desaparece y 2FA se fuerza a true sin mostrarse (ver `_mappers/`).
+ *  - SIGNER: nombre/apellido/email siempre; la configuración de 2FA aplica a todo el documento
+ *    y se decide en la segunda sección.
  *  - VIEWER: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
+ *
+ * Historia "Selección de tipo de firma al crear documentos": el tipo de firma ya no se elige por
+ * firmante (era un checkbox acá) sino una sola vez para todo el documento. El
+ * RFC dejó de pedirse a los firmantes avanzados: el flujo de e.firma lo obtiene del certificado al
+ * momento de firmar.
  *
  * Los campos se arman desde `_config/collaborator-fields.config.ts` y cada uno resuelve su
  * propio error con `useController` (dentro de `FormInput`), así que este componente ya no
@@ -40,6 +51,7 @@ export default function CollaboratorFormItem({
   index,
   control,
   onRemove,
+  isSelf = false,
   orderIndex,
   dragHandleProps,
 }: CollaboratorFormItemProps) {
@@ -47,14 +59,8 @@ export default function CollaboratorFormItem({
     control,
     name: `collaborators.${index}.collaboratorType`,
   });
-  const signatureType = useWatch({
-    control,
-    name: `collaborators.${index}.signatureType` as `collaborators.${number}.signatureType`,
-  });
-
   const isSigner = collaboratorType === 'SIGNER';
-  const isAdvanced = isSigner && signatureType === 'ADVANCED';
-  const showRfc = isAdvanced || collaboratorType === 'VIEWER';
+  const showRfc = collaboratorType === 'VIEWER';
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -79,16 +85,23 @@ export default function CollaboratorFormItem({
               {orderIndex}
             </span>
           )}
-          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground">
             {isSigner ? 'Firmante' : 'Espectador'}
           </span>
+          {isSelf && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+              Tú
+            </span>
+          )}
         </div>
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
           onClick={onRemove}
-          aria-label="Quitar participante"
+          aria-label={
+            isSelf ? 'Quitarme como firmante' : 'Quitar participante'
+          }
         >
           <X className="size-3.5" />
         </Button>
@@ -103,7 +116,8 @@ export default function CollaboratorFormItem({
             label={field.label}
             type={field.type}
             placeholder={field.placeholder}
-            required={field.required}
+            normalizeOnBlur={formatPersonName}
+            disabled={isSelf}
           />
         ))}
       </div>
@@ -114,18 +128,8 @@ export default function CollaboratorFormItem({
         label={COLLABORATOR_EMAIL_FIELD.label}
         type={COLLABORATOR_EMAIL_FIELD.type}
         placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
-        required={COLLABORATOR_EMAIL_FIELD.required}
+        disabled={isSelf}
       />
-
-      {isSigner && (
-        <FormCheckbox
-          control={control}
-          name={`collaborators.${index}.signatureType`}
-          label="¿Requiere firma avanzada (FIEL)?"
-          checkedValue="ADVANCED"
-          uncheckedValue="SIMPLE"
-        />
-      )}
 
       {showRfc && (
         <FormInput
@@ -134,17 +138,9 @@ export default function CollaboratorFormItem({
           label={COLLABORATOR_RFC_FIELD.label}
           type={COLLABORATOR_RFC_FIELD.type}
           placeholder={COLLABORATOR_RFC_FIELD.placeholder}
-          required={COLLABORATOR_RFC_FIELD.required}
         />
       )}
 
-      {isAdvanced && (
-        <FormCheckbox
-          control={control}
-          name={`collaborators.${index}.requiresTwoFactorAuth`}
-          label="Código de verificación (2FA)"
-        />
-      )}
     </div>
   );
 }

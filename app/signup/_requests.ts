@@ -15,6 +15,12 @@ export interface RegisterResponseData {
 }
 
 export interface RegisterRequestValues extends RegisterFormValues {
+  /**
+   * Token de un solo uso del widget de Cloudflare Turnstile. El backend lo canjea contra
+   * Siteverify antes de crear el pre-registro; si falta o ya no sirve, responde 400 y no se crea
+   * nada (ver signature-server TurnstileService).
+   */
+  turnstileToken: string;
   /** Presente cuando el registro viene de /join (RFC nuevo) — une automáticamente al usuario recién creado a esa organización (ver signature-server AuthService.register). */
   invitationToken?: string;
 }
@@ -44,6 +50,35 @@ export async function verifyOtpRequest(
     message: string;
     data: VerifyOtpResponseData;
   }>('/auth/verify-otp', { email, code });
+  return data.data;
+}
+
+/**
+ * Corrección de un registro que todavía no verifica su correo (ver historia "Permitir corregir
+ * datos antes de verificar el correo"). Se autoriza con la contraseña elegida al registrarse,
+ * no con el OTP: cuando el error está justamente en el correo, el código nunca llegó.
+ *
+ * Solo se mandan los campos a corregir; los ausentes se quedan como estaban.
+ */
+export interface UpdatePreRegistrationValues {
+  /** Correo con el que se hizo el registro, aunque sea el que tiene el error. */
+  currentEmail: string;
+  password: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  nationalId?: string;
+  rfc?: string;
+}
+
+export async function updatePreRegistrationRequest(
+  values: UpdatePreRegistrationValues,
+): Promise<RegisterResponseData> {
+  const { data } = await apiClient.patch<{
+    success: boolean;
+    message: string;
+    data: RegisterResponseData;
+  }>('/auth/pre-registration', values);
   return data.data;
 }
 

@@ -138,7 +138,12 @@ export default function DocumentsFilterPanel({
       {showStatusFilter && (
         <div>
           <FilterLabel>Estado del documento</FilterLabel>
+          {/*
+            `items` hace que el trigger muestre la etiqueta del estado ("Firmado por todos") y no
+            su valor interno: sin esta prop, `<Select.Value>` renderiza el valor crudo.
+          */}
           <Select
+            items={STATUS_OPTIONS}
             value={draft.status || null}
             onValueChange={(value) =>
               update('status', (value ?? '') as DocumentStatus | '')

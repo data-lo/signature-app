@@ -1,6 +1,6 @@
 import type {
   CollaboratorFormValues,
-  SignerFormValues,
+  DocumentSignatureType,
 } from '../_schemas';
 import type {
   CollaboratorPayload,
@@ -14,32 +14,31 @@ import type {
  * formulario y evita que un componente "sepa" cómo se llaman los campos del backend.
  */
 
-/** Escenario 3 de la historia: SIMPLE/FIEL si todos los firmantes coinciden, MIX si hay combinación. */
-export function computeRequiresDifferentSignatures(
-  collaborators: CollaboratorFormValues[],
+/**
+ * Traduce el tipo de firma del documento al vocabulario del dominio del backend. Ya no se calcula
+ * recorriendo a los firmantes (ni existe el resultado `MIX`): desde la historia "Selección de tipo
+ * de firma al crear documentos" el tipo es una sola decisión del documento, así que esto es una
+ * conversión de nombre, no una agregación.
+ */
+export function toRequiresDifferentSignatures(
+  signatureType: DocumentSignatureType,
 ): RequiresDifferentSignatures {
-  const signerTypes = new Set(
-    collaborators
-      .filter((c): c is SignerFormValues => c.collaboratorType === 'SIGNER')
-      .map((c) => c.signatureType),
-  );
-
-  if (signerTypes.size <= 1) {
-    const onlyType = [...signerTypes][0];
-    return onlyType === 'ADVANCED' ? 'FIEL' : 'SIMPLE';
-  }
-  return 'MIX';
+  return signatureType === 'ADVANCED' ? 'FIEL' : 'SIMPLE';
 }
 
 /**
- * Refuerza acá (no solo en el esquema de Zod) la regla de la historia: SIMPLE siempre manda
- * requiresTwoFactorAuth=true "oculto", sin importar qué haya quedado en el estado del form — el
- * checkbox de 2FA ni siquiera se renderiza para SIMPLE (ver CollaboratorFormItem), así que esto
- * es la única fuente de verdad para ese caso.
+ * Refuerza acá (no solo en el esquema de Zod) la regla de la historia: con firma simple siempre se
+ * manda requiresTwoFactorAuth=true "oculto". En firma avanzada, la configuración única del
+ * documento se aplica a todos los firmantes.
+ *
+ * Un firmante nunca lleva `rfc`: el flujo avanzado lo obtiene del certificado de e.firma al firmar
+ * (ver historia "Selección de tipo de firma al crear documentos"), y el simple nunca lo pidió.
  */
 export function toCollaboratorPayload(
   collaborator: CollaboratorFormValues,
+  signatureType: DocumentSignatureType,
   orderIndex = 0,
+  requiresTwoFactorAuth = true,
 ): CollaboratorPayload {
   if (collaborator.collaboratorType === 'VIEWER') {
     return {
@@ -57,8 +56,6 @@ export function toCollaboratorPayload(
     firstName: collaborator.firstName,
     lastName: collaborator.lastName,
     email: collaborator.email,
-    rfc: collaborator.signatureType === 'ADVANCED' ? collaborator.rfc : null,
-    signatureType: collaborator.signatureType,
     signatures: collaborator.signatures.map((position) => ({
       signatureId: position.id,
       page: position.page,
@@ -68,9 +65,7 @@ export function toCollaboratorPayload(
       heightRatio: position.heightRatio,
     })),
     requiresTwoFactorAuth:
-      collaborator.signatureType === 'SIMPLE'
-        ? true
-        : collaborator.requiresTwoFactorAuth,
+      signatureType === 'SIMPLE' ? true : requiresTwoFactorAuth,
     orderIndex,
   };
 }
@@ -82,8 +77,15 @@ export function toCollaboratorPayload(
  */
 export function toCollaboratorPayloads(
   collaborators: CollaboratorFormValues[],
+  signatureType: DocumentSignatureType,
+  requiresTwoFactorAuth: boolean,
 ): CollaboratorPayload[] {
   return collaborators.map((collaborator, index) =>
-    toCollaboratorPayload(collaborator, index),
+    toCollaboratorPayload(
+      collaborator,
+      signatureType,
+      index,
+      requiresTwoFactorAuth,
+    ),
   );
 }

@@ -19,19 +19,17 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import type { CurrentUser } from '@/lib/api/auth';
 import { ineFileSchema, signatureFileSchema } from '../_schemas';
+import {
+  INE_DOCUMENT,
+  SIGNATURE_DOCUMENT,
+  getPersonalDocumentConfig,
+  type PersonalDocumentField,
+} from '../_config/personal-documents.config';
 import { useDeletePersonalDocument } from '../_hooks/useDeletePersonalDocument';
 import { useUpdatePersonalDocument } from '../_hooks/useUpdatePersonalDocument';
-import DocumentDropzone from './DocumentDropzone';
-import DocumentPreviewItem from './DocumentPreviewItem';
+import PersonalDocumentCard from './PersonalDocumentCard';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 
 interface PersonalDocumentsPartialProps {
@@ -45,15 +43,16 @@ export default function PersonalDocumentsPartial({
 }: PersonalDocumentsPartialProps) {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | undefined>();
-  const [pendingDelete, setPendingDelete] = useState<
-    'ine' | 'signature' | null
-  >(null);
+  const [pendingDelete, setPendingDelete] =
+    useState<PersonalDocumentField | null>(null);
 
   const deleteMutation = useDeletePersonalDocument();
   const updateMutation = useUpdatePersonalDocument();
 
   const signatureId = (signature?.id ?? officialFile?.id) as string;
-  const missingField: 'ine' | 'signature' = officialFile ? 'signature' : 'ine';
+  const missingField: PersonalDocumentField = officialFile
+    ? 'signature'
+    : 'ine';
 
   function handleFileChange(file: File | null) {
     setPendingFile(file);
@@ -84,79 +83,69 @@ export default function PersonalDocumentsPartial({
     );
   }
 
+  /** Props del documento que falta: dropzone activo y sin acción de eliminar. */
+  function missingDocumentProps(field: PersonalDocumentField) {
+    return {
+      storedUrl: null,
+      pendingFile,
+      error: fileError,
+      onFileChange: handleFileChange,
+      // La INE es opcional en el alta, así que también lo es cuando es la que falta.
+      optional: field === 'ine',
+    };
+  }
+
+  /** Props del documento ya guardado: solo previsualización y eliminar. */
+  function storedDocumentProps(field: PersonalDocumentField, url: string) {
+    return {
+      storedUrl: url,
+      onDelete: () => setPendingDelete(field),
+      deleting: deleteMutation.isPending,
+    };
+  }
+
   return (
-    <Card className="max-w-xl w-full">
-      <CardHeader>
-        <CardTitle>Documentos personales incompletos</CardTitle>
-        <CardDescription>
-          Falta{' '}
-          {missingField === 'ine'
-            ? 'tu identificación (INE)'
-            : 'tu firma digital'}{' '}
-          para completar tu perfil.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {officialFile && (
-          <DocumentPreviewItem
-            label="Identificación (INE)"
-            secureUrl={officialFile.secureUrl}
-            deleting={deleteMutation.isPending}
-            onDelete={() => setPendingDelete('ine')}
-          />
-        )}
-
-        {signature && (
-          <DocumentPreviewItem
-            label="Firma digital"
-            secureUrl={signature.secureUrl}
-            deleting={deleteMutation.isPending}
-            onDelete={() => setPendingDelete('signature')}
-          />
-        )}
-
-        <DocumentDropzone
-          id={missingField === 'ine' ? 'ineFile' : 'signatureFile'}
-          label={
-            missingField === 'ine' ? 'Identificación (INE)' : 'Firma digital'
-          }
-          hint={
-            missingField === 'ine'
-              ? 'PDF, JPG o PNG. Máximo 20MB.'
-              : 'Formato PNG. Máximo 10MB.'
-          }
-          accept={
-            missingField === 'ine'
-              ? 'application/pdf,image/jpeg,image/png'
-              : 'image/png'
-          }
-          file={pendingFile}
-          error={fileError}
-          onFileChange={handleFileChange}
-          maxFileSizeMB={missingField === 'ine' ? 20 : 10}
+    <div className="flex w-full flex-col gap-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <PersonalDocumentCard
+          config={INE_DOCUMENT}
+          {...(officialFile
+            ? storedDocumentProps('ine', officialFile.secureUrl)
+            : missingDocumentProps('ine'))}
         />
 
-        <Button
-          type="button"
-          className="w-full"
-          disabled={
-            !pendingFile || Boolean(fileError) || updateMutation.isPending
-          }
-          onClick={handleSave}
-        >
-          {updateMutation.isPending ? 'Guardando...' : 'Guardar'}
-        </Button>
-      </CardContent>
+        <PersonalDocumentCard
+          config={SIGNATURE_DOCUMENT}
+          {...(signature
+            ? storedDocumentProps('signature', signature.secureUrl)
+            : missingDocumentProps('signature'))}
+        />
+      </div>
+
+      <Button
+        type="button"
+        className="w-full sm:w-auto sm:self-start"
+        disabled={
+          !pendingFile || Boolean(fileError) || updateMutation.isPending
+        }
+        onClick={handleSave}
+      >
+        {updateMutation.isPending
+          ? 'Guardando...'
+          : `Guardar ${getPersonalDocumentConfig(missingField).possessiveName}`}
+      </Button>
 
       <DeleteConfirmDialog
         open={pendingDelete !== null}
         label={
-          pendingDelete === 'ine' ? 'tu identificación (INE)' : 'tu firma digital'
+          pendingDelete
+            ? getPersonalDocumentConfig(pendingDelete).possessiveName
+            : ''
         }
         onOpenChange={(open) => !open && setPendingDelete(null)}
         onConfirm={handleConfirmDelete}
         confirming={deleteMutation.isPending}
       />
-    </Card>
+    </div>
   );
 }

@@ -17,6 +17,12 @@ import SignatureCard from './SignatureCard';
  *
  * Los dos pasos —validar identidad y registrar firma— están siempre visibles; lo que cambia es
  * cuál está activo y cuál bloqueado.
+ *
+ * Esta vista sustituye al flujo anterior de documentos personales, en el que el usuario subía su
+ * INE a mano junto con la firma: ahora la identificación la captura y valida Didit, así que la
+ * pantalla sólo pide la firma PNG y sólo después de que la identidad quedó aprobada. Los
+ * componentes de aquel flujo siguen en `../../_components` sin consumidor — ver la nota en cada
+ * uno.
  */
 export default function IdentitySignatureView() {
   const { data, isLoading, isError, refetch } = useIdentityVerification();
@@ -33,7 +39,7 @@ export default function IdentitySignatureView() {
 
   if (isError || !data) {
     return (
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-start gap-3">
         <p className="text-sm text-destructive">
           No se pudo cargar el estado de tu identidad. Intenta de nuevo más
           tarde.
@@ -53,13 +59,15 @@ export default function IdentitySignatureView() {
 
   return (
     <div
-      id="identity-and-signature"
+      id="signature-documents"
       className="flex w-full max-w-xl flex-col gap-6"
     >
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Identidad y firma</h1>
+        <h1 className="font-heading text-lg font-medium text-foreground">
+          Identidad y firma
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Valida tu identidad y registra tu firma para poder firmar documentos.
+          {DESCRIPTION_BY_STEP[signatureStepState(status)]}
         </p>
       </header>
 
@@ -78,6 +86,16 @@ export default function IdentitySignatureView() {
     </div>
   );
 }
+
+/**
+ * El encabezado describe el paso en el que está el usuario, y se decide en un solo lugar para
+ * que no pueda contradecir a lo que muestran las tarjetas de abajo.
+ */
+const DESCRIPTION_BY_STEP: Record<'done' | 'active' | 'blocked', string> = {
+  blocked: 'Valida tu identidad para poder registrar tu firma.',
+  active: 'Tu identidad está validada. Sube tu firma para terminar.',
+  done: 'Tu credencial está lista: ya puedes firmar documentos.',
+};
 
 /** El paso 1 se da por terminado en cuanto la identidad queda aprobada. */
 function identityStepState(

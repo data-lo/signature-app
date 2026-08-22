@@ -11,7 +11,8 @@ registerPlugin(FilePondPluginFileValidateType, FilePondPluginFileValidateSize);
 interface DocumentDropzoneProps {
   id: string;
   label: string;
-  hint: string;
+  /** Formatos y peso permitidos. Se omite cuando el contenedor ya los muestra por su cuenta. */
+  hint?: string;
   accept: string;
   file: File | null;
   error?: string;
@@ -33,7 +34,7 @@ export default function DocumentDropzone({
   return (
     <Field data-invalid={error ? true : undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <p className="text-xs text-muted-foreground">{hint}</p>
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
 
       <FilePond
         id={id}

@@ -1,5 +1,5 @@
 import {
-  computeRequiresDifferentSignatures,
+  toRequiresDifferentSignatures,
   toCollaboratorPayload,
   toCollaboratorPayloads,
 } from './collaborator-payload.mapper';
@@ -30,59 +30,32 @@ function viewer(): CollaboratorFormValues {
   };
 }
 
-describe('computeRequiresDifferentSignatures', () => {
-  it('SIMPLE cuando todos los firmantes son SIMPLE', () => {
-    const collaborators: CollaboratorFormValues[] = [
-      signer({ signatureType: 'SIMPLE' }),
-      signer({ signatureType: 'SIMPLE', email: 'otro@mail.com' }),
-    ];
-    expect(computeRequiresDifferentSignatures(collaborators)).toBe('SIMPLE');
-  });
-
-  it('FIEL cuando todos los firmantes son ADVANCED', () => {
-    const collaborators: CollaboratorFormValues[] = [
-      signer({ signatureType: 'ADVANCED', rfc: 'PEAJ800101XXX' }),
-    ];
-    expect(computeRequiresDifferentSignatures(collaborators)).toBe('FIEL');
-  });
-
-  it('MIX cuando hay una combinación de tipos de firma', () => {
-    const collaborators: CollaboratorFormValues[] = [
-      signer({ signatureType: 'SIMPLE' }),
-      signer({
-        signatureType: 'ADVANCED',
-        rfc: 'PEAJ800101XXX',
-        email: 'otro@mail.com',
-      }),
-    ];
-    expect(computeRequiresDifferentSignatures(collaborators)).toBe('MIX');
-  });
-
-  it('ignora a los espectadores para el cálculo', () => {
-    const collaborators: CollaboratorFormValues[] = [
-      signer({ signatureType: 'SIMPLE' }),
-      viewer(),
-    ];
-    expect(computeRequiresDifferentSignatures(collaborators)).toBe('SIMPLE');
+describe('toRequiresDifferentSignatures', () => {
+  it('traduce el tipo del documento al vocabulario del backend', () => {
+    expect(toRequiresDifferentSignatures('SIMPLE')).toBe('SIMPLE');
+    expect(toRequiresDifferentSignatures('ADVANCED')).toBe('FIEL');
   });
 });
 
 describe('toCollaboratorPayload', () => {
-  it('sin firmas colocadas, manda un arreglo vacío y no manda rfc para SIMPLE', () => {
-    const payload = toCollaboratorPayload(
-      signer({ signatureType: 'SIMPLE', rfc: null }),
-    );
+  it('sin firmas colocadas, manda un arreglo vacío y ningún rfc para el firmante', () => {
+    const payload = toCollaboratorPayload(signer(), 'SIMPLE');
 
     expect(payload.signatures).toEqual([]);
-    expect(payload.rfc).toBeNull();
+    expect(payload.rfc).toBeUndefined();
     // SIMPLE: requiresTwoFactorAuth forzado a true "oculto", sin importar el valor del form.
     expect(payload.requiresTwoFactorAuth).toBe(true);
+  });
+
+  it('historia "Selección de tipo de firma": un firmante con firma avanzada tampoco manda rfc', () => {
+    const payload = toCollaboratorPayload(signer(), 'ADVANCED');
+
+    expect(payload.rfc).toBeUndefined();
   });
 
   it('historia "Ubicación de firmas por usuario": traduce cada posición colocada al shape del backend', () => {
     const payload = toCollaboratorPayload(
       signer({
-        signatureType: 'SIMPLE',
         signatures: [
           {
             id: 'client-id-1',
@@ -94,6 +67,7 @@ describe('toCollaboratorPayload', () => {
           },
         ],
       }),
+      'SIMPLE',
     );
 
     expect(payload.signatures).toEqual([
@@ -108,49 +82,44 @@ describe('toCollaboratorPayload', () => {
     ]);
   });
 
-  it('SIMPLE fuerza requiresTwoFactorAuth=true aunque el form tenga false', () => {
+  it('un documento SIMPLE fuerza requiresTwoFactorAuth=true', () => {
     const payload = toCollaboratorPayload(
-      signer({ signatureType: 'SIMPLE', requiresTwoFactorAuth: false }),
+      signer(),
+      'SIMPLE',
     );
 
     expect(payload.requiresTwoFactorAuth).toBe(true);
   });
 
-  it('ADVANCED respeta el valor explícito de requiresTwoFactorAuth y manda el rfc', () => {
+  it('un documento ADVANCED aplica la configuración única de requiresTwoFactorAuth', () => {
     const payload = toCollaboratorPayload(
-      signer({
-        signatureType: 'ADVANCED',
-        rfc: 'PEAJ800101XXX',
-        requiresTwoFactorAuth: false,
-      }),
+      signer(),
+      'ADVANCED',
+      0,
+      false,
     );
 
-    expect(payload.rfc).toBe('PEAJ800101XXX');
     expect(payload.requiresTwoFactorAuth).toBe(false);
   });
 
-  it('un viewer no manda signatureType, signatures ni requiresTwoFactorAuth', () => {
-    const payload = toCollaboratorPayload(viewer());
+  it('un viewer no manda signatures ni requiresTwoFactorAuth, pero sí su rfc', () => {
+    const payload = toCollaboratorPayload(viewer(), 'ADVANCED');
 
     expect(payload.collaboratorType).toBe('VIEWER');
-    expect(payload.signatureType).toBeUndefined();
     expect(payload.signatures).toBeUndefined();
     expect(payload.requiresTwoFactorAuth).toBeUndefined();
     expect(payload.rfc).toBe('AURU800101ABC');
   });
 
   it('historia "Habilitar ordenamiento Drag and Drop": sin orderIndex explícito, cae a 0 por defecto', () => {
-    const payload = toCollaboratorPayload(signer({ signatureType: 'SIMPLE' }));
+    const payload = toCollaboratorPayload(signer(), 'SIMPLE');
 
     expect(payload.orderIndex).toBe(0);
   });
 
   it('historia "Habilitar ordenamiento Drag and Drop": refleja el orderIndex explícito para SIGNER y VIEWER', () => {
-    const signerPayload = toCollaboratorPayload(
-      signer({ signatureType: 'SIMPLE' }),
-      2,
-    );
-    const viewerPayload = toCollaboratorPayload(viewer(), 1);
+    const signerPayload = toCollaboratorPayload(signer(), 'SIMPLE', 2);
+    const viewerPayload = toCollaboratorPayload(viewer(), 'SIMPLE', 1);
 
     expect(signerPayload.orderIndex).toBe(2);
     expect(viewerPayload.orderIndex).toBe(1);
@@ -159,11 +128,15 @@ describe('toCollaboratorPayload', () => {
 
 describe('toCollaboratorPayloads', () => {
   it('asigna el orderIndex según la posición en el arreglo ya reordenado', () => {
-    const payloads = toCollaboratorPayloads([
-      signer({ email: 'primero@mail.com' }),
-      viewer(),
-      signer({ email: 'tercero@mail.com' }),
-    ]);
+    const payloads = toCollaboratorPayloads(
+      [
+        signer({ email: 'primero@mail.com' }),
+        viewer(),
+        signer({ email: 'tercero@mail.com' }),
+      ],
+      'SIMPLE',
+      true,
+    );
 
     expect(payloads.map((payload) => payload.orderIndex)).toEqual([0, 1, 2]);
     expect(payloads.map((payload) => payload.email)).toEqual([

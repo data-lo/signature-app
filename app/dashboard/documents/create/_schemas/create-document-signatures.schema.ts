@@ -13,14 +13,25 @@ import { z } from 'zod';
 export const createDocumentSignaturesSchema = documentConfigurationSchema
   .extend(documentParticipantsSchema.shape)
   .superRefine((values, ctx) => {
-    // Regla cruzada (participantes × configuración): "Incluirme como firmante" cuenta como
-    // firmante aunque el arreglo manual esté vacío o solo tenga espectadores — el firmante "yo"
-    // se agrega al enviar (ver `_mappers/submission-collaborators.mapper.ts`), no en el arreglo.
-    if (countSigners(values.collaborators) === 0 && !values.includeMeAsSigner) {
+    if (values.signatureType === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Selecciona el tipo de firma',
+        path: ['signatureType'],
+      });
+    }
+
+    // Basta con contar el arreglo: desde la historia "Crear y eliminar automáticamente el
+    // participante Usuario firmante", marcar "Incluirme como firmante" inserta al creador como
+    // una tarjeta SIGNER más, así que `countSigners` ya lo incluye. Antes esta regla tenía que
+    // mirar además el checkbox porque ese firmante no existía hasta el envío — y eso hacía que el
+    // formulario se diera por válido en un caso en el que no lo estaba: con la opción marcada
+    // pero el perfil sin cargar, no había a quién agregar y se enviaba un documento sin firmantes.
+    if (countSigners(values.collaborators) === 0) {
       ctx.addIssue({
         code: 'custom',
         message:
-          'Agrega al menos un firmante, o marca "Incluirme como firmante"',
+          'Agrega al menos un firmante o inclúyete como firmante para continuar.',
         path: ['collaborators'],
       });
     }
@@ -33,6 +44,9 @@ export type CreateDocumentSignaturesFormValues = z.infer<
 /** Estado inicial del formulario y estado al que vuelve tras un envío exitoso. */
 export const CREATE_DOCUMENT_DEFAULT_VALUES: CreateDocumentSignaturesFormValues =
   {
+    // El tipo de firma debe elegirse explícitamente antes de poder enviar la solicitud.
+    signatureType: null,
+    requiresTwoFactorAuth: true,
     requiresApproval: false,
     includeMeAsSigner: false,
     requiresOrder: false,

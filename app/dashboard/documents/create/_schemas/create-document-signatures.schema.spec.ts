@@ -5,6 +5,7 @@ import {
   countSigners,
   type CollaboratorFormValues,
   type SignerFormValues,
+  type ViewerFormValues,
 } from './index';
 
 function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
@@ -17,7 +18,7 @@ function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
   };
 }
 
-function viewer(): CollaboratorFormValues {
+function viewer(): ViewerFormValues {
   return {
     ...emptyViewer(),
     firstName: 'Ana',
@@ -27,8 +28,14 @@ function viewer(): CollaboratorFormValues {
   };
 }
 
-function formValues(collaborators: CollaboratorFormValues[], includeMeAsSigner = false) {
+function formValues(
+  collaborators: CollaboratorFormValues[],
+  includeMeAsSigner = false,
+  signatureType: 'SIMPLE' | 'ADVANCED' = 'SIMPLE',
+) {
   return {
+    signatureType,
+    requiresTwoFactorAuth: true,
     requiresApproval: false,
     requiresOrder: false,
     includeMeAsSigner,
@@ -37,37 +44,30 @@ function formValues(collaborators: CollaboratorFormValues[], includeMeAsSigner =
 }
 
 describe('createDocumentSignaturesSchema', () => {
-  it('acepta un firmante SIMPLE sin rfc', () => {
+  it('acepta un documento de firma simple con un firmante', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'SIMPLE' })]),
+      formValues([signer()]),
     );
 
     expect(result.success).toBe(true);
   });
 
-  it('rechaza un firmante ADVANCED sin rfc', () => {
+  it('historia "Selección de tipo de firma": acepta firma avanzada sin pedirle rfc al firmante', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'ADVANCED', rfc: null })]),
-    );
-
-    expect(result.success).toBe(false);
-  });
-
-  it('el error de rfc faltante se reporta en el campo rfc del firmante, no en la raíz', () => {
-    const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'ADVANCED', rfc: null })]),
-    );
-
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].path).toEqual(['collaborators', 0, 'rfc']);
-  });
-
-  it('acepta un firmante ADVANCED con rfc', () => {
-    const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer({ signatureType: 'ADVANCED', rfc: 'PEAJ800101XXX' })]),
+      formValues([signer()], false, 'ADVANCED'),
     );
 
     expect(result.success).toBe(true);
+  });
+
+  it('historia "Selección de tipo de firma": rechaza cualquier tipo de firma fuera de los dos flujos', () => {
+    const result = createDocumentSignaturesSchema.safeParse({
+      ...formValues([signer()]),
+      signatureType: 'MIX',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
   it('rechaza un espectador sin rfc', () => {
@@ -87,7 +87,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['collaborators', 0, 'email']);
   });
 
-  it('rechaza si no hay ningún firmante manual ni "incluirme como firmante"', () => {
+  it('rechaza si solo hay espectadores', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([viewer()]),
     );
@@ -103,9 +103,23 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].message).toMatch(/al menos un firmante/i);
   });
 
-  it('acepta sin firmante manual si "incluirme como firmante" está activo', () => {
+  /**
+   * Antes bastaba con el checkbox marcado para dar por válido el formulario, porque el firmante
+   * "yo" no existía hasta el envío. Desde la historia "Crear y eliminar automáticamente el
+   * participante Usuario firmante" esa tarjeta es un SIGNER más del arreglo, así que la regla
+   * cuenta el arreglo y nada más: lo que se valida es lo que se ve en pantalla.
+   */
+  it('el checkbox por sí solo no alcanza: lo que cuenta es la tarjeta ya agregada al arreglo', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([], true),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('acepta cuando la tarjeta del usuario en sesión es el único firmante', () => {
+    const result = createDocumentSignaturesSchema.safeParse(
+      formValues([signer({ isSelf: true })], true),
     );
 
     expect(result.success).toBe(true);

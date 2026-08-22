@@ -1,6 +1,12 @@
 'use client';
 
-import { useFieldArray, useWatch, type Control } from 'react-hook-form';
+import { useEffect } from 'react';
+import {
+  useController,
+  useFieldArray,
+  useWatch,
+  type Control,
+} from 'react-hook-form';
 import { UserPlus, Eye } from 'lucide-react';
 import {
   DndContext,
@@ -17,12 +23,15 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Button } from '@/components/ui/button';
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import CollaboratorFormItem from './CollaboratorFormItem';
 import SortableCollaboratorItem from './SortableCollaboratorItem';
+import { resolveSelfSignerSync } from '../_mappers/self-signer.mapper';
 import {
   countSigners,
   emptySigner,
   emptyViewer,
+  isSelfSigner,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
 
@@ -45,10 +54,46 @@ export default function CollaboratorsFieldArray({
     name: 'collaborators',
   });
   const requiresOrder = useWatch({ control, name: 'requiresOrder' });
-  // Espejo de MIN_SIGNERS_FOR_ORDER en RequiresOrderField: sin esta misma condición aquí, el
-  // toggle podría quedar en true (estado obsoleto, antes de que su propio useEffect lo apague)
-  // mientras esta lista ya no tiene suficientes firmantes para justificar el Drag and Drop.
-  const canReorder = requiresOrder === true && countSigners(fields) > 2;
+
+  // "Incluirme como firmante" se gobierna desde acá porque este componente es el dueño del
+  // arreglo: es el único que puede dar de alta y de baja tarjetas sin desincronizar el
+  // `useFieldArray`. El checkbox se lee y se escribe con `useController` (no por props) para que
+  // `IncludeMeAsSignerField` siga siendo solo el control visual.
+  const { field: includeMeAsSigner } = useController({
+    control,
+    name: 'includeMeAsSigner',
+  });
+  const currentUserQuery = useCurrentUser();
+  const currentUser = currentUserQuery.data;
+
+  useEffect(() => {
+    const sync = resolveSelfSignerSync({
+      includeMeAsSigner: includeMeAsSigner.value,
+      currentUser,
+      collaborators: fields,
+    });
+
+    if (sync.action === 'add') append(sync.signer);
+    else if (sync.action === 'remove') remove(sync.index);
+    // Con `fields` en las dependencias el efecto se reevalúa después de cada alta/baja y vuelve a
+    // decidir: la segunda vuelta siempre resuelve 'none', así que no se realimenta.
+  }, [includeMeAsSigner.value, currentUser, fields, append, remove]);
+
+  /**
+   * Quitar la tarjeta propia con su botón de cerrar también desmarca la opción. Si solo se
+   * quitara del arreglo, el efecto de arriba la volvería a agregar en el render siguiente (el
+   * checkbox seguiría marcado) y el botón se sentiría roto.
+   */
+  function handleRemove(index: number) {
+    if (isSelfSigner(fields[index])) {
+      includeMeAsSigner.onChange(false);
+      return;
+    }
+    remove(index);
+  }
+  // El orden solo cobra sentido cuando hay al menos dos firmantes. El interruptor se puede
+  // activar desde configuración, pero los controles de arrastre aparecen hasta entonces.
+  const canReorder = requiresOrder === true && countSigners(fields) >= 2;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -98,7 +143,7 @@ export default function CollaboratorsFieldArray({
 
       {fields.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Agrega al menos un firmante para continuar.
+          Agrega al menos un firmante o inclúyete como firmante para continuar.
         </p>
       )}
 
@@ -119,7 +164,8 @@ export default function CollaboratorsFieldArray({
                     <CollaboratorFormItem
                       index={index}
                       control={control}
-                      onRemove={() => remove(index)}
+                      onRemove={() => handleRemove(index)}
+                      isSelf={isSelfSigner(field)}
                       orderIndex={index + 1}
                       dragHandleProps={dragHandleProps}
                     />
@@ -136,7 +182,8 @@ export default function CollaboratorsFieldArray({
               key={field.id}
               index={index}
               control={control}
-              onRemove={() => remove(index)}
+              onRemove={() => handleRemove(index)}
+              isSelf={isSelfSigner(field)}
             />
           ))}
         </div>

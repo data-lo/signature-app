@@ -10,6 +10,7 @@ function params(
   return {
     hasFile: false,
     isFileLoading: false,
+    isReadyToSubmit: false,
     isSubmitting: false,
     showCreatedDocuments: true,
     isLoadingCreatedDocuments: false,
@@ -125,39 +126,39 @@ describe('buildCreateDocumentSections', () => {
   });
 
   describe('envío', () => {
-    it('sin archivo no se puede enviar', () => {
+    it('con alguna de las tres secciones incompleta no se puede enviar', () => {
       expect(
-        buildCreateDocumentSections(params({ hasFile: false })).submission
-          .isEnabled,
+        buildCreateDocumentSections(params({ isReadyToSubmit: false }))
+          .submission.isEnabled,
       ).toBe(false);
     });
 
-    it('con un archivo a medio cargar tampoco: evita enviar el anterior mientras se reemplaza', () => {
+    it('no depende del archivo por su cuenta: el requisito completo lo resuelve `isReadyToSubmit`', () => {
       expect(
-        buildCreateDocumentSections(params({ hasFile: true, isFileLoading: true }))
-          .submission.isEnabled,
+        buildCreateDocumentSections(params({ hasFile: true })).submission
+          .isEnabled,
       ).toBe(false);
     });
 
     it('con un envío en curso, se bloquea y se reporta como carga', () => {
       const sections = buildCreateDocumentSections(
-        params({ hasFile: true, isSubmitting: true }),
+        params({ isReadyToSubmit: true, isSubmitting: true }),
       );
 
       expect(sections.submission.isEnabled).toBe(false);
       expect(sections.submission.isLoading).toBe(true);
     });
 
-    it('con archivo listo y sin envío en curso, se habilita', () => {
+    it('con las tres secciones completas y sin envío en curso, se habilita', () => {
       expect(
-        buildCreateDocumentSections(params({ hasFile: true })).submission
+        buildCreateDocumentSections(params({ isReadyToSubmit: true })).submission
           .isEnabled,
       ).toBe(true);
     });
 
     it('expone el error del backend del último envío', () => {
       const sections = buildCreateDocumentSections(
-        params({ hasFile: true, submitErrorMessage: 'Nombre duplicado' }),
+        params({ isReadyToSubmit: true, submitErrorMessage: 'Nombre duplicado' }),
       );
 
       expect(sections.submission.hasError).toBe(true);

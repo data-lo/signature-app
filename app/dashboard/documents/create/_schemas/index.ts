@@ -16,6 +16,9 @@ export {
   emptySigner,
   emptyViewer,
   countSigners,
+  countViewers,
+  isSelfSigner,
+  findSelfSignerIndex,
   type SignerFormValues,
   type ViewerFormValues,
   type CollaboratorFormValues,
@@ -28,6 +31,8 @@ export {
 
 export {
   documentConfigurationSchema,
+  DOCUMENT_SIGNATURE_TYPES,
+  type DocumentSignatureType,
   type DocumentConfigurationFormValues,
 } from './document-configuration.schema';
 

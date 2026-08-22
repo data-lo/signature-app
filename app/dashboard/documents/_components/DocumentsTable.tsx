@@ -7,8 +7,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Eye,
-  FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,13 +25,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import DocumentsFilterButton from './DocumentsFilterButton';
-import DocumentPreviewDialog from './DocumentPreviewDialog';
+import DocumentRowActions from './DocumentRowActions';
+import ShareDocumentDialog from './ShareDocumentDialog';
 import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { DocumentStatus } from '@/lib/enums/document';
+import { formatLongDateTime } from '@/lib/format-datetime';
+import { DocumentStatus, SignatureType } from '@/lib/enums/document';
 
 export interface DocumentListItem {
   id: string;
@@ -42,8 +42,16 @@ export interface DocumentListItem {
   signers: string[];
   spectators: string[];
   creator: string;
+  /** RFC de quien creó el documento; null mientras no lo haya registrado en su perfil. */
+  creatorRfc?: string | null;
   totalPages: number;
   status: DocumentStatus;
+  /**
+   * Tipo de firma con el que se firma el documento. Es una decisión del documento —el backend lo
+   * copia igual a todos sus firmantes al crearlo— y lo resuelve el listado a partir de ellos.
+   * Null en los documentos del endpoint antiguo, que nunca asignó tipo.
+   */
+  signatureType?: SignatureType | null;
   createdAt: string;
 }
 
@@ -55,6 +63,16 @@ const STATUS_LABELS: Record<DocumentStatus, string> = {
   [DocumentStatus.Expired]: 'Expirado',
   [DocumentStatus.CancellationPending]: 'Cancelación pendiente',
   [DocumentStatus.Cancelled]: 'Cancelado',
+};
+
+/**
+ * Etiquetas cortas a propósito: la tabla ya es ancha y esta columna solo distingue entre los dos
+ * tipos. Los nombres largos ("Firma Electrónica Avanzada (e.firma)") viven en el formulario de
+ * creación, donde el usuario está eligiendo y necesita la descripción completa.
+ */
+const SIGNATURE_TYPE_LABELS: Record<SignatureType, string> = {
+  [SignatureType.Simple]: 'Simple',
+  [SignatureType.Fiel]: 'E.Firma',
 };
 
 const STATUS_DOT: Record<DocumentStatus, string> = {
@@ -82,13 +100,6 @@ interface DocumentsTableProps {
   showStatusFilter?: boolean;
 }
 
-function formatDate(isoDate: string): string {
-  const date = new Date(isoDate);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${day}/${month}/${date.getFullYear()}`;
-}
-
 function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1 cursor-pointer select-none">
@@ -112,7 +123,7 @@ export default function DocumentsTable({
   showMyTurnFilter,
   showStatusFilter,
 }: DocumentsTableProps) {
-  const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
+  const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
 
   return (
@@ -127,106 +138,99 @@ export default function DocumentsTable({
           />
         </div>
       )}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <SortableHeader>Nombre del documento</SortableHeader>
-            </TableHead>
-            <TableHead>Participantes</TableHead>
-            <TableHead>
-              <SortableHeader>Creado</SortableHeader>
-            </TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {documents.map((doc) => (
-            <TableRow key={doc.id}>
-              <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
-                <div className="flex items-start gap-1.5">
-                  <span
-                    className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                  />
-                  <span className="min-w-0 flex-1 break-words">
-                    {doc.fileName}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                {doc.signers.length > 0 ? (
-                  <span>{doc.signers.join(', ')}</span>
-                ) : (
-                  <span className="italic text-muted-foreground">
-                    Sin firmantes asignados
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>{formatDate(doc.createdAt)}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                  />
-                  <span>{STATUS_LABELS[doc.status]}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1">
-                  {onSignClick && doc.status === DocumentStatus.Pending ? (
-                    <Button
-                      variant="brand"
-                      size="sm"
-                      onClick={() => onSignClick(doc.id)}
-                    >
-                      FIRMAR
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={
-                        downloadMutation.isPending &&
-                        downloadMutation.variables === doc.id
-                      }
-                      onClick={() => downloadMutation.mutate(doc.id)}
-                    >
-                      {downloadMutation.isPending &&
-                      downloadMutation.variables === doc.id
-                        ? 'Descargando...'
-                        : 'DESCARGAR'}
-                      <FileDown className="size-3.5" />
-                    </Button>
-                  )}
-                  {doc.status === DocumentStatus.Signed && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      title="Previsualizar documento firmado"
-                      onClick={() => setPreviewDoc(doc)}
-                    >
-                      <Eye className="size-4" />
-                    </Button>
-                  )}
-                  {onViewDetail &&
-                    (doc.status === DocumentStatus.Signed ||
-                      doc.status === DocumentStatus.CancellationPending ||
-                      doc.status === DocumentStatus.Cancelled) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewDetail(doc.id)}
-                      >
-                        Ver detalle
-                      </Button>
-                    )}
-                </div>
-              </TableCell>
+      {/* La tabla vive dentro de una tarjeta con borde y encabezado gris, igual en las tres
+          secciones; `components/ui/table` se deja intacto porque también lo usa MembersTable. */}
+      <div className="overflow-hidden rounded-xl border border-border">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow className="hover:bg-transparent">
+              <TableHead>
+                <SortableHeader>Documento</SortableHeader>
+              </TableHead>
+              <TableHead>Creado por</TableHead>
+              <TableHead>Fecha de creación</TableHead>
+              <TableHead>Tipo de firma</TableHead>
+              <TableHead>Estado de firma</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {documents.map((doc) => {
+              const isDownloading =
+                downloadMutation.isPending &&
+                downloadMutation.variables === doc.id;
+
+              return (
+                <TableRow key={doc.id}>
+                  <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
+                    <div className="flex items-start gap-1.5">
+                      <span
+                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                      />
+                      <span className="min-w-0 flex-1 break-words">
+                        {doc.fileName}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{doc.creator}</span>
+                      {doc.creatorRfc && (
+                        <span className="text-xs text-muted-foreground">
+                          RFC: {doc.creatorRfc}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatLongDateTime(doc.createdAt)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {doc.signatureType ? (
+                      SIGNATURE_TYPE_LABELS[doc.signatureType]
+                    ) : (
+                      // Documento anterior a que el tipo de firma se registrara: un guion dice
+                      // "no se sabe", que es la verdad; suponer "Simple" sería inventar.
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                      />
+                      <span>{STATUS_LABELS[doc.status]}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      {/* La firma sigue siendo la acción primaria de "Por firmar", así que conserva
+                        su botón propio; el resto de acciones vive en el menú de tres puntos. */}
+                      {onSignClick && doc.status === DocumentStatus.Pending && (
+                        <Button
+                          variant="brand"
+                          size="sm"
+                          onClick={() => onSignClick(doc.id)}
+                        >
+                          FIRMAR
+                        </Button>
+                      )}
+                      <DocumentRowActions
+                        isDownloading={isDownloading}
+                        onDownload={() => downloadMutation.mutate(doc.id)}
+                        onViewDetail={
+                          onViewDetail ? () => onViewDetail(doc.id) : undefined
+                        }
+                        onShare={() => setShareDoc(doc)}
+                      />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
       <div className="mt-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -282,10 +286,10 @@ export default function DocumentsTable({
         </div>
       </div>
 
-      <DocumentPreviewDialog
-        documentId={previewDoc?.id ?? null}
-        fileName={previewDoc?.fileName}
-        onOpenChange={(open) => !open && setPreviewDoc(null)}
+      <ShareDocumentDialog
+        documentId={shareDoc?.id ?? null}
+        fileName={shareDoc?.fileName}
+        onOpenChange={(open) => !open && setShareDoc(null)}
       />
     </div>
   );

@@ -31,7 +31,7 @@ describe('SignatureBox', () => {
 
     const label = screen.getByText('ANA GÓMEZ');
     expect(label).toBeInTheDocument();
-    expect(label.parentElement).toHaveClass('uppercase');
+    expect(label.parentElement).not.toHaveClass('uppercase');
   });
 
   it('no renderiza ningún control de redimensionamiento (Escenario 5 de la historia)', () => {

@@ -70,7 +70,16 @@ export function FormSelect<TFieldValues extends FieldValues>({
       errorMessage={fieldState.error?.message}
       className={containerClassName}
     >
+      {/*
+        `items` es lo que hace que el trigger muestre la ETIQUETA de la opción elegida y no su
+        valor: sin esta prop, `<Select.Value>` de @base-ui/react renderiza el valor crudo (su
+        documentación: "When specified, `<Select.Value>` renders the label of the selected item
+        instead of the raw value"). Se veía "SIMPLE" en vez de "Firma simple" y, donde el valor es
+        un id, el UUID del registro. Recibe el mismo arreglo `options` que alimenta la lista, así
+        que etiqueta y opción no pueden discrepar.
+      */}
       <Select
+        items={options}
         value={value}
         onValueChange={(nextValue) => field.onChange(nextValue ?? '')}
         disabled={disabled ?? field.disabled}

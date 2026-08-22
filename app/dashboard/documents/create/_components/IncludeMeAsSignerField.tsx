@@ -6,12 +6,15 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 
 /**
- * "Incluirme como firmante" (ver historia): al activarlo, el usuario en sesión se agrega como
- * SIGNER autocompletado al enviar (ver `_mappers/submission-collaborators.mapper.ts`) sin
- * pedirle que escriba sus datos otra vez. Este componente solo es el checkbox + la leyenda de
- * contexto ("firmas en representación de...") — necesita saber si la cuenta activa es PERSONAL
- * u ORGANIZATION para redactarla, tomado de useAuthStore (mismo store que ya gobierna el
- * selector de cuenta activa en el resto de la app).
+ * "Incluirme como firmante" (ver historia): al activarlo, el usuario en sesión aparece de
+ * inmediato como una tarjeta SIGNER autocompletada en la lista de participantes, y al desactivarlo
+ * esa tarjeta se quita. Este componente es solo el control visual: el alta y la baja las hace
+ * `CollaboratorsFieldArray`, que es el dueño del arreglo `collaborators` (ver
+ * `_mappers/self-signer.mapper.ts` para las reglas).
+ *
+ * Lo único propio de acá es la leyenda de contexto ("firmas en representación de...") — necesita
+ * saber si la cuenta activa es PERSONAL u ORGANIZATION para redactarla, tomado de useAuthStore
+ * (mismo store que ya gobierna el selector de cuenta activa en el resto de la app).
  */
 export default function IncludeMeAsSignerField({
   control,
@@ -25,10 +28,8 @@ export default function IncludeMeAsSignerField({
   const activeEntry = accountsList.find(
     (entry) => entry.id === activeAccount?.id,
   );
-  const contextLabel =
-    activeAccount?.accountType === 'ORGANIZATION'
-      ? (activeEntry?.organizationName ?? 'tu organización')
-      : 'tu perfil personal';
+  const isOrganization = activeAccount?.accountType === 'ORGANIZATION';
+  const organizationName = activeEntry?.organizationName ?? 'tu organización';
 
   return (
     <FormCheckbox
@@ -38,10 +39,14 @@ export default function IncludeMeAsSignerField({
       label="Incluirme como firmante"
       description={
         includeMeAsSigner ? (
-          <>
-            Estás firmando este documento en representación de{' '}
-            <strong>{contextLabel}</strong>.
-          </>
+          isOrganization ? (
+            <>
+              Firmarás este documento en nombre de{' '}
+              <strong>{organizationName}</strong>.
+            </>
+          ) : (
+            'Firmarás este documento con tu perfil personal.'
+          )
         ) : undefined
       }
     />
