@@ -1,5 +1,23 @@
 'use client';
 
+/**
+ * SIN USO desde que "Identidad y firma" pasó al flujo con Didit.
+ *
+ * Su único consumidor era `IdentitySignatureView`, que ahora dibuja la pantalla a partir de
+ * `users.signing_credential_status` con dos tarjetas propias (`DiditVerificationCard` y
+ * `SignatureCard`). No hay ninguna ruta que monte este componente.
+ *
+ * Se conserva a propósito y no se borró junto con el cambio: es la última ruta de la aplicación
+ * que permite subir la identificación oficial (INE), que el flujo nuevo no pide porque la
+ * captura Didit.
+ *
+ * Si se decide que la INE queda exclusivamente en manos de Didit, este archivo —junto con los
+ * otros marcados igual y sus hooks exclusivos— se puede eliminar completo. Mientras tanto, NO
+ * agregarle funcionalidad: cualquier regla nueva sobre identidad o firma va en el flujo de
+ * `identity/`, que es el que sí está conectado y el único que respeta la máquina de estados
+ * del backend (el endpoint de alta responde 403 salvo en SIGNATURE_PENDING).
+ */
+
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';

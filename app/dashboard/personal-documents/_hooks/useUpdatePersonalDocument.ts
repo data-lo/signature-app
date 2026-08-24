@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * SIN USO fuera de `PersonalDocumentsPartial`, que ya no lo monta ninguna ruta (ver la nota en
+ * ese archivo). Se conserva con él, y con él se elimina.
+ */
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
