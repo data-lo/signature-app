@@ -26,6 +26,7 @@ jobs:
             echo "BACKEND_API_URL está vacío o no existe como secret"
           else
             echo "BACKEND_API_URL tiene un valor definido"
+          fi
           
           if [ -z "${{ secrets.TURNSTILE_SITE_KEY }}" ]; then
             echo "TURNSTILE_SITE_KEY está vacío o no existe como secret"
