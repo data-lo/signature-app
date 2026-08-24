@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * SIN USO fuera de `PersonalDocumentsCompleted` y `PersonalDocumentsPartial`, que ya no monta
+ * ninguna ruta (ver las notas en esos archivos).
+ *
+ * La baja de firma del flujo vigente es `identity/_hooks/useDeleteSignatureImage`: hace lo mismo
+ * pero invalida también el estado de la credencial, porque borrar la firma devuelve al usuario a
+ * SIGNATURE_PENDING y sin esa invalidación la pantalla seguiría marcando el paso 2 como
+ * terminado.
+ */
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';

@@ -54,7 +54,9 @@ export function SignerEvidenceCard({ signer }: { signer: PublicSigner }) {
           // constancia de firma avanzada del QR.
           value={signer.signedAt ? formatLongDateTime(signer.signedAt) : null}
         />
-        <InfoRow label="Geolocalización" value={signer.geoLocation} />
+        {/* Sin renglón de geolocalización (historia "Ocultar geolocalización en hojas de firma y
+            vistas públicas"): esta pantalla la abre cualquiera con el id, sin sesión. El backend
+            dejó de mandar el dato, así que tampoco es que esté disponible y se oculte. */}
       </div>
     </div>
   );

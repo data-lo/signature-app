@@ -21,6 +21,11 @@ export interface PublicConservationRecord {
  * Evidencia pública de UNA firma. Los campos que no aplican al tipo de firma llegan en `null`, que
  * es lo que permite ocultar el renglón entero: los campos exclusivos de un tipo nunca se muestran
  * para el otro.
+ *
+ * No incluye la geolocalización (historia "Ocultar geolocalización en hojas de firma y vistas
+ * públicas"): el backend dejó de publicar la ubicación desde la que firmó cada participante — ni
+ * acá, ni en la hoja de firmas del PDF, ni en el contenido del QR. El dato se sigue capturando y
+ * guardando como evidencia; lo que desapareció es su publicación.
  */
 export interface PublicSigner {
   id: string;
@@ -36,7 +41,6 @@ export interface PublicSigner {
   legalBacking: string;
   ipAddress: string;
   signedAt: string | null;
-  geoLocation: string | null;
   /** Solo firma simple. */
   otpCode: string | null;
   /** Solo firma avanzada. */
