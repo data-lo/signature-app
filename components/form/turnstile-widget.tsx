@@ -21,6 +21,7 @@ interface TurnstileRenderOptions {
   'expired-callback': () => void;
   'error-callback': (code?: string) => void;
   theme?: 'auto' | 'light' | 'dark';
+  size?: 'normal' | 'flexible' | 'compact';
 }
 
 declare global {
@@ -179,6 +180,8 @@ export function TurnstileWidget({
               callbacksRef.current.onError?.();
             },
             theme: 'auto',
+            // Cloudflare adapta el iframe al 100% del ancho del formulario (mínimo 300 px).
+            size: 'flexible',
           });
         } catch {
           failToMount();
@@ -251,7 +254,7 @@ export function TurnstileWidget({
     <Field>
       {/* El contenedor se mantiene montado aunque haya error: Cloudflare pinta ahí su propio
           reintento automático, y `reset()` necesita que el nodo siga existiendo. */}
-      <div ref={containerRef} data-slot="turnstile-widget" />
+      <div ref={containerRef} data-slot="turnstile-widget" className="w-full" />
       {failure && (
         <>
           <FieldError>

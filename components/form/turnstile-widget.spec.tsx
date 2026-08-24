@@ -9,6 +9,7 @@ type TurnstileCallbacks = {
   callback: (token: string) => void;
   'expired-callback': () => void;
   'error-callback': (code?: string) => void;
+  size?: 'normal' | 'flexible' | 'compact';
 };
 
 /**
@@ -47,6 +48,14 @@ describe('TurnstileWidget', () => {
     rendered.options?.callback('token-1');
 
     expect(onVerify).toHaveBeenCalledWith('token-1');
+  });
+
+  it('ocupa todo el ancho disponible del formulario', async () => {
+    const { rendered } = stubTurnstile();
+    render(<TurnstileWidget siteKey={SITE_KEY} onVerify={jest.fn()} />);
+
+    await waitFor(() => expect(rendered.options).toBeDefined());
+    expect(rendered.options?.size).toBe('flexible');
   });
 
   it('avisa cuando el reto expira, para que el formulario descarte el token', async () => {

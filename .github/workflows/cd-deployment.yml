@@ -28,12 +28,6 @@ jobs:
             echo "BACKEND_API_URL tiene un valor definido"
           fi
           
-          if [ -z "${{ secrets.TURNSTILE_SITE_KEY }}" ]; then
-            echo "TURNSTILE_SITE_KEY está vacío o no existe como secret"
-          else
-            echo "TURNSTILE_SITE_KEY tiene un valor definido"
-          fi
-
       - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -42,7 +36,6 @@ jobs:
           no-cache: false
           build-args: |
             BACKEND_API_URL=${{ secrets.BACKEND_API_URL }}
-            TURNSTILE_SITE_KEY=${{ secrets.TURNSTILE_SITE_KEY }}
           tags: |
             dataloplatforms/signature-app:latest
             dataloplatforms/signature-app:${{ github.sha }}
