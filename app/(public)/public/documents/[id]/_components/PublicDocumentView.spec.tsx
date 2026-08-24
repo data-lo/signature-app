@@ -25,7 +25,6 @@ function buildSigner(overrides: Partial<PublicSigner> = {}): PublicSigner {
       'Firma Electrónica Simple (Arts. 89, 90 y 93 del Código de Comercio)',
     ipAddress: '187.190.12.4',
     signedAt: '2026-03-15T23:55:00.000Z',
-    geoLocation: '19.4326, -99.1332',
     otpCode: '482915',
     certificateSerialNumber: null,
     electronicSignature: null,
@@ -57,7 +56,6 @@ function buildPending(
         legalBacking: '',
         ipAddress: '',
         signedAt: null,
-        geoLocation: null,
         otpCode: null,
         certificateSerialNumber: null,
         electronicSignature: null,
@@ -70,7 +68,6 @@ function buildPending(
         legalBacking: '',
         ipAddress: '',
         signedAt: null,
-        geoLocation: null,
         otpCode: null,
         certificateSerialNumber: null,
         electronicSignature: null,
@@ -302,6 +299,27 @@ describe('PublicDocumentView', () => {
         expect(
           evidence.queryByText(/^firma electrónica$/i),
         ).not.toBeInTheDocument();
+      });
+
+      /**
+       * La ubicación desde la que firmó una persona no se publica en una pantalla que abre
+       * cualquiera con el id del documento, sin sesión. Se sigue capturando como evidencia y la
+       * hoja de firmas del PDF la imprime; lo que no puede es viajar por esta ruta.
+       */
+      it('ninguna tarjeta muestra la geolocalización del firmante', () => {
+        mockData(
+          buildCompleted({
+            signers: [
+              buildSigner(),
+              buildSigner({ id: 'collab-2', name: 'María López' }),
+            ],
+          }),
+        );
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(screen.queryByText(/geolocalizaci/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/19\.4326/)).not.toBeInTheDocument();
       });
 
       it('firma avanzada: muestra certificado y firma electrónica, y oculta el OTP', () => {
