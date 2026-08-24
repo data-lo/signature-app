@@ -60,8 +60,8 @@ Debajo de los acordeones, fijos: el **resumen de la solicitud** (`DocumentReques
 | Sección | Qué hace | Regla de activación |
 |---|---|---|
 | `DocumentUploadSection` (acordeón 1, "Cargar documento") | Selección del PDF (`DocumentFilePicker` → `FormFileUpload`, valida `application/pdf` ≤20MB) | Siempre habilitada: es el punto de entrada. Reporta "procesando" mientras FilePond lee el archivo |
-| `DocumentConfigurationSection` (acordeón 2, "Configurar firma") | `SignatureTypeField` (obligatorio), `RequiresApprovalField` (solo cuentas ORGANIZATION) y `RequiresOrderField` (solo con >2 firmantes) | Siempre habilitada: no depende del PDF; las restricciones son de campo, con su propio contexto |
-| `DocumentParticipantsSection` (acordeón 3, "Añadir participantes") | `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray`) + `IncludeMeAsSignerField`. Cada colaborador se captura como datos libres (nombre/apellido/email/RFC), con `collaboratorType` `SIGNER`/`VIEWER`; un SIGNER `ADVANCED` exige RFC y puede requerir 2FA, SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) reordena firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder` | Siempre habilitada; muestra el error general "agrega al menos un firmante" (el único que no pertenece a un campo) |
+| `DocumentConfigurationSection` (acordeón 2, "Configurar firma") | `SignatureTypeField` (obligatorio) y `RequiresApprovalField` (solo cuentas ORGANIZATION) | Siempre habilitada: no depende del PDF; las restricciones son de campo, con su propio contexto |
+| `DocumentParticipantsSection` (acordeón 3, "Añadir participantes") | `RequiresOrderField` + `CollaboratorsFieldArray`/`CollaboratorFormItem` (`useFieldArray`) + `IncludeMeAsSignerField`. Cada colaborador se captura como datos libres (nombre/apellido/email/RFC), con `collaboratorType` `SIGNER`/`VIEWER`; un SIGNER `ADVANCED` exige RFC y puede requerir 2FA, SIMPLE siempre fuerza 2FA. `SortableCollaboratorItem` (`@dnd-kit`) reordena firmantes cuando "Requiere firmas en orden" está activo — define el `signingOrder` | Siempre habilitada; muestra el error general "agrega al menos un firmante" (el único que no pertenece a un campo) |
 | `DocumentSignaturePlacementSection` | `SignaturePlacementField`/`SignaturePageDropZone`/`SignatureBox` (`@dnd-kit`, `lib/signature-geometry.ts`): coloca por arrastre la posición de cada firma sobre el PDF | **Requisito duro**: un PDF completamente cargado. Sin él se muestra deshabilitada explicando qué falta |
 | `CreatedDocumentsSection` | Documentos que el usuario ya envió a firma (`GET /document?email=...`) | Solo cuando `showCreatedDocuments`; esta lista también vive en su propia ruta, `/dashboard/documents/sent` ("Enviados para firma") |
 
@@ -441,6 +441,74 @@ Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `e
 ---
 
 ## 9. Pendientes / trabajo futuro
+
+### Resuelto en esta ronda ("Requiere firmas en orden" se mudó al paso de participantes) — 2026-08-24
+
+El interruptor vivía en el acordeón 2 ("Configurar firma") y gobierna algo que solo se ve en el
+acordeón 3: las manijas de arrastre y la numeración de la lista de participantes
+(`CollaboratorsFieldArray`, que las muestra con dos o más firmantes). Activarlo desde el paso
+anterior era pedirle al usuario que confiara en un efecto que no podía ver. Ahora está **arriba de
+la lista que gobierna**, para que la causa se lea antes que el efecto.
+
+Es una mudanza de ubicación, no de comportamiento: el campo del formulario sigue siendo
+`requiresOrder` y el payload (`isSequential`) no cambia. `requiresOrder` se quedó a propósito en
+`document-configuration.schema.ts` pese a renderizarse en participantes — mismo caso que
+`includeMeAsSigner`, que ya estaba así: el esquema compuesto aplana ambos objetos con
+`.extend(shape)`, así que repartir los campos entre uno y otro no cambiaría ni los valores del
+formulario ni lo que se envía. **Lo que decide en qué acordeón aparece un control es dónde se monta
+su componente, no en qué esquema está declarado su campo.**
+
+`CreateDocumentView.spec.tsx` cubre la ubicación (el interruptor no está en configuración y sí en
+participantes), para que no vuelva a moverse sin querer en un refactor. 507 tests en 73 suites.
+
+### Captura de firma manuscrita (canvas + QR): la API está lista, la pantalla no — 2026-08-24
+
+El backend ya expone el flujo completo (ver README de `signature-server`, sección 3, módulo
+`signature-capture-sessions`): el usuario cuya identidad aprobó Didit puede dibujar su rúbrica en el
+canvas de la PC, o escanear un QR y dibujarla en el teléfono. **De este lado no hay nada todavía**:
+`SignatureCard` (en `/dashboard/personal-documents/identity`) sigue ofreciendo únicamente la subida
+de un archivo PNG cuando el estado es `SIGNATURE_PENDING`.
+
+Lo que falta construir:
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| Canvas de firma | `identity/_components/` | Dibujo con puntero/dedo y exportación con `canvas.toBlob('image/png')`. El backend **sólo acepta PNG** y lo valida por los bytes de cabecera, no por el `Content-Type`. |
+| Panel del QR | `identity/_components/` | `POST /api/v1/signature-capture-sessions` con `channel: MOBILE_QR` y render de `qrUrl`. **`qrcode.react` ya es dependencia del proyecto** (hoy la usa `VerificationQrPanel` para Didit) — no hace falta agregar nada. |
+| Sondeo del estado | `identity/_hooks/` | `GET /api/v1/signature-capture-sessions/:id` cada pocos segundos mientras la sesión esté `PENDING`/`CLAIMED`. Mismo patrón que `useIdentityVerification` con `IN_FLIGHT_SIGNING_CREDENTIAL_STATUSES`. |
+| Página móvil | `app/signature-capture/` | Canjea el token (`POST …/claim`), muestra el canvas y envía el PNG. **La ruta es un contrato con el backend**: está fijada en su constante `SIGNATURE_CAPTURE_MOBILE_PATH`, así que colgar la página de otra ruta deja el QR apuntando a un 404. |
+| Enums espejo | `lib/enums/` | `channel` y `status` de la sesión, al estilo de `lib/enums/identity.ts`, para no comparar contra strings sueltos. |
+
+**El obstáculo que hay que resolver primero, porque no es de maquetación:** `/signature-capture` es
+una ruta protegida, así que un teléfono sin sesión rebota al `/login` del middleware — y eso *es
+deseable*, es lo que impide que un QR fotografiado por un tercero sirva para nada. El problema es
+que **hoy el token se pierde en ese rebote**: `useLogin` manda a `/dashboard/documents/create` salvo
+que exista un *pending signature context*, que es específico de documentos y no aplica acá. El
+usuario inicia sesión y aterriza en el dashboard, sin forma de volver al QR — tendría que escanearlo
+otra vez, ya con sesión. Hay dos caminos: generalizar `lib/pending-signature-context.ts` a un
+contexto de retorno (guarda el token en `localStorage` antes de rebotar, igual que hace
+`/access-document`), o que `/login` acepte un `returnTo`. El primero sigue la convención que ya
+existe en el proyecto y evita meter el token en la URL de `/login`.
+
+Detalles del contrato que conviene tener presentes al construirlo:
+
+- **El token del QR se entrega una sola vez**, en la respuesta que crea la sesión. No se puede
+  recuperar (en base sólo vive su hash): si el usuario pierde el código, la única salida es generar
+  otra sesión. Por eso pedir el QR de nuevo **rota** el token y el anterior queda inservible.
+- **Sólo hay una captura activa por usuario.** Pedir una nueva mientras la anterior sigue sin
+  reclamar la sustituye sin avisar; pero si un teléfono ya la reclamó, el backend responde **409** —
+  la UI tiene que ofrecer "cancelar la captura en curso" (`POST …/:id/cancel`) en vez de mostrar el
+  error crudo. Es el caso real de quien deja el celular a medias y vuelve a la PC.
+- **`GET …/:id` devuelve también `signingCredentialStatus`**, así que la PC pasa sola a "firma
+  registrada" con la misma petición que ya está sondeando: no hace falta reconsultar el perfil ni
+  reiniciar el flujo cuando la firma entra desde el teléfono.
+- **La sesión vence a los 10 minutos** y el propio sondeo la reporta como `EXPIRED`. Conviene
+  mostrar el tiempo restante junto al QR: es corto a propósito, y sin indicarlo el usuario que
+  tardó en desbloquear el teléfono no entiende por qué dejó de funcionar.
+- **Errores del canje** (`POST …/claim`): **403** significa "este QR es de otra cuenta" —el caso del
+  celular con la sesión de otra persona, que hay que explicar tal cual—, mientras que **404** cubre
+  a propósito todos los demás casos (no existe, ya se canjeó, se canceló, venció) con un solo
+  mensaje: generar otro código.
 
 ### Resuelto en esta ronda (enlace público para compartir + `DocumentView`/`DocumentViewSection`) — 2026-08-17
 

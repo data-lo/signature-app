@@ -21,7 +21,7 @@ function Harness({
 }
 
 describe('RequiresOrderField', () => {
-  it('está habilitado desde la configuración, sin importar los firmantes agregados', () => {
+  it('está habilitado sin importar los firmantes agregados', () => {
     renderWithProviders(<Harness />);
 
     expect(
