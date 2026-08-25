@@ -69,8 +69,8 @@ export function buildCreateDocumentSections({
 
     // Configuración: el usuario puede prepararla antes de elegir el archivo (no hay nada del PDF
     // de lo que dependa). Las restricciones internas de cada opción son de campo, no de sección:
-    // "Requiere aprobación" solo existe en cuentas ORGANIZATION y "Requiere firmas en orden" solo
-    // se habilita con dos firmantes — cada campo las resuelve con su propio contexto.
+    // "Requiere aprobación" solo existe en cuentas ORGANIZATION, y lo resuelve el propio campo con
+    // su contexto.
     configuration: {
       isEnabled: true,
       isLoading: false,

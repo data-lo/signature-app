@@ -91,8 +91,9 @@ export default function CollaboratorsFieldArray({
     }
     remove(index);
   }
-  // El orden solo cobra sentido cuando hay al menos dos firmantes. El interruptor se puede
-  // activar desde configuración, pero los controles de arrastre aparecen hasta entonces.
+  // El orden solo cobra sentido cuando hay al menos dos firmantes. El interruptor está justo
+  // encima de esta lista (`DocumentParticipantsSection`) y se puede activar antes, pero los
+  // controles de arrastre aparecen hasta entonces.
   const canReorder = requiresOrder === true && countSigners(fields) >= 2;
 
   const sensors = useSensors(
