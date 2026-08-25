@@ -10,9 +10,11 @@ interface RequiresOrderFieldProps {
 
 /**
  * "Requiere firmas en orden" (ver historia "Habilitar ordenamiento Drag and Drop para firmantes
- * requeridos"): se puede activar desde la configuración del documento. El orden visual para
- * arrastrar participantes aparece en la tercera sección únicamente cuando ya hay dos o más
- * firmantes (esa condición vive en `CollaboratorsFieldArray`).
+ * requeridos"): vive en la sección de participantes, justo encima de la lista que gobierna. Se
+ * puede activar en cualquier momento, aunque las manijas de arrastre aparezcan únicamente cuando
+ * ya hay dos o más firmantes — esa condición vive en `CollaboratorsFieldArray`, no acá: apagar el
+ * interruptor por no tener suficientes firmantes todavía perdería una decisión que el usuario ya
+ * tomó, y que sigue valiendo en cuanto agregue al segundo.
  */
 export default function RequiresOrderField({
   control,

@@ -19,6 +19,12 @@ export type DocumentSignatureType = (typeof DOCUMENT_SIGNATURE_TYPES)[number];
  *  - `requiresApproval` solo aplica a cuentas ORGANIZATION (ver `RequiresApprovalField`).
  *  - `requiresOrder` solo se puede ordenar visualmente con dos o más firmantes.
  *  - `includeMeAsSigner` participa de la regla cruzada del esquema compuesto.
+ *
+ * `requiresOrder` e `includeMeAsSigner` se **renderizan** en `DocumentParticipantsSection`, no en
+ * la sección que da nombre a este esquema. Se quedan acá a propósito: el esquema compuesto aplana
+ * ambos objetos (`.extend(shape)`), así que repartir los campos entre uno y otro no cambiaría ni
+ * los valores del formulario ni el payload — solo produciría un diff sin efecto. Lo que decide en
+ * qué acordeón aparece cada control es dónde se monta su componente.
  */
 export const documentConfigurationSchema = z.object({
   signatureType: z.enum(DOCUMENT_SIGNATURE_TYPES).nullable(),

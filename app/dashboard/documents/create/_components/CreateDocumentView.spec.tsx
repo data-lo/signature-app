@@ -240,6 +240,26 @@ describe('CreateDocumentView', () => {
       expect(screen.getByRole('button', { name: /^firmante$/i })).toBeVisible();
     });
 
+    /**
+     * El interruptor gobierna las manijas de arrastre y la numeración de la lista de
+     * participantes, así que vive en ese acordeón: desde configuración el usuario activaba algo
+     * cuyo efecto estaba en otro paso y no podía ver.
+     */
+    it('"Requiere firmas en orden" está en participantes, no en configurar firma', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await user.click(trigger(/configurar firma/i));
+      expect(
+        screen.queryByRole('switch', { name: /requiere firmas en orden/i }),
+      ).not.toBeInTheDocument();
+
+      await user.click(trigger(/añadir participantes/i));
+      expect(
+        screen.getByRole('switch', { name: /requiere firmas en orden/i }),
+      ).toBeVisible();
+    });
+
     it('ilumina en verde el círculo de cada sección cuando queda configurada', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
