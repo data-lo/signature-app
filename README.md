@@ -321,13 +321,24 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 | `getMemberPermissionsRequest` | `GET /api/v1/organizations/members/:accountId/permissions` |
 | `updateMemberPermissionsRequest` | `PATCH /api/v1/organizations/members/:accountId/permissions` (`{permissionIds}`) |
 
-**`lib/api/plans/`**
+**`app/dashboard/plans/_requests.ts`** y **`app/dashboard/subscriptions/_requests.ts`**
+
+> Estas tres filas decían `lib/api/plans/` con `GET /stripe/plans`, `POST /stripe/checkout/session`
+> y `GET /stripe/subscription`. **Ni el módulo ni esas rutas existen ya**: el backend renombró
+> `stripe` a `payments` y las peticiones se co-localizaron en cada segmento. Se corrige porque la
+> documentación vieja fue parte de lo que hizo difícil ubicar el fallo de "no cargan los planes".
 
 | Función | Endpoint |
 |---|---|
-| `getPlansRequest` | `GET /stripe/plans` |
-| `createCheckoutSessionRequest(planId)` | `POST /stripe/checkout/session` |
-| `getSubscriptionStateRequest` | `GET /stripe/subscription` |
+| `getPaymentServicesRequest` | `GET /api/v1/payments/services` — catálogo leído en vivo de Stripe |
+| `createCheckoutSessionRequest(priceId)` | `POST /api/v1/payments/checkout-sessions` — devuelve la URL hospedada; se navega con `window.location.assign()` porque Checkout vive en el dominio de Stripe |
+| `getSubscriptionStateRequest` | `GET /api/v1/payments/subscription` |
+
+Los dos primeros traducen el error de axios a un `PaymentsError` (`_errors.ts`) antes de dejarlo
+subir al error boundary del segmento: es el único punto que todavía tiene el código de respuesta, y
+es lo que permite que la pantalla distinga "el proveedor está caído" (502, reintentable) de "la
+configuración del servidor está mal" (500), "este backend no expone pagos" (404) o "tu sesión
+expiró" (401).
 
 **`app/dashboard/documents/_requests.ts`**
 
@@ -442,73 +453,29 @@ Jest configurado vía `next/jest` (`jest.config.mjs`, ESM — consistente con `e
 
 ## 9. Pendientes / trabajo futuro
 
-### Resuelto en esta ronda ("Requiere firmas en orden" se mudó al paso de participantes) — 2026-08-24
+### Resuelto en esta ronda (la pantalla de Planes ahora dice por qué falló) — 2026-08-24
 
-El interruptor vivía en el acordeón 2 ("Configurar firma") y gobierna algo que solo se ve en el
-acordeón 3: las manijas de arrastre y la numeración de la lista de participantes
-(`CollaboratorsFieldArray`, que las muestra con dos o más firmantes). Activarlo desde el paso
-anterior era pedirle al usuario que confiara en un efecto que no podía ver. Ahora está **arriba de
-la lista que gobierna**, para que la causa se lea antes que el efecto.
+Se reportó que la sección de pagos no cargaba los servicios ni dejaba continuar al Checkout.
+**Contra el stack local funciona de punta a punta**, verificado en Chromium real: las 4 tarjetas se
+pintan y "Comprar" aterriza en `checkout.stripe.com`. El fallo es del entorno desplegado (ver el
+README de `signature-server`, sección de pendientes, para qué revisar en Dokploy).
 
-Es una mudanza de ubicación, no de comportamiento: el campo del formulario sigue siendo
-`requiresOrder` y el payload (`isSequential`) no cambia. `requiresOrder` se quedó a propósito en
-`document-configuration.schema.ts` pese a renderizarse en participantes — mismo caso que
-`includeMeAsSigner`, que ya estaba así: el esquema compuesto aplana ambos objetos con
-`.extend(shape)`, así que repartir los campos entre uno y otro no cambiaría ni los valores del
-formulario ni lo que se envía. **Lo que decide en qué acordeón aparece un control es dónde se monta
-su componente, no en qué esquema está declarado su campo.**
+Lo que sí era un defecto de esta aplicación es que **no había forma de saberlo**: cualquier causa
+—proveedor caído, llave de Stripe mal configurada, backend sin el módulo de pagos, sesión vencida—
+mostraba el mismo "No pudimos cargar los planes", y el detalle sólo iba a la consola del navegador,
+donde nadie mira antes de reportar. Por eso este ticket llegó sin causa.
 
-`CreateDocumentView.spec.tsx` cubre la ubicación (el interruptor no está en configuración y sí en
-participantes), para que no vuelva a moverse sin querer en un refactor. 507 tests en 73 suites.
-
-### Captura de firma manuscrita (canvas + QR): la API está lista, la pantalla no — 2026-08-24
-
-El backend ya expone el flujo completo (ver README de `signature-server`, sección 3, módulo
-`signature-capture-sessions`): el usuario cuya identidad aprobó Didit puede dibujar su rúbrica en el
-canvas de la PC, o escanear un QR y dibujarla en el teléfono. **De este lado no hay nada todavía**:
-`SignatureCard` (en `/dashboard/personal-documents/identity`) sigue ofreciendo únicamente la subida
-de un archivo PNG cuando el estado es `SIGNATURE_PENDING`.
-
-Lo que falta construir:
-
-| Pieza | Dónde | Qué hace |
-|---|---|---|
-| Canvas de firma | `identity/_components/` | Dibujo con puntero/dedo y exportación con `canvas.toBlob('image/png')`. El backend **sólo acepta PNG** y lo valida por los bytes de cabecera, no por el `Content-Type`. |
-| Panel del QR | `identity/_components/` | `POST /api/v1/signature-capture-sessions` con `channel: MOBILE_QR` y render de `qrUrl`. **`qrcode.react` ya es dependencia del proyecto** (hoy la usa `VerificationQrPanel` para Didit) — no hace falta agregar nada. |
-| Sondeo del estado | `identity/_hooks/` | `GET /api/v1/signature-capture-sessions/:id` cada pocos segundos mientras la sesión esté `PENDING`/`CLAIMED`. Mismo patrón que `useIdentityVerification` con `IN_FLIGHT_SIGNING_CREDENTIAL_STATUSES`. |
-| Página móvil | `app/signature-capture/` | Canjea el token (`POST …/claim`), muestra el canvas y envía el PNG. **La ruta es un contrato con el backend**: está fijada en su constante `SIGNATURE_CAPTURE_MOBILE_PATH`, así que colgar la página de otra ruta deja el QR apuntando a un 404. |
-| Enums espejo | `lib/enums/` | `channel` y `status` de la sesión, al estilo de `lib/enums/identity.ts`, para no comparar contra strings sueltos. |
-
-**El obstáculo que hay que resolver primero, porque no es de maquetación:** `/signature-capture` es
-una ruta protegida, así que un teléfono sin sesión rebota al `/login` del middleware — y eso *es
-deseable*, es lo que impide que un QR fotografiado por un tercero sirva para nada. El problema es
-que **hoy el token se pierde en ese rebote**: `useLogin` manda a `/dashboard/documents/create` salvo
-que exista un *pending signature context*, que es específico de documentos y no aplica acá. El
-usuario inicia sesión y aterriza en el dashboard, sin forma de volver al QR — tendría que escanearlo
-otra vez, ya con sesión. Hay dos caminos: generalizar `lib/pending-signature-context.ts` a un
-contexto de retorno (guarda el token en `localStorage` antes de rebotar, igual que hace
-`/access-document`), o que `/login` acepte un `returnTo`. El primero sigue la convención que ya
-existe en el proyecto y evita meter el token en la URL de `/login`.
-
-Detalles del contrato que conviene tener presentes al construirlo:
-
-- **El token del QR se entrega una sola vez**, en la respuesta que crea la sesión. No se puede
-  recuperar (en base sólo vive su hash): si el usuario pierde el código, la única salida es generar
-  otra sesión. Por eso pedir el QR de nuevo **rota** el token y el anterior queda inservible.
-- **Sólo hay una captura activa por usuario.** Pedir una nueva mientras la anterior sigue sin
-  reclamar la sustituye sin avisar; pero si un teléfono ya la reclamó, el backend responde **409** —
-  la UI tiene que ofrecer "cancelar la captura en curso" (`POST …/:id/cancel`) en vez de mostrar el
-  error crudo. Es el caso real de quien deja el celular a medias y vuelve a la PC.
-- **`GET …/:id` devuelve también `signingCredentialStatus`**, así que la PC pasa sola a "firma
-  registrada" con la misma petición que ya está sondeando: no hace falta reconsultar el perfil ni
-  reiniciar el flujo cuando la firma entra desde el teléfono.
-- **La sesión vence a los 10 minutos** y el propio sondeo la reporta como `EXPIRED`. Conviene
-  mostrar el tiempo restante junto al QR: es corto a propósito, y sin indicarlo el usuario que
-  tardó en desbloquear el teléfono no entiende por qué dejó de funcionar.
-- **Errores del canje** (`POST …/claim`): **403** significa "este QR es de otra cuenta" —el caso del
-  celular con la sesión de otra persona, que hay que explicar tal cual—, mientras que **404** cubre
-  a propósito todos los demás casos (no existe, ya se canjeó, se canceló, venció) con un solo
-  mensaje: generar otro código.
+- **`_errors.ts`** (nuevo): clasifica el fallo por su código de respuesta en categorías que cambian
+  lo que el usuario puede hacer —`unauthorized`, `not-found`, `misconfigured`, `unavailable`,
+  `network`, `unknown`— y define qué mensaje va con cada una.
+- **`error.tsx`** muestra el mensaje correspondiente y **sólo ofrece "Reintentar" cuando reintentar
+  puede funcionar**: con una llave mal configurada o una ruta inexistente, el botón mandaba al
+  usuario a repetir un fallo garantizado. Añade además el código HTTP en letra pequeña, que es lo
+  primero que pide soporte y lo que antes había que ir a buscar a la consola.
+- **`_requests.ts`** traduce el error de axios en el borde, el único punto que todavía tiene el
+  código de respuesta.
+- 12 pruebas nuevas (`_errors.spec.ts`); las pantallas se verificaron además en navegador real
+  interceptando la respuesta con 502, 500 y 404. 519 tests en 74 suites.
 
 ### Resuelto en esta ronda (enlace público para compartir + `DocumentView`/`DocumentViewSection`) — 2026-08-17
 
@@ -626,7 +593,7 @@ Auditoría completa contra las 6 historias del README raíz (`C:/Signature/READM
 
 ### Pendientes reales (lo que queda abierto hoy)
 - **"Requiere aprobación" no tiene efecto real todavía**: `/documents/create` manda `requiresApproval` correctamente y el backend lo guarda, pero nada enruta el documento a un aprobador — se notifica a los firmantes igual que si el checkbox estuviera apagado. Ver README de `signature-server`, sección de pendientes, para el detalle de lo que falta del lado del backend antes de que esto tenga sentido construir algo más en la UI (ej. una vista de "documentos por aprobar").
-- **`useCreateCheckoutSession` sin manejo de error**: si `POST /stripe/checkout/session` falla, el botón "Suscribirse" solo vuelve a su estado normal sin ningún toast — a diferencia del resto de los hooks de mutación del proyecto, que sí muestran el mensaje del backend. Encontrado en la auditoría general de esta ronda.
+- ~~**`useCreateCheckoutSession` sin manejo de error**~~ — **resuelto**. La descripción además ya no correspondía al código: el hook usa `throwOnError`, así que un fallo levanta el error boundary del segmento en vez de dejar el botón mudo. Desde esta ronda, esa pantalla dice *por qué* falló (ver "Resuelto en esta ronda" del flujo de Stripe).
 - **De los dos headers que manda `lib/axios.ts`, solo `X-Account-Id` tiene efecto, y solo en documentos (crear + listar) y en la invitación/gestión de miembros**: cambiar de cuenta en el switcher ya filtra `/document` de verdad, y las rutas de organización ya validan contra la cuenta activa — ver README de `signature-server`. `X-Organization-Id` se manda igual en cada request (cuando la cuenta activa es una organización) pero **ningún endpoint del backend lo lee todavía**. El resto de recursos (detalle de documento, firma/rechazo/cancelación) tampoco distinguen cuenta activa; cambiar de cuenta ahí sigue sin efecto en el backend. (`GET /user` para elegir firmantes/espectadores ya no aplica: `/documents/create` dejó de usar ese picker, ver "Resuelto en esta ronda" de la historia de carga de documentos.)
 - **Cobertura de tests desigual**: 101 tests en 21 suites. `AuthProvider`, `AccountSwitcher`, `OnboardingBanner`, `CreateOrganizationForm`/`useCreateOrganization`, `InviteMemberModal`/`useInviteMember`, `MembersView`/`MembersTable` y `JoinView`/`SignupForm` ya tienen tests de componente (ver "Resuelto" abajo). **Siguen sin cobertura** los hooks de `personal-documents` que mutan el onboarding (`useUpdatePersonalInformation`, `useUploadPersonalDocuments`), `PersonalDocumentsView`/`UserInfoCard`, `DocumentsView`, y los flujos de `plans`/Stripe. Sin tests end-to-end (Playwright/Cypress) — todo lo actual es unitario/de integración con mocks.
 - **Reminders / mensaje para participantes / fecha de expiración**: sigue **deliberadamente pendiente** (decisión del equipo) — ver "Ideas descartadas" más abajo. Si el producto los pide más adelante, hay que diseñarlos end-to-end (no es reconectar código existente).
