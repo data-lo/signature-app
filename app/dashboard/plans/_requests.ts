@@ -1,15 +1,28 @@
 import apiClient from '@/lib/axios';
 import type { PaymentService } from './_interfaces/payment-service.interface';
 import type { CheckoutSession } from './_interfaces/checkout-session.interface';
+import { toPaymentsError } from './_errors';
 
+/**
+ * Los dos llamados traducen el error de axios a un `PaymentsError` antes de dejarlo subir.
+ *
+ * Se hace aquí, en el borde, y no en la pantalla de error: es el único punto que todavía tiene el
+ * error de axios completo —con su código de respuesta— y es lo que permite que el error boundary
+ * distinga "el proveedor está caído" de "este backend no tiene el módulo de pagos" o "la llave de
+ * Stripe está mal configurada", en vez de mostrar el mismo mensaje para todo.
+ */
 export async function getPaymentServicesRequest(): Promise<PaymentService[]> {
-  const { data } = await apiClient.get<{
-    success: boolean;
-    message: string;
-    data: PaymentService[];
-  }>('/api/v1/payments/services');
+  try {
+    const { data } = await apiClient.get<{
+      success: boolean;
+      message: string;
+      data: PaymentService[];
+    }>('/api/v1/payments/services');
 
-  return data.data;
+    return data.data;
+  } catch (error) {
+    throw toPaymentsError(error);
+  }
 }
 
 /**
@@ -22,11 +35,15 @@ export async function getPaymentServicesRequest(): Promise<PaymentService[]> {
 export async function createCheckoutSessionRequest(
   priceId: string,
 ): Promise<CheckoutSession> {
-  const { data } = await apiClient.post<{
-    success: boolean;
-    message: string;
-    data: CheckoutSession;
-  }>('/api/v1/payments/checkout-sessions', { priceId });
+  try {
+    const { data } = await apiClient.post<{
+      success: boolean;
+      message: string;
+      data: CheckoutSession;
+    }>('/api/v1/payments/checkout-sessions', { priceId });
 
-  return data.data;
+    return data.data;
+  } catch (error) {
+    throw toPaymentsError(error);
+  }
 }
