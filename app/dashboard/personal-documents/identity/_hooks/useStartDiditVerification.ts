@@ -19,9 +19,10 @@ export function useStartDiditVerification() {
     mutationFn: () => startDiditVerificationRequest(IDENTITY_RETURN_PATH),
     onSuccess: () => {
       /**
-       * No se navega a Didit automáticamente: la pantalla pasa a mostrar el QR y los botones
-       * para abrirla. Quien está en la computadora suele querer seguir en el celular, y un
-       * redirect forzado le quitaría esa opción.
+       * No se navega a Didit automáticamente: la pantalla pasa a mostrar el código QR, que es el
+       * camino previsto para continuar en el celular. Un redirect forzado dejaría la
+       * verificación abierta en la computadora, que es justo donde el usuario no tiene cámara
+       * para su INE ni para la selfie.
        */
       queryClient.invalidateQueries({
         queryKey: IDENTITY_VERIFICATION_QUERY_KEY,
