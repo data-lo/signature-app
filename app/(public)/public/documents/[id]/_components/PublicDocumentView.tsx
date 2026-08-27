@@ -202,7 +202,11 @@ function CompletedVerification({ data }: { data: PublicDocumentViewData }) {
       </VerificationSection>
 
       <VerificationSection title="Descargas disponibles">
-        <SealDownloads documentId={data.id} downloads={data.downloads} />
+        <SealDownloads
+          documentId={data.id}
+          downloads={data.downloads}
+          sealEvidence={data.sealEvidence}
+        />
       </VerificationSection>
 
       {/* El documento en sí sigue siendo lo que viene a ver quien escanea el QR impreso en la

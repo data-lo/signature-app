@@ -1,47 +1,42 @@
+'use client';
+
 import { Download } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   sealArtifactDownloadUrl,
   type PublicSealDownloads,
-  type SealArtifact,
+  type PublicSealEvidence,
 } from '../_requests';
-
-/**
- * Cómo se rotula cada artefacto del sello del PSC.
- *
- * `canonical` se llama "Cadena canónica" y no "XML canónico" como lo nombra la historia: lo que
- * Seal Service sella y devuelve NO es XML, sino segmentos con su longitud en bytes al frente
- * unidos por `||` (ver su `seal.service.ts`), y se descarga como `.txt`. Ponerle "XML" al botón
- * haría que quien lo abra crea que el archivo está corrupto. Si el producto quiere XML de verdad,
- * el cambio es de Seal Service.
- */
-const ARTIFACT_LABELS: Record<SealArtifact, string> = {
-  nom151: 'Constancia NOM-151',
-  timestamp: 'Sello de tiempo',
-  canonical: 'Cadena canónica',
-};
-
-const ARTIFACT_ORDER: SealArtifact[] = ['nom151', 'timestamp', 'canonical'];
+import { downloadBase64Evidence } from '../_utils/download-base64-evidence';
 
 /**
  * Descargas de la constancia del PSC de un documento completado.
  *
- * Son enlaces normales, no botones con JavaScript: el backend responde con
- * `Content-Disposition: attachment`, así que el navegador guarda el archivo solo. Cada uno se
- * pinta solo si el backend confirmó que ese artefacto existe — un documento de firma simple no
- * tiene sello, y el sellado es best-effort incluso en los avanzados.
+ * El sello de tiempo y la constancia NOM-151 se descargan de su evidencia cruda
+ * (`sealEvidence.*FileBase64`, un DER/ASN.1 en Base64): el botón la decodifica en el navegador y
+ * arma el archivo ahí mismo (ver `downloadBase64Evidence`), así que se deshabilita —no se oculta—
+ * cuando el documento no tiene esa evidencia.
+ *
+ * La cadena canónica sigue siendo un enlace normal al backend, sin tocar: el backend responde con
+ * `Content-Disposition: attachment` y el navegador la guarda solo. No se habilita su descarga en
+ * Base64 todavía — ver historia "Habilitar descarga de evidencias de sellado en la vista pública".
  */
 export function SealDownloads({
   documentId,
   downloads,
+  sealEvidence,
 }: {
   documentId: string;
   downloads: PublicSealDownloads;
+  sealEvidence: PublicSealEvidence;
 }) {
-  const available = ARTIFACT_ORDER.filter((artifact) => downloads[artifact]);
+  const hasAnyDownload =
+    Boolean(sealEvidence.integrityFileBase64) ||
+    Boolean(sealEvidence.timestampFileBase64) ||
+    downloads.canonical;
 
-  if (available.length === 0) {
+  if (!hasAnyDownload) {
     return (
       <p className="text-sm text-muted-foreground">
         Este documento no tiene constancia de conservación descargable.
@@ -51,17 +46,50 @@ export function SealDownloads({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {available.map((artifact) => (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!sealEvidence.integrityFileBase64}
+        onClick={() => {
+          if (!sealEvidence.integrityFileBase64) return;
+          downloadBase64Evidence(
+            sealEvidence.integrityFileBase64,
+            `nom151-${documentId}.der`,
+          );
+        }}
+      >
+        <Download className="size-3.5" aria-hidden />
+        Constancia NOM-151
+      </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!sealEvidence.timestampFileBase64}
+        onClick={() => {
+          if (!sealEvidence.timestampFileBase64) return;
+          downloadBase64Evidence(
+            sealEvidence.timestampFileBase64,
+            `sello-de-tiempo-${documentId}.tsr`,
+          );
+        }}
+      >
+        <Download className="size-3.5" aria-hidden />
+        Sello de tiempo
+      </Button>
+
+      {downloads.canonical && (
         <a
-          key={artifact}
-          href={sealArtifactDownloadUrl(documentId, artifact)}
+          href={sealArtifactDownloadUrl(documentId, 'canonical')}
           download
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
         >
           <Download className="size-3.5" aria-hidden />
-          {ARTIFACT_LABELS[artifact]}
+          Cadena canónica
         </a>
-      ))}
+      )}
     </div>
   );
 }
