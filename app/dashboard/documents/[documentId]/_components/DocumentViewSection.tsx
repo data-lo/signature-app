@@ -10,6 +10,7 @@ import {
   type GeolocationErrorReason,
 } from '@/lib/hooks/useGeolocation';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { isSigningCredentialConfigured } from '@/lib/store/auth.slice';
 import { SignatureType } from '@/lib/enums/document';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
@@ -166,15 +167,22 @@ export default function DocumentViewSection({
     });
   }
 
-  // Bug corregido: mientras el store todavía no hidrata el perfil (`user` undefined), esta
-  // condición daba `true` y abría el modal "Firma no configurada" —bloqueando la pantalla
-  // completa— a usuarios que sí tenían su firma lista; se veía como un modal fantasma que
-  // aparecía y desaparecía según lo que tardara `/auth/me`. Igual que `useOnboardingReady`,
-  // "todavía no sé" se trata distinto de "sé que falta": sin perfil no se afirma nada.
+  /**
+   * La condición es la misma que aplica el backend al firmar: `signingCredentialStatus` en
+   * CONFIGURED. Antes se miraba `signatureConfigured`, derivada de tener `signatureId`, que
+   * decía otra cosa — un usuario con la rúbrica subida pero con la identidad rechazada pasaba
+   * este control y se topaba con el rechazo recién al enviar la firma.
+   *
+   * Bug corregido: mientras el store todavía no hidrata el perfil (`user` undefined), esta
+   * condición daba `true` y abría el modal "Firma no configurada" —bloqueando la pantalla
+   * completa— a usuarios que sí tenían su firma lista; se veía como un modal fantasma que
+   * aparecía y desaparecía según lo que tardara `/auth/me`. "Todavía no sé" se trata distinto
+   * de "sé que falta": sin perfil no se afirma nada.
+   */
   const needsSimpleSignatureSetup =
     document?.mySignatureType === SignatureType.Simple &&
     user != null &&
-    !user.signatureConfigured;
+    !isSigningCredentialConfigured(user.signingCredentialStatus);
 
   // Alcance: solo firma simple. Bloquea también la lectura del documento (no solo
   // los botones de firma) porque el usuario puede llegar por URL directa (ej.
