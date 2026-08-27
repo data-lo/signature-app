@@ -68,6 +68,17 @@ export interface PublicSealEvidence {
 }
 
 /**
+ * Serie y fecha de emisión (`notBefore`) del certificado TSA embebido en la evidencia NOM-151
+ * (`integrityFileBase64`), extraídos de su ASN.1. `null` cuando no se pudieron extraer — la
+ * pantalla no muestra el componente de certificado en ese caso, nunca uno de los dos campos suelto.
+ */
+export interface PublicIntegrityTsaCertificate {
+  serialNumber: string;
+  /** ISO 8601 en UTC. */
+  issuedAt: string;
+}
+
+/**
  * Vista pública de verificación de un documento (`GET /document/public/:id`, sin autenticación).
  *
  * `isCompleted` es el interruptor de toda la pantalla (ver historia "Actualizar vista pública de
@@ -91,6 +102,7 @@ export interface PublicDocumentView {
   signers: PublicSigner[];
   downloads: PublicSealDownloads;
   sealEvidence: PublicSealEvidence;
+  integrityTsaCertificate: PublicIntegrityTsaCertificate | null;
 }
 
 export async function getPublicDocumentRequest(
