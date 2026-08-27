@@ -3,18 +3,16 @@ import AuthProvider from './AuthProvider';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useAccountsCatalog } from '@/lib/hooks/useAccountsCatalog';
 import { useOnboardingProfile } from '@/lib/hooks/useOnboardingProfile';
-import { usePatchUserStatus } from '@/lib/hooks/usePatchUserStatus';
 import type { AccountData } from '@/lib/api/accounts';
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
 
 jest.mock('@/lib/hooks/useAccountsCatalog');
 jest.mock('@/lib/hooks/useOnboardingProfile');
-jest.mock('@/lib/hooks/usePatchUserStatus');
 jest.mock('@/lib/cookies', () => ({ getAuthToken: () => 'jwt-token' }));
 
 const mockedUseAccountsCatalog = useAccountsCatalog as jest.Mock;
 const mockedUseOnboardingProfile = useOnboardingProfile as jest.Mock;
-const mockedUsePatchUserStatus = usePatchUserStatus as jest.Mock;
 
 const ACCOUNTS: AccountData[] = [
   {
@@ -52,13 +50,11 @@ describe('AuthProvider', () => {
     useAuthStore.setState({
       authToken: null,
       user: null,
-      consolidationInFlight: false,
       accountsList: [],
       activeAccount: null,
     });
     mockedUseOnboardingProfile.mockReturnValue({ data: undefined });
     mockedUseAccountsCatalog.mockReturnValue({ data: ACCOUNTS });
-    mockedUsePatchUserStatus.mockReturnValue({ mutate: jest.fn() });
     jest.spyOn(useAuthStore.persist, 'hasHydrated').mockReturnValue(true);
     jest
       .spyOn(useAuthStore.persist, 'rehydrate')
@@ -104,9 +100,13 @@ describe('AuthProvider', () => {
     expect(useAuthStore.getState().activeAccount?.id).toBe('org-1');
   });
 
-  it('bug corregido (SCRUM-12): si PATCH /me/status falla, no reintenta la consolidación en bucle infinito', async () => {
-    const mutate = jest.fn((_vars, opts) => opts?.onError?.(new Error('boom')));
-    mockedUsePatchUserStatus.mockReturnValue({ mutate });
+  /**
+   * El efecto que consolidaba el onboarding (`PATCH /users/me/status`) desapareció junto con
+   * `isConfigured`: crear documentos ya no depende de esa bandera y firmar depende de
+   * `signingCredentialStatus`, que sólo mueve el backend. Con él se fue el bucle de reintentos
+   * de SCRUM-12, que era una consecuencia de tenerlo.
+   */
+  it('no dispara ninguna consolidacion de onboarding', async () => {
     useAuthStore.setState({
       user: {
         id: 'user-1',
@@ -114,22 +114,20 @@ describe('AuthProvider', () => {
         identificationNumber: 'PELJ850101HDFRNN08',
         name: 'Juan',
         lastName: 'Pérez',
-        isConfigured: false,
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
         personalConfigured: true,
-        signatureConfigured: true,
       },
     });
 
     renderWithProviders(<AuthProvider>hijos</AuthProvider>);
 
     await waitFor(() => {
-      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(useAuthStore.getState().accountsList.length).toBe(2);
     });
 
-    // Antes del fix, onError dejaba el estado exactamente como antes del intento
-    // (consolidationInFlight en false, isConfigured en false), lo que volvía a cumplir la
-    // condición de disparo de inmediato y reintentaba mutate() sin límite ni backoff.
-    expect(useAuthStore.getState().consolidationInFlight).toBe(false);
-    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(
+      useAuthStore.getState().user?.signingCredentialStatus,
+    ).toBe(SigningCredentialStatus.IdentityVerificationRequired);
   });
 });

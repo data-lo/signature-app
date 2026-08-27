@@ -39,11 +39,12 @@ function signButtonLabel({
 /**
  * Acciones del firmante: autorizar con código si aplica, firmar y rechazar.
  *
- * El acceso a "Configurar mi firma" vive FUERA del bloque inerte a propósito. Bug corregido: el
- * backend exige rúbrica/INE en archivo tanto para firmar como para rechazar, así que sin firma
- * configurada todas las acciones de abajo quedan inertes; el único camino para desbloquearse
- * estaba dentro del diálogo "Firma no configurada", que se puede cerrar y no vuelve a abrirse —
- * al cerrarlo la pantalla quedaba sin ninguna acción posible.
+ * Lo único que se bloquea sin credencial configurada es firmar: el aviso "Configurar mi firma" y
+ * el botón "Rechazar documento" quedan FUERA del bloque inerte.
+ *
+ * Bug corregido: antes el bloque inerte envolvía todo, incluido rechazar, y el único camino para
+ * desbloquearse estaba dentro del diálogo "Firma no configurada", que se puede cerrar y no
+ * vuelve a abrirse — al cerrarlo la pantalla quedaba sin ninguna acción posible.
  */
 export default function DocumentSignaturePanel({
   needsSimpleSignatureSetup,
@@ -112,26 +113,28 @@ export default function DocumentSignaturePanel({
           </div>
         )}
 
-        {/*
-          Bug corregido: "Rechazar documento" vivía dentro del bloque que exige la verificación
-          confirmada, así que un firmante con 2FA pendiente no podía ni firmar ni rechazar — y si
-          además el correo del código no salía, se quedaba sin ninguna acción disponible. Rechazar
-          es negarse a firmar, no firmar: el backend nunca pidió el código para
-          `PATCH /document/:id/reject` (ver reject() en signature-server), así que la única puerta
-          era esta condición de UI. Sigue dentro del bloque `inert` de "firma no configurada"
-          porque el backend sí exige firma en archivo para rechazar.
-        */}
-        {canReject && (
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full"
-            onClick={onRejectClick}
-          >
-            Rechazar documento
-          </Button>
-        )}
       </div>
+
+      {/*
+        "Rechazar documento" vive FUERA del bloque inerte, y fuera también del bloque que exige
+        la verificación confirmada.
+
+        Rechazar es negarse a firmar, no firmar: no produce ninguna firma, así que no necesita
+        ni el código de 2FA ni la credencial configurada — el backend no pide ninguna de las dos
+        para `PATCH /document/:id/reject`. Las dos veces que estuvo dentro de un bloque
+        bloqueado el resultado fue el mismo: un firmante sin salida y un documento esperando
+        para siempre una respuesta que esa persona no podía dar.
+      */}
+      {canReject && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full"
+          onClick={onRejectClick}
+        >
+          Rechazar documento
+        </Button>
+      )}
     </div>
   );
 }
