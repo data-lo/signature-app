@@ -77,11 +77,13 @@ export default function DiditVerificationCard({
           title="La sesión de verificación expiró"
           description="El enlace que abrimos ya no es válido. Inicia una nueva verificación para continuar."
         >
-          <StartButton
-            label="Iniciar nueva verificación"
-            onStart={onStart}
-            starting={starting}
-          />
+          <CardActions>
+            <StartButton
+              label="Iniciar nueva verificación"
+              onStart={onStart}
+              starting={starting}
+            />
+          </CardActions>
         </StateCard>
       );
 
@@ -106,11 +108,13 @@ export default function DiditVerificationCard({
             'La verificación no se completó. Puedes intentarlo de nuevo.'
           }
         >
-          <StartButton
-            label="Intentar nuevamente"
-            onStart={onStart}
-            starting={starting}
-          />
+          <CardActions>
+            <StartButton
+              label="Intentar nuevamente"
+              onStart={onStart}
+              starting={starting}
+            />
+          </CardActions>
         </StateCard>
       );
 
@@ -146,7 +150,9 @@ export default function DiditVerificationCard({
           icon={<BadgeCheck className="size-5" />}
           title="Identidad validada por Didit"
         >
-          <IdentityDetailDialog data={data} />
+          <CardActions>
+            <IdentityDetailDialog data={data} />
+          </CardActions>
         </StateCard>
       );
 
@@ -159,11 +165,13 @@ export default function DiditVerificationCard({
           title="Identidad con Didit"
           description="Captura tu INE y confirma que eres tú con una selfie en vivo. Toma menos de dos minutos."
         >
-          <StartButton
-            label="Iniciar verificación"
-            onStart={onStart}
-            starting={starting}
-          />
+          <CardActions>
+            <StartButton
+              label="Iniciar verificación"
+              onStart={onStart}
+              starting={starting}
+            />
+          </CardActions>
         </StateCard>
       );
   }
@@ -209,6 +217,22 @@ function StateCard({
       {children ? <CardContent>{children}</CardContent> : null}
     </Card>
   );
+}
+
+/**
+ * Fila de acciones de la tarjeta, centrada horizontalmente.
+ *
+ * El título y los textos de la tarjeta se quedan a la izquierda —se leen de corrido— pero las
+ * acciones se centran para que el paso a seguir quede en el eje de la tarjeta y no perdido
+ * contra el borde izquierdo de una caja ancha. Es el mismo criterio con el que ya se dibujaba el
+ * QR y sus dos salidas (ver `VerificationQrPanel`), aplicado ahora a todos los estados para que
+ * la tarjeta no cambie de composición según el avance del usuario.
+ *
+ * `flex-wrap` porque en pantallas angostas las etiquetas largas ("Iniciar nueva verificación")
+ * tienen que poder bajar de línea sin desbordar la tarjeta.
+ */
+function CardActions({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-wrap justify-center gap-2">{children}</div>;
 }
 
 function StartButton({
