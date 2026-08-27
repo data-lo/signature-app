@@ -57,6 +57,17 @@ export interface PublicSealDownloads {
 }
 
 /**
+ * Evidencia cruda del sellado, en Base64: el DER/ASN.1 tal cual lo emitió el PSC, no el PDF de la
+ * constancia. La pantalla la decodifica en el navegador para descargarla (ver
+ * `downloadBase64Evidence`) — por eso viaja el contenido y no solo un booleano como en
+ * `PublicSealDownloads`. `null` cuando el documento no tiene esa evidencia.
+ */
+export interface PublicSealEvidence {
+  timestampFileBase64: string | null;
+  integrityFileBase64: string | null;
+}
+
+/**
  * Vista pública de verificación de un documento (`GET /document/public/:id`, sin autenticación).
  *
  * `isCompleted` es el interruptor de toda la pantalla (ver historia "Actualizar vista pública de
@@ -79,6 +90,7 @@ export interface PublicDocumentView {
   conservationRecord: PublicConservationRecord | null;
   signers: PublicSigner[];
   downloads: PublicSealDownloads;
+  sealEvidence: PublicSealEvidence;
 }
 
 export async function getPublicDocumentRequest(

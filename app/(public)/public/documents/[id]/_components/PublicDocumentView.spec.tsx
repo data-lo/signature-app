@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, within } from '@/test-utils';
 import PublicDocumentView from './PublicDocumentView';
 import { usePublicDocument } from '../_hooks/usePublicDocument';
@@ -12,8 +13,17 @@ jest.mock('./PublicPdfViewer', () => ({
   __esModule: true,
   default: ({ file }: { file: string }) => <div>PublicPdfViewer file={file}</div>,
 }));
+// La mecánica de decodificar Base64 y disparar la descarga (atob, Blob, URL.createObjectURL) se
+// prueba aparte en download-base64-evidence.spec.ts; acá solo importa que el botón la invoque con
+// el contenido y el nombre de archivo correctos.
+jest.mock('../_utils/download-base64-evidence', () => ({
+  downloadBase64Evidence: jest.fn(),
+}));
 
 const mockedUsePublicDocument = usePublicDocument as jest.Mock;
+const mockedDownloadBase64Evidence = jest.requireMock(
+  '../_utils/download-base64-evidence',
+).downloadBase64Evidence as jest.Mock;
 
 function buildSigner(overrides: Partial<PublicSigner> = {}): PublicSigner {
   return {
@@ -74,6 +84,7 @@ function buildPending(
       },
     ],
     downloads: { nom151: false, timestamp: false, canonical: false },
+    sealEvidence: { timestampFileBase64: null, integrityFileBase64: null },
     ...overrides,
   };
 }
@@ -98,6 +109,10 @@ function buildCompleted(
     },
     signers: [buildSigner()],
     downloads: { nom151: true, timestamp: true, canonical: true },
+    sealEvidence: {
+      timestampFileBase64: 'dHNyLWVuLWJhc2U2NA==',
+      integrityFileBase64: 'bm9tMTUxLWVuLWJhc2U2NA==',
+    },
     ...overrides,
   };
 }
@@ -391,37 +406,68 @@ describe('PublicDocumentView', () => {
     });
 
     describe('descargas disponibles', () => {
-      it('ofrece los tres artefactos apuntando a la ruta pública del backend', () => {
+      it('ofrece los tres artefactos: NOM-151 y sello de tiempo habilitados, canónica apuntando al backend', () => {
         mockData(buildCompleted());
 
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(
-          screen.getByRole('link', { name: /constancia nom-151/i }),
-        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/nom151');
+          screen.getByRole('button', { name: /constancia nom-151/i }),
+        ).toBeEnabled();
         expect(
-          screen.getByRole('link', { name: /sello de tiempo/i }),
-        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/timestamp');
+          screen.getByRole('button', { name: /sello de tiempo/i }),
+        ).toBeEnabled();
         expect(
           screen.getByRole('link', { name: /cadena canónica/i }),
         ).toHaveAttribute('href', '/api/document/public/doc-1/seal/canonical');
       });
 
-      it('solo ofrece los artefactos que el backend confirmó que existen', () => {
+      it('decodifica el Base64 de cada evidencia en el navegador al hacer clic en su botón', async () => {
+        const user = userEvent.setup();
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(
+          screen.getByRole('button', { name: /constancia nom-151/i }),
+        );
+        expect(mockedDownloadBase64Evidence).toHaveBeenCalledWith(
+          'bm9tMTUxLWVuLWJhc2U2NA==',
+          'nom151-doc-1.der',
+        );
+
+        await user.click(
+          screen.getByRole('button', { name: /sello de tiempo/i }),
+        );
+        expect(mockedDownloadBase64Evidence).toHaveBeenCalledWith(
+          'dHNyLWVuLWJhc2U2NA==',
+          'sello-de-tiempo-doc-1.tsr',
+        );
+
+        // La cadena canónica no se toca en esta historia: sigue siendo un enlace directo al
+        // backend, no una decodificación en el navegador.
+        expect(mockedDownloadBase64Evidence).toHaveBeenCalledTimes(2);
+      });
+
+      it('deshabilita el botón de una evidencia que el documento no tiene, sin ocultar las demás', () => {
         mockData(
           buildCompleted({
             downloads: { nom151: false, timestamp: true, canonical: false },
+            sealEvidence: {
+              timestampFileBase64: 'dHNyLWVuLWJhc2U2NA==',
+              integrityFileBase64: null,
+            },
           }),
         );
 
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(
-          screen.getByRole('link', { name: /sello de tiempo/i }),
-        ).toBeInTheDocument();
+          screen.getByRole('button', { name: /sello de tiempo/i }),
+        ).toBeEnabled();
         expect(
-          screen.queryByRole('link', { name: /constancia nom-151/i }),
-        ).not.toBeInTheDocument();
+          screen.getByRole('button', { name: /constancia nom-151/i }),
+        ).toBeDisabled();
         expect(
           screen.queryByRole('link', { name: /cadena canónica/i }),
         ).not.toBeInTheDocument();
@@ -431,6 +477,10 @@ describe('PublicDocumentView', () => {
         mockData(
           buildCompleted({
             downloads: { nom151: false, timestamp: false, canonical: false },
+            sealEvidence: {
+              timestampFileBase64: null,
+              integrityFileBase64: null,
+            },
           }),
         );
 
