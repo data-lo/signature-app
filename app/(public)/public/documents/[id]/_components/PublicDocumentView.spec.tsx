@@ -85,6 +85,7 @@ function buildPending(
     ],
     downloads: { nom151: false, timestamp: false, canonical: false },
     sealEvidence: { timestampFileBase64: null, integrityFileBase64: null },
+    integrityTsaCertificate: null,
     ...overrides,
   };
 }
@@ -112,6 +113,10 @@ function buildCompleted(
     sealEvidence: {
       timestampFileBase64: 'dHNyLWVuLWJhc2U2NA==',
       integrityFileBase64: 'bm9tMTUxLWVuLWJhc2U2NA==',
+    },
+    integrityTsaCertificate: {
+      serialNumber: '4A1B2C3D',
+      issuedAt: '2026-08-27T18:06:37.000Z',
     },
     ...overrides,
   };
@@ -274,11 +279,13 @@ describe('PublicDocumentView', () => {
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(screen.getByText(/fecha de emisión/i)).toBeInTheDocument();
-        // tsaCertificate y serialNumber llegan en null: el renglón entero no se pinta.
+        // tsaCertificate y serialNumber (los del token RFC 3161) llegan en null: ese renglón
+        // exacto no se pinta — distinto de "Serie/Emisión del certificado (TSA)", que sí se
+        // pintan porque vienen de integrityTsaCertificate (ver el describe de más abajo).
         expect(
-          screen.queryByText(/certificado \(tsa\)/i),
+          screen.queryByText(/^certificado \(tsa\)$/i),
         ).not.toBeInTheDocument();
-        expect(screen.queryByText(/número de serie$/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/^número de serie$/i)).not.toBeInTheDocument();
       });
 
       it('sin constancia: lo dice en vez de dejar la sección vacía', () => {
@@ -291,6 +298,35 @@ describe('PublicDocumentView', () => {
             /no cuenta con una constancia de conservación emitida por un psc/i,
           ),
         ).toBeInTheDocument();
+      });
+
+      describe('certificado TSA de la evidencia NOM-151', () => {
+        it('muestra la serie y la fecha de emisión del certificado cuando el backend las extrajo', () => {
+          mockData(buildCompleted());
+
+          renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+          expect(
+            screen.getByText(/serie del certificado \(tsa\)/i),
+          ).toBeInTheDocument();
+          expect(screen.getByText('4A1B2C3D')).toBeInTheDocument();
+          expect(
+            screen.getByText(/emisión del certificado \(tsa\)/i),
+          ).toBeInTheDocument();
+        });
+
+        it('no muestra el componente si el backend no pudo extraer el certificado', () => {
+          mockData(buildCompleted({ integrityTsaCertificate: null }));
+
+          renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+          expect(
+            screen.queryByText(/serie del certificado \(tsa\)/i),
+          ).not.toBeInTheDocument();
+          expect(
+            screen.queryByText(/emisión del certificado \(tsa\)/i),
+          ).not.toBeInTheDocument();
+        });
       });
     });
 
