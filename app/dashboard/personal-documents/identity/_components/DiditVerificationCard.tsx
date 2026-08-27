@@ -8,6 +8,7 @@ import {
   LockKeyhole,
   ScanFace,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -65,8 +66,8 @@ export default function DiditVerificationCard({
       return verification?.url ? (
         <StateCard
           tone="progress"
-          icon={<Loader2 className="size-5 animate-spin" />}
-          title="Identidad con Didit · en proceso"
+          title="Verificación de identidad con Didit"
+          badge={<Badge variant="warning">Pendiente</Badge>}
         >
           <VerificationQrPanel url={verification.url} />
         </StateCard>
@@ -194,12 +195,19 @@ function StateCard({
   tone,
   icon,
   title,
+  badge,
   description,
   children,
 }: {
   tone: Tone;
-  icon: React.ReactNode;
+  /**
+   * Opcional: la tarjeta de verificación pendiente no lleva ninguno. El estado lo comunica el
+   * badge, y el icono animado que había ahí antes sugería un proceso corriendo en el servidor
+   * cuando lo que falta es que el usuario escanee el QR.
+   */
+  icon?: React.ReactNode;
   title: string;
+  badge?: React.ReactNode;
   description?: string;
   children?: React.ReactNode;
 }) {
@@ -209,8 +217,9 @@ function StateCard({
     <Card className={styles.card}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className={styles.icon}>{icon}</span>
+          {icon ? <span className={styles.icon}>{icon}</span> : null}
           {title}
+          {badge}
         </CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>

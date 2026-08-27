@@ -1,5 +1,9 @@
 import { useAuthStore } from './useAuthStore';
-import { derivePersonalConfigured, deriveSignatureConfigured } from './auth.slice';
+import {
+  derivePersonalConfigured,
+  isSigningCredentialConfigured,
+} from './auth.slice';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
 import type { CurrentUser } from '@/lib/api/auth';
 import type { AccountData } from '@/lib/api/accounts';
 
@@ -15,7 +19,7 @@ function buildProfile(overrides: Partial<CurrentUser> = {}): CurrentUser {
     secondaryEmail: null,
     rfc: null,
     signatureId: null,
-    isConfigured: false,
+    signingCredentialStatus: SigningCredentialStatus.IdentityVerificationRequired,
     ...overrides,
   };
 }
@@ -36,7 +40,6 @@ function buildAccount(overrides: Partial<AccountData> = {}): AccountData {
 const RESET_STATE = {
   authToken: null,
   user: null,
-  consolidationInFlight: false,
   accountsList: [],
   activeAccount: null,
 };
@@ -68,17 +71,34 @@ describe('derivePersonalConfigured', () => {
   });
 });
 
-describe('deriveSignatureConfigured', () => {
-  it('es false si signatureId es null', () => {
-    expect(deriveSignatureConfigured(buildProfile({ signatureId: null }))).toBe(
-      false,
-    );
+/**
+ * Sustituye a `deriveSignatureConfigured`, que respondía "¿tiene rúbrica subida?" mirando
+ * `signatureId`. Esa pregunta no alcanzaba: no dice nada sobre si la identidad quedó validada,
+ * así que daba `true` para usuarios a los que el backend igual les rechazaba la firma.
+ */
+describe('isSigningCredentialConfigured', () => {
+  it('solo es true en CONFIGURED', () => {
+    expect(
+      isSigningCredentialConfigured(SigningCredentialStatus.Configured),
+    ).toBe(true);
   });
 
-  it('es true si signatureId está presente', () => {
-    expect(
-      deriveSignatureConfigured(buildProfile({ signatureId: 'sig-1' })),
-    ).toBe(true);
+  it.each([
+    SigningCredentialStatus.IdentityVerificationRequired,
+    SigningCredentialStatus.IdentityVerificationPending,
+    SigningCredentialStatus.IdentityVerificationInProgress,
+    SigningCredentialStatus.IdentityVerificationInReview,
+    SigningCredentialStatus.IdentityVerificationRetryRequired,
+    SigningCredentialStatus.IdentityVerificationFailed,
+    SigningCredentialStatus.IdentityVerificationMaxAttemptsExceeded,
+    SigningCredentialStatus.SignaturePending,
+  ])('es false en %s', (status) => {
+    expect(isSigningCredentialConfigured(status)).toBe(false);
+  });
+
+  /** Sin perfil hidratado no se afirma que falte nada: sólo que todavía no está configurada. */
+  it('es false si todavia no se conoce el estado', () => {
+    expect(isSigningCredentialConfigured(undefined)).toBe(false);
   });
 });
 
@@ -89,11 +109,12 @@ describe('useAuthStore', () => {
   });
 
   describe('setAuth', () => {
-    it('guarda el token y mapea el perfil, calculando ambas sub-banderas', () => {
+    it('guarda el token y mapea el perfil, incluida la credencial de firma', () => {
       const profile = buildProfile({
         phoneNumber: '5512345678',
         secondaryEmail: 'secundario@correo.com',
         signatureId: 'sig-1',
+        signingCredentialStatus: SigningCredentialStatus.Configured,
       });
 
       useAuthStore.getState().setAuth('jwt-token', profile);
@@ -106,38 +127,44 @@ describe('useAuthStore', () => {
         identificationNumber: 'PELJ850101HDFRNN08',
         name: 'Juan',
         lastName: 'Pérez',
-        isConfigured: false,
+        signingCredentialStatus: SigningCredentialStatus.Configured,
         personalConfigured: true,
-        signatureConfigured: true,
       });
     });
 
-    it('calcula personalConfigured/signatureConfigured en false cuando faltan datos', () => {
+    /**
+     * El estado de la credencial se copia tal cual: el store no lo deriva de `signatureId` ni de
+     * ninguna otra cosa, porque quien lo calcula es el backend.
+     */
+    it('no deduce la credencial a partir de signatureId', () => {
+      useAuthStore
+        .getState()
+        .setAuth('jwt-token', buildProfile({ signatureId: 'sig-1' }));
+
+      expect(useAuthStore.getState().user?.signingCredentialStatus).toBe(
+        SigningCredentialStatus.IdentityVerificationRequired,
+      );
+    });
+
+    it('calcula personalConfigured en false cuando faltan datos de contacto', () => {
       useAuthStore.getState().setAuth('jwt-token', buildProfile());
 
-      const { user } = useAuthStore.getState();
-      expect(user?.personalConfigured).toBe(false);
-      expect(user?.signatureConfigured).toBe(false);
+      expect(useAuthStore.getState().user?.personalConfigured).toBe(false);
     });
   });
 
-  describe('updateOnboardingStatus', () => {
+  describe('setPersonalConfigured', () => {
     beforeEach(() => {
       useAuthStore.getState().setAuth('jwt-token', buildProfile());
     });
 
-    it('muta únicamente personalConfigured cuando step es "personal"', () => {
-      useAuthStore.getState().updateOnboardingStatus('personal', true);
+    it('marca los datos de contacto sin tocar la credencial de firma', () => {
+      useAuthStore.getState().setPersonalConfigured(true);
 
       expect(useAuthStore.getState().user?.personalConfigured).toBe(true);
-      expect(useAuthStore.getState().user?.signatureConfigured).toBe(false);
-    });
-
-    it('muta únicamente signatureConfigured cuando step es "signature"', () => {
-      useAuthStore.getState().updateOnboardingStatus('signature', true);
-
-      expect(useAuthStore.getState().user?.signatureConfigured).toBe(true);
-      expect(useAuthStore.getState().user?.personalConfigured).toBe(false);
+      expect(useAuthStore.getState().user?.signingCredentialStatus).toBe(
+        SigningCredentialStatus.IdentityVerificationRequired,
+      );
     });
   });
 
@@ -254,15 +281,4 @@ describe('useAuthStore', () => {
     });
   });
 
-  describe('markConsolidating / markConsolidated', () => {
-    it('markConsolidated fija isConfigured=true y apaga consolidationInFlight', () => {
-      useAuthStore.getState().setAuth('jwt-token', buildProfile());
-      useAuthStore.getState().markConsolidating(true);
-
-      useAuthStore.getState().markConsolidated();
-
-      expect(useAuthStore.getState().user?.isConfigured).toBe(true);
-      expect(useAuthStore.getState().consolidationInFlight).toBe(false);
-    });
-  });
 });

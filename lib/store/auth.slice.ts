@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { CurrentUser } from '@/lib/api/auth';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
 import type { AuthSlice, AuthState } from './types/auth-store.types';
 
 export function derivePersonalConfigured(user: CurrentUser | null): boolean {
@@ -7,9 +8,15 @@ export function derivePersonalConfigured(user: CurrentUser | null): boolean {
   return !!user.phoneNumber && !!user.secondaryEmail;
 }
 
-export function deriveSignatureConfigured(user: CurrentUser | null): boolean {
-  if (!user) return false;
-  return user.signatureId != null;
+/**
+ * Única pregunta que hay que hacerle a la credencial: ¿puede esta persona firmar con firma
+ * Simple? Vive acá y no repartida por las pantallas para que la comparación contra el enum
+ * exista una sola vez.
+ */
+export function isSigningCredentialConfigured(
+  status: SigningCredentialStatus | undefined,
+): boolean {
+  return status === SigningCredentialStatus.Configured;
 }
 
 export const createAuthSlice: StateCreator<AuthState, [], [], AuthSlice> = (
@@ -17,7 +24,6 @@ export const createAuthSlice: StateCreator<AuthState, [], [], AuthSlice> = (
 ) => ({
   user: null,
   authToken: null,
-  consolidationInFlight: false,
 
   setAuth: (token, userData) =>
     set({
@@ -28,27 +34,20 @@ export const createAuthSlice: StateCreator<AuthState, [], [], AuthSlice> = (
         identificationNumber: userData.nationalId,
         name: userData.firstName,
         lastName: userData.lastName,
-        isConfigured: userData.isConfigured,
+        signingCredentialStatus: userData.signingCredentialStatus,
         personalConfigured: derivePersonalConfigured(userData),
-        signatureConfigured: deriveSignatureConfigured(userData),
       },
     }),
 
-  updateOnboardingStatus: (step, value) =>
-    set((state) => {
-      if (!state.user) return state;
-      const key =
-        step === 'personal' ? 'personalConfigured' : 'signatureConfigured';
-      return { user: { ...state.user, [key]: value } };
-    }),
-
-  markConsolidating: (value) => set({ consolidationInFlight: value }),
-
-  markConsolidated: () =>
-    set((state) => ({
-      user: state.user ? { ...state.user, isConfigured: true } : state.user,
-      consolidationInFlight: false,
-    })),
+  /**
+   * Refleja de inmediato que el usuario acaba de guardar sus datos de contacto, sin esperar a
+   * que `/users/me` se vuelva a consultar. No toca la credencial de firma: ésa sólo cambia
+   * cuando el backend la mueve.
+   */
+  setPersonalConfigured: (value) =>
+    set((state) =>
+      state.user ? { user: { ...state.user, personalConfigured: value } } : state,
+    ),
 
   logout: () =>
     set({
@@ -56,6 +55,5 @@ export const createAuthSlice: StateCreator<AuthState, [], [], AuthSlice> = (
       user: null,
       accountsList: [],
       activeAccount: null,
-      consolidationInFlight: false,
     }),
 });

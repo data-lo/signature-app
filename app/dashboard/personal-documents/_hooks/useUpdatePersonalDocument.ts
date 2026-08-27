@@ -9,7 +9,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { updateIneFileRequest, updateSignatureFileRequest } from '../_requests';
-import { useAuthStore } from '@/lib/store/useAuthStore';
 
 type UpdatableField = 'ine' | 'signature';
 
@@ -41,9 +40,6 @@ export function useUpdatePersonalDocument() {
       );
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
-      if (field === 'signature') {
-        useAuthStore.getState().updateOnboardingStatus('signature', true);
-      }
     },
     onError: (error, { field }) => {
       toast.error(getErrorMessage(error, getUpdateFallbackMessage(field)));

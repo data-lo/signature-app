@@ -3,7 +3,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
-import { useAuthStore } from '@/lib/store/useAuthStore';
 import { uploadPersonalDocumentsRequest } from '../../_requests';
 import { IDENTITY_VERIFICATION_QUERY_KEY } from './useIdentityVerification';
 
@@ -28,7 +27,11 @@ export function useUploadSignatureImage() {
       });
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
-      useAuthStore.getState().updateOnboardingStatus('signature', true);
+      /**
+       * No se marca nada en el store a mano: subir la rúbrica no es lo que habilita la firma
+       * —eso lo decide `signingCredentialStatus`, que sólo mueve el backend—, y las
+       * invalidaciones de arriba ya lo vuelven a traer.
+       */
     },
     onError: (error) => {
       toast.error(

@@ -16,7 +16,6 @@ import { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { uploadPersonalDocumentsRequest } from '../_requests';
-import { useAuthStore } from '@/lib/store/useAuthStore';
 
 function getUploadErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError;
@@ -39,10 +38,7 @@ export function useUploadPersonalDocuments() {
       toast.success('Tus documentos se guardaron correctamente');
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       queryClient.invalidateQueries({ queryKey: ['onboardingProfile'] });
-      useAuthStore.getState().updateOnboardingStatus('signature', true);
-      if (!useAuthStore.getState().user?.isConfigured) {
-        router.push('/dashboard/documents/create');
-      }
+      router.push('/dashboard/documents/create');
     },
     onError: (error) => {
       toast.error(getUploadErrorMessage(error));
