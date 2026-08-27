@@ -305,6 +305,52 @@ describe('IdentitySignatureView', () => {
     });
   });
 
+  describe('aviso de credencial sin configurar', () => {
+    const WARNING =
+      'Es necesario configurar tu identidad y firma para poder firmar con firma Simple.';
+
+    it.each([
+      SigningCredentialStatus.IdentityVerificationRequired,
+      SigningCredentialStatus.IdentityVerificationPending,
+      SigningCredentialStatus.IdentityVerificationInProgress,
+      SigningCredentialStatus.IdentityVerificationInReview,
+      SigningCredentialStatus.IdentityVerificationRetryRequired,
+      SigningCredentialStatus.IdentityVerificationFailed,
+      SigningCredentialStatus.IdentityVerificationMaxAttemptsExceeded,
+      SigningCredentialStatus.SignaturePending,
+    ])('en %s avisa que falta configurar la credencial', async (status) => {
+      givenStatus(status);
+
+      renderWithProviders(<IdentitySignatureView />);
+
+      expect(await screen.findByText(WARNING)).toBeInTheDocument();
+    });
+
+    it('con la credencial configurada no avisa nada', async () => {
+      givenStatus(SigningCredentialStatus.Configured);
+
+      renderWithProviders(<IdentitySignatureView />);
+
+      await screen.findByText(/tu credencial está lista/i);
+      expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
+    });
+
+    /**
+     * Acá el aviso va sin enlace: el usuario ya está en la pantalla de configuración, y
+     * mandarlo a donde ya se encuentra no le diría nada.
+     */
+    it('no ofrece un enlace a la propia pantalla en la que ya esta', async () => {
+      givenStatus(SigningCredentialStatus.IdentityVerificationRequired);
+
+      renderWithProviders(<IdentitySignatureView />);
+
+      await screen.findByText(WARNING);
+      expect(
+        screen.queryByRole('link', { name: /configura aquí/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('si el estado no carga, no inventa una pantalla: avisa y ofrece reintentar', async () => {
     mockedGetCurrent.mockRejectedValue(new Error('backend caído'));
 

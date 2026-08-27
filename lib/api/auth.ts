@@ -1,4 +1,5 @@
 import apiClient from '@/lib/axios';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
 
 export interface CurrentUser {
   id: string;
@@ -11,7 +12,12 @@ export interface CurrentUser {
   secondaryEmail: string | null;
   rfc: string | null;
   signatureId: string | null;
-  isConfigured: boolean;
+  /**
+   * Única fuente de verdad sobre qué acciones de firma tiene habilitadas el usuario. El
+   * frontend sólo la lee: quien la mueve es el backend, a partir de los eventos de Didit y de
+   * las acciones sobre la firma.
+   */
+  signingCredentialStatus: SigningCredentialStatus;
   signature?: {
     id: string;
     secureUrl: string;
@@ -41,8 +47,8 @@ interface CachedUserProfile {
   email: string;
   roles: string[];
   nationalId: string;
-  isConfigured: boolean;
   signatureId: string | null;
+  signingCredentialStatus: SigningCredentialStatus;
   personalInformation: {
     rfc: string | null;
     phoneNumber: string | null;
@@ -51,9 +57,9 @@ interface CachedUserProfile {
 }
 
 /**
- * Lee /api/v1/users/me (Redis DB 0 por CURP) para hidratar el store de
- * onboarding. A diferencia de getCurrentUserRequest, no trae URLs prefirmadas
- * de MinIO: solo lo necesario para calcular personalConfigured/signatureConfigured.
+ * Lee /api/v1/users/me (Redis DB 0 por CURP) para hidratar el store de sesión. A diferencia de
+ * getCurrentUserRequest no trae URLs prefirmadas de MinIO: sólo los datos de contacto y
+ * `signingCredentialStatus`, que es lo que las pantallas necesitan para decidir qué habilitar.
  */
 export async function getOnboardingProfileRequest(): Promise<CurrentUser> {
   const { data } = await apiClient.get<{
@@ -74,6 +80,6 @@ export async function getOnboardingProfileRequest(): Promise<CurrentUser> {
     secondaryEmail: cached.personalInformation.secondaryEmail,
     rfc: cached.personalInformation.rfc,
     signatureId: cached.signatureId,
-    isConfigured: cached.isConfigured,
+    signingCredentialStatus: cached.signingCredentialStatus,
   };
 }

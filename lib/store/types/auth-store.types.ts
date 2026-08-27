@@ -1,5 +1,6 @@
 import type { CurrentUser } from '@/lib/api/auth';
 import type { AccountData } from '@/lib/api/accounts';
+import type { SigningCredentialStatus } from '@/lib/enums/identity';
 
 export type AccountKind = 'PERSONAL' | 'ORGANIZATION';
 export type AccountStatus = 'ACTIVE' | 'INACTIVE';
@@ -11,9 +12,19 @@ export interface AuthUser {
   identificationNumber: string;
   name: string;
   lastName: string;
-  isConfigured: boolean;
+  /**
+   * Avance de identidad y firma del usuario, tal cual lo reporta el backend. Es lo único que
+   * decide si las acciones de firma Simple están habilitadas.
+   *
+   * Sustituye a `isConfigured` y a la bandera derivada `signatureConfigured`: las tres
+   * describían el mismo avance con criterios distintos —fin del onboarding, existencia de la
+   * rúbrica, identidad validada— y podían contradecirse entre sí. Un usuario con la rúbrica
+   * subida pero con la verificación rechazada tenía `signatureConfigured` en true y aun así el
+   * backend le rechazaba la firma.
+   */
+  signingCredentialStatus: SigningCredentialStatus;
+  /** Datos de contacto completos (teléfono y correo secundario). No interviene en la firma. */
   personalConfigured: boolean;
-  signatureConfigured: boolean;
 }
 
 // Slice 2: catálogo de cuentas del usuario (cargado desde /accounts/me)
@@ -37,13 +48,8 @@ export interface ActiveAccount {
 export interface AuthSlice {
   user: AuthUser | null;
   authToken: string | null;
-  // Guard interno para no disparar dos veces el PATCH /me/status mientras
-  // está en vuelo; no es parte del contrato público del store.
-  consolidationInFlight: boolean;
   setAuth: (token: string, userData: CurrentUser) => void;
-  updateOnboardingStatus: (step: 'personal' | 'signature', value: boolean) => void;
-  markConsolidating: (value: boolean) => void;
-  markConsolidated: () => void;
+  setPersonalConfigured: (value: boolean) => void;
   logout: () => void;
 }
 
