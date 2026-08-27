@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { SigningCredentialStatus } from '@/lib/enums/identity';
 import { useIdentityVerification } from '../_hooks/useIdentityVerification';
 import { useStartDiditVerification } from '../_hooks/useStartDiditVerification';
+import SigningCredentialWarning from '@/components/signing/SigningCredentialWarning';
 import IdentityStepper from './IdentityStepper';
 import DiditVerificationCard from './DiditVerificationCard';
 import SignatureCard from './SignatureCard';
@@ -71,6 +72,10 @@ export default function IdentitySignatureView() {
         </p>
       </header>
 
+      {status !== SigningCredentialStatus.Configured && (
+        <SigningCredentialWarning message={SIGNING_CREDENTIAL_WARNING} />
+      )}
+
       <IdentityStepper
         identity={identityStepState(status)}
         signature={signatureStepState(status)}
@@ -86,6 +91,15 @@ export default function IdentitySignatureView() {
     </div>
   );
 }
+
+/**
+ * Aviso que encabeza la pantalla mientras la credencial no esté lista.
+ *
+ * Va sin enlace a diferencia del que aparece al crear un documento: el usuario ya está en la
+ * pantalla de configuración, y mandarlo a donde ya se encuentra no le diría nada.
+ */
+const SIGNING_CREDENTIAL_WARNING =
+  'Es necesario configurar tu identidad y firma para poder firmar con firma Simple.';
 
 /**
  * El encabezado describe el paso en el que está el usuario, y se decide en un solo lugar para

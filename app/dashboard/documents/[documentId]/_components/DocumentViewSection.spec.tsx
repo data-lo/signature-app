@@ -2,6 +2,7 @@ import userEvent from '@testing-library/user-event';
 import toast from 'react-hot-toast';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentViewSection from './DocumentViewSection';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
 import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
 import { useSignDocument } from '../_hooks/useSignDocument';
@@ -113,9 +114,9 @@ function buildUser(overrides: Partial<AuthUser> = {}): AuthUser {
     identificationNumber: 'PELJ850101HDFRNN08',
     name: 'Juan',
     lastName: 'Pérez',
-    isConfigured: false,
+    signingCredentialStatus:
+      SigningCredentialStatus.IdentityVerificationRequired,
     personalConfigured: false,
-    signatureConfigured: false,
     ...overrides,
   };
 }
@@ -177,7 +178,7 @@ describe('DocumentViewSection', () => {
     mockedToast.success.mockClear();
     mockedCopyTextToClipboard.mockReset().mockResolvedValue(true);
     mockGeolocationSuccess();
-    useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
+    useAuthStore.setState({ user: buildUser({ signingCredentialStatus: SigningCredentialStatus.Configured }) });
 
     mockedUseSignDocument.mockReturnValue({
       mutate: signMutate,
@@ -539,7 +540,10 @@ describe('DocumentViewSection', () => {
   });
 
   it('bug corregido: si el documento requiere firma simple y el usuario no la tiene configurada, deshabilita/atenúa la firma y muestra la leyenda explicativa', () => {
-    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    useAuthStore.setState({ user: buildUser({
+      signingCredentialStatus:
+        SigningCredentialStatus.IdentityVerificationRequired,
+    }) });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -568,9 +572,53 @@ describe('DocumentViewSection', () => {
     expect(wrapper?.className).toContain('pointer-events-none');
   });
 
+  /**
+   * Rechazar no produce ninguna firma, así que no exige la credencial: el backend dejó de
+   * pedirla para `PATCH /document/:id/reject`. Cuando sí la exigía, un firmante sin identidad
+   * validada no podía firmar —correcto— pero tampoco declinar, y el documento se quedaba
+   * esperando para siempre una respuesta que esa persona no podía dar.
+   */
+  it('sin credencial configurada, rechazar sigue disponible', async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    // Se cierra el diálogo de "Firma no configurada" para llegar a la pantalla.
+    await user.keyboard('{Escape}');
+
+    const reject = screen.getByRole('button', {
+      name: /rechazar documento/i,
+    });
+
+    expect(reject.closest('[inert]')).toBeNull();
+
+    await user.click(reject);
+
+    expect(
+      screen.getByPlaceholderText(/explica detalladamente por qué rechazas/i),
+    ).toBeInTheDocument();
+  });
+
   it('bug corregido: sin firma configurada, la leyenda incluye un acceso HABILITADO para configurarla — al cerrar el modal la pantalla quedaba sin ninguna acción posible', async () => {
     const user = userEvent.setup();
-    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    useAuthStore.setState({ user: buildUser({
+      signingCredentialStatus:
+        SigningCredentialStatus.IdentityVerificationRequired,
+    }) });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -597,7 +645,10 @@ describe('DocumentViewSection', () => {
   });
 
   it('bug corregido: al acceder por ruta directa sin firma simple configurada, bloquea el documento con un overlay y despliega un modal de alerta', () => {
-    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    useAuthStore.setState({ user: buildUser({
+      signingCredentialStatus:
+        SigningCredentialStatus.IdentityVerificationRequired,
+    }) });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -622,7 +673,10 @@ describe('DocumentViewSection', () => {
   });
 
   it('no bloquea el documento ni abre el modal de firma cuando el documento no requiere firma simple', () => {
-    useAuthStore.setState({ user: buildUser({ signatureConfigured: false }) });
+    useAuthStore.setState({ user: buildUser({
+      signingCredentialStatus:
+        SigningCredentialStatus.IdentityVerificationRequired,
+    }) });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -641,7 +695,7 @@ describe('DocumentViewSection', () => {
   });
 
   it('no muestra la leyenda de firma simple cuando el usuario ya la tiene configurada', () => {
-    useAuthStore.setState({ user: buildUser({ signatureConfigured: true }) });
+    useAuthStore.setState({ user: buildUser({ signingCredentialStatus: SigningCredentialStatus.Configured }) });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
