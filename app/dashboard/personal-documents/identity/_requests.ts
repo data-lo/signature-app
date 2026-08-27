@@ -22,9 +22,10 @@ export interface IdentityVerificationAttempt {
   provider: 'DIDIT';
   status: IdentityVerificationStatus;
   /**
-   * URL hospedada de Didit. El backend sólo la expone mientras la sesión sigue abierta y
-   * vigente: si llega `null`, no hay nada que abrir ni que convertir en QR y hay que arrancar
-   * una verificación nueva.
+   * URL hospedada de Didit. Su único uso en la pantalla es ser el contenido del código QR: no se
+   * muestra, no se enlaza y no se copia. El backend sólo la expone mientras la sesión sigue
+   * abierta y vigente; si llega `null` no hay QR que dibujar y hay que arrancar una verificación
+   * nueva.
    */
   url: string | null;
   failureReason: string | null;
@@ -53,7 +54,7 @@ export interface StartedVerification {
   provider: 'DIDIT';
   status: IdentityVerificationStatus;
   sessionId: string | null;
-  /** URL hospedada: se abre en este equipo o se convierte en QR para seguir en el celular. */
+  /** URL hospedada. La pantalla no la usa directamente: relee el estado y dibuja el QR desde ahí. */
   url: string;
   expiresAt: string | null;
   /** `true` si el backend devolvió una sesión ya abierta en lugar de crear otra. */
