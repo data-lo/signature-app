@@ -7,6 +7,7 @@ import type {
   PublicDocumentView as PublicDocumentViewData,
   PublicSigner,
 } from '../_requests';
+import { CanonicalXmlDownloadError } from '../_utils/download-canonical-xml';
 
 jest.mock('../_hooks/usePublicDocument');
 jest.mock('./PublicPdfViewer', () => ({
@@ -19,11 +20,29 @@ jest.mock('./PublicPdfViewer', () => ({
 jest.mock('../_utils/download-base64-evidence', () => ({
   downloadBase64Evidence: jest.fn(),
 }));
+/**
+ * Igual que con el Base64: la mecánica de traer el XML, validarlo y guardarlo se prueba en
+ * `download-canonical-xml.spec.ts`. `CanonicalXmlDownloadError` se conserva real porque el
+ * componente decide por su tipo qué mensaje mostrar.
+ */
+jest.mock('../_utils/download-canonical-xml', () => ({
+  ...jest.requireActual('../_utils/download-canonical-xml'),
+  downloadCanonicalXml: jest.fn(),
+}));
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: { error: jest.fn(), success: jest.fn() },
+}));
 
 const mockedUsePublicDocument = usePublicDocument as jest.Mock;
 const mockedDownloadBase64Evidence = jest.requireMock(
   '../_utils/download-base64-evidence',
 ).downloadBase64Evidence as jest.Mock;
+const mockedDownloadCanonicalXml = jest.requireMock(
+  '../_utils/download-canonical-xml',
+).downloadCanonicalXml as jest.Mock;
+const mockedToastError = jest.requireMock('react-hot-toast').default
+  .error as jest.Mock;
 
 function buildSigner(overrides: Partial<PublicSigner> = {}): PublicSigner {
   return {
@@ -442,7 +461,7 @@ describe('PublicDocumentView', () => {
     });
 
     describe('descargas disponibles', () => {
-      it('ofrece los tres artefactos: NOM-151 y sello de tiempo habilitados, canónica apuntando al backend', () => {
+      it('ofrece los tres artefactos habilitados', () => {
         mockData(buildCompleted());
 
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
@@ -454,8 +473,44 @@ describe('PublicDocumentView', () => {
           screen.getByRole('button', { name: /sello de tiempo/i }),
         ).toBeEnabled();
         expect(
-          screen.getByRole('link', { name: /cadena canónica/i }),
-        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/canonical');
+          screen.getByRole('button', { name: /xml canónico/i }),
+        ).toBeEnabled();
+      });
+
+      it('descarga el XML canónico consultando el sello al hacer clic', async () => {
+        const user = userEvent.setup();
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(screen.getByRole('button', { name: /xml canónico/i }));
+
+        expect(mockedDownloadCanonicalXml).toHaveBeenCalledWith(
+          '/api/document/public/doc-1/seal/canonical',
+          'cadena-canonica-doc-1.xml',
+        );
+      });
+
+      /**
+       * El criterio de aceptación que motiva no usar un enlace directo: si la descarga falla, se
+       * avisa y NO se guarda nada. Un `<a href download>` habría guardado el cuerpo del error.
+       */
+      it('avisa y no descarga nada si el XML canónico no se puede obtener', async () => {
+        const user = userEvent.setup();
+        mockedDownloadCanonicalXml.mockRejectedValueOnce(
+          new CanonicalXmlDownloadError(
+            'Este documento no tiene XML canónico disponible.',
+          ),
+        );
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(screen.getByRole('button', { name: /xml canónico/i }));
+
+        expect(mockedToastError).toHaveBeenCalledWith(
+          'Este documento no tiene XML canónico disponible.',
+        );
       });
 
       it('decodifica el Base64 de cada evidencia en el navegador al hacer clic en su botón', async () => {
@@ -480,8 +535,7 @@ describe('PublicDocumentView', () => {
           'sello-de-tiempo-doc-1.tsr',
         );
 
-        // La cadena canónica no se toca en esta historia: sigue siendo un enlace directo al
-        // backend, no una decodificación en el navegador.
+        // El XML canónico no se decodifica de Base64: se pide al backend ya envuelto en XML.
         expect(mockedDownloadBase64Evidence).toHaveBeenCalledTimes(2);
       });
 
@@ -504,9 +558,10 @@ describe('PublicDocumentView', () => {
         expect(
           screen.getByRole('button', { name: /constancia nom-151/i }),
         ).toBeDisabled();
+        // Se deshabilita, no se oculta: mismo criterio que las otras dos evidencias.
         expect(
-          screen.queryByRole('link', { name: /cadena canónica/i }),
-        ).not.toBeInTheDocument();
+          screen.getByRole('button', { name: /xml canónico/i }),
+        ).toBeDisabled();
       });
 
       it('sin ningún artefacto, lo dice en vez de dejar la sección vacía', () => {
