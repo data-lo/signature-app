@@ -85,6 +85,7 @@ describe('IdentitySignatureView', () => {
     expect(
       await screen.findByRole('button', { name: /iniciar verificación/i }),
     ).toBeInTheDocument();
+    expect(screen.getByText(/firma · bloqueada/i)).toBeInTheDocument();
     expect(
       screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
     ).toBeInTheDocument();
@@ -214,9 +215,7 @@ describe('IdentitySignatureView', () => {
     expect(
       screen.queryByRole('button', { name: /verificación|intentar/i }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/firma · bloqueada/i)).toBeInTheDocument();
   });
 
   it('identidad aprobada: habilita el paso 2 y deja de bloquear la firma', async () => {
@@ -227,13 +226,20 @@ describe('IdentitySignatureView', () => {
     expect(
       await screen.findByText(/^tu identidad ha sido verificada$/i),
     ).toBeInTheDocument();
-    expect(screen.getByText('Agregar firma digital')).toBeInTheDocument();
-    expect(screen.getByText(/selecciona el archivo/i)).toBeInTheDocument();
+    /**
+     * El paso 2 ya no es una carga de archivo: la rúbrica se dibuja. Se ofrecen los dos caminos
+     * —en esta pantalla o pasando al celular con un QR— y el selector de PNG dejó de existir.
+     */
+    expect(screen.getByText(/registra tu firma/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /guardar mi firma/i }),
+      screen.getByRole('button', { name: /dibujar aquí/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(/firma png · bloqueada/i),
+      screen.getByRole('button', { name: /firmar desde mi celular/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/selecciona el archivo/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/firma · bloqueada/i),
     ).not.toBeInTheDocument();
   });
 

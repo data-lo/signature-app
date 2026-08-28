@@ -91,6 +91,8 @@ describe('DiditVerificationCard · distribución', () => {
       'flex',
       'justify-center',
     );
+    // El QR quedó como única salida: las acciones que lo acompañaban se retiraron (ver
+    // `VerificationQrPanel`), así que ya no hay una segunda fila que centrar.
     expect(
       screen.queryByRole('link', { name: /abrir verificación/i }),
     ).not.toBeInTheDocument();
