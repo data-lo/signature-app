@@ -1,14 +1,19 @@
 'use client';
 
-import { Download } from 'lucide-react';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { Download, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
 import {
   sealArtifactDownloadUrl,
   type PublicSealDownloads,
   type PublicSealEvidence,
 } from '../_requests';
 import { downloadBase64Evidence } from '../_utils/download-base64-evidence';
+import {
+  CanonicalXmlDownloadError,
+  downloadCanonicalXml,
+} from '../_utils/download-canonical-xml';
 
 /**
  * Descargas de la constancia del PSC de un documento completado.
@@ -18,9 +23,11 @@ import { downloadBase64Evidence } from '../_utils/download-base64-evidence';
  * arma el archivo ahí mismo (ver `downloadBase64Evidence`), así que se deshabilita —no se oculta—
  * cuando el documento no tiene esa evidencia.
  *
- * La cadena canónica sigue siendo un enlace normal al backend, sin tocar: el backend responde con
- * `Content-Disposition: attachment` y el navegador la guarda solo. No se habilita su descarga en
- * Base64 todavía — ver historia "Habilitar descarga de evidencias de sellado en la vista pública".
+ * El XML canónico se pide al backend en el momento del clic —es el único que se consulta en vivo,
+ * porque la cadena es grande y no tiene sentido cargarla en cada visita a la página— y se guarda
+ * sólo después de comprobar la respuesta (ver `downloadCanonicalXml`). Antes era un `<a href
+ * download>`: eso guardaba en disco cualquier cosa que respondiera el servidor, incluido el JSON
+ * de un 404 renombrado a `.xml`.
  */
 export function SealDownloads({
   documentId,
@@ -31,6 +38,27 @@ export function SealDownloads({
   downloads: PublicSealDownloads;
   sealEvidence: PublicSealEvidence;
 }) {
+  const [downloadingCanonical, setDownloadingCanonical] = useState(false);
+
+  async function handleCanonicalDownload() {
+    setDownloadingCanonical(true);
+
+    try {
+      await downloadCanonicalXml(
+        sealArtifactDownloadUrl(documentId, 'canonical'),
+        `cadena-canonica-${documentId}.xml`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof CanonicalXmlDownloadError
+          ? error.message
+          : 'No se pudo descargar el XML canónico.',
+      );
+    } finally {
+      setDownloadingCanonical(false);
+    }
+  }
+
   const hasAnyDownload =
     Boolean(sealEvidence.integrityFileBase64) ||
     Boolean(sealEvidence.timestampFileBase64) ||
@@ -80,16 +108,20 @@ export function SealDownloads({
         Sello de tiempo
       </Button>
 
-      {downloads.canonical && (
-        <a
-          href={sealArtifactDownloadUrl(documentId, 'canonical')}
-          download
-          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-        >
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!downloads.canonical || downloadingCanonical}
+        onClick={handleCanonicalDownload}
+      >
+        {downloadingCanonical ? (
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        ) : (
           <Download className="size-3.5" aria-hidden />
-          Cadena canónica
-        </a>
-      )}
+        )}
+        XML canónico
+      </Button>
     </div>
   );
 }
