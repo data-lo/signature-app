@@ -77,7 +77,7 @@ describe('IdentitySignatureView', () => {
     });
   });
 
-  it('sin verificación: ofrece iniciarla y deja el paso 2 bloqueado', async () => {
+  it('sin verificación: ofrece iniciarla e informa cuándo estará disponible la firma', async () => {
     givenStatus(SigningCredentialStatus.IdentityVerificationRequired);
 
     renderWithProviders(<IdentitySignatureView />);
@@ -86,10 +86,7 @@ describe('IdentitySignatureView', () => {
       await screen.findByRole('button', { name: /iniciar verificación/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/agregar firma digital · bloqueada/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/se habilita cuando se apruebe tu identidad/i),
+      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
     ).toBeInTheDocument();
   });
 
@@ -128,7 +125,7 @@ describe('IdentitySignatureView', () => {
       screen.getByText(/escanea el código qr para iniciar el proceso/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/permanece visible; aún no se puede modificar/i),
+      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
     ).toBeInTheDocument();
   });
 
@@ -218,7 +215,7 @@ describe('IdentitySignatureView', () => {
       screen.queryByRole('button', { name: /verificación|intentar/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText(/agregar firma digital · bloqueada/i),
+      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
     ).toBeInTheDocument();
   });
 
@@ -330,7 +327,7 @@ describe('IdentitySignatureView', () => {
     });
   });
 
-  describe('aviso de credencial sin configurar', () => {
+  describe('sin aviso de credencial', () => {
     const WARNING =
       'Es necesario configurar tu identidad y firma para poder firmar con firma Simple.';
 
@@ -343,38 +340,13 @@ describe('IdentitySignatureView', () => {
       SigningCredentialStatus.IdentityVerificationFailed,
       SigningCredentialStatus.IdentityVerificationMaxAttemptsExceeded,
       SigningCredentialStatus.SignaturePending,
-    ])('en %s avisa que falta configurar la credencial', async (status) => {
+      SigningCredentialStatus.Configured,
+    ])('en %s no muestra un aviso redundante de credencial', (status) => {
       givenStatus(status);
 
       renderWithProviders(<IdentitySignatureView />);
 
-      expect(await screen.findByText(WARNING)).toBeInTheDocument();
-    });
-
-    it('con la credencial configurada no avisa nada', async () => {
-      givenStatus(SigningCredentialStatus.Configured);
-
-      renderWithProviders(<IdentitySignatureView />);
-
-      await screen.findByText(
-        /aquí puedes iniciar el proceso de verificación de identidad/i,
-      );
       expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
-    });
-
-    /**
-     * Acá el aviso va sin enlace: el usuario ya está en la pantalla de configuración, y
-     * mandarlo a donde ya se encuentra no le diría nada.
-     */
-    it('no ofrece un enlace a la propia pantalla en la que ya esta', async () => {
-      givenStatus(SigningCredentialStatus.IdentityVerificationRequired);
-
-      renderWithProviders(<IdentitySignatureView />);
-
-      await screen.findByText(WARNING);
-      expect(
-        screen.queryByRole('link', { name: /configura aquí/i }),
-      ).not.toBeInTheDocument();
     });
   });
 

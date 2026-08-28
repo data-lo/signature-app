@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  ArrowRight,
   BadgeCheck,
   Clock,
   Loader2,
@@ -164,13 +165,14 @@ export default function DiditVerificationCard({
           tone="primary"
           icon={<ScanFace className="size-5" />}
           title="Validación de identidad"
-          description="Captura tu INE y confirma que eres tú con una selfie en vivo. Toma menos de dos minutos."
+          description="Verifica tu identidad con tu INE y una selfie en vivo. El proceso toma menos de dos minutos."
         >
-          <CardActions>
+          <CardActions align="end">
             <StartButton
               label="Iniciar verificación"
               onStart={onStart}
               starting={starting}
+              icon={<ArrowRight className="size-4" aria-hidden />}
             />
           </CardActions>
         </StateCard>
@@ -251,10 +253,12 @@ function StartButton({
   label,
   onStart,
   starting,
+  icon,
 }: {
   label: string;
   onStart: () => void;
   starting: boolean;
+  icon?: React.ReactNode;
 }) {
   return (
     <Button type="button" onClick={onStart} disabled={starting}>
@@ -264,7 +268,10 @@ function StartButton({
           Abriendo verificación...
         </>
       ) : (
-        label
+        <>
+          {icon}
+          {label}
+        </>
       )}
     </Button>
   );
