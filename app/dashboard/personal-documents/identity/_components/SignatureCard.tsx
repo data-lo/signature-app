@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { LockKeyhole, PenLine, Smartphone } from 'lucide-react';
+import { BadgeCheck, LockKeyhole, PenLine, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -10,13 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { BadgeCheck, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardHeader } from '@/components/ui/card';
-import { Form } from '@/components/form/form';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { SigningCredentialStatus } from '@/lib/enums/identity';
 import { SignatureCaptureChannel } from '@/lib/api/signature-capture';
@@ -34,6 +27,16 @@ import MobileHandoffPanel from './MobileHandoffPanel';
 interface SignatureCardProps {
   status: SigningCredentialStatus;
 }
+
+/**
+ * La firma ya registrada se anuncia como tal: la tarjeta de documento personal es la misma que
+ * en el resto de la sección, sólo cambia el encabezado para que se lea como una confirmación y
+ * no como un pendiente.
+ */
+const REGISTERED_SIGNATURE_CONFIG = {
+  ...SIGNATURE_DOCUMENT,
+  label: 'Tu firma ha sido agregada',
+};
 
 /**
  * Paso 2: la rúbrica.
@@ -198,8 +201,16 @@ function RegisteredSignature() {
     <>
       <div className="flex flex-col gap-3">
         <PersonalDocumentCard
-          config={SIGNATURE_DOCUMENT}
+          config={REGISTERED_SIGNATURE_CONFIG}
           storedUrl={signature?.secureUrl ?? null}
+          storedTitleIcon={
+            <BadgeCheck
+              className="size-5 text-emerald-600 dark:text-emerald-400"
+              aria-hidden
+            />
+          }
+          showOpen={false}
+          deleteVariant="destructive"
           deleting={deleteMutation.isPending}
           onDelete={signature ? () => setConfirmingDelete(true) : undefined}
         />
