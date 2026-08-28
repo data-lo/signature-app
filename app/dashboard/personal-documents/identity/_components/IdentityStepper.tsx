@@ -1,6 +1,6 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { BadgeCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type StepState = 'done' | 'active' | 'blocked';
@@ -31,7 +31,7 @@ export default function IdentityStepper({
     <ol className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
       <li className={cn('flex items-center gap-1.5', STEP_STYLES[identity])}>
         {identity === 'done' ? (
-          <Check className="size-4" aria-hidden />
+          <BadgeCheck className="size-4" aria-hidden />
         ) : (
           <span aria-hidden>1.</span>
         )}
@@ -44,7 +44,7 @@ export default function IdentityStepper({
 
       <li className={cn('flex items-center gap-1.5', STEP_STYLES[signature])}>
         {signature === 'done' ? (
-          <Check className="size-4" aria-hidden />
+          <BadgeCheck className="size-4" aria-hidden />
         ) : (
           <span aria-hidden>2.</span>
         )}

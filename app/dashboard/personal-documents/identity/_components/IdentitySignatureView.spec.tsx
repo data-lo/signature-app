@@ -77,7 +77,7 @@ describe('IdentitySignatureView', () => {
     });
   });
 
-  it('sin verificación: ofrece iniciarla y deja el paso 2 bloqueado', async () => {
+  it('sin verificación: ofrece iniciarla e informa cuándo estará disponible la firma', async () => {
     givenStatus(SigningCredentialStatus.IdentityVerificationRequired);
 
     renderWithProviders(<IdentitySignatureView />);
@@ -87,7 +87,7 @@ describe('IdentitySignatureView', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/firma · bloqueada/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/se habilita cuando didit apruebe tu identidad/i),
+      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
     ).toBeInTheDocument();
   });
 
@@ -126,7 +126,7 @@ describe('IdentitySignatureView', () => {
       screen.getByText(/escanea el código qr para iniciar el proceso/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/permanece visible; aún no se puede modificar/i),
+      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
     ).toBeInTheDocument();
   });
 
@@ -224,7 +224,7 @@ describe('IdentitySignatureView', () => {
     renderWithProviders(<IdentitySignatureView />);
 
     expect(
-      await screen.findByText(/identidad validada por didit/i),
+      await screen.findByText(/^tu identidad ha sido verificada$/i),
     ).toBeInTheDocument();
     /**
      * El paso 2 ya no es una carga de archivo: la rúbrica se dibuja. Se ofrecen los dos caminos
@@ -249,15 +249,15 @@ describe('IdentitySignatureView', () => {
     renderWithProviders(<IdentitySignatureView />);
 
     expect(
-      await screen.findByText(/tu credencial está lista/i),
+      await screen.findByText(
+        /aquí puedes iniciar el proceso de verificación de identidad/i,
+      ),
     ).toBeInTheDocument();
+    expect(screen.getByText('Tu firma ha sido agregada')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /eliminar/i }),
     ).toBeInTheDocument();
-    // Los dos pasos quedan marcados como terminados en el encabezado.
-    const [identityStep, signatureStep] = screen.getAllByRole('listitem');
-    expect(identityStep).toHaveTextContent('Identidad validada');
-    expect(signatureStep).toHaveTextContent('Firma registrada');
+    expect(screen.queryByRole('link', { name: /abrir/i })).not.toBeInTheDocument();
   });
 
   describe('detalle de la validación', () => {
@@ -276,7 +276,7 @@ describe('IdentitySignatureView', () => {
 
       await userEvent.click(
         await screen.findByRole('button', {
-          name: /ver detalle de la validación/i,
+          name: 'Detalles',
         }),
       );
 
@@ -304,7 +304,7 @@ describe('IdentitySignatureView', () => {
 
       await userEvent.click(
         await screen.findByRole('button', {
-          name: /ver detalle de la validación/i,
+          name: 'Detalles',
         }),
       );
 
@@ -312,7 +312,7 @@ describe('IdentitySignatureView', () => {
       expect(screen.getByText(/no reportada/i)).toBeInTheDocument();
     });
 
-    it('sin veredicto del proveedor lo dice, en vez de pintar tres renglones vacíos', async () => {
+    it('sin detalle de comprobaciones lo indica, en vez de pintar tres renglones vacíos', async () => {
       givenStatus(SigningCredentialStatus.SignaturePending, {
         ...openSession(null),
         status: IdentityVerificationStatus.Approved,
@@ -323,17 +323,17 @@ describe('IdentitySignatureView', () => {
 
       await userEvent.click(
         await screen.findByRole('button', {
-          name: /ver detalle de la validación/i,
+          name: 'Detalles',
         }),
       );
 
       expect(
-        await screen.findByText(/no reportó el detalle de las comprobaciones/i),
+        await screen.findByText(/no contamos con el detalle de las comprobaciones/i),
       ).toBeInTheDocument();
     });
   });
 
-  describe('aviso de credencial sin configurar', () => {
+  describe('sin aviso de credencial', () => {
     const WARNING =
       'Es necesario configurar tu identidad y firma para poder firmar con firma Simple.';
 
@@ -346,36 +346,13 @@ describe('IdentitySignatureView', () => {
       SigningCredentialStatus.IdentityVerificationFailed,
       SigningCredentialStatus.IdentityVerificationMaxAttemptsExceeded,
       SigningCredentialStatus.SignaturePending,
-    ])('en %s avisa que falta configurar la credencial', async (status) => {
+      SigningCredentialStatus.Configured,
+    ])('en %s no muestra un aviso redundante de credencial', (status) => {
       givenStatus(status);
 
       renderWithProviders(<IdentitySignatureView />);
 
-      expect(await screen.findByText(WARNING)).toBeInTheDocument();
-    });
-
-    it('con la credencial configurada no avisa nada', async () => {
-      givenStatus(SigningCredentialStatus.Configured);
-
-      renderWithProviders(<IdentitySignatureView />);
-
-      await screen.findByText(/tu credencial está lista/i);
       expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
-    });
-
-    /**
-     * Acá el aviso va sin enlace: el usuario ya está en la pantalla de configuración, y
-     * mandarlo a donde ya se encuentra no le diría nada.
-     */
-    it('no ofrece un enlace a la propia pantalla en la que ya esta', async () => {
-      givenStatus(SigningCredentialStatus.IdentityVerificationRequired);
-
-      renderWithProviders(<IdentitySignatureView />);
-
-      await screen.findByText(WARNING);
-      expect(
-        screen.queryByRole('link', { name: /configura aquí/i }),
-      ).not.toBeInTheDocument();
     });
   });
 

@@ -80,7 +80,7 @@ export default function ShareDocumentDialog({
 
   return (
     <Dialog open={!!documentId} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Compartir documento</DialogTitle>
           <DialogDescription>

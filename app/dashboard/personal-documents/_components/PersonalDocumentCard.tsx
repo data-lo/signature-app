@@ -26,6 +26,12 @@ interface PersonalDocumentCardProps {
   /** Sin handler no se ofrece eliminar (el documento todavía no existe en el servidor). */
   onDelete?: () => void;
   deleting?: boolean;
+  /** Ícono que acompaña el título una vez que el documento está guardado. */
+  storedTitleIcon?: React.ReactNode;
+  /** Variante visual del botón para eliminar un documento guardado. */
+  deleteVariant?: 'ghost' | 'destructive';
+  /** Permite ocultar la acción para abrir el archivo guardado. */
+  showOpen?: boolean;
   /** Marca el documento como no obligatorio en su título. */
   optional?: boolean;
 }
@@ -45,6 +51,9 @@ export default function PersonalDocumentCard({
   onFileChange,
   onDelete,
   deleting,
+  storedTitleIcon,
+  deleteVariant = 'ghost',
+  showOpen = true,
   optional,
 }: PersonalDocumentCardProps) {
   const isStored = storedUrl !== null;
@@ -53,7 +62,10 @@ export default function PersonalDocumentCard({
     <Card className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          {isStored && <CheckCircle2 className="size-4 text-emerald-500" />}
+          {isStored &&
+            (storedTitleIcon ?? (
+              <CheckCircle2 className="size-4 text-emerald-500" />
+            ))}
           {config.label}
           {optional && !isStored && (
             <span className="text-sm font-normal text-muted-foreground">
@@ -67,22 +79,32 @@ export default function PersonalDocumentCard({
 
         {isStored && (
           <CardAction className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              render={
-                <a href={storedUrl} target="_blank" rel="noopener noreferrer" />
-              }
-            >
-              <ExternalLink className="size-4" />
-              Abrir
-            </Button>
+            {showOpen && (
+              <Button
+                variant="ghost"
+                size="sm"
+                render={
+                  <a
+                    href={storedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
+              >
+                <ExternalLink className="size-4" />
+                Abrir
+              </Button>
+            )}
             {onDelete && (
               <Button
                 type="button"
-                variant="ghost"
+                variant={deleteVariant}
                 size="sm"
-                className="text-destructive hover:text-destructive"
+                className={
+                  deleteVariant === 'ghost'
+                    ? 'text-destructive hover:text-destructive'
+                    : undefined
+                }
                 disabled={deleting}
                 onClick={onDelete}
               >

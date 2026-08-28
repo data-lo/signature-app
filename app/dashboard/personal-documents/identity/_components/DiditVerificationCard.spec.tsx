@@ -38,21 +38,21 @@ function renderCard(
  * quite el centrado de los que ya lo tienen.
  */
 describe('DiditVerificationCard · distribución', () => {
-  it.each([
-    [
-      'sin verificación iniciada',
-      SigningCredentialStatus.IdentityVerificationRequired,
-      /iniciar verificación/i,
-    ],
-    [
-      'tras un rechazo',
-      SigningCredentialStatus.IdentityVerificationRetryRequired,
-      /intentar nuevamente/i,
-    ],
-  ])('centra la acción principal %s', (_caso, status, label) => {
-    renderCard(status);
+  it('coloca el inicio de la verificación a la derecha y muestra su icono', () => {
+    renderCard(SigningCredentialStatus.IdentityVerificationRequired);
 
-    const action = screen.getByRole('button', { name: label });
+    const action = screen.getByRole('button', {
+      name: /iniciar verificación/i,
+    });
+
+    expect(action.parentElement).toHaveClass('flex', 'justify-end');
+    expect(action.querySelector('svg')).toHaveClass('lucide-arrow-right');
+  });
+
+  it('centra la acción después de un rechazo', () => {
+    renderCard(SigningCredentialStatus.IdentityVerificationRetryRequired);
+
+    const action = screen.getByRole('button', { name: /intentar nuevamente/i });
 
     expect(action.parentElement).toHaveClass('flex', 'justify-center');
   });
@@ -68,12 +68,12 @@ describe('DiditVerificationCard · distribución', () => {
     expect(action.parentElement).toHaveClass('flex', 'justify-center');
   });
 
-  it('centra la acción de la identidad ya validada', () => {
+  it('coloca los detalles a la derecha cuando la identidad ya está validada', () => {
     renderCard(SigningCredentialStatus.Configured);
 
-    const action = screen.getByRole('button', { name: /ver detalle/i });
+    const action = screen.getByRole('button', { name: 'Detalles' });
 
-    expect(action.parentElement).toHaveClass('flex', 'justify-center');
+    expect(action.parentElement).toHaveClass('flex', 'justify-end');
   });
 
   /**
@@ -102,8 +102,8 @@ describe('DiditVerificationCard · distribución', () => {
   it('deja el título y la descripción alineados a la izquierda', () => {
     renderCard(SigningCredentialStatus.IdentityVerificationRequired);
 
-    const title = screen.getByText('Identidad con Didit');
-    const description = screen.getByText(/captura tu ine/i);
+    const title = screen.getByText('Validación de identidad');
+    const description = screen.getByText(/verifica tu identidad con tu ine/i);
 
     expect(title.className).not.toMatch(/text-center|justify-center/);
     expect(description.className).not.toMatch(/text-center|justify-center/);

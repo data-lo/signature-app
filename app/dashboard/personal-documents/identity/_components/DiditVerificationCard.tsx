@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  ArrowRight,
   BadgeCheck,
   Clock,
   Loader2,
@@ -149,9 +150,9 @@ export default function DiditVerificationCard({
         <StateCard
           tone="success"
           icon={<BadgeCheck className="size-5" />}
-          title="Identidad validada por Didit"
+          title="Tu identidad ha sido verificada"
         >
-          <CardActions>
+          <CardActions align="end">
             <IdentityDetailDialog data={data} />
           </CardActions>
         </StateCard>
@@ -163,14 +164,15 @@ export default function DiditVerificationCard({
         <StateCard
           tone="primary"
           icon={<ScanFace className="size-5" />}
-          title="Identidad con Didit"
-          description="Captura tu INE y confirma que eres tú con una selfie en vivo. Toma menos de dos minutos."
+          title="Validación de identidad"
+          description="Verifica tu identidad con tu INE y una selfie en vivo. El proceso toma menos de dos minutos."
         >
-          <CardActions>
+          <CardActions align="end">
             <StartButton
               label="Iniciar verificación"
               onStart={onStart}
               starting={starting}
+              icon={<ArrowRight className="size-4" aria-hidden />}
             />
           </CardActions>
         </StateCard>
@@ -228,30 +230,35 @@ function StateCard({
   );
 }
 
-/**
- * Fila de acciones de la tarjeta, centrada horizontalmente.
- *
- * El título y los textos de la tarjeta se quedan a la izquierda —se leen de corrido— pero las
- * acciones se centran para que el paso a seguir quede en el eje de la tarjeta y no perdido
- * contra el borde izquierdo de una caja ancha. Es el mismo criterio con el que ya se dibujaba el
- * QR y sus dos salidas (ver `VerificationQrPanel`), aplicado ahora a todos los estados para que
- * la tarjeta no cambie de composición según el avance del usuario.
- *
- * `flex-wrap` porque en pantallas angostas las etiquetas largas ("Iniciar nueva verificación")
- * tienen que poder bajar de línea sin desbordar la tarjeta.
- */
-function CardActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap justify-center gap-2">{children}</div>;
+/** Fila de acciones centrada, salvo los detalles de una identidad ya validada. */
+function CardActions({
+  children,
+  align = 'center',
+}: {
+  children: React.ReactNode;
+  align?: 'center' | 'end';
+}) {
+  return (
+    <div
+      className={`flex flex-wrap gap-2 ${
+        align === 'end' ? 'justify-end' : 'justify-center'
+      }`}
+    >
+      {children}
+    </div>
+  );
 }
 
 function StartButton({
   label,
   onStart,
   starting,
+  icon,
 }: {
   label: string;
   onStart: () => void;
   starting: boolean;
+  icon?: React.ReactNode;
 }) {
   return (
     <Button type="button" onClick={onStart} disabled={starting}>
@@ -261,7 +268,10 @@ function StartButton({
           Abriendo verificación...
         </>
       ) : (
-        label
+        <>
+          {icon}
+          {label}
+        </>
       )}
     </Button>
   );

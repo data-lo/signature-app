@@ -10,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { BadgeCheck, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardHeader } from '@/components/ui/card';
+import { Form } from '@/components/form/form';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { SigningCredentialStatus } from '@/lib/enums/identity';
 import { SignatureCaptureChannel } from '@/lib/api/signature-capture';
@@ -36,9 +43,8 @@ interface SignatureCardProps {
  * carga sigue existiendo en el backend, así que nada se rompe — sólo dejó de haber dos caminos
  * que explicar para lo mismo.
  *
- * La tarjeta se muestra SIEMPRE, incluso bloqueada. El diagrama de la pantalla lo pide así a
- * propósito: el usuario tiene que ver desde el principio que el flujo tiene dos pasos y por qué
- * el segundo todavía no está disponible.
+ * La tarjeta se muestra siempre antes de que la firma esté disponible, para indicar qué falta
+ * completar sin repetir el estado de la verificación.
  *
  * El bloqueo acá es de interfaz, no de seguridad: quien fuerce la petición se topa con el 403
  * del backend, que valida el mismo estado contra la base de datos.
@@ -52,13 +58,10 @@ export default function SignatureCard({ status }: SignatureCardProps) {
     return <SignatureCapture />;
   }
 
-  return <LockedSignature status={status} />;
+  return <LockedSignature />;
 }
 
-function LockedSignature({ status }: { status: SigningCredentialStatus }) {
-  const identityStarted =
-    status !== SigningCredentialStatus.IdentityVerificationRequired;
-
+function LockedSignature() {
   return (
     <Card className="border-dashed bg-muted/30 shadow-none">
       <CardHeader>
@@ -67,9 +70,7 @@ function LockedSignature({ status }: { status: SigningCredentialStatus }) {
           Firma · bloqueada
         </CardTitle>
         <CardDescription>
-          {identityStarted
-            ? 'Permanece visible; aún no se puede modificar.'
-            : 'Se habilita cuando Didit apruebe tu identidad.'}
+          Podrás registrar tu firma cuando se apruebe tu identidad.
         </CardDescription>
       </CardHeader>
     </Card>

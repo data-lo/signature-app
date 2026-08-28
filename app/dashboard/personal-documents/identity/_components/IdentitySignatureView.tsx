@@ -4,8 +4,6 @@ import { Loader2 } from 'lucide-react';
 import { SigningCredentialStatus } from '@/lib/enums/identity';
 import { useIdentityVerification } from '../_hooks/useIdentityVerification';
 import { useStartDiditVerification } from '../_hooks/useStartDiditVerification';
-import SigningCredentialWarning from '@/components/signing/SigningCredentialWarning';
-import IdentityStepper from './IdentityStepper';
 import DiditVerificationCard from './DiditVerificationCard';
 import SignatureCard from './SignatureCard';
 
@@ -61,85 +59,24 @@ export default function IdentitySignatureView() {
   return (
     <div
       id="signature-documents"
-      className="flex w-full max-w-xl flex-col gap-6"
+      className="flex w-full flex-col gap-6"
     >
-      <header className="flex flex-col gap-1">
-        <h1 className="font-heading text-lg font-medium text-foreground">
-          Identidad y firma
-        </h1>
+      <header>
         <p className="text-sm text-muted-foreground">
-          {DESCRIPTION_BY_STEP[signatureStepState(status)]}
+          Aquí puedes iniciar el proceso de verificación de identidad y
+          registrar tu firma para firmar de manera simple.
         </p>
       </header>
 
-      {status !== SigningCredentialStatus.Configured && (
-        <SigningCredentialWarning message={SIGNING_CREDENTIAL_WARNING} />
-      )}
+      <div className="flex w-full flex-col gap-6">
+        <DiditVerificationCard
+          data={data}
+          onStart={() => startMutation.mutate()}
+          starting={startMutation.isPending}
+        />
 
-      <IdentityStepper
-        identity={identityStepState(status)}
-        signature={signatureStepState(status)}
-      />
-
-      <DiditVerificationCard
-        data={data}
-        onStart={() => startMutation.mutate()}
-        starting={startMutation.isPending}
-      />
-
-      <SignatureCard status={status} />
+        <SignatureCard status={status} />
+      </div>
     </div>
   );
-}
-
-/**
- * Aviso que encabeza la pantalla mientras la credencial no esté lista.
- *
- * Va sin enlace a diferencia del que aparece al crear un documento: el usuario ya está en la
- * pantalla de configuración, y mandarlo a donde ya se encuentra no le diría nada.
- */
-const SIGNING_CREDENTIAL_WARNING =
-  'Es necesario configurar tu identidad y firma para poder firmar con firma Simple.';
-
-/**
- * El encabezado describe el paso en el que está el usuario, y se decide en un solo lugar para
- * que no pueda contradecir a lo que muestran las tarjetas de abajo.
- */
-const DESCRIPTION_BY_STEP: Record<'done' | 'active' | 'blocked', string> = {
-  blocked: 'Valida tu identidad para poder registrar tu firma.',
-  active: 'Tu identidad está validada. Sube tu firma para terminar.',
-  done: 'Tu credencial está lista: ya puedes firmar documentos.',
-};
-
-/** El paso 1 se da por terminado en cuanto la identidad queda aprobada. */
-function identityStepState(
-  status: SigningCredentialStatus,
-): 'done' | 'active' | 'blocked' {
-  if (
-    status === SigningCredentialStatus.SignaturePending ||
-    status === SigningCredentialStatus.Configured
-  ) {
-    return 'done';
-  }
-
-  /**
-   * Bloqueado y no "activo": en estos dos estados el usuario no puede avanzar por su cuenta, y
-   * mostrar el paso como accionable lo dejaría intentando algo que la pantalla ya no permite.
-   */
-  if (
-    status === SigningCredentialStatus.IdentityVerificationFailed ||
-    status === SigningCredentialStatus.IdentityVerificationMaxAttemptsExceeded
-  ) {
-    return 'blocked';
-  }
-
-  return 'active';
-}
-
-function signatureStepState(
-  status: SigningCredentialStatus,
-): 'done' | 'active' | 'blocked' {
-  if (status === SigningCredentialStatus.Configured) return 'done';
-  if (status === SigningCredentialStatus.SignaturePending) return 'active';
-  return 'blocked';
 }
