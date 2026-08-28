@@ -172,4 +172,96 @@ describe('SignupForm', () => {
     await user.click(screen.getByRole('button', { name: /crear cuenta/i }));
     expect(mutate).not.toHaveBeenCalled();
   });
+  /**
+   * Historia "Capitalizar nombre y apellido": la normalización tiene que ocurrir sobre lo que
+   * se envía, no sólo cuando el campo pierde el foco. El `onBlur` del campo da el efecto
+   * inmediato mientras se teclea, pero no cubre enviar con Enter sin salir del campo, el
+   * autocompletado del navegador ni pegar y enviar. Estas pruebas escriben en el último campo y
+   * envían desde ahí, así que los campos de nombre nunca se vuelven a enfocar y lo único que
+   * puede capitalizar es el esquema.
+   */
+  describe('capitalización del nombre y el apellido', () => {
+    async function submitWithNames(
+      user: ReturnType<typeof userEvent.setup>,
+      firstName: string,
+      lastName: string,
+    ) {
+      renderWithProviders(<SignupForm turnstileSiteKey={SITE_KEY} />);
+
+      await user.type(screen.getByLabelText(/nombre\(s\)/i), firstName);
+      await user.type(screen.getByLabelText(/apellidos/i), lastName);
+      await user.type(
+        screen.getByLabelText(/correo electrónico/i),
+        'juan.perez@empresa.com',
+      );
+      await user.type(screen.getByLabelText(/curp/i), 'PELJ850101HDFRNN08');
+      await user.type(screen.getByLabelText(/^rfc$/i), 'PELJ850101ABC');
+      await user.type(
+        screen.getByLabelText(/^contraseña$/i),
+        'supersecret123',
+      );
+      await user.type(
+        screen.getByLabelText(/confirmar contraseña/i),
+        'supersecret123',
+      );
+      await user.click(
+        screen.getByRole('button', { name: /resolver captcha/i }),
+      );
+      await user.click(screen.getByRole('button', { name: /crear cuenta/i }));
+    }
+
+    it.each([
+      ['nombre compuesto', 'juan carlos', 'pérez', 'Juan Carlos', 'Pérez'],
+      [
+        'apellido compuesto',
+        'ana',
+        'de la cruz mendoza',
+        'Ana',
+        'De La Cruz Mendoza',
+      ],
+      [
+        'valores en mayúsculas',
+        'MARÍA DEL CARMEN',
+        'GÓMEZ',
+        'María Del Carmen',
+        'Gómez',
+      ],
+      [
+        'espacios adicionales',
+        '  ana   maria  ',
+        '  lopez   soto ',
+        'Ana Maria',
+        'Lopez Soto',
+      ],
+    ])(
+      'envía capitalizado con %s',
+      async (_caso, firstName, lastName, expectedFirst, expectedLast) => {
+        const user = userEvent.setup();
+
+        await submitWithNames(user, firstName, lastName);
+
+        expect(mutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            firstName: expectedFirst,
+            lastName: expectedLast,
+          }),
+        );
+      },
+    );
+
+    /** Los demás campos conservan su tratamiento: el CURP y el RFC no se capitalizan. */
+    it('no altera el resto de los campos', async () => {
+      const user = userEvent.setup();
+
+      await submitWithNames(user, 'ana', 'lopez');
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'juan.perez@empresa.com',
+          nationalId: 'PELJ850101HDFRNN08',
+          rfc: 'PELJ850101ABC',
+        }),
+      );
+    });
+  });
 });

@@ -4,6 +4,7 @@ import {
   FileDown,
   MoreVertical,
   Share2,
+  Signature,
   SquareArrowOutUpRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface DocumentRowActionsProps {
+  /**
+   * Lleva al flujo de firma. Ausente cuando el documento no es firmable por este usuario en esta
+   * sección: quien decide eso es la tabla, acá sólo se dibuja lo que llega.
+   */
+  onSign?: () => void;
   /** true mientras se resuelve la URL de descarga de ESTE documento (no de otro de la lista). */
   isDownloading?: boolean;
   onDownload: () => void;
@@ -28,11 +34,16 @@ interface DocumentRowActionsProps {
  * firma, Completados): las acciones dejaron de ser botones sueltos por sección para concentrarse
  * aquí, con ícono y texto.
  *
- * Son exactamente tres, también para documentos ya firmados. La previsualización en diálogo que
- * vivía aquí se retiró: "Ver detalle" lleva a `/dashboard/documents/:id`, que ya renderiza el PDF,
- * así que era un segundo camino al mismo visor.
+ * "Firmar" fue la última en mudarse: era un botón de texto propio al lado del menú, el único
+ * resto del reparto anterior. Va primero en la lista porque en "Por firmar" es la acción que el
+ * usuario viene a hacer, y sólo aparece en los documentos que puede firmar.
+ *
+ * La previsualización en diálogo que vivía aquí se retiró: "Ver detalle" lleva a
+ * `/dashboard/documents/:id`, que ya renderiza el PDF, así que era un segundo camino al mismo
+ * visor.
  */
 export default function DocumentRowActions({
+  onSign,
   isDownloading = false,
   onDownload,
   onViewDetail,
@@ -52,6 +63,12 @@ export default function DocumentRowActions({
         <MoreVertical className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
+        {onSign && (
+          <DropdownMenuItem onClick={onSign}>
+            <Signature className="size-4" />
+            Firmar
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem disabled={isDownloading} onClick={onDownload}>
           <FileDown className="size-4" />
           {isDownloading ? 'Descargando...' : 'Descargar'}

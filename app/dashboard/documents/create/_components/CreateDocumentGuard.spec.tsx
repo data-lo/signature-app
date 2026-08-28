@@ -1,61 +1,42 @@
 import { render, screen } from '@testing-library/react';
 import CreateDocumentGuard from './CreateDocumentGuard';
-import { useOnboardingReady } from '@/lib/hooks/useOnboardingReady';
 
-jest.mock('@/lib/hooks/useOnboardingReady');
 jest.mock('./CreateDocumentView', () => ({
   __esModule: true,
   default: ({ trackDocumentsCount }: { trackDocumentsCount?: boolean }) => (
-    <div>CreateDocumentView (trackDocumentsCount={String(trackDocumentsCount)})</div>
+    <div>
+      CreateDocumentView (trackDocumentsCount={String(trackDocumentsCount)})
+    </div>
   ),
 }));
-jest.mock('./OnboardingBanner', () => ({
-  __esModule: true,
-  default: () => <div>OnboardingBanner</div>,
-}));
-
-const mockedUseOnboardingReady = useOnboardingReady as jest.Mock;
 
 describe('CreateDocumentGuard', () => {
-  it('mientras el store todavía no hidrata (isLoading), no renderiza nada', () => {
-    mockedUseOnboardingReady.mockReturnValue({ isLoading: true, isReady: false });
-
-    const { container } = render(<CreateDocumentGuard />);
-
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('con onboarding incompleto: renderiza la vista visible pero bloqueada (inert + opacidad), sin redirigir a otra ruta', () => {
-    mockedUseOnboardingReady.mockReturnValue({ isLoading: false, isReady: false });
-
+  /**
+   * Crear un documento dejó de depender del estado de identidad y firma del creador. Antes la
+   * vista se renderizaba inerte (`inert`, `pointer-events-none`, opacidad reducida) con un
+   * banner encima mientras el onboarding no estuviera completo; ahora se monta habilitada
+   * siempre, sin consultar nada del usuario.
+   */
+  it('renderiza la vista habilitada, sin consultar el estado del usuario', () => {
     render(<CreateDocumentGuard />);
 
-    expect(screen.getByText('OnboardingBanner')).toBeInTheDocument();
     const createDocumentView = screen.getByText(/CreateDocumentView/);
+
     expect(createDocumentView).toBeInTheDocument();
-
-    const wrapper = createDocumentView.closest('[aria-disabled]');
-    expect(wrapper).toHaveAttribute('inert');
-    expect(wrapper).toHaveAttribute('aria-disabled', 'true');
-    expect(wrapper?.className).toContain('opacity-50');
-    expect(wrapper?.className).toContain('pointer-events-none');
-    expect(
-      screen.getByText('CreateDocumentView (trackDocumentsCount=false)'),
-    ).toBeInTheDocument();
-  });
-
-  it('con onboarding completo: renderiza la vista habilitada (sin inert ni opacidad)', () => {
-    mockedUseOnboardingReady.mockReturnValue({ isLoading: false, isReady: true });
-
-    render(<CreateDocumentGuard />);
-
-    const createDocumentView = screen.getByText(/CreateDocumentView/);
-    const wrapper = createDocumentView.closest('[aria-disabled]');
-    expect(wrapper).not.toHaveAttribute('inert');
-    expect(wrapper).toHaveAttribute('aria-disabled', 'false');
+    expect(createDocumentView.closest('[aria-disabled]')).toBeNull();
+    expect(createDocumentView.closest('[inert]')).toBeNull();
     expect(
       screen.getByText('CreateDocumentView (trackDocumentsCount=true)'),
     ).toBeInTheDocument();
+  });
+
+  /** El banner de onboarding desapareció: el aviso ahora vive junto al tipo de firma. */
+  it('no muestra ningun banner de configuracion requerida', () => {
+    render(<CreateDocumentGuard />);
+
+    expect(
+      screen.queryByText(/es requerido configurar tu usuario/i),
+    ).not.toBeInTheDocument();
   });
 
   /**
@@ -64,9 +45,7 @@ describe('CreateDocumentGuard', () => {
    * Se afirma sin mockear nada: si alguien vuelve a montar el modal acá, esta prueba lo detecta
    * (un mock lo escondería detrás de un texto de reemplazo).
    */
-  it('no ofrece "Invitar miembro": esa acción vive en Administrar miembros', () => {
-    mockedUseOnboardingReady.mockReturnValue({ isLoading: false, isReady: true });
-
+  it('no ofrece "Invitar miembro": esa accion vive en Administrar miembros', () => {
     render(<CreateDocumentGuard />);
 
     expect(

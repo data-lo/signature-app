@@ -57,6 +57,28 @@ export interface PublicSealDownloads {
 }
 
 /**
+ * Evidencia cruda del sellado, en Base64: el DER/ASN.1 tal cual lo emitió el PSC, no el PDF de la
+ * constancia. La pantalla la decodifica en el navegador para descargarla (ver
+ * `downloadBase64Evidence`) — por eso viaja el contenido y no solo un booleano como en
+ * `PublicSealDownloads`. `null` cuando el documento no tiene esa evidencia.
+ */
+export interface PublicSealEvidence {
+  timestampFileBase64: string | null;
+  integrityFileBase64: string | null;
+}
+
+/**
+ * Serie y fecha de emisión (`notBefore`) del certificado TSA embebido en la evidencia NOM-151
+ * (`integrityFileBase64`), extraídos de su ASN.1. `null` cuando no se pudieron extraer — la
+ * pantalla no muestra el componente de certificado en ese caso, nunca uno de los dos campos suelto.
+ */
+export interface PublicIntegrityTsaCertificate {
+  serialNumber: string;
+  /** ISO 8601 en UTC. */
+  issuedAt: string;
+}
+
+/**
  * Vista pública de verificación de un documento (`GET /document/public/:id`, sin autenticación).
  *
  * `isCompleted` es el interruptor de toda la pantalla (ver historia "Actualizar vista pública de
@@ -79,6 +101,8 @@ export interface PublicDocumentView {
   conservationRecord: PublicConservationRecord | null;
   signers: PublicSigner[];
   downloads: PublicSealDownloads;
+  sealEvidence: PublicSealEvidence;
+  integrityTsaCertificate: PublicIntegrityTsaCertificate | null;
 }
 
 export async function getPublicDocumentRequest(

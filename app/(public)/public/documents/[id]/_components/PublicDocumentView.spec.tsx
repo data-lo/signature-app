@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, within } from '@/test-utils';
 import PublicDocumentView from './PublicDocumentView';
 import { usePublicDocument } from '../_hooks/usePublicDocument';
@@ -6,14 +7,42 @@ import type {
   PublicDocumentView as PublicDocumentViewData,
   PublicSigner,
 } from '../_requests';
+import { CanonicalXmlDownloadError } from '../_utils/download-canonical-xml';
 
 jest.mock('../_hooks/usePublicDocument');
 jest.mock('./PublicPdfViewer', () => ({
   __esModule: true,
   default: ({ file }: { file: string }) => <div>PublicPdfViewer file={file}</div>,
 }));
+// La mecánica de decodificar Base64 y disparar la descarga (atob, Blob, URL.createObjectURL) se
+// prueba aparte en download-base64-evidence.spec.ts; acá solo importa que el botón la invoque con
+// el contenido y el nombre de archivo correctos.
+jest.mock('../_utils/download-base64-evidence', () => ({
+  downloadBase64Evidence: jest.fn(),
+}));
+/**
+ * Igual que con el Base64: la mecánica de traer el XML, validarlo y guardarlo se prueba en
+ * `download-canonical-xml.spec.ts`. `CanonicalXmlDownloadError` se conserva real porque el
+ * componente decide por su tipo qué mensaje mostrar.
+ */
+jest.mock('../_utils/download-canonical-xml', () => ({
+  ...jest.requireActual('../_utils/download-canonical-xml'),
+  downloadCanonicalXml: jest.fn(),
+}));
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: { error: jest.fn(), success: jest.fn() },
+}));
 
 const mockedUsePublicDocument = usePublicDocument as jest.Mock;
+const mockedDownloadBase64Evidence = jest.requireMock(
+  '../_utils/download-base64-evidence',
+).downloadBase64Evidence as jest.Mock;
+const mockedDownloadCanonicalXml = jest.requireMock(
+  '../_utils/download-canonical-xml',
+).downloadCanonicalXml as jest.Mock;
+const mockedToastError = jest.requireMock('react-hot-toast').default
+  .error as jest.Mock;
 
 function buildSigner(overrides: Partial<PublicSigner> = {}): PublicSigner {
   return {
@@ -74,6 +103,8 @@ function buildPending(
       },
     ],
     downloads: { nom151: false, timestamp: false, canonical: false },
+    sealEvidence: { timestampFileBase64: null, integrityFileBase64: null },
+    integrityTsaCertificate: null,
     ...overrides,
   };
 }
@@ -98,6 +129,14 @@ function buildCompleted(
     },
     signers: [buildSigner()],
     downloads: { nom151: true, timestamp: true, canonical: true },
+    sealEvidence: {
+      timestampFileBase64: 'dHNyLWVuLWJhc2U2NA==',
+      integrityFileBase64: 'bm9tMTUxLWVuLWJhc2U2NA==',
+    },
+    integrityTsaCertificate: {
+      serialNumber: '4A1B2C3D',
+      issuedAt: '2026-08-27T18:06:37.000Z',
+    },
     ...overrides,
   };
 }
@@ -259,11 +298,13 @@ describe('PublicDocumentView', () => {
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(screen.getByText(/fecha de emisión/i)).toBeInTheDocument();
-        // tsaCertificate y serialNumber llegan en null: el renglón entero no se pinta.
+        // tsaCertificate y serialNumber (los del token RFC 3161) llegan en null: ese renglón
+        // exacto no se pinta — distinto de "Serie/Emisión del certificado (TSA)", que sí se
+        // pintan porque vienen de integrityTsaCertificate (ver el describe de más abajo).
         expect(
-          screen.queryByText(/certificado \(tsa\)/i),
+          screen.queryByText(/^certificado \(tsa\)$/i),
         ).not.toBeInTheDocument();
-        expect(screen.queryByText(/número de serie$/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/^número de serie$/i)).not.toBeInTheDocument();
       });
 
       it('sin constancia: lo dice en vez de dejar la sección vacía', () => {
@@ -276,6 +317,35 @@ describe('PublicDocumentView', () => {
             /no cuenta con una constancia de conservación emitida por un psc/i,
           ),
         ).toBeInTheDocument();
+      });
+
+      describe('certificado TSA de la evidencia NOM-151', () => {
+        it('muestra la serie y la fecha de emisión del certificado cuando el backend las extrajo', () => {
+          mockData(buildCompleted());
+
+          renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+          expect(
+            screen.getByText(/serie del certificado \(tsa\)/i),
+          ).toBeInTheDocument();
+          expect(screen.getByText('4A1B2C3D')).toBeInTheDocument();
+          expect(
+            screen.getByText(/emisión del certificado \(tsa\)/i),
+          ).toBeInTheDocument();
+        });
+
+        it('no muestra el componente si el backend no pudo extraer el certificado', () => {
+          mockData(buildCompleted({ integrityTsaCertificate: null }));
+
+          renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+          expect(
+            screen.queryByText(/serie del certificado \(tsa\)/i),
+          ).not.toBeInTheDocument();
+          expect(
+            screen.queryByText(/emisión del certificado \(tsa\)/i),
+          ).not.toBeInTheDocument();
+        });
       });
     });
 
@@ -391,46 +461,117 @@ describe('PublicDocumentView', () => {
     });
 
     describe('descargas disponibles', () => {
-      it('ofrece los tres artefactos apuntando a la ruta pública del backend', () => {
+      it('ofrece los tres artefactos habilitados', () => {
         mockData(buildCompleted());
 
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(
-          screen.getByRole('link', { name: /constancia nom-151/i }),
-        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/nom151');
+          screen.getByRole('button', { name: /constancia nom-151/i }),
+        ).toBeEnabled();
         expect(
-          screen.getByRole('link', { name: /sello de tiempo/i }),
-        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/timestamp');
+          screen.getByRole('button', { name: /sello de tiempo/i }),
+        ).toBeEnabled();
         expect(
-          screen.getByRole('link', { name: /cadena canónica/i }),
-        ).toHaveAttribute('href', '/api/document/public/doc-1/seal/canonical');
+          screen.getByRole('button', { name: /xml canónico/i }),
+        ).toBeEnabled();
       });
 
-      it('solo ofrece los artefactos que el backend confirmó que existen', () => {
+      it('descarga el XML canónico consultando el sello al hacer clic', async () => {
+        const user = userEvent.setup();
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(screen.getByRole('button', { name: /xml canónico/i }));
+
+        expect(mockedDownloadCanonicalXml).toHaveBeenCalledWith(
+          '/api/document/public/doc-1/seal/canonical',
+          'cadena-canonica-doc-1.xml',
+        );
+      });
+
+      /**
+       * El criterio de aceptación que motiva no usar un enlace directo: si la descarga falla, se
+       * avisa y NO se guarda nada. Un `<a href download>` habría guardado el cuerpo del error.
+       */
+      it('avisa y no descarga nada si el XML canónico no se puede obtener', async () => {
+        const user = userEvent.setup();
+        mockedDownloadCanonicalXml.mockRejectedValueOnce(
+          new CanonicalXmlDownloadError(
+            'Este documento no tiene XML canónico disponible.',
+          ),
+        );
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(screen.getByRole('button', { name: /xml canónico/i }));
+
+        expect(mockedToastError).toHaveBeenCalledWith(
+          'Este documento no tiene XML canónico disponible.',
+        );
+      });
+
+      it('decodifica el Base64 de cada evidencia en el navegador al hacer clic en su botón', async () => {
+        const user = userEvent.setup();
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(
+          screen.getByRole('button', { name: /constancia nom-151/i }),
+        );
+        expect(mockedDownloadBase64Evidence).toHaveBeenCalledWith(
+          'bm9tMTUxLWVuLWJhc2U2NA==',
+          'nom151-doc-1.der',
+        );
+
+        await user.click(
+          screen.getByRole('button', { name: /sello de tiempo/i }),
+        );
+        expect(mockedDownloadBase64Evidence).toHaveBeenCalledWith(
+          'dHNyLWVuLWJhc2U2NA==',
+          'sello-de-tiempo-doc-1.tsr',
+        );
+
+        // El XML canónico no se decodifica de Base64: se pide al backend ya envuelto en XML.
+        expect(mockedDownloadBase64Evidence).toHaveBeenCalledTimes(2);
+      });
+
+      it('deshabilita el botón de una evidencia que el documento no tiene, sin ocultar las demás', () => {
         mockData(
           buildCompleted({
             downloads: { nom151: false, timestamp: true, canonical: false },
+            sealEvidence: {
+              timestampFileBase64: 'dHNyLWVuLWJhc2U2NA==',
+              integrityFileBase64: null,
+            },
           }),
         );
 
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(
-          screen.getByRole('link', { name: /sello de tiempo/i }),
-        ).toBeInTheDocument();
+          screen.getByRole('button', { name: /sello de tiempo/i }),
+        ).toBeEnabled();
         expect(
-          screen.queryByRole('link', { name: /constancia nom-151/i }),
-        ).not.toBeInTheDocument();
+          screen.getByRole('button', { name: /constancia nom-151/i }),
+        ).toBeDisabled();
+        // Se deshabilita, no se oculta: mismo criterio que las otras dos evidencias.
         expect(
-          screen.queryByRole('link', { name: /cadena canónica/i }),
-        ).not.toBeInTheDocument();
+          screen.getByRole('button', { name: /xml canónico/i }),
+        ).toBeDisabled();
       });
 
       it('sin ningún artefacto, lo dice en vez de dejar la sección vacía', () => {
         mockData(
           buildCompleted({
             downloads: { nom151: false, timestamp: false, canonical: false },
+            sealEvidence: {
+              timestampFileBase64: null,
+              integrityFileBase64: null,
+            },
           }),
         );
 

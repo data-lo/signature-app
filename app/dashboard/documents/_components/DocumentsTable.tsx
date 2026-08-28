@@ -126,6 +126,14 @@ export default function DocumentsTable({
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
 
+  /**
+   * Un documento es firmable si la sección ofrece esa acción (`onSignClick`, que sólo llega en
+   * "Por firmar") y todavía está en progreso. Es la misma condición que gobernaba el botón de
+   * texto anterior: mudar la acción al menú no cambió a quién se le ofrece.
+   */
+  const canSignDocument = (doc: DocumentListItem) =>
+    onSignClick != null && doc.status === DocumentStatus.Pending;
+
   return (
     <div className="flex-1 min-w-0">
       {onFiltersChange && (
@@ -204,18 +212,16 @@ export default function DocumentsTable({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
-                      {/* La firma sigue siendo la acción primaria de "Por firmar", así que conserva
-                        su botón propio; el resto de acciones vive en el menú de tres puntos. */}
-                      {onSignClick && doc.status === DocumentStatus.Pending && (
-                        <Button
-                          variant="brand"
-                          size="sm"
-                          onClick={() => onSignClick(doc.id)}
-                        >
-                          FIRMAR
-                        </Button>
-                      )}
+                      {/* Todas las acciones viven en el menú, incluida firmar: era el último
+                        botón de texto suelto de la columna. La condición de elegibilidad no
+                        cambió al mudarla — sigue siendo "esta sección permite firmar y el
+                        documento está en progreso"—, sólo cambió dónde se dibuja. */}
                       <DocumentRowActions
+                        onSign={
+                          canSignDocument(doc)
+                            ? () => onSignClick?.(doc.id)
+                            : undefined
+                        }
                         isDownloading={isDownloading}
                         onDownload={() => downloadMutation.mutate(doc.id)}
                         onViewDetail={

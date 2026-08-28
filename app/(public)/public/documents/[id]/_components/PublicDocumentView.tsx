@@ -182,6 +182,24 @@ function CompletedVerification({ data }: { data: PublicDocumentViewData }) {
             por un PSC.
           </p>
         )}
+
+        {/* Serie y notBefore del certificado TSA embebido en la evidencia NOM-151
+            (`integrityEvidence.fileBase64`), distinto del renglón "Certificado (TSA)" de arriba
+            —ese vive dentro del sello de tiempo RFC 3161, que el backend todavía no extrae—. Solo
+            se pinta cuando el backend logró extraer AMBOS datos: uno sin el otro no se muestra. */}
+        {data.integrityTsaCertificate && (
+          <div className="mt-3 flex flex-col border-t border-border pt-3">
+            <InfoRow
+              label="Serie del certificado (TSA)"
+              value={data.integrityTsaCertificate.serialNumber}
+              mono
+            />
+            <InfoRow
+              label="Emisión del certificado (TSA)"
+              value={formatLongDateTime(data.integrityTsaCertificate.issuedAt)}
+            />
+          </div>
+        )}
       </VerificationSection>
 
       <VerificationSection
@@ -202,7 +220,11 @@ function CompletedVerification({ data }: { data: PublicDocumentViewData }) {
       </VerificationSection>
 
       <VerificationSection title="Descargas disponibles">
-        <SealDownloads documentId={data.id} downloads={data.downloads} />
+        <SealDownloads
+          documentId={data.id}
+          downloads={data.downloads}
+          sealEvidence={data.sealEvidence}
+        />
       </VerificationSection>
 
       {/* El documento en sí sigue siendo lo que viene a ver quien escanea el QR impreso en la
