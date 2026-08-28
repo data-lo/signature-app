@@ -7,7 +7,6 @@ import {
   SigningCredentialStatus,
 } from '@/lib/enums/identity';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import { SIGNATURE_DOCUMENT } from '../../_config/personal-documents.config';
 import {
   getCurrentIdentityVerificationRequest,
   startDiditVerificationRequest,
@@ -86,9 +85,11 @@ describe('IdentitySignatureView', () => {
     expect(
       await screen.findByRole('button', { name: /iniciar verificación/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/firma png · bloqueada/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/se habilita cuando didit apruebe tu identidad/i),
+      screen.getByText(/agregar firma digital · bloqueada/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/se habilita cuando se apruebe tu identidad/i),
     ).toBeInTheDocument();
   });
 
@@ -216,7 +217,9 @@ describe('IdentitySignatureView', () => {
     expect(
       screen.queryByRole('button', { name: /verificación|intentar/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/firma png · bloqueada/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/agregar firma digital · bloqueada/i),
+    ).toBeInTheDocument();
   });
 
   it('identidad aprobada: habilita el paso 2 y deja de bloquear la firma', async () => {
@@ -225,11 +228,9 @@ describe('IdentitySignatureView', () => {
     renderWithProviders(<IdentitySignatureView />);
 
     expect(
-      await screen.findByText(/identidad validada por didit/i),
+      await screen.findByText(/^tu identidad ha sido verificada$/i),
     ).toBeInTheDocument();
-    // El paso 2 se dibuja con la tarjeta de documento personal de la sección, así que su título
-    // es la etiqueta de SIGNATURE_DOCUMENT y no un rótulo propio de esta pantalla.
-    expect(screen.getByText(SIGNATURE_DOCUMENT.label)).toBeInTheDocument();
+    expect(screen.getByText('Agregar firma digital')).toBeInTheDocument();
     expect(screen.getByText(/selecciona el archivo/i)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /guardar mi firma/i }),
@@ -247,6 +248,7 @@ describe('IdentitySignatureView', () => {
     expect(
       await screen.findByText(/tu credencial está lista/i),
     ).toBeInTheDocument();
+    expect(screen.getByText('Tu firma ha sido agregada')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /eliminar/i }),
     ).toBeInTheDocument();
@@ -308,7 +310,7 @@ describe('IdentitySignatureView', () => {
       expect(screen.getByText(/no reportada/i)).toBeInTheDocument();
     });
 
-    it('sin veredicto del proveedor lo dice, en vez de pintar tres renglones vacíos', async () => {
+    it('sin detalle de comprobaciones lo indica, en vez de pintar tres renglones vacíos', async () => {
       givenStatus(SigningCredentialStatus.SignaturePending, {
         ...openSession(null),
         status: IdentityVerificationStatus.Approved,
@@ -324,7 +326,7 @@ describe('IdentitySignatureView', () => {
       );
 
       expect(
-        await screen.findByText(/no reportó el detalle de las comprobaciones/i),
+        await screen.findByText(/no contamos con el detalle de las comprobaciones/i),
       ).toBeInTheDocument();
     });
   });

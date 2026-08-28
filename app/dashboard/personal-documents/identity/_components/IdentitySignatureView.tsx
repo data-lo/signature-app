@@ -61,7 +61,7 @@ export default function IdentitySignatureView() {
   return (
     <div
       id="signature-documents"
-      className="flex w-full max-w-xl flex-col gap-6"
+      className="flex w-full flex-col gap-6"
     >
       <header className="flex flex-col gap-1">
         <h1 className="font-heading text-lg font-medium text-foreground">
@@ -76,18 +76,20 @@ export default function IdentitySignatureView() {
         <SigningCredentialWarning message={SIGNING_CREDENTIAL_WARNING} />
       )}
 
-      <IdentityStepper
-        identity={identityStepState(status)}
-        signature={signatureStepState(status)}
-      />
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+        <IdentityStepper
+          identity={identityStepState(status)}
+          signature={signatureStepState(status)}
+        />
 
-      <DiditVerificationCard
-        data={data}
-        onStart={() => startMutation.mutate()}
-        starting={startMutation.isPending}
-      />
+        <DiditVerificationCard
+          data={data}
+          onStart={() => startMutation.mutate()}
+          starting={startMutation.isPending}
+        />
 
-      <SignatureCard status={status} />
+        <SignatureCard status={status} />
+      </div>
     </div>
   );
 }

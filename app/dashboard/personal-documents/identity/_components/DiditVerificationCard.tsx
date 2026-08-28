@@ -149,7 +149,7 @@ export default function DiditVerificationCard({
         <StateCard
           tone="success"
           icon={<BadgeCheck className="size-5" />}
-          title="Identidad validada por Didit"
+          title="Tu identidad ha sido verificada"
         >
           <CardActions>
             <IdentityDetailDialog data={data} />
@@ -163,7 +163,7 @@ export default function DiditVerificationCard({
         <StateCard
           tone="primary"
           icon={<ScanFace className="size-5" />}
-          title="Identidad con Didit"
+          title="Validación de identidad"
           description="Captura tu INE y confirma que eres tú con una selfie en vivo. Toma menos de dos minutos."
         >
           <CardActions>
