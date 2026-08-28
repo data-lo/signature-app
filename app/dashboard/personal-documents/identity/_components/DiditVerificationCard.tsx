@@ -66,7 +66,7 @@ export default function DiditVerificationCard({
         <StateCard
           tone="progress"
           icon={<Loader2 className="size-5 animate-spin" />}
-          title="Identidad con Didit · en proceso"
+          title="Validación de identidad en proceso"
         >
           <VerificationQrPanel url={verification.url} />
         </StateCard>
@@ -144,7 +144,7 @@ export default function DiditVerificationCard({
         <StateCard
           tone="success"
           icon={<BadgeCheck className="size-5" />}
-          title="Identidad validada por Didit"
+          title="Tu identidad ha sido verificada"
         >
           <IdentityDetailDialog data={data} />
         </StateCard>
@@ -156,7 +156,7 @@ export default function DiditVerificationCard({
         <StateCard
           tone="primary"
           icon={<ScanFace className="size-5" />}
-          title="Identidad con Didit"
+          title="Validación de identidad"
           description="Captura tu INE y confirma que eres tú con una selfie en vivo. Toma menos de dos minutos."
         >
           <StartButton

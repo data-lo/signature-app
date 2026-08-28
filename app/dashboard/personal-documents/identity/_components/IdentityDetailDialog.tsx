@@ -32,10 +32,10 @@ const CHECK_LABELS: Array<{
 ];
 
 /**
- * "Ver detalle de la validación": qué se comprobó, cuándo y con qué proveedor.
+ * "Ver detalle de la validación": qué se comprobó y cuándo.
  *
  * El desglose viene ya resumido del backend (`verification.checks`), que filtra el veredicto
- * crudo de Didit: acá sólo llega cómo salió cada comprobación, nunca el nombre, el número de
+ * crudo del proveedor: acá sólo llega cómo salió cada comprobación, nunca el nombre, el número de
  * documento, las imágenes de la INE ni las puntuaciones de los modelos.
  */
 export default function IdentityDetailDialog({
@@ -47,7 +47,7 @@ export default function IdentityDetailDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button type="button" variant="link" className="h-auto p-0" />}
+        render={<Button type="button" variant="outline" />}
       >
         Ver detalle de la validación
       </DialogTrigger>
@@ -68,13 +68,12 @@ export default function IdentityDetailDialog({
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">
-            El proveedor no reportó el detalle de las comprobaciones para esta
+            No contamos con el detalle de las comprobaciones para esta
             verificación.
           </p>
         )}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t pt-4 text-sm">
-          <DetailRow label="Proveedor" value="Didit" />
           <DetailRow
             label="Validada el"
             value={formatDateTime(data.identityVerifiedAt)}

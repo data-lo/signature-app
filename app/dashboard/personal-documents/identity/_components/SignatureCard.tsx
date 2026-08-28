@@ -24,6 +24,16 @@ interface SignatureCardProps {
 const signatureFormSchema = z.object({ signatureFile: signatureFileSchema });
 type SignatureFormValues = z.infer<typeof signatureFormSchema>;
 
+const PENDING_SIGNATURE_CONFIG = {
+  ...SIGNATURE_DOCUMENT,
+  label: 'Agregar firma digital',
+};
+
+const REGISTERED_SIGNATURE_CONFIG = {
+  ...SIGNATURE_DOCUMENT,
+  label: 'Tu firma ha sido agregada',
+};
+
 /**
  * Paso 2: la firma PNG.
  *
@@ -59,12 +69,12 @@ function LockedSignature({ status }: { status: SigningCredentialStatus }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-muted-foreground">
           <LockKeyhole className="size-5" />
-          Firma PNG · bloqueada
+          Agregar firma digital · bloqueada
         </CardTitle>
         <CardDescription>
           {identityStarted
             ? 'Permanece visible; aún no se puede modificar.'
-            : 'Se habilita cuando Didit apruebe tu identidad.'}
+            : 'Se habilita cuando se apruebe tu identidad.'}
         </CardDescription>
       </CardHeader>
     </Card>
@@ -93,7 +103,7 @@ function SignatureUploadForm() {
     >
       <div className="flex flex-col gap-4">
         <PersonalDocumentCard
-          config={SIGNATURE_DOCUMENT}
+          config={PENDING_SIGNATURE_CONFIG}
           storedUrl={null}
           pendingFile={signatureFile}
           error={errors.signatureFile?.message}
@@ -134,7 +144,7 @@ function RegisteredSignature() {
   return (
     <>
       <PersonalDocumentCard
-        config={SIGNATURE_DOCUMENT}
+        config={REGISTERED_SIGNATURE_CONFIG}
         storedUrl={signature?.secureUrl ?? null}
         deleting={deleteMutation.isPending}
         onDelete={signature ? () => setConfirmingDelete(true) : undefined}
