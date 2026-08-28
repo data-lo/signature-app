@@ -1,3 +1,5 @@
+import { saveBlobAsFile } from './save-blob-as-file';
+
 /**
  * Decodifica un Base64 a sus bytes crudos y dispara la descarga como archivo binario.
  *
@@ -14,15 +16,8 @@ export function downloadBase64Evidence(base64: string, fileName: string): void {
     bytes[i] = binary.charCodeAt(i);
   }
 
-  const blob = new Blob([bytes], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
+  saveBlobAsFile(
+    new Blob([bytes], { type: 'application/octet-stream' }),
+    fileName,
+  );
 }

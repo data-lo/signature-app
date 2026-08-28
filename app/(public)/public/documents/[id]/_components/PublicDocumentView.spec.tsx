@@ -8,6 +8,7 @@ import type {
   PublicSigner,
 } from '../_requests';
 import { CanonicalXmlDownloadError } from '../_utils/download-canonical-xml';
+import { AuditXmlDownloadError } from '../_utils/download-audit-xml';
 
 jest.mock('../_hooks/usePublicDocument');
 jest.mock('./PublicPdfViewer', () => ({
@@ -29,6 +30,15 @@ jest.mock('../_utils/download-canonical-xml', () => ({
   ...jest.requireActual('../_utils/download-canonical-xml'),
   downloadCanonicalXml: jest.fn(),
 }));
+/**
+ * El XML de auditoría se pide igual que el canónico: la mecánica (fetch, comprobación del estatus
+ * y guardado del blob) se prueba en `download-audit-xml.spec.ts`. `AuditXmlDownloadError` se
+ * conserva real porque el componente decide por su tipo qué mensaje mostrar.
+ */
+jest.mock('../_utils/download-audit-xml', () => ({
+  ...jest.requireActual('../_utils/download-audit-xml'),
+  downloadAuditXml: jest.fn(),
+}));
 jest.mock('react-hot-toast', () => ({
   __esModule: true,
   default: { error: jest.fn(), success: jest.fn() },
@@ -41,6 +51,8 @@ const mockedDownloadBase64Evidence = jest.requireMock(
 const mockedDownloadCanonicalXml = jest.requireMock(
   '../_utils/download-canonical-xml',
 ).downloadCanonicalXml as jest.Mock;
+const mockedDownloadAuditXml = jest.requireMock('../_utils/download-audit-xml')
+  .downloadAuditXml as jest.Mock;
 const mockedToastError = jest.requireMock('react-hot-toast').default
   .error as jest.Mock;
 
@@ -216,6 +228,11 @@ describe('PublicDocumentView', () => {
         screen.queryByRole('link', { name: /constancia nom-151/i }),
       ).not.toBeInTheDocument();
       expect(screen.queryByText(/PublicPdfViewer/)).not.toBeInTheDocument();
+      // El XML de auditoría sólo se ofrece para documentos firmados: mientras la firma no se
+      // completa no hay expediente que auditar, y esta URL no pide sesión.
+      expect(
+        screen.queryByRole('button', { name: /xml de auditoría/i }),
+      ).not.toBeInTheDocument();
     });
 
     /**
@@ -461,6 +478,82 @@ describe('PublicDocumentView', () => {
     });
 
     describe('descargas disponibles', () => {
+      it('ofrece el XML de auditoría en un documento completado', () => {
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          screen.getByRole('button', { name: /descargar xml de auditoría/i }),
+        ).toBeEnabled();
+      });
+
+      it('pide el XML de auditoría al backend al hacer clic', async () => {
+        const user = userEvent.setup();
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(
+          screen.getByRole('button', { name: /descargar xml de auditoría/i }),
+        );
+
+        expect(mockedDownloadAuditXml).toHaveBeenCalledWith(
+          '/api/document/public/doc-1/audit-xml',
+          'auditoria-doc-1.xml',
+        );
+      });
+
+      /**
+       * El expediente se arma con evidencia que puede faltar (un PDF ilegible en su bucket): si el
+       * backend responde un error controlado, se avisa y no se guarda un archivo a medias.
+       */
+      it('avisa y no descarga nada si el XML de auditoría no se puede generar', async () => {
+        const user = userEvent.setup();
+        mockedDownloadAuditXml.mockRejectedValueOnce(
+          new AuditXmlDownloadError(
+            'Este documento no tiene XML de auditoría disponible.',
+          ),
+        );
+        mockData(buildCompleted());
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        await user.click(
+          screen.getByRole('button', { name: /descargar xml de auditoría/i }),
+        );
+
+        expect(mockedToastError).toHaveBeenCalledWith(
+          'Este documento no tiene XML de auditoría disponible.',
+        );
+      });
+
+      /**
+       * El XML de auditoría no es una pieza de la constancia del PSC: existe aunque el documento
+       * nunca se haya sellado, así que el aviso de "sin constancia descargable" no puede llevárselo
+       * por delante.
+       */
+      it('sigue ofreciendo el XML de auditoría en un documento sin constancia', () => {
+        mockData(
+          buildCompleted({
+            downloads: { nom151: false, timestamp: false, canonical: false },
+            sealEvidence: {
+              timestampFileBase64: null,
+              integrityFileBase64: null,
+            },
+          }),
+        );
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          screen.getByRole('button', { name: /descargar xml de auditoría/i }),
+        ).toBeEnabled();
+        expect(
+          screen.getByText(/no tiene constancia de conservación descargable/i),
+        ).toBeInTheDocument();
+      });
+
       it('ofrece los tres artefactos habilitados', () => {
         mockData(buildCompleted());
 

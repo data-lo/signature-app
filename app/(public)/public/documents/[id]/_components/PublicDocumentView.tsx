@@ -7,6 +7,7 @@ import { formatLongDateTime } from '@/lib/format-datetime';
 import { DocumentStatus } from '@/lib/enums/document';
 import { usePublicDocument } from '../_hooks/usePublicDocument';
 import type { PublicDocumentView as PublicDocumentViewData } from '../_requests';
+import { AuditXmlDownload } from './AuditXmlDownload';
 import { SealDownloads } from './SealDownloads';
 import { SignerEvidenceCard } from './SignerEvidenceCard';
 import {
@@ -220,11 +221,18 @@ function CompletedVerification({ data }: { data: PublicDocumentViewData }) {
       </VerificationSection>
 
       <VerificationSection title="Descargas disponibles">
-        <SealDownloads
-          documentId={data.id}
-          downloads={data.downloads}
-          sealEvidence={data.sealEvidence}
-        />
+        <div className="flex flex-col gap-4">
+          {/* Primero el expediente completo y luego las piezas sueltas del sello: quien viene a
+              auditar el documento se lleva todo en un archivo, y quien busca verificar una pieza
+              concreta con sus propias herramientas la sigue teniendo suelta. */}
+          <AuditXmlDownload documentId={data.id} />
+
+          <SealDownloads
+            documentId={data.id}
+            downloads={data.downloads}
+            sealEvidence={data.sealEvidence}
+          />
+        </div>
       </VerificationSection>
 
       {/* El documento en sí sigue siendo lo que viene a ver quien escanea el QR impreso en la
