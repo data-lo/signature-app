@@ -135,3 +135,15 @@ export function sealArtifactDownloadUrl(
 ): string {
   return `/api/document/public/${documentId}/seal/${artifact}`;
 }
+
+/**
+ * URL de descarga del XML de auditoría del documento.
+ *
+ * Enlace directo al backend a través del proxy `/api` de Next, igual que los artefactos del sello,
+ * pero fuera de `sealArtifactDownloadUrl` a propósito: esto no es una pieza de la constancia del
+ * PSC —de hecho existe aunque el documento nunca se haya sellado—, es el expediente completo que
+ * el backend arma en el momento de pedirlo.
+ */
+export function auditXmlDownloadUrl(documentId: string): string {
+  return `/api/document/public/${documentId}/audit-xml`;
+}

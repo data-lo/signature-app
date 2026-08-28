@@ -12,6 +12,8 @@
  * construye ni se reescribe, sólo se comprueba y se guarda.
  */
 
+import { saveBlobAsFile } from './save-blob-as-file';
+
 /** Lo que el llamador muestra al usuario cuando la descarga no se puede completar. */
 export class CanonicalXmlDownloadError extends Error {}
 
@@ -72,15 +74,8 @@ function assertParsesAsXml(xml: string): void {
 function save(xml: string, fileName: string): void {
   // `charset=utf-8` en el blob: la cadena canónica lleva acentos (el nombre del firmante) y sin
   // declararlo el archivo se abre con los caracteres rotos en algunos visores.
-  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
+  saveBlobAsFile(
+    new Blob([xml], { type: 'application/xml;charset=utf-8' }),
+    fileName,
+  );
 }
