@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, LockKeyhole } from 'lucide-react';
+import { BadgeCheck, Loader2, LockKeyhole } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form } from '@/components/form/form';
@@ -146,6 +146,14 @@ function RegisteredSignature() {
       <PersonalDocumentCard
         config={REGISTERED_SIGNATURE_CONFIG}
         storedUrl={signature?.secureUrl ?? null}
+        storedTitleIcon={
+          <BadgeCheck
+            className="size-5 text-emerald-600 dark:text-emerald-400"
+            aria-hidden
+          />
+        }
+        showOpen={false}
+        deleteVariant="destructive"
         deleting={deleteMutation.isPending}
         onDelete={signature ? () => setConfirmingDelete(true) : undefined}
       />

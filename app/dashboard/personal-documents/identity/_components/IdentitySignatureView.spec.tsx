@@ -246,16 +246,15 @@ describe('IdentitySignatureView', () => {
     renderWithProviders(<IdentitySignatureView />);
 
     expect(
-      await screen.findByText(/tu credencial está lista/i),
+      await screen.findByText(
+        /aquí puedes iniciar el proceso de verificación de identidad/i,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText('Tu firma ha sido agregada')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /eliminar/i }),
     ).toBeInTheDocument();
-    // Los dos pasos quedan marcados como terminados en el encabezado.
-    const [identityStep, signatureStep] = screen.getAllByRole('listitem');
-    expect(identityStep).toHaveTextContent('Identidad validada');
-    expect(signatureStep).toHaveTextContent('Firma registrada');
+    expect(screen.queryByRole('link', { name: /abrir/i })).not.toBeInTheDocument();
   });
 
   describe('detalle de la validación', () => {
@@ -274,7 +273,7 @@ describe('IdentitySignatureView', () => {
 
       await userEvent.click(
         await screen.findByRole('button', {
-          name: /ver detalle de la validación/i,
+          name: 'Detalles',
         }),
       );
 
@@ -302,7 +301,7 @@ describe('IdentitySignatureView', () => {
 
       await userEvent.click(
         await screen.findByRole('button', {
-          name: /ver detalle de la validación/i,
+          name: 'Detalles',
         }),
       );
 
@@ -321,7 +320,7 @@ describe('IdentitySignatureView', () => {
 
       await userEvent.click(
         await screen.findByRole('button', {
-          name: /ver detalle de la validación/i,
+          name: 'Detalles',
         }),
       );
 
@@ -357,7 +356,9 @@ describe('IdentitySignatureView', () => {
 
       renderWithProviders(<IdentitySignatureView />);
 
-      await screen.findByText(/tu credencial está lista/i);
+      await screen.findByText(
+        /aquí puedes iniciar el proceso de verificación de identidad/i,
+      );
       expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
     });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Minus, X } from 'lucide-react';
+import { Check, Eye, Minus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -49,7 +49,8 @@ export default function IdentityDetailDialog({
       <DialogTrigger
         render={<Button type="button" variant="outline" />}
       >
-        Ver detalle de la validación
+        <Eye className="size-4" aria-hidden />
+        Detalles
       </DialogTrigger>
 
       <DialogContent>

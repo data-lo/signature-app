@@ -151,7 +151,7 @@ export default function DiditVerificationCard({
           icon={<BadgeCheck className="size-5" />}
           title="Tu identidad ha sido verificada"
         >
-          <CardActions>
+          <CardActions align="end">
             <IdentityDetailDialog data={data} />
           </CardActions>
         </StateCard>
@@ -228,20 +228,23 @@ function StateCard({
   );
 }
 
-/**
- * Fila de acciones de la tarjeta, centrada horizontalmente.
- *
- * El título y los textos de la tarjeta se quedan a la izquierda —se leen de corrido— pero las
- * acciones se centran para que el paso a seguir quede en el eje de la tarjeta y no perdido
- * contra el borde izquierdo de una caja ancha. Es el mismo criterio con el que ya se dibujaba el
- * QR y sus dos salidas (ver `VerificationQrPanel`), aplicado ahora a todos los estados para que
- * la tarjeta no cambie de composición según el avance del usuario.
- *
- * `flex-wrap` porque en pantallas angostas las etiquetas largas ("Iniciar nueva verificación")
- * tienen que poder bajar de línea sin desbordar la tarjeta.
- */
-function CardActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap justify-center gap-2">{children}</div>;
+/** Fila de acciones centrada, salvo los detalles de una identidad ya validada. */
+function CardActions({
+  children,
+  align = 'center',
+}: {
+  children: React.ReactNode;
+  align?: 'center' | 'end';
+}) {
+  return (
+    <div
+      className={`flex flex-wrap gap-2 ${
+        align === 'end' ? 'justify-end' : 'justify-center'
+      }`}
+    >
+      {children}
+    </div>
+  );
 }
 
 function StartButton({
