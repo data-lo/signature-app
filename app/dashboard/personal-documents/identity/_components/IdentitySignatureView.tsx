@@ -76,10 +76,11 @@ export default function IdentitySignatureView() {
         <SigningCredentialWarning message={SIGNING_CREDENTIAL_WARNING} />
       )}
 
-      <IdentityStepper
-        identity={identityStepState(status)}
-        signature={signatureStepState(status)}
-      />
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+        <IdentityStepper
+          identity={identityStepState(status)}
+          signature={signatureStepState(status)}
+        />
 
         <DiditVerificationCard
           data={data}
