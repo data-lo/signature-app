@@ -11,6 +11,7 @@ import {
   getPendingSignatureContext,
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
+import { getPendingSignatureCaptureToken } from '@/lib/pending-signature-capture';
 import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
 import { resendOtpRequest } from '@/app/signup/_requests';
 import { loginRequest } from '../_requests';
@@ -30,6 +31,18 @@ export function useLogin() {
       // y se le manda directo al documento en vez de /dashboard/documents/create. Best-effort:
       // si la vinculación falla, igual se le manda al documento — sign() reintenta la
       // vinculación por email al firmar (Caso A), así que el usuario nunca queda atascado.
+      /**
+       * Regreso a la captura de firma: el usuario escaneó el QR en su celular, no tenía sesión y
+       * `/signature-capture` guardó el token antes de mandarlo aquí. Se le devuelve a la captura
+       * en vez de al dashboard, que es donde acabaría sin esto — con el QR ya gastado y sin forma
+       * de retomarlo. Va antes que la vinculación de documento porque son flujos excluyentes y
+       * este es el que el usuario tiene delante en ese momento.
+       */
+      if (getPendingSignatureCaptureToken()) {
+        window.location.href = '/signature-capture';
+        return;
+      }
+
       const pendingContext = getPendingSignatureContext();
       if (pendingContext) {
         try {

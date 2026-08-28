@@ -21,18 +21,23 @@ describe('VerificationQrPanel · distribución', () => {
     expect(row).toHaveClass('flex', 'justify-center');
   });
 
-  it('centra las dos acciones asociadas al QR', () => {
+  /**
+   * El QR es la ÚNICA salida hacia Didit. La tarjeta ofrecía además "Abrir verificación" y
+   * "Copiar enlace", y las dos se retiraron junto con el rótulo que mostraba la URL: escanear con
+   * el celular es el camino previsto —ahí están la cámara y la selfie— y sostener tres caminos
+   * para lo mismo obligaba a explicar en pantalla cuál convenía.
+   */
+  it('no ofrece abrir ni copiar el enlace: el QR es la única salida', () => {
     render(<VerificationQrPanel url={URL} />);
 
-    const row = screen
-      .getByRole('link', { name: /abrir verificación/i })
-      .parentElement;
-
-    expect(row).toHaveClass('flex', 'justify-center');
-    // Las dos salidas del flujo comparten la misma fila centrada.
-    expect(row).toContainElement(
-      screen.getByRole('button', { name: /copiar enlace/i }),
-    );
+    expect(
+      screen.queryByRole('link', { name: /abrir verificación/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /copiar enlace/i }),
+    ).not.toBeInTheDocument();
+    // La URL viaja para poder codificarla, pero no se muestra en ninguna parte.
+    expect(screen.queryByText(URL)).not.toBeInTheDocument();
   });
 
   /**
@@ -42,7 +47,7 @@ describe('VerificationQrPanel · distribución', () => {
   it('deja el texto instructivo alineado a la izquierda', () => {
     render(<VerificationQrPanel url={URL} />);
 
-    const instructions = screen.getByText(/escanea el qr con tu celular/i);
+    const instructions = screen.getByText(/escanea el código qr/i);
 
     expect(instructions.className).not.toMatch(/text-center|justify-center/);
   });

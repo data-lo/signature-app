@@ -12,7 +12,14 @@ const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/signup/verify'];
 // contexto, que /login consume para devolverlo al documento — o directo al documento si ya hay
 // sesión. Tampoco va en AUTH_ROUTES, porque ahí un usuario con sesión sería desviado al
 // dashboard y se saltaría la vinculación del colaborador.
-const PUBLIC_ROUTES = ['/access-document'];
+//
+// `/signature-capture` es el destino del QR de captura de firma y está aquí por la misma razón:
+// se abre casi siempre en un celular sin sesión iniciada, y si el middleware redirige antes de
+// renderizar, el `?token=…` se pierde y el QR —que es de un solo uso— queda gastado sin haberse
+// canjeado. La página guarda el token y decide: a /login si no hay sesión, o directo al canvas si
+// la hay. Que no pase por el guard NO la deja abierta: canjear el token exige sesión y el backend
+// comprueba que quien reclama sea el mismo usuario que generó la captura.
+const PUBLIC_ROUTES = ['/access-document', '/signature-capture'];
 
 // El dashboard vivía en la raíz (/home, /documents, /organization, /personal-documents, /plans)
 // antes de moverlo bajo /dashboard. Cualquier link/bookmark viejo a una de estas rutas se

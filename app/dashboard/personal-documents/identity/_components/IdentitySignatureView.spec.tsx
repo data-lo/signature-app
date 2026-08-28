@@ -7,7 +7,6 @@ import {
   SigningCredentialStatus,
 } from '@/lib/enums/identity';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import { SIGNATURE_DOCUMENT } from '../../_config/personal-documents.config';
 import {
   getCurrentIdentityVerificationRequest,
   startDiditVerificationRequest,
@@ -86,7 +85,7 @@ describe('IdentitySignatureView', () => {
     expect(
       await screen.findByRole('button', { name: /iniciar verificación/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/firma png · bloqueada/i)).toBeInTheDocument();
+    expect(screen.getByText(/firma · bloqueada/i)).toBeInTheDocument();
     expect(
       screen.getByText(/se habilita cuando didit apruebe tu identidad/i),
     ).toBeInTheDocument();
@@ -216,7 +215,7 @@ describe('IdentitySignatureView', () => {
     expect(
       screen.queryByRole('button', { name: /verificación|intentar/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/firma png · bloqueada/i)).toBeInTheDocument();
+    expect(screen.getByText(/firma · bloqueada/i)).toBeInTheDocument();
   });
 
   it('identidad aprobada: habilita el paso 2 y deja de bloquear la firma', async () => {
@@ -227,15 +226,20 @@ describe('IdentitySignatureView', () => {
     expect(
       await screen.findByText(/identidad validada por didit/i),
     ).toBeInTheDocument();
-    // El paso 2 se dibuja con la tarjeta de documento personal de la sección, así que su título
-    // es la etiqueta de SIGNATURE_DOCUMENT y no un rótulo propio de esta pantalla.
-    expect(screen.getByText(SIGNATURE_DOCUMENT.label)).toBeInTheDocument();
-    expect(screen.getByText(/selecciona el archivo/i)).toBeInTheDocument();
+    /**
+     * El paso 2 ya no es una carga de archivo: la rúbrica se dibuja. Se ofrecen los dos caminos
+     * —en esta pantalla o pasando al celular con un QR— y el selector de PNG dejó de existir.
+     */
+    expect(screen.getByText(/registra tu firma/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /guardar mi firma/i }),
+      screen.getByRole('button', { name: /dibujar aquí/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(/firma png · bloqueada/i),
+      screen.getByRole('button', { name: /firmar desde mi celular/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/selecciona el archivo/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/firma · bloqueada/i),
     ).not.toBeInTheDocument();
   });
 

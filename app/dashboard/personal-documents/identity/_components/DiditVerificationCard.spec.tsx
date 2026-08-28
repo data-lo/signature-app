@@ -80,7 +80,7 @@ describe('DiditVerificationCard · distribución', () => {
    * El QR y sus dos salidas ya venían centrados desde que se creó el panel; se afirma acá
    * también para que la tarjeta tenga una sola regla de composición en todos sus estados.
    */
-  it('centra el QR y sus salidas mientras la verificación está en proceso', () => {
+  it('centra el QR mientras la verificación está en proceso', () => {
     renderCard(SigningCredentialStatus.IdentityVerificationInProgress, {
       url: 'https://verify.didit.me/session/abc',
     } as CurrentIdentityVerification['verification']);
@@ -91,9 +91,11 @@ describe('DiditVerificationCard · distribución', () => {
       'flex',
       'justify-center',
     );
+    // El QR quedó como única salida: las acciones que lo acompañaban se retiraron (ver
+    // `VerificationQrPanel`), así que ya no hay una segunda fila que centrar.
     expect(
-      screen.getByRole('link', { name: /abrir verificación/i }).parentElement,
-    ).toHaveClass('flex', 'justify-center');
+      screen.queryByRole('link', { name: /abrir verificación/i }),
+    ).not.toBeInTheDocument();
   });
 
   /** Título y descripción conservan su alineación: se leen de corrido, no se centran. */
