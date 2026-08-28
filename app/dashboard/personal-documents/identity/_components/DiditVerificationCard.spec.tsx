@@ -68,19 +68,19 @@ describe('DiditVerificationCard · distribución', () => {
     expect(action.parentElement).toHaveClass('flex', 'justify-center');
   });
 
-  it('centra la acción de la identidad ya validada', () => {
+  it('coloca los detalles a la derecha cuando la identidad ya está validada', () => {
     renderCard(SigningCredentialStatus.Configured);
 
-    const action = screen.getByRole('button', { name: /ver detalle/i });
+    const action = screen.getByRole('button', { name: 'Detalles' });
 
-    expect(action.parentElement).toHaveClass('flex', 'justify-center');
+    expect(action.parentElement).toHaveClass('flex', 'justify-end');
   });
 
   /**
    * El QR y sus dos salidas ya venían centrados desde que se creó el panel; se afirma acá
    * también para que la tarjeta tenga una sola regla de composición en todos sus estados.
    */
-  it('centra el QR y sus salidas mientras la verificación está en proceso', () => {
+  it('centra el QR mientras la verificación está en proceso', () => {
     renderCard(SigningCredentialStatus.IdentityVerificationInProgress, {
       url: 'https://verify.didit.me/session/abc',
     } as CurrentIdentityVerification['verification']);
@@ -92,15 +92,15 @@ describe('DiditVerificationCard · distribución', () => {
       'justify-center',
     );
     expect(
-      screen.getByRole('link', { name: /abrir verificación/i }).parentElement,
-    ).toHaveClass('flex', 'justify-center');
+      screen.queryByRole('link', { name: /abrir verificación/i }),
+    ).not.toBeInTheDocument();
   });
 
   /** Título y descripción conservan su alineación: se leen de corrido, no se centran. */
   it('deja el título y la descripción alineados a la izquierda', () => {
     renderCard(SigningCredentialStatus.IdentityVerificationRequired);
 
-    const title = screen.getByText('Identidad con Didit');
+    const title = screen.getByText('Validación de identidad');
     const description = screen.getByText(/captura tu ine/i);
 
     expect(title.className).not.toMatch(/text-center|justify-center/);

@@ -95,4 +95,20 @@ describe('PersonalDocumentCard', () => {
 
     expect(screen.getByRole('button', { name: /eliminar/i })).toBeDisabled();
   });
+
+  it('permite destacar la eliminación con la variante destructiva', () => {
+    renderWithProviders(
+      <PersonalDocumentCard
+        config={SIGNATURE_DOCUMENT}
+        storedUrl="https://minio.test/signature.png"
+        onDelete={jest.fn()}
+        deleteVariant="destructive"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /eliminar/i })).toHaveClass(
+      'bg-destructive/10',
+      'text-destructive',
+    );
+  });
 });
