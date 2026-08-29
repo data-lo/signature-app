@@ -175,6 +175,15 @@ function CompletedVerification({ data }: { data: PublicDocumentViewData }) {
               }
             />
           </div>
+        ) : data.sealingPending ? (
+          /* La constancia está en camino: no se pudo emitir al firmar porque el servicio del SAT
+             no respondió, y se emite en cuanto se pueda comprobar la revocación del certificado.
+             Se distingue del caso "no le corresponde" para no dar por definitivo algo temporal. */
+          <p className="text-sm text-muted-foreground">
+            La constancia de conservación de este documento está pendiente de
+            emitirse. El documento ya está firmado y es válido; su constancia se
+            generará en cuanto el servicio del SAT vuelva a estar disponible.
+          </p>
         ) : (
           // Solo se sellan ante el PSC los documentos con firma avanzada, y el sellado es
           // best-effort: decirlo es más útil que dejar la sección vacía.

@@ -98,6 +98,12 @@ export interface PublicDocumentView {
   totalPages: number | null;
   /** Quién creó el documento — el mismo dato que imprime la hoja de evidencia. */
   createdBy: string | null;
+  /**
+   * `true` mientras el documento espera su constancia NOM-151 porque el SAT no respondió al
+   * firmar. El documento es válido y está firmado; sólo falta la constancia, que se emite en
+   * cuanto la comprobación de revocación se completa.
+   */
+  sealingPending: boolean;
   conservationRecord: PublicConservationRecord | null;
   signers: PublicSigner[];
   downloads: PublicSealDownloads;
