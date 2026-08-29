@@ -82,6 +82,7 @@ function buildPending(
     fileName: 'contrato.pdf',
     status: DocumentStatus.Pending,
     isCompleted: false,
+    sealingPending: false,
     secureUrl: null,
     expiresIn: null,
     hash: null,
@@ -129,6 +130,7 @@ function buildCompleted(
     fileName: 'contrato.pdf',
     status: DocumentStatus.Signed,
     isCompleted: true,
+    sealingPending: false,
     secureUrl: 'https://minio/finalized-documents/doc-1',
     expiresIn: 86400,
     hash: 'hash-firmado-abc123',
@@ -322,6 +324,27 @@ describe('PublicDocumentView', () => {
           screen.queryByText(/^certificado \(tsa\)$/i),
         ).not.toBeInTheDocument();
         expect(screen.queryByText(/^número de serie$/i)).not.toBeInTheDocument();
+      });
+
+      /**
+       * Distinto de "no le corresponde": aquí la constancia SÍ va a llegar. Se firmó mientras el
+       * servicio del SAT no respondía, así que la comprobación de revocación quedó pendiente y
+       * con ella el sellado. Decirlo evita que el usuario lea un hueco como un fallo definitivo.
+       */
+      it('pendiente de sellar: avisa que la constancia está por emitirse', () => {
+        mockData(
+          buildCompleted({ conservationRecord: null, sealingPending: true }),
+        );
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        expect(
+          screen.getByText(/constancia de conservación .* pendiente de emitirse/i),
+        ).toBeInTheDocument();
+        // No debe leerse como que el documento no tiene constancia y punto.
+        expect(
+          screen.queryByText(/no cuenta con una constancia/i),
+        ).not.toBeInTheDocument();
       });
 
       it('sin constancia: lo dice en vez de dejar la sección vacía', () => {
