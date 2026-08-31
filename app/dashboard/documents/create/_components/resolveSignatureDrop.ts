@@ -1,8 +1,8 @@
 import {
   computeDropRatio,
   hasCollision,
-  SIGNATURE_BOX_WIDTH_RATIO,
-  SIGNATURE_BOX_HEIGHT_RATIO,
+  signatureBoxRatios,
+  type PageSizePt,
   type PlacedBox,
   type RectLike,
 } from '@/lib/signature-geometry';
@@ -25,6 +25,12 @@ export interface ResolveSignatureDropParams {
   activeRect: RectLike | null;
   /** Rect (viewport) de la página destino — `event.over.rect`. */
   containerRect: RectLike | null;
+  /**
+   * Tamaño en PUNTOS de la página destino, tal como se ve (con su rotación aplicada). De él sale
+   * el tamaño del cuadro: en puntos es constante, así que sus ratios dependen de la hoja. Null
+   * mientras el visor no lo haya reportado, y entonces se cae a la referencia A4 vertical.
+   */
+  pageSize: PageSizePt | null;
   collaborators: CollaboratorFormValues[];
   /** Generador de id para una entrada nueva — inyectado para que el test no dependa de crypto.randomUUID. */
   createId: () => string;
@@ -49,6 +55,7 @@ export function resolveSignatureDrop({
   pageNumber,
   activeRect,
   containerRect,
+  pageSize,
   collaborators,
   createId,
 }: ResolveSignatureDropParams): ResolveSignatureDropResult {
@@ -61,13 +68,28 @@ export function resolveSignatureDrop({
     return { outcome: 'noop' };
   }
 
-  const { xRatio, yRatio } = computeDropRatio(activeRect, containerRect);
+  /**
+   * El cuadro mide lo mismo en puntos en toda hoja, así que sus ratios se calculan contra ESTA
+   * página: en una apaisada, el mismo cuadro ocupa menos fracción de ancho y más de alto. Antes
+   * eran dos constantes, y por eso la firma salía achatada en horizontal.
+   *
+   * Los ratios entran también en el cálculo del drop: `computeDropRatio` centra el cuadro en el
+   * punto donde se soltó y lo mantiene dentro de la hoja, y las dos cosas dependen de cuánto mide.
+   */
+  const { widthRatio, heightRatio } = signatureBoxRatios(pageSize);
+
+  const { xRatio, yRatio } = computeDropRatio(
+    activeRect,
+    containerRect,
+    widthRatio,
+    heightRatio,
+  );
   const candidate = {
     page: pageNumber,
     xRatio,
     yRatio,
-    widthRatio: SIGNATURE_BOX_WIDTH_RATIO,
-    heightRatio: SIGNATURE_BOX_HEIGHT_RATIO,
+    widthRatio,
+    heightRatio,
   };
 
   // Colisión contra TODAS las firmas ya colocadas (de cualquier firmante) en esa página —
