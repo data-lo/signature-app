@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { formatLongDateTime } from '@/lib/format-datetime';
+import { cn } from '@/lib/utils';
 import { SignatureType } from '@/lib/enums/document';
 import type { PublicSigner } from '../_requests';
 import { InfoRow } from './VerificationLayout';
@@ -14,17 +16,50 @@ import { InfoRow } from './VerificationLayout';
  * El texto legal ("Sustentada") NO se escribe aquí: viaja en `legalBacking` desde el backend, que
  * es el mismo valor que se estampa en el PDF. Es la única forma de garantizar que la pantalla y el
  * documento impreso digan exactamente lo mismo.
+ *
+ * `highlighted` marca la firma cuyo QR se escaneó (ver `useHighlightedSigner`). Un documento puede
+ * llevar varias firmas y la lista puede quedar larga: sin señalarla, quien escanea el código
+ * estampado junto a UNA firma aterriza en la página y tiene que buscar cuál era. Además de
+ * destacarla, la tarjeta se trae sola a la vista.
  */
-export function SignerEvidenceCard({ signer }: { signer: PublicSigner }) {
+export function SignerEvidenceCard({
+  signer,
+  highlighted = false,
+}: {
+  signer: PublicSigner;
+  highlighted?: boolean;
+}) {
   const isAdvanced = signer.signatureType === SignatureType.Fiel;
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!highlighted) return;
+
+    // `block: 'center'` y no el default: deja la tarjeta en medio de la pantalla en vez de pegada
+    // al borde superior, que en un teléfono la esconde tras la barra del navegador.
+    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlighted]);
 
   return (
     <div
+      ref={cardRef}
       data-slot="signer-evidence"
       data-signature-type={signer.signatureType ?? undefined}
-      className="rounded-lg border border-border p-4"
+      data-highlighted={highlighted || undefined}
+      className={cn(
+        'rounded-lg border border-border p-4',
+        highlighted &&
+          'border-primary bg-primary/5 ring-2 ring-primary/40 dark:bg-primary/10',
+      )}
     >
-      <h3 className="text-sm font-semibold text-foreground">{signer.name}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-foreground">{signer.name}</h3>
+        {highlighted && (
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            Firma del código escaneado
+          </span>
+        )}
+      </div>
 
       <div className="mt-2 flex flex-col">
         <InfoRow label="Tipo de firma" value={signer.signatureTypeLabel} />
