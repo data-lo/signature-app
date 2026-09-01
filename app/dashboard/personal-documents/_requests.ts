@@ -32,7 +32,7 @@ export async function updateIneFileRequest(
 ): Promise<void> {
   const formData = new FormData();
   formData.append('officialFile', file);
-  await apiClient.patch(`/signature/${signatureId}`, formData);
+  await apiClient.patch(`/api/v1/signature/${signatureId}`, formData);
 }
 
 export async function updateSignatureFileRequest(
@@ -41,17 +41,17 @@ export async function updateSignatureFileRequest(
 ): Promise<void> {
   const formData = new FormData();
   formData.append('signatureImage', file);
-  await apiClient.patch(`/signature/${signatureId}`, formData);
+  await apiClient.patch(`/api/v1/signature/${signatureId}`, formData);
 }
 
 export async function deleteIneFileRequest(signatureId: string): Promise<void> {
-  await apiClient.delete(`/signature/${signatureId}/official-file`);
+  await apiClient.delete(`/api/v1/signature/${signatureId}/official-file`);
 }
 
 export async function deleteSignatureFileRequest(
   signatureId: string,
 ): Promise<void> {
-  await apiClient.delete(`/signature/${signatureId}/signature-image`);
+  await apiClient.delete(`/api/v1/signature/${signatureId}/signature-image`);
 }
 
 export async function updatePersonalInformationRequest(

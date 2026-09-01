@@ -23,7 +23,7 @@ export async function getAdvancedSignatureRequest(
     success: boolean;
     message: string;
     data: AdvancedSignaturePublicView;
-  }>(`/document/public/${documentId}/signatures/${collaboratorId}`);
+  }>(`/api/v1/document/public/${documentId}/signatures/${collaboratorId}`);
 
   return data.data;
 }

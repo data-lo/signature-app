@@ -55,7 +55,7 @@ export default function AccessDocumentView({
 
     (async () => {
       try {
-        await apiClient.patch(`/document/${documentId}/link-collaborator`);
+        await apiClient.patch(`/api/v1/document/${documentId}/link-collaborator`);
       } catch (error) {
         console.error(
           '[access-document] no se pudo vincular la cuenta al documento:',

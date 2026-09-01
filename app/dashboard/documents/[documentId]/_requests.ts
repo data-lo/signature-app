@@ -45,7 +45,7 @@ export async function getDocumentDetailRequest(
     success: boolean;
     message: string;
     data: DocumentDetail;
-  }>(`/document/${documentId}`);
+  }>(`/api/v1/document/${documentId}`);
 
   return data.data;
 }
@@ -90,7 +90,7 @@ export async function signDocumentRequest(
     formData.append('key', payload.advancedSignature.keyFile);
     formData.append('cer', payload.advancedSignature.cerFile);
   }
-  await apiClient.patch(`/document/${documentId}/sign`, formData);
+  await apiClient.patch(`/api/v1/document/${documentId}/sign`, formData);
 }
 
 /**
@@ -110,7 +110,7 @@ export async function requestVerificationCodeRequest(
     success: boolean;
     message: string;
     data: RequestVerificationCodeResponseData | null;
-  }>(`/document/${documentId}/verification-codes`);
+  }>(`/api/v1/document/${documentId}/verification-codes`);
 
   // Un backend anterior a este contrato responde `data: null`; si llegó hasta acá con 2xx, el
   // correo salió (antes un fallo de envío era un 500), así que se asume entregado.
@@ -121,7 +121,7 @@ export async function verifyCodeRequest(
   documentId: string,
   code: string,
 ): Promise<void> {
-  await apiClient.post(`/document/${documentId}/verification-codes/verify`, {
+  await apiClient.post(`/api/v1/document/${documentId}/verification-codes/verify`, {
     code,
   });
 }
@@ -133,7 +133,7 @@ export async function linkCollaboratorRequest(
     success: boolean;
     message: string;
     data: { linked: boolean };
-  }>(`/document/${documentId}/link-collaborator`);
+  }>(`/api/v1/document/${documentId}/link-collaborator`);
 
   return data.data;
 }
@@ -142,17 +142,17 @@ export async function rejectDocumentRequest(
   documentId: string,
   reason: string,
 ): Promise<void> {
-  await apiClient.patch(`/document/${documentId}/reject`, { reason });
+  await apiClient.patch(`/api/v1/document/${documentId}/reject`, { reason });
 }
 
 export async function requestCancellationRequest(
   documentId: string,
 ): Promise<void> {
-  await apiClient.patch(`/document/${documentId}/submit-for-cancellation`);
+  await apiClient.patch(`/api/v1/document/${documentId}/submit-for-cancellation`);
 }
 
 export async function confirmCancellationRequest(
   documentId: string,
 ): Promise<void> {
-  await apiClient.patch(`/document/${documentId}/confirm-cancellation`);
+  await apiClient.patch(`/api/v1/document/${documentId}/confirm-cancellation`);
 }

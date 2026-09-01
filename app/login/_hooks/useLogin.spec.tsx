@@ -97,7 +97,7 @@ describe('useLogin', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(mockedApiClientPatch).toHaveBeenCalledWith(
-      '/document/doc-1/link-collaborator',
+      '/api/v1/document/doc-1/link-collaborator',
     );
     expect(mockedClearPendingSignatureContext).toHaveBeenCalled();
   });

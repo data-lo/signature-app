@@ -5,7 +5,7 @@ import apiClient from '@/lib/axios';
  * AuthService.forgotPassword) sin importar si el correo existe o no.
  */
 export async function forgotPasswordRequest(email: string): Promise<void> {
-  await apiClient.post('/auth/forgot-password', { email });
+  await apiClient.post('/api/v1/auth/forgot-password', { email });
 }
 
 export interface VerifyResetCodeResponseData {
@@ -20,7 +20,7 @@ export async function verifyResetCodeRequest(
     success: boolean;
     message: string;
     data: VerifyResetCodeResponseData;
-  }>('/auth/verify-reset-code', { email, code });
+  }>('/api/v1/auth/verify-reset-code', { email, code });
   return data.data;
 }
 
@@ -29,7 +29,7 @@ export async function resetPasswordRequest(
   newPassword: string,
   confirmPassword: string,
 ): Promise<void> {
-  await apiClient.post('/auth/reset-password', {
+  await apiClient.post('/api/v1/auth/reset-password', {
     resetToken,
     newPassword,
     confirmPassword,
