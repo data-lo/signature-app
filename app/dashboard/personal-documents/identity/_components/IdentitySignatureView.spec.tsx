@@ -140,7 +140,7 @@ describe('IdentitySignatureView', () => {
    * La URL hospedada sigue viajando en la respuesta porque es lo que el QR codifica, pero dejó
    * de ser algo que el usuario pueda abrir, copiar o leer en pantalla.
    */
-  it('sesión en curso: no ofrece abrir ni copiar el enlace de verificación', async () => {
+  it('sesión en curso: ofrece el QR y el enlace para abrir la verificación aquí mismo', async () => {
     givenStatus(
       SigningCredentialStatus.IdentityVerificationInProgress,
       openSession(HOSTED_URL),
@@ -150,9 +150,11 @@ describe('IdentitySignatureView', () => {
 
     await screen.findByLabelText(/código qr para continuar/i);
 
+    // Escanear el código de la propia pantalla con esa misma pantalla es imposible: quien ya está
+    // en el dispositivo desde el que quiere verificarse necesita este enlace.
     expect(
-      screen.queryByRole('link', { name: /abrir verificación/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('link', { name: /abrir verificación/i }),
+    ).toHaveAttribute('href', HOSTED_URL);
     expect(
       screen.queryByRole('button', { name: /copiar enlace/i }),
     ).not.toBeInTheDocument();
