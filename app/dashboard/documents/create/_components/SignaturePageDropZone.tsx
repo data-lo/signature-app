@@ -3,6 +3,7 @@
 import { Page } from 'react-pdf';
 import { useDroppable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import type { PageSizePt } from '@/lib/signature-geometry';
 import SignatureBox from './SignatureBox';
 
 export interface PlacedBoxView {
@@ -24,6 +25,12 @@ interface SignaturePageDropZoneProps {
   rejectedId: string | null;
   rejectionNonce: number;
   onDeleteBox: (collaboratorIndex: number, signatureId: string) => void;
+  /**
+   * Publica el tamaño en PUNTOS de esta página, ya con su rotación aplicada. De ahí sale el
+   * tamaño del cuadro de firma, que es constante en puntos y por lo tanto distinto en ratios
+   * según la hoja (ver `signatureBoxRatios`).
+   */
+  onPageSize: (pageNumber: number, size: PageSizePt) => void;
 }
 
 /**
@@ -39,6 +46,7 @@ export default function SignaturePageDropZone({
   rejectedId,
   rejectionNonce,
   onDeleteBox,
+  onPageSize,
 }: SignaturePageDropZoneProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `page-${pageNumber}`,
@@ -48,12 +56,26 @@ export default function SignaturePageDropZone({
   return (
     <div
       ref={setNodeRef}
-      className={cn(
-        'relative shadow-xl',
-        isOver && 'ring-2 ring-primary/40',
-      )}
+      className={cn('relative shadow-xl', isOver && 'ring-2 ring-primary/40')}
     >
-      <Page pageNumber={pageNumber} width={pageWidth} renderTextLayer renderAnnotationLayer />
+      <Page
+        pageNumber={pageNumber}
+        width={pageWidth}
+        renderTextLayer
+        renderAnnotationLayer
+        /**
+         * `originalWidth`/`originalHeight` son el viewport a escala 1, que pdf.js construye con la
+         * rotación de la página ya aplicada: son los puntos de la hoja TAL COMO SE VE. `width`/
+         * `height` no sirven acá porque están escalados al ancho de render, que depende del
+         * tamaño de la ventana.
+         */
+        onLoadSuccess={(page) =>
+          onPageSize(pageNumber, {
+            width: page.originalWidth,
+            height: page.originalHeight,
+          })
+        }
+      />
       {boxes.map((box) => {
         const dndId = `box-${box.collaboratorIndex}-${box.id}`;
         const isRejected = rejectedId === dndId;

@@ -17,6 +17,7 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { cn } from '@/lib/utils';
+import type { PageSizePt } from '@/lib/signature-geometry';
 import SignerChipsBar, { type SignerChipData } from './SignerChipsBar';
 import SignaturePlacementPdfPreview from './SignaturePlacementPdfPreview';
 import type { PlacedBoxView } from './SignaturePageDropZone';
@@ -54,8 +55,8 @@ function formatSignerName(name: string): string {
     .trim()
     .toLocaleLowerCase('es-MX')
     .split(/\s+/)
-    .map((part) =>
-      `${part.charAt(0).toLocaleUpperCase('es-MX')}${part.slice(1)}`,
+    .map(
+      (part) => `${part.charAt(0).toLocaleUpperCase('es-MX')}${part.slice(1)}`,
     )
     .join(' ');
 }
@@ -81,6 +82,21 @@ export default function SignaturePlacementField({
   );
   const [rejectedId, setRejectedId] = useState<string | null>(null);
   const [rejectionNonce, setRejectionNonce] = useState(0);
+
+  /**
+   * Tamaño en puntos de cada página, tal como se ve. Lo reporta el visor conforme carga cada hoja
+   * y de él sale el tamaño del cuadro de firma, que es constante en puntos: en una hoja apaisada
+   * ocupa menos fracción de ancho y más de alto que en una vertical.
+   *
+   * Va en un ref y no en estado porque sólo se lee al soltar una firma: guardarlo en estado
+   * volvería a renderizar el visor una vez por página cargada, sin que nada de lo que se ve
+   * cambie.
+   */
+  const pageSizesRef = useRef(new Map<number, PageSizePt>());
+
+  const handlePageSize = useCallback((pageNumber: number, size: PageSizePt) => {
+    pageSizesRef.current.set(pageNumber, size);
+  }, []);
 
   // distance:4 evita que un simple click en un chip o en el botón de borrar de una caja se
   // interprete como el inicio de un arrastre.
@@ -178,13 +194,19 @@ export default function SignaturePlacementField({
     setActiveDrag(null);
 
     const dragPayload = active.data.current as SignatureDragPayload;
+    const pageNumber =
+      (over?.data.current as { pageNumber: number } | undefined)?.pageNumber ??
+      null;
+
     const result = resolveSignatureDrop({
       dragPayload,
-      pageNumber:
-        (over?.data.current as { pageNumber: number } | undefined)
-          ?.pageNumber ?? null,
+      pageNumber,
       activeRect: active.rect.current.translated,
       containerRect: over?.rect ?? null,
+      pageSize:
+        pageNumber != null
+          ? (pageSizesRef.current.get(pageNumber) ?? null)
+          : null,
       collaborators: getValues('collaborators'),
       createId: () => crypto.randomUUID(),
     });
@@ -249,6 +271,7 @@ export default function SignaturePlacementField({
             rejectionNonce={rejectionNonce}
             onDeleteBox={handleDeleteBox}
             onPageCountChange={onPageCountChange}
+            onPageSize={handlePageSize}
           />
         </div>
       </div>
