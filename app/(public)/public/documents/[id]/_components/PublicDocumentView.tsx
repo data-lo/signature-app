@@ -3,9 +3,11 @@
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { formatLongDateTime } from '@/lib/format-datetime';
 import { DocumentStatus } from '@/lib/enums/document';
 import { usePublicDocument } from '../_hooks/usePublicDocument';
+import { useHighlightedSigner } from '../_hooks/useHighlightedSigner';
 import type { PublicDocumentView as PublicDocumentViewData } from '../_requests';
 import { AuditXmlDownload } from './AuditXmlDownload';
 import { SealDownloads } from './SealDownloads';
@@ -97,7 +99,13 @@ function VerificationPage({ children }: { children: React.ReactNode }) {
  * y esta URL no pide sesión. El backend tampoco manda el resto — aquí no se está ocultando algo
  * que sí haya llegado.
  */
-function PendingVerification({ data }: { data: PublicDocumentViewData }) {
+function PendingVerification({
+  data,
+  highlightedSignerId,
+}: {
+  data: PublicDocumentViewData;
+  highlightedSignerId: string | null;
+}) {
   return (
     <VerificationPage>
       <VerificationAlert variant="warning">
@@ -120,7 +128,14 @@ function PendingVerification({ data }: { data: PublicDocumentViewData }) {
             {data.signers.map((signer) => (
               <li
                 key={signer.id}
-                className="rounded-lg border border-border px-3 py-2 text-sm text-foreground"
+                data-highlighted={
+                  signer.id === highlightedSignerId || undefined
+                }
+                className={cn(
+                  'rounded-lg border border-border px-3 py-2 text-sm text-foreground',
+                  signer.id === highlightedSignerId &&
+                    'border-primary bg-primary/5 ring-2 ring-primary/40 dark:bg-primary/10',
+                )}
               >
                 {signer.name}
               </li>
@@ -133,7 +148,13 @@ function PendingVerification({ data }: { data: PublicDocumentViewData }) {
 }
 
 /** Documento firmado por todos: las cinco secciones de la historia, más el documento en sí. */
-function CompletedVerification({ data }: { data: PublicDocumentViewData }) {
+function CompletedVerification({
+  data,
+  highlightedSignerId,
+}: {
+  data: PublicDocumentViewData;
+  highlightedSignerId: string | null;
+}) {
   return (
     <VerificationPage>
       <VerificationAlert variant="success">
@@ -223,7 +244,11 @@ function CompletedVerification({ data }: { data: PublicDocumentViewData }) {
         ) : (
           <div className="flex flex-col gap-3">
             {data.signers.map((signer) => (
-              <SignerEvidenceCard key={signer.id} signer={signer} />
+              <SignerEvidenceCard
+                key={signer.id}
+                signer={signer}
+                highlighted={signer.id === highlightedSignerId}
+              />
             ))}
           </div>
         )}
@@ -271,6 +296,16 @@ export default function PublicDocumentView({
 }: PublicDocumentViewProps) {
   const { data, isLoading, isError } = usePublicDocument(documentId);
 
+  /**
+   * Firma señalada por el QR que se escaneó. Se resuelve contra los firmantes que el backend ya
+   * publicó, así que un parámetro ausente, inválido o de otro documento simplemente no resalta
+   * nada y la página carga como siempre (ver `useHighlightedSigner`).
+   *
+   * El hook va antes de los returns tempranos porque es un hook: React exige que se llame en el
+   * mismo orden en cada render, y mientras carga `data` es `undefined` —el hook lo contempla—.
+   */
+  const highlightedSignerId = useHighlightedSigner(data?.signers);
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -289,8 +324,14 @@ export default function PublicDocumentView({
   }
 
   return data.isCompleted ? (
-    <CompletedVerification data={data} />
+    <CompletedVerification
+      data={data}
+      highlightedSignerId={highlightedSignerId}
+    />
   ) : (
-    <PendingVerification data={data} />
+    <PendingVerification
+      data={data}
+      highlightedSignerId={highlightedSignerId}
+    />
   );
 }
