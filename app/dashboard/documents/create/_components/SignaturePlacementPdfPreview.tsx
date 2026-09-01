@@ -6,6 +6,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 // Configura el worker de PDF.js desde el propio origen (ver lib/pdf-worker.ts).
 import '@/lib/pdf-worker';
+import type { PageSizePt } from '@/lib/signature-geometry';
 import SignaturePageDropZone, {
   type PlacedBoxView,
 } from './SignaturePageDropZone';
@@ -26,6 +27,12 @@ interface SignaturePlacementPdfPreviewProps {
    * donde ese dato existe sin volver a leer y decodificar el archivo.
    */
   onPageCountChange?: (pageCount: number) => void;
+  /**
+   * Tamaño en puntos de cada página, conforme el visor las va cargando. Este componente ya parsea
+   * el PDF para dibujarlo, así que es el único lugar donde ese dato existe sin volver a leer y
+   * decodificar el archivo — igual que `onPageCountChange`.
+   */
+  onPageSize: (pageNumber: number, size: PageSizePt) => void;
 }
 
 /**
@@ -42,6 +49,7 @@ function SignaturePlacementPdfPreview({
   rejectionNonce,
   onDeleteBox,
   onPageCountChange,
+  onPageSize,
 }: SignaturePlacementPdfPreviewProps) {
   const [numPages, setNumPages] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,6 +114,7 @@ function SignaturePlacementPdfPreview({
               rejectedId={rejectedId}
               rejectionNonce={rejectionNonce}
               onDeleteBox={onDeleteBox}
+              onPageSize={onPageSize}
             />
           );
         })}
