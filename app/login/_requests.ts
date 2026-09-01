@@ -22,6 +22,6 @@ export async function loginRequest(
     success: boolean;
     message: string;
     data: LoginResponseData;
-  }>('/auth/login', values);
+  }>('/api/v1/auth/login', values);
   return data.data;
 }

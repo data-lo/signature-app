@@ -43,7 +43,7 @@ export async function getDocumentFileUrlRequest(
   { download = false }: { download?: boolean } = {},
 ): Promise<DocumentFileUrl> {
   const { data } = await apiClient.get<DocumentFileUrl>(
-    `/document/file/${documentId}`,
+    `/api/v1/document/file/${documentId}`,
     download ? { params: { download: 'true' } } : undefined,
   );
 
@@ -76,7 +76,7 @@ export async function getDocumentsRequest({
     message: string;
     data: DocumentListItem[];
     meta: DocumentsMeta;
-  }>('/document', {
+  }>('/api/v1/document', {
     params: {
       participantEmail,
       email,

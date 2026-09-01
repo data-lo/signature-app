@@ -32,7 +32,7 @@ export async function registerRequest(
     success: boolean;
     message: string;
     data: RegisterResponseData;
-  }>('/auth/register', values);
+  }>('/api/v1/auth/register', values);
   return data.data;
 }
 
@@ -49,7 +49,7 @@ export async function verifyOtpRequest(
     success: boolean;
     message: string;
     data: VerifyOtpResponseData;
-  }>('/auth/verify-otp', { email, code });
+  }>('/api/v1/auth/verify-otp', { email, code });
   return data.data;
 }
 
@@ -78,7 +78,7 @@ export async function updatePreRegistrationRequest(
     success: boolean;
     message: string;
     data: RegisterResponseData;
-  }>('/auth/pre-registration', values);
+  }>('/api/v1/auth/pre-registration', values);
   return data.data;
 }
 
@@ -94,6 +94,6 @@ export async function resendOtpRequest(
     success: boolean;
     message: string;
     data: ResendOtpResponseData;
-  }>('/auth/resend-otp', { email });
+  }>('/api/v1/auth/resend-otp', { email });
   return data.data;
 }

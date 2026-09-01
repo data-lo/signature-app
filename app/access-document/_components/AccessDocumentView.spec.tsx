@@ -53,7 +53,7 @@ describe('AccessDocumentView', () => {
 
     await waitFor(() =>
       expect(mockedPatch).toHaveBeenCalledWith(
-        '/document/doc-1/link-collaborator',
+        '/api/v1/document/doc-1/link-collaborator',
       ),
     );
     await waitFor(() =>

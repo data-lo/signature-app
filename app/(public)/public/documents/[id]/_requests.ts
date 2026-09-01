@@ -118,7 +118,7 @@ export async function getPublicDocumentRequest(
     success: boolean;
     message: string;
     data: PublicDocumentView;
-  }>(`/document/public/${documentId}`);
+  }>(`/api/v1/document/public/${documentId}`);
 
   return data.data;
 }

@@ -47,7 +47,7 @@ export function useLogin() {
       if (pendingContext) {
         try {
           await apiClient.patch(
-            `/document/${pendingContext.documentId}/link-collaborator`,
+            `/api/v1/document/${pendingContext.documentId}/link-collaborator`,
           );
         } catch (error) {
           console.error(

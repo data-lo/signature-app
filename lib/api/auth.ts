@@ -35,7 +35,7 @@ export async function getCurrentUserRequest(): Promise<CurrentUser> {
     success: boolean;
     message: string;
     data: CurrentUser;
-  }>('/auth/me');
+  }>('/api/v1/auth/me');
 
   return data.data;
 }
