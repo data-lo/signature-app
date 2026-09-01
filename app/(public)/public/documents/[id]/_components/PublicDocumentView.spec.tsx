@@ -11,9 +11,19 @@ import { CanonicalXmlDownloadError } from '../_utils/download-canonical-xml';
 import { AuditXmlDownloadError } from '../_utils/download-audit-xml';
 
 jest.mock('../_hooks/usePublicDocument');
+/**
+ * El parámetro `firma` de la URL es lo único que esta pantalla toma del router, y es lo que el QR
+ * de una firma avanzada usa para señalar a su firmante.
+ */
+let searchParams = new URLSearchParams();
+jest.mock('next/navigation', () => ({
+  useSearchParams: () => searchParams,
+}));
 jest.mock('./PublicPdfViewer', () => ({
   __esModule: true,
-  default: ({ file }: { file: string }) => <div>PublicPdfViewer file={file}</div>,
+  default: ({ file }: { file: string }) => (
+    <div>PublicPdfViewer file={file}</div>
+  ),
 }));
 // La mecánica de decodificar Base64 y disparar la descarga (atob, Blob, URL.createObjectURL) se
 // prueba aparte en download-base64-evidence.spec.ts; acá solo importa que el botón la invoque con
@@ -45,6 +55,9 @@ jest.mock('react-hot-toast', () => ({
 }));
 
 const mockedUsePublicDocument = usePublicDocument as jest.Mock;
+
+// jsdom no implementa `scrollIntoView`; la tarjeta resaltada lo llama al montarse.
+Element.prototype.scrollIntoView = jest.fn();
 const mockedDownloadBase64Evidence = jest.requireMock(
   '../_utils/download-base64-evidence',
 ).downloadBase64Evidence as jest.Mock;
@@ -164,6 +177,11 @@ function mockData(data: PublicDocumentViewData | undefined) {
 }
 
 describe('PublicDocumentView', () => {
+  beforeEach(() => {
+    // Sin parámetro salvo que la prueba lo ponga: es el caso de quien entra por el enlace normal.
+    searchParams = new URLSearchParams();
+  });
+
   it('muestra un indicador de carga mientras isLoading es true', () => {
     mockedUsePublicDocument.mockReturnValue({
       data: undefined,
@@ -245,16 +263,21 @@ describe('PublicDocumentView', () => {
       [DocumentStatus.Rejected, /lo rechazó/i],
       [DocumentStatus.Cancelled, /fue cancelado/i],
       [DocumentStatus.Expired, /venció su fecha límite/i],
-    ])('status %s: el aviso dice que ya no se completará', (status, matcher) => {
-      mockData(buildPending({ status }));
+    ])(
+      'status %s: el aviso dice que ya no se completará',
+      (status, matcher) => {
+        mockData(buildPending({ status }));
 
-      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
-      expect(screen.getByText(matcher)).toBeInTheDocument();
-      expect(
-        screen.queryByText('Este documento aún no se ha completado de firmar.'),
-      ).not.toBeInTheDocument();
-    });
+        expect(screen.getByText(matcher)).toBeInTheDocument();
+        expect(
+          screen.queryByText(
+            'Este documento aún no se ha completado de firmar.',
+          ),
+        ).not.toBeInTheDocument();
+      },
+    );
   });
 
   describe('documento completado', () => {
@@ -279,7 +302,9 @@ describe('PublicDocumentView', () => {
         /^firmantes$/i,
         /descargas disponibles/i,
       ]) {
-        expect(screen.getByRole('heading', { name: titulo })).toBeInTheDocument();
+        expect(
+          screen.getByRole('heading', { name: titulo }),
+        ).toBeInTheDocument();
       }
       expect(screen.getByText('doc-1')).toBeInTheDocument();
       expect(screen.getByText('hash-firmado-abc123')).toBeInTheDocument();
@@ -323,7 +348,9 @@ describe('PublicDocumentView', () => {
         expect(
           screen.queryByText(/^certificado \(tsa\)$/i),
         ).not.toBeInTheDocument();
-        expect(screen.queryByText(/^número de serie$/i)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/^número de serie$/i),
+        ).not.toBeInTheDocument();
       });
 
       /**
@@ -339,7 +366,9 @@ describe('PublicDocumentView', () => {
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(
-          screen.getByText(/constancia de conservación .* pendiente de emitirse/i),
+          screen.getByText(
+            /constancia de conservación .* pendiente de emitirse/i,
+          ),
         ).toBeInTheDocument();
         // No debe leerse como que el documento no tiene constancia y punto.
         expect(
@@ -395,7 +424,9 @@ describe('PublicDocumentView', () => {
 
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
-        const card = screen.getByText('Isaay Sosa').closest('[data-slot="signer-evidence"]');
+        const card = screen
+          .getByText('Isaay Sosa')
+          .closest('[data-slot="signer-evidence"]');
         const evidence = within(card as HTMLElement);
 
         expect(evidence.getByText('Digital Simple')).toBeInTheDocument();
@@ -461,12 +492,8 @@ describe('PublicDocumentView', () => {
         expect(
           evidence.getByText('Firma Electronica Avanzada'),
         ).toBeInTheDocument();
-        expect(
-          evidence.getByText('00001000000512345678'),
-        ).toBeInTheDocument();
-        expect(
-          evidence.getByText('MEUCIQDf-firma-base64'),
-        ).toBeInTheDocument();
+        expect(evidence.getByText('00001000000512345678')).toBeInTheDocument();
+        expect(evidence.getByText('MEUCIQDf-firma-base64')).toBeInTheDocument();
         expect(evidence.getByText(/art\. 97/i)).toBeInTheDocument();
 
         expect(evidence.queryByText(/otp code/i)).not.toBeInTheDocument();
@@ -697,6 +724,94 @@ describe('PublicDocumentView', () => {
           screen.getByText(/no tiene constancia de conservación descargable/i),
         ).toBeInTheDocument();
       });
+    });
+  });
+
+  /**
+   * Historia "Redirigir QR de firma avanzada a la vista pública y resaltar al firmante".
+   *
+   * El QR estampado junto a una firma avanzada abre esta pantalla con `?firma=<id>`. Un documento
+   * puede llevar varias firmas y la lista puede quedar larga: sin señalarla, quien escanea el
+   * código de UNA firma aterriza aquí y tiene que buscar cuál era.
+   */
+  describe('firma señalada por el QR escaneado', () => {
+    /** El firmante resaltado, o null. Se identifica por el atributo que pone la tarjeta. */
+    function highlighted(): HTMLElement | null {
+      return document.querySelector<HTMLElement>('[data-highlighted="true"]');
+    }
+
+    it('resalta al firmante que señala el parámetro', () => {
+      searchParams = new URLSearchParams({ firma: 'collab-2' });
+      mockData(
+        buildCompleted({
+          signers: [
+            buildSigner({ id: 'collab-1', name: 'Isaay Sosa' }),
+            buildSigner({ id: 'collab-2', name: 'María López' }),
+          ],
+        }),
+      );
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(highlighted()).toHaveTextContent('María López');
+      expect(highlighted()).not.toHaveTextContent('Isaay Sosa');
+    });
+
+    /** La lista puede ser larga y el firmante señalado quedar fuera de pantalla. */
+    it('trae a la vista la tarjeta resaltada', () => {
+      searchParams = new URLSearchParams({ firma: 'collab-1' });
+      mockData(buildCompleted({ signers: [buildSigner({ id: 'collab-1' })] }));
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    /**
+     * Criterio "si el parámetro no existe, es inválido o la firma no pertenece al documento, la
+     * vista pública carga normalmente sin resaltar información incorrecta". El caso peligroso es
+     * el último: resaltar por posición, o pintar la tarjeta equivocada, sería peor que no
+     * resaltar nada.
+     */
+    it.each([
+      ['no viene el parámetro', undefined],
+      ['el parámetro viene vacío', ''],
+      ['el id no es de este documento', 'collab-de-otro-documento'],
+      ['el id es basura', '../../etc/passwd'],
+    ])('carga normalmente y no resalta a nadie cuando %s', (_caso, firma) => {
+      searchParams =
+        firma === undefined
+          ? new URLSearchParams()
+          : new URLSearchParams({ firma });
+      mockData(
+        buildCompleted({
+          signers: [
+            buildSigner({ id: 'collab-1', name: 'Isaay Sosa' }),
+            buildSigner({ id: 'collab-2', name: 'María López' }),
+          ],
+        }),
+      );
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      // La pantalla se ve entera, sólo que sin nadie señalado.
+      expect(screen.getByText('Isaay Sosa')).toBeInTheDocument();
+      expect(screen.getByText('María López')).toBeInTheDocument();
+      expect(highlighted()).toBeNull();
+    });
+
+    /**
+     * El QR se estampa en cuanto un firmante avanzado firma, así que puede escanearse mientras el
+     * documento sigue esperando a los demás. Ahí la pantalla sólo publica nombres, pero señalar
+     * cuál es sigue teniendo sentido.
+     */
+    it('también resalta en un documento todavía pendiente de firmas', () => {
+      searchParams = new URLSearchParams({ firma: 'collab-2' });
+      mockData(buildPending());
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(highlighted()).toHaveTextContent('María López');
     });
   });
 });
