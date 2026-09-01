@@ -10,8 +10,7 @@ function build(
   return {
     verification,
     signingCredentialStatus: status,
-    signingCredentialConfigured:
-      status === SigningCredentialStatus.Configured,
+    signingCredentialConfigured: status === SigningCredentialStatus.Configured,
     identityVerifiedAt: null,
   } as CurrentIdentityVerification;
 }
@@ -91,11 +90,11 @@ describe('DiditVerificationCard · distribución', () => {
       'flex',
       'justify-center',
     );
-    // El QR quedó como única salida: las acciones que lo acompañaban se retiraron (ver
-    // `VerificationQrPanel`), así que ya no hay una segunda fila que centrar.
+    // El QR va centrado; la acción que lo acompaña vive en su propia fila, alineada a la derecha
+    // (ver `VerificationQrPanel`), así que no comparte el centrado.
     expect(
-      screen.queryByRole('link', { name: /abrir verificación/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('link', { name: /abrir verificación/i }).parentElement,
+    ).toHaveClass('justify-end');
   });
 
   /** Título y descripción conservan su alineación: se leen de corrido, no se centran. */

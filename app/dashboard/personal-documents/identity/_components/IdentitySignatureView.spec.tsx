@@ -41,8 +41,7 @@ function givenStatus(
   mockedGetCurrent.mockResolvedValue({
     verification,
     signingCredentialStatus: status,
-    signingCredentialConfigured:
-      status === SigningCredentialStatus.Configured,
+    signingCredentialConfigured: status === SigningCredentialStatus.Configured,
     identityVerifiedAt:
       status === SigningCredentialStatus.SignaturePending ||
       status === SigningCredentialStatus.Configured
@@ -87,7 +86,9 @@ describe('IdentitySignatureView', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/firma · bloqueada/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
+      screen.getByText(
+        /podrás registrar tu firma cuando se apruebe tu identidad/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -126,7 +127,9 @@ describe('IdentitySignatureView', () => {
       screen.getByText(/escanea el código qr para iniciar el proceso/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
+      screen.getByText(
+        /podrás registrar tu firma cuando se apruebe tu identidad/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -134,7 +137,7 @@ describe('IdentitySignatureView', () => {
    * La URL hospedada sigue viajando en la respuesta porque es lo que el QR codifica, pero dejó
    * de ser algo que el usuario pueda abrir, copiar o leer en pantalla.
    */
-  it('sesión en curso: no ofrece abrir ni copiar el enlace de verificación', async () => {
+  it('sesión en curso: ofrece el QR y el enlace para abrir la verificación aquí mismo', async () => {
     givenStatus(
       SigningCredentialStatus.IdentityVerificationInProgress,
       openSession(HOSTED_URL),
@@ -144,9 +147,11 @@ describe('IdentitySignatureView', () => {
 
     await screen.findByLabelText(/código qr para continuar/i);
 
+    // Escanear el código de la propia pantalla con esa misma pantalla es imposible: quien ya está
+    // en el dispositivo desde el que quiere verificarse necesita este enlace.
     expect(
-      screen.queryByRole('link', { name: /abrir verificación/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('link', { name: /abrir verificación/i }),
+    ).toHaveAttribute('href', HOSTED_URL);
     expect(
       screen.queryByRole('button', { name: /copiar enlace/i }),
     ).not.toBeInTheDocument();
@@ -237,10 +242,10 @@ describe('IdentitySignatureView', () => {
     expect(
       screen.getByRole('button', { name: /firmar desde mi celular/i }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/selecciona el archivo/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/firma · bloqueada/i),
+      screen.queryByText(/selecciona el archivo/i),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText(/firma · bloqueada/i)).not.toBeInTheDocument();
   });
 
   it('credencial configurada: muestra la firma registrada con opción de eliminarla', async () => {
@@ -257,7 +262,9 @@ describe('IdentitySignatureView', () => {
     expect(
       screen.getByRole('button', { name: /eliminar/i }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /abrir/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /abrir/i }),
+    ).not.toBeInTheDocument();
   });
 
   describe('detalle de la validación', () => {
@@ -328,7 +335,9 @@ describe('IdentitySignatureView', () => {
       );
 
       expect(
-        await screen.findByText(/no contamos con el detalle de las comprobaciones/i),
+        await screen.findByText(
+          /no contamos con el detalle de las comprobaciones/i,
+        ),
       ).toBeInTheDocument();
     });
   });

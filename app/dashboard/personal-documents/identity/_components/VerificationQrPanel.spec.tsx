@@ -4,8 +4,8 @@ import VerificationQrPanel from './VerificationQrPanel';
 const URL = 'https://verify.didit.me/session/abc';
 
 /**
- * Distribución de la tarjeta "Identidad con Didit · en proceso": el QR y sus dos acciones van
- * centrados horizontalmente, y el texto instructivo se queda alineado a la izquierda.
+ * Distribución de la tarjeta "Identidad con Didit · en proceso": el QR va centrado, el texto
+ * instructivo alineado a la izquierda y la acción al final, a la derecha.
  *
  * Se afirma sobre las clases y no sobre posiciones porque jsdom no calcula layout. Es suficiente
  * para lo que se quiere evitar —que alguien quite el centrado sin darse cuenta— y no depende de
@@ -22,22 +22,81 @@ describe('VerificationQrPanel · distribución', () => {
   });
 
   /**
-   * El QR es la ÚNICA salida hacia Didit. La tarjeta ofrecía además "Abrir verificación" y
-   * "Copiar enlace", y las dos se retiraron junto con el rótulo que mostraba la URL: escanear con
-   * el celular es el camino previsto —ahí están la cámara y la selfie— y sostener tres caminos
-   * para lo mismo obligaba a explicar en pantalla cuál convenía.
+   * Historia "Restaurar botón para abrir enlace de verificación QR": escanear el código de la
+   * propia pantalla con esa misma pantalla es imposible, así que quien ya está en el dispositivo
+   * desde el que quiere verificarse se quedaba sin camino.
    */
-  it('no ofrece abrir ni copiar el enlace: el QR es la única salida', () => {
+  it('ofrece abrir la verificación en el enlace correcto', () => {
     render(<VerificationQrPanel url={URL} />);
 
+    const link = screen.getByRole('link', { name: /abrir verificación/i });
+
+    expect(link).toHaveAttribute('href', URL);
+    // Pestaña nueva y sin exponer `window.opener`: el destino es un dominio externo.
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+  });
+
+  /** Mismo componente que el resto de acciones de la app, no un enlace suelto con estilos. */
+  it('usa el botón compartido de la aplicación', () => {
+    render(<VerificationQrPanel url={URL} />);
+
+    expect(
+      screen.getByRole('link', { name: /abrir verificación/i }),
+    ).toHaveAttribute('data-slot', 'button');
+  });
+
+  /** Criterio: al final de la sección, alineado abajo a la derecha. */
+  it('coloca la acción al final y alineada a la derecha', () => {
+    const { container } = render(<VerificationQrPanel url={URL} />);
+
+    const row = screen.getByRole('link', {
+      name: /abrir verificación/i,
+    }).parentElement;
+
+    expect(row).toHaveClass('flex', 'justify-end');
+    // Última fila de la tarjeta: nada la sigue.
+    expect(container.firstElementChild?.lastElementChild).toBe(row);
+  });
+
+  /**
+   * "Copiar enlace" NO vuelve: no abre nada por sí solo y era el tercer camino para lo mismo, que
+   * obligaba a explicar en pantalla cuál convenía.
+   */
+  it('no reintroduce la acción de copiar el enlace', () => {
+    render(<VerificationQrPanel url={URL} />);
+
+    expect(
+      screen.queryByRole('button', { name: /copiar enlace/i }),
+    ).not.toBeInTheDocument();
+    // La URL se codifica y se enlaza, pero no se muestra como texto.
+    expect(screen.queryByText(URL)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Estado seguro. Se ocultan LOS DOS, no sólo el botón: un QR que codifica algo que no es una
+   * URL no inicia ninguna verificación, y enseñarlo haría creer al usuario que falla su cámara.
+   *
+   * El esquema ejecutable está en la lista porque la URL viene de un proveedor externo y termina
+   * en el `href` de un enlace: con ese esquema se ejecutaría al pulsarlo.
+   */
+  it.each([
+    ['vacía', ''],
+    ['no es una URL', 'no-es-una-url'],
+    ['relativa', '/session/abc'],
+    ['con esquema ejecutable', 'javascript:alert(1)'],
+  ])('con una URL %s no dibuja ni el QR ni el botón', (_caso, url) => {
+    render(<VerificationQrPanel url={url} />);
+
+    expect(
+      screen.queryByLabelText(/código qr para continuar/i),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: /abrir verificación/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /copiar enlace/i }),
-    ).not.toBeInTheDocument();
-    // La URL viaja para poder codificarla, pero no se muestra en ninguna parte.
-    expect(screen.queryByText(URL)).not.toBeInTheDocument();
+      screen.getByText(/no se pudo generar el enlace de verificación/i),
+    ).toBeInTheDocument();
   });
 
   /**
