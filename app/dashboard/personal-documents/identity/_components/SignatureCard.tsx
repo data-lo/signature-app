@@ -85,8 +85,12 @@ function LockedSignature() {
  *
  * Los dos caminos terminan en el mismo sitio —una sesión de captura y un PNG— así que el estado
  * que gobierna la pantalla es cuál de los dos está abierto, no dos flujos separados.
+ *
+ * Sólo se llega acá SIN firma registrada. Antes esta misma pantalla servía además para
+ * reemplazar una existente, y por eso su título cambiaba; ese camino se retiró (ver
+ * `RegisteredSignature`).
  */
-function SignatureCapture({ replacing = false }: { replacing?: boolean } = {}) {
+function SignatureCapture() {
   const [mode, setMode] = useState<'idle' | 'draw' | 'mobile'>('idle');
 
   const createSession = useCreateSignatureCaptureSession();
@@ -114,7 +118,7 @@ function SignatureCapture({ replacing = false }: { replacing?: boolean } = {}) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <PenLine className="size-5 text-primary" />
-          {replacing ? 'Reemplazar mi firma' : 'Registra tu firma'}
+          Registra tu firma
         </CardTitle>
         <CardDescription>
           Dibújala aquí mismo o continúa en tu celular, donde es más cómodo
@@ -169,61 +173,42 @@ function SignatureCapture({ replacing = false }: { replacing?: boolean } = {}) {
 }
 
 /**
- * Firma ya registrada. Se puede ver, reemplazar por una nueva o eliminar.
+ * Firma ya registrada: se ve y se elimina. Nada más.
  *
- * Reemplazar reutiliza la misma captura que el alta: la rúbrica nueva se dibuja igual y sustituye
- * a la anterior por el mismo camino, sin pasos distintos que mantener.
+ * **Mientras haya una firma guardada, eliminarla es la única acción.** Acá convivía un botón
+ * «Dibujar una firma nueva» que abría la captura encima de la firma existente, con un «Conservar
+ * mi firma actual» para deshacer. Eran dos maneras de llegar al mismo sitio y obligaban a
+ * explicar la diferencia entre reemplazar y eliminar; ahora para registrar otra rúbrica primero
+ * se borra la actual, que es lo que ya hacían el INE y el resto de los documentos personales
+ * (ver `PersonalDocumentCard`, que oculta su selector de archivo en cuanto el documento existe).
+ *
+ * Al eliminar, la credencial vuelve a SIGNATURE_PENDING y `SignatureCard` monta de nuevo
+ * `SignatureCapture` con sus dos opciones. Por eso no hace falta ningún estado local para
+ * "volver a capturar": lo gobierna el estado de la credencial, que es la fuente de verdad.
  */
 function RegisteredSignature() {
   const { data: user } = useCurrentUser();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [replacing, setReplacing] = useState(false);
   const deleteMutation = useDeleteSignatureImage();
 
   const signature = user?.signature ?? null;
 
-  if (replacing) {
-    return (
-      <div className="flex flex-col gap-3">
-        <SignatureCapture replacing />
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setReplacing(false)}
-        >
-          Conservar mi firma actual
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <>
-      <div className="flex flex-col gap-3">
-        <PersonalDocumentCard
-          config={REGISTERED_SIGNATURE_CONFIG}
-          storedUrl={signature?.secureUrl ?? null}
-          storedTitleIcon={
-            <BadgeCheck
-              className="size-5 text-emerald-600 dark:text-emerald-400"
-              aria-hidden
-            />
-          }
-          showOpen={false}
-          deleteVariant="destructive"
-          deleting={deleteMutation.isPending}
-          onDelete={signature ? () => setConfirmingDelete(true) : undefined}
-        />
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setReplacing(true)}
-        >
-          <PenLine className="size-4" aria-hidden />
-          Dibujar una firma nueva
-        </Button>
-      </div>
+      <PersonalDocumentCard
+        config={REGISTERED_SIGNATURE_CONFIG}
+        storedUrl={signature?.secureUrl ?? null}
+        storedTitleIcon={
+          <BadgeCheck
+            className="size-5 text-emerald-600 dark:text-emerald-400"
+            aria-hidden
+          />
+        }
+        showOpen={false}
+        deleteVariant="destructive"
+        deleting={deleteMutation.isPending}
+        onDelete={signature ? () => setConfirmingDelete(true) : undefined}
+      />
 
       <DeleteConfirmDialog
         open={confirmingDelete}
