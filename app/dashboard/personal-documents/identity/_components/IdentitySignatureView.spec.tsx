@@ -13,9 +13,11 @@ import {
   type CurrentIdentityVerification,
   type IdentityVerificationAttempt,
 } from '../_requests';
+import { deleteSignatureFileRequest } from '../../_requests';
 import IdentitySignatureView from './IdentitySignatureView';
 
 jest.mock('../_requests');
+jest.mock('../../_requests');
 jest.mock('@/lib/hooks/useCurrentUser');
 
 /**
@@ -31,6 +33,7 @@ jest.mock('../../_components/DocumentDropzone', () => ({
 const mockedGetCurrent = getCurrentIdentityVerificationRequest as jest.Mock;
 const mockedStart = startDiditVerificationRequest as jest.Mock;
 const mockedUseCurrentUser = useCurrentUser as jest.Mock;
+const mockedDeleteSignature = deleteSignatureFileRequest as jest.Mock;
 
 const HOSTED_URL = 'https://verify.didit.me/session/abc';
 
@@ -41,8 +44,7 @@ function givenStatus(
   mockedGetCurrent.mockResolvedValue({
     verification,
     signingCredentialStatus: status,
-    signingCredentialConfigured:
-      status === SigningCredentialStatus.Configured,
+    signingCredentialConfigured: status === SigningCredentialStatus.Configured,
     identityVerifiedAt:
       status === SigningCredentialStatus.SignaturePending ||
       status === SigningCredentialStatus.Configured
@@ -87,7 +89,9 @@ describe('IdentitySignatureView', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/firma · bloqueada/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
+      screen.getByText(
+        /podrás registrar tu firma cuando se apruebe tu identidad/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -126,7 +130,9 @@ describe('IdentitySignatureView', () => {
       screen.getByText(/escanea el código qr para iniciar el proceso/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/podrás registrar tu firma cuando se apruebe tu identidad/i),
+      screen.getByText(
+        /podrás registrar tu firma cuando se apruebe tu identidad/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -237,10 +243,10 @@ describe('IdentitySignatureView', () => {
     expect(
       screen.getByRole('button', { name: /firmar desde mi celular/i }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/selecciona el archivo/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/firma · bloqueada/i),
+      screen.queryByText(/selecciona el archivo/i),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText(/firma · bloqueada/i)).not.toBeInTheDocument();
   });
 
   it('credencial configurada: muestra la firma registrada con opción de eliminarla', async () => {
@@ -257,7 +263,85 @@ describe('IdentitySignatureView', () => {
     expect(
       screen.getByRole('button', { name: /eliminar/i }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /abrir/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /abrir/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * Historia "Eliminar opción «Dibujar nueva firma» cuando existe una firma cargada".
+   *
+   * Mientras haya rúbrica guardada, eliminarla es la única acción: para registrar otra hay que
+   * borrar la actual primero. Es el mismo trato que ya recibían el INE y el resto de documentos
+   * personales, cuyo selector de archivo desaparece en cuanto el documento existe.
+   */
+  describe('firma ya registrada', () => {
+    it('no ofrece dibujar una firma nueva mientras haya una guardada', async () => {
+      givenStatus(SigningCredentialStatus.Configured);
+
+      renderWithProviders(<IdentitySignatureView />);
+
+      expect(
+        await screen.findByText('Tu firma ha sido agregada'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /dibujar/i }),
+      ).not.toBeInTheDocument();
+      // Tampoco el «Conservar mi firma actual» que deshacía aquel reemplazo.
+      expect(
+        screen.queryByRole('button', { name: /conservar/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('la firma guardada se sigue mostrando junto a la única acción disponible', async () => {
+      givenStatus(SigningCredentialStatus.Configured);
+
+      renderWithProviders(<IdentitySignatureView />);
+
+      expect(
+        await screen.findByText('Tu firma ha sido agregada'),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/documento guardado/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /eliminar/i }),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * Al borrarla, la credencial vuelve a SIGNATURE_PENDING y la pantalla monta otra vez la
+     * captura. No hay estado local que lo gobierne: manda el estado de la credencial, así que la
+     * prueba lo recorre por donde de verdad ocurre —la consulta que se invalida al eliminar— y no
+     * simulando el cambio a mano.
+     */
+    it('al eliminarla, vuelven las opciones para registrar una firma', async () => {
+      givenStatus(SigningCredentialStatus.Configured);
+      mockedDeleteSignature.mockImplementation(async () => {
+        givenStatus(SigningCredentialStatus.SignaturePending);
+      });
+
+      renderWithProviders(<IdentitySignatureView />);
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: /eliminar/i }),
+      );
+      // El diálogo de confirmación: la baja no ocurre de un solo clic. Mientras está abierto, el
+      // resto de la pantalla queda `aria-hidden`, así que este `eliminar` es el suyo.
+      await userEvent.click(
+        await screen.findByRole('button', { name: /^eliminar$/i }),
+      );
+
+      // Que la baja ocurrió de verdad, y no que la pantalla cambió por otro motivo.
+      await waitFor(() =>
+        expect(mockedDeleteSignature).toHaveBeenCalledWith('sig-1'),
+      );
+
+      expect(
+        await screen.findByRole('button', { name: /dibujar aquí/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /firmar desde mi celular/i }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('detalle de la validación', () => {
@@ -328,7 +412,9 @@ describe('IdentitySignatureView', () => {
       );
 
       expect(
-        await screen.findByText(/no contamos con el detalle de las comprobaciones/i),
+        await screen.findByText(
+          /no contamos con el detalle de las comprobaciones/i,
+        ),
       ).toBeInTheDocument();
     });
   });

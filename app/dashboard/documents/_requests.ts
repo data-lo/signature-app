@@ -27,11 +27,24 @@ export interface DocumentFileUrl {
   expiresIn: number;
 }
 
+/**
+ * URL prefirmada del PDF.
+ *
+ * Con `download`, el backend firma la URL pidiéndole a MinIO que responda el archivo con el
+ * NOMBRE DEL DOCUMENTO en vez de con la clave del objeto, que es un UUID. Sin el parámetro
+ * devuelve la URL de siempre, que es la que consume el visor: una cabecera de descarga haría que
+ * el PDF se bajara en lugar de mostrarse dentro de la pantalla de detalle.
+ *
+ * El nombre lo pone el backend, no esta capa: es el que está guardado en el documento y viaja
+ * firmado dentro de la URL.
+ */
 export async function getDocumentFileUrlRequest(
   documentId: string,
+  { download = false }: { download?: boolean } = {},
 ): Promise<DocumentFileUrl> {
   const { data } = await apiClient.get<DocumentFileUrl>(
     `/document/file/${documentId}`,
+    download ? { params: { download: 'true' } } : undefined,
   );
 
   return data;
