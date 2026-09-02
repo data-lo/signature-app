@@ -35,8 +35,24 @@ function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
     totalPages: 1,
     status: DocumentStatus.Signed,
     createdAt: new Date(2026, 2, 15, 23, 55).toISOString(),
+    signedAt: new Date(2026, 4, 10, 9, 30).toISOString(),
     ...overrides,
   };
+}
+
+/**
+ * Celda de la única fila renderizada que corresponde a la columna `header`, ubicada por la
+ * posición de ese encabezado: así las aserciones siguen valiendo si el orden vuelve a cambiar.
+ */
+function dataCell(header: string): HTMLElement {
+  const headers = screen.getAllByRole('columnheader');
+  const columnIndex = headers.findIndex(
+    (columnHeader) => columnHeader.textContent?.trim() === header,
+  );
+  expect(columnIndex).toBeGreaterThan(-1);
+
+  const [row] = screen.getAllByRole('row').slice(1);
+  return within(row).getAllByRole('cell')[columnIndex];
 }
 
 /** Abre el menú de tres puntos de la única fila renderizada y devuelve su contenido. */
@@ -60,7 +76,7 @@ describe('DocumentsTable', () => {
   });
 
   describe('estructura de tabla compartida por las tres secciones', () => {
-    it('renderiza las columnas Documento / Creado por / Fecha de creación / Tipo de firma / Estado de firma / Acciones', () => {
+    it('renderiza las columnas en el orden Documento / Creado por / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const headers = screen
@@ -70,9 +86,10 @@ describe('DocumentsTable', () => {
       expect(headers).toEqual([
         'Documento',
         'Creado por',
+        'Estatus',
         'Fecha de creación',
+        'Fecha de firma',
         'Tipo de firma',
-        'Estado de firma',
         'Acciones',
       ]);
     });
@@ -95,12 +112,62 @@ describe('DocumentsTable', () => {
       expect(screen.queryByText(/RFC:/)).not.toBeInTheDocument();
     });
 
-    it('usa el formato de fecha legible y contextual en "Fecha de creación"', () => {
+    it('muestra el nombre de quien creó el documento en "Creado por"', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
-      expect(
-        screen.getByText('Domingo 15 de marzo, 11:55 PM'),
-      ).toBeInTheDocument();
+      expect(dataCell('Creado por')).toHaveTextContent('Creador Uno');
+    });
+  });
+
+  /**
+   * Historia "Reordenar y ajustar datos en las tablas de documentos": las dos fechas se muestran
+   * en DD/MM/YYYY, que es lo que se compara de un vistazo en un listado. El formato largo
+   * ("Domingo 15 de marzo, 11:55 PM") sigue en las pantallas de detalle y evidencia.
+   */
+  describe('fechas', () => {
+    it('muestra la fecha de creación en formato DD/MM/YYYY', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataCell('Fecha de creación')).toHaveTextContent('15/03/2026');
+    });
+
+    it('muestra la fecha de firma en formato DD/MM/YYYY', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('10/05/2026');
+    });
+
+    it('rellena con ceros los días y meses de un solo dígito', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ createdAt: new Date(2026, 0, 2, 8, 5).toISOString() }),
+          ]}
+        />,
+      );
+
+      expect(dataCell('Fecha de creación')).toHaveTextContent('02/01/2026');
+    });
+
+    it('muestra "No disponible" en "Fecha de firma" mientras el documento no está firmado', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ status: DocumentStatus.Pending, signedAt: null }),
+          ]}
+        />,
+      );
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('No disponible');
+    });
+
+    /** Documentos del endpoint antiguo: la fila se ve completa igual, sin fecha inventada. */
+    it('también muestra "No disponible" si el backend no informa la fecha de firma', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ signedAt: undefined })]} />,
+      );
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('No disponible');
     });
   });
 
@@ -331,18 +398,6 @@ describe('DocumentsTable', () => {
    * a partir de los firmantes del documento; acá solo se traduce a la etiqueta de la columna.
    */
   describe('columna Tipo de firma', () => {
-    /** Celda de "Tipo de firma" de la única fila renderizada, por su posición en el encabezado. */
-    function signatureTypeCell(): HTMLElement {
-      const headers = screen.getAllByRole('columnheader');
-      const columnIndex = headers.findIndex(
-        (header) => header.textContent?.trim() === 'Tipo de firma',
-      );
-      expect(columnIndex).toBeGreaterThan(-1);
-
-      const [row] = screen.getAllByRole('row').slice(1);
-      return within(row).getAllByRole('cell')[columnIndex];
-    }
-
     it('muestra "Simple" para un documento de firma simple', () => {
       renderWithProviders(
         <DocumentsTable
@@ -350,7 +405,7 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      expect(signatureTypeCell()).toHaveTextContent('Simple');
+      expect(dataCell('Tipo de firma')).toHaveTextContent('Simple');
     });
 
     it('muestra "E.Firma" para un documento de firma avanzada', () => {
@@ -360,7 +415,7 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      expect(signatureTypeCell()).toHaveTextContent('E.Firma');
+      expect(dataCell('Tipo de firma')).toHaveTextContent('E.Firma');
     });
 
     // Documentos creados antes de que se registrara el tipo de firma: la fila se sigue viendo
@@ -370,7 +425,7 @@ describe('DocumentsTable', () => {
         <DocumentsTable documents={[buildDoc({ signatureType: null })]} />,
       );
 
-      expect(signatureTypeCell()).toHaveTextContent('—');
+      expect(dataCell('Tipo de firma')).toHaveTextContent('—');
     });
 
     // Criterio "la nueva columna no afecta la visualización, filtros ni acciones existentes".

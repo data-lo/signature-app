@@ -57,3 +57,30 @@ export function formatLongDateTime(
 
   return `${weekday} ${date.getDate()} de ${month}, ${hours}:${minutes} ${meridiem}`;
 }
+
+/**
+ * Formato corto `DD/MM/YYYY` con el que las tablas de documentos muestran las fechas de creación
+ * y de firma: en un listado se comparan fechas de un vistazo, y para eso el formato numérico
+ * alineado pesa más que la frase legible de `formatLongDateTime` (que sigue siendo la de las
+ * pantallas de detalle y evidencia, donde cada fecha se lee sola).
+ *
+ * Se compone a mano por la misma razón que el otro: el resultado de `Intl` varía entre runtimes.
+ *
+ * @param isoDate fecha ISO tal como la devuelve el backend (`createdAt`, `signedAt`).
+ * @param fallback texto para cuando no hay fecha o la que llegó no es parseable.
+ * @returns p. ej. `"10/05/2026"`, en la zona horaria del navegador.
+ */
+export function formatShortDate(
+  isoDate: string | Date | null | undefined,
+  fallback: string = EMPTY_DATE_PLACEHOLDER,
+): string {
+  if (!isoDate) return fallback;
+
+  const date = isoDate instanceof Date ? isoDate : new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return fallback;
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+
+  return `${day}/${month}/${date.getFullYear()}`;
+}
