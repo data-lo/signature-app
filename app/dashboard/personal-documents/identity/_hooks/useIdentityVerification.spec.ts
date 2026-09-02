@@ -2,14 +2,11 @@ import { SigningCredentialStatus } from '@/lib/enums/identity';
 import { identityPollInterval } from './useIdentityVerification';
 import type { CurrentIdentityVerification } from '../_requests';
 
-function given(
-  status: SigningCredentialStatus,
-): CurrentIdentityVerification {
+function given(status: SigningCredentialStatus): CurrentIdentityVerification {
   return {
     verification: null,
     signingCredentialStatus: status,
-    signingCredentialConfigured:
-      status === SigningCredentialStatus.Configured,
+    signingCredentialConfigured: status === SigningCredentialStatus.Configured,
     identityVerifiedAt: null,
     signatureRegistered: false,
   };

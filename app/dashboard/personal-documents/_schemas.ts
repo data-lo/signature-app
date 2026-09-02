@@ -56,3 +56,23 @@ export const updatePersonalInfoSchema = z.object({
 export type UpdatePersonalInfoFormValues = z.infer<
   typeof updatePersonalInfoSchema
 >;
+
+/**
+ * Cambio de contraseña desde configuración. La contraseña actual solo se exige presente: quién
+ * decide si es la correcta es el backend, y adelantar acá cualquier regla de forma sobre ella
+ * dejaría fuera a quien se registró antes de que esa regla existiera.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Ingresa tu contraseña actual'),
+    newPassword: z
+      .string()
+      .min(8, 'La contraseña debe tener al menos 8 caracteres'),
+    confirmPassword: z.string().min(1, 'Confirma tu nueva contraseña'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  });
+
+export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;

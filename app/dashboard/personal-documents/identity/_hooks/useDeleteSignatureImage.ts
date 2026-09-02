@@ -17,7 +17,8 @@ export function useDeleteSignatureImage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (signatureId: string) => deleteSignatureFileRequest(signatureId),
+    mutationFn: (signatureId: string) =>
+      deleteSignatureFileRequest(signatureId),
     onSuccess: () => {
       toast.success('Firma eliminada correctamente');
       queryClient.invalidateQueries({
