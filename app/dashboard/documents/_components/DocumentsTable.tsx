@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table';
 import DocumentsFilterButton from './DocumentsFilterButton';
 import DocumentRowActions from './DocumentRowActions';
+import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import {
   EMPTY_DOCUMENTS_FILTERS,
@@ -124,6 +125,8 @@ export default function DocumentsTable({
   showStatusFilter,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
+  const [participantsDoc, setParticipantsDoc] =
+    useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
 
   /**
@@ -227,6 +230,7 @@ export default function DocumentsTable({
                         onViewDetail={
                           onViewDetail ? () => onViewDetail(doc.id) : undefined
                         }
+                        onViewParticipants={() => setParticipantsDoc(doc)}
                         onShare={() => setShareDoc(doc)}
                       />
                     </div>
@@ -296,6 +300,12 @@ export default function DocumentsTable({
         documentId={shareDoc?.id ?? null}
         fileName={shareDoc?.fileName}
         onOpenChange={(open) => !open && setShareDoc(null)}
+      />
+
+      <DocumentParticipantsDialog
+        documentId={participantsDoc?.id ?? null}
+        fileName={participantsDoc?.fileName}
+        onOpenChange={(open) => !open && setParticipantsDoc(null)}
       />
     </div>
   );

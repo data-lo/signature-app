@@ -6,6 +6,7 @@ import {
   Share2,
   Signature,
   SquareArrowOutUpRight,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +27,8 @@ interface DocumentRowActionsProps {
   onDownload: () => void;
   /** Navegación al detalle; ausente solo si la vista contenedora no ofrece esa ruta. */
   onViewDetail?: () => void;
+  /** Abre el modal con las personas involucradas en el documento, agrupadas por rol. */
+  onViewParticipants: () => void;
   onShare: () => void;
 }
 
@@ -47,6 +50,7 @@ export default function DocumentRowActions({
   isDownloading = false,
   onDownload,
   onViewDetail,
+  onViewParticipants,
   onShare,
 }: DocumentRowActionsProps) {
   return (
@@ -79,6 +83,12 @@ export default function DocumentRowActions({
             Ver detalle
           </DropdownMenuItem>
         )}
+        {/* Junto a "Ver detalle" porque las dos son consultas sobre el documento, no acciones
+          que lo modifiquen o lo saquen de la plataforma. */}
+        <DropdownMenuItem onClick={onViewParticipants}>
+          <Users className="size-4" />
+          Ver participantes
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={onShare}>
           <Share2 className="size-4" />
           Compartir
