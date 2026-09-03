@@ -32,7 +32,7 @@ import {
   type DocumentsFilters,
 } from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { formatLongDateTime } from '@/lib/format-datetime';
+import { formatShortDate } from '@/lib/format-datetime';
 import { DocumentStatus, SignatureType } from '@/lib/enums/document';
 
 export interface DocumentListItem {
@@ -53,6 +53,11 @@ export interface DocumentListItem {
    */
   signatureType?: SignatureType | null;
   createdAt: string;
+  /**
+   * Momento en que el documento quedó firmado por TODOS sus firmantes; null mientras el flujo
+   * sigue abierto (o si el backend todavía no lo informa, como en el endpoint antiguo).
+   */
+  signedAt?: string | null;
 }
 
 const STATUS_LABELS: Record<DocumentStatus, string> = {
@@ -74,6 +79,9 @@ const SIGNATURE_TYPE_LABELS: Record<SignatureType, string> = {
   [SignatureType.Simple]: 'Simple',
   [SignatureType.Fiel]: 'E.Firma',
 };
+
+/** Lo que muestra "Fecha de firma" mientras el documento no está firmado por todos. */
+const UNSIGNED_DATE_LABEL = 'No disponible';
 
 const STATUS_DOT: Record<DocumentStatus, string> = {
   [DocumentStatus.Created]: 'bg-amber-400',
@@ -151,9 +159,10 @@ export default function DocumentsTable({
                 <SortableHeader>Documento</SortableHeader>
               </TableHead>
               <TableHead>Creado por</TableHead>
+              <TableHead>Estatus</TableHead>
               <TableHead>Fecha de creación</TableHead>
+              <TableHead>Fecha de firma</TableHead>
               <TableHead>Tipo de firma</TableHead>
-              <TableHead>Estado de firma</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -162,6 +171,16 @@ export default function DocumentsTable({
               const isDownloading =
                 downloadMutation.isPending &&
                 downloadMutation.variables === doc.id;
+              /**
+               * "No disponible" cubre los dos casos en que no hay fecha de firma que mostrar: el
+               * documento todavía no está firmado por todos, o el backend no la informó (endpoint
+               * antiguo, dato ilegible). Se lee mejor que un guion en una columna que la mayoría
+               * de las veces está vacía.
+               */
+              const signedAtLabel = formatShortDate(
+                doc.signedAt,
+                UNSIGNED_DATE_LABEL,
+              );
 
               return (
                 <TableRow
@@ -204,8 +223,27 @@ export default function DocumentsTable({
                       )}
                     </div>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                      />
+                      <span>{STATUS_LABELS[doc.status]}</span>
+                    </div>
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {formatLongDateTime(doc.createdAt)}
+                    {formatShortDate(doc.createdAt)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <span
+                      className={
+                        signedAtLabel === UNSIGNED_DATE_LABEL
+                          ? 'text-muted-foreground'
+                          : undefined
+                      }
+                    >
+                      {signedAtLabel}
+                    </span>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {doc.signatureType ? (
@@ -215,14 +253,6 @@ export default function DocumentsTable({
                       // "no se sabe", que es la verdad; suponer "Simple" sería inventar.
                       <span className="text-muted-foreground">—</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                      />
-                      <span>{STATUS_LABELS[doc.status]}</span>
-                    </div>
                   </TableCell>
                   <TableCell>
                     {/* Descargar y compartir son acciones sobre el documento, no maneras de
