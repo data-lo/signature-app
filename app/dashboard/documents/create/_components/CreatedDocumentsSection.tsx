@@ -48,7 +48,7 @@ export default function CreatedDocumentsSection({
         hasNextPage={documents?.meta.hasNextPage}
         hasPrevPage={documents?.meta.hasPrevPage}
         onPageChange={onPageChange}
-        onViewDetail={(id) => router.push(`/dashboard/documents/${id}`)}
+        onRowSelect={(id) => router.push(`/dashboard/documents/${id}`)}
         filters={filters}
         onFiltersChange={onFiltersChange}
       />

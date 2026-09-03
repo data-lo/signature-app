@@ -27,7 +27,7 @@ export default function DocumentsView({ type, title }: DocumentsViewProps) {
   const router = useRouter();
   const { page, setPage, filters, handleFiltersChange } =
     useDocumentsListState();
-  const { limit, canSign, showMyTurnFilter, showStatusFilter } =
+  const { limit, showMyTurnFilter, showStatusFilter } =
     DOCUMENTS_LIST_CONFIG[type];
 
   const documentsQuery = useDocuments({
@@ -51,10 +51,7 @@ export default function DocumentsView({ type, title }: DocumentsViewProps) {
         hasNextPage={documentsResult?.meta.hasNextPage}
         hasPrevPage={documentsResult?.meta.hasPrevPage}
         onPageChange={setPage}
-        onSignClick={
-          canSign ? (id) => router.push(`/dashboard/documents/${id}`) : undefined
-        }
-        onViewDetail={(id) => router.push(`/dashboard/documents/${id}`)}
+        onRowSelect={(id) => router.push(`/dashboard/documents/${id}`)}
         filters={filters}
         onFiltersChange={handleFiltersChange}
         showMyTurnFilter={showMyTurnFilter}
