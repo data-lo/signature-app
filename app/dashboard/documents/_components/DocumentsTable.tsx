@@ -100,8 +100,12 @@ interface DocumentsTableProps {
   hasNextPage?: boolean;
   hasPrevPage?: boolean;
   onPageChange?: (page: number) => void;
-  onSignClick?: (documentId: string) => void;
-  onViewDetail?: (documentId: string) => void;
+  /**
+   * Navegación al detalle del documento, disparada al seleccionar la fila (clic en cualquier
+   * punto de ella, o Enter/Espacio sobre el nombre del documento). Ausente sólo si la vista
+   * contenedora no ofrece esa ruta: entonces las filas no son seleccionables.
+   */
+  onRowSelect?: (documentId: string) => void;
   filters?: DocumentsFilters;
   onFiltersChange?: (filters: DocumentsFilters) => void;
   showMyTurnFilter?: boolean;
@@ -124,8 +128,7 @@ export default function DocumentsTable({
   hasNextPage = false,
   hasPrevPage = false,
   onPageChange,
-  onSignClick,
-  onViewDetail,
+  onRowSelect,
   filters,
   onFiltersChange,
   showMyTurnFilter,
@@ -133,14 +136,6 @@ export default function DocumentsTable({
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
-
-  /**
-   * Un documento es firmable si la sección ofrece esa acción (`onSignClick`, que sólo llega en
-   * "Por firmar") y todavía está en progreso. Es la misma condición que gobernaba el botón de
-   * texto anterior: mudar la acción al menú no cambió a quién se le ofrece.
-   */
-  const canSignDocument = (doc: DocumentListItem) =>
-    onSignClick != null && doc.status === DocumentStatus.Pending;
 
   return (
     <div className="flex-1 min-w-0">
@@ -188,14 +183,33 @@ export default function DocumentsTable({
               );
 
               return (
-                <TableRow key={doc.id}>
+                <TableRow
+                  key={doc.id}
+                  // La fila entera es el camino al detalle del documento. `TableRow` ya resalta
+                  // en hover; el cursor de mano es lo que anuncia que además se puede activar.
+                  className={onRowSelect ? 'cursor-pointer' : undefined}
+                  onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
+                >
                   <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
                     <div className="flex items-start gap-1.5">
                       <span
                         className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
                       />
                       <span className="min-w-0 flex-1 break-words">
-                        {doc.fileName}
+                        {onRowSelect ? (
+                          // El botón no lleva `onClick` propio: existe para que la fila sea
+                          // alcanzable con Tab y activable con Enter/Espacio, que emiten un clic
+                          // y éste sube hasta el manejador de la fila. Así la tabla conserva su
+                          // semántica (un `tr` no es un control) sin dejar fuera al teclado.
+                          <button
+                            type="button"
+                            className="rounded-sm text-left break-words outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                          >
+                            {doc.fileName}
+                          </button>
+                        ) : (
+                          doc.fileName
+                        )}
                       </span>
                     </div>
                   </TableCell>
@@ -241,22 +255,17 @@ export default function DocumentsTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      {/* Todas las acciones viven en el menú, incluida firmar: era el último
-                        botón de texto suelto de la columna. La condición de elegibilidad no
-                        cambió al mudarla — sigue siendo "esta sección permite firmar y el
-                        documento está en progreso"—, sólo cambió dónde se dibuja. */}
+                    {/* Descargar y compartir son acciones sobre el documento, no maneras de
+                      abrirlo: el clic se detiene acá para que usarlas no navegue también al
+                      detalle. Incluye la activación por teclado del menú, que también emite un
+                      clic sobre el disparador. */}
+                    <div
+                      className="flex items-center justify-end gap-1"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <DocumentRowActions
-                        onSign={
-                          canSignDocument(doc)
-                            ? () => onSignClick?.(doc.id)
-                            : undefined
-                        }
                         isDownloading={isDownloading}
                         onDownload={() => downloadMutation.mutate(doc.id)}
-                        onViewDetail={
-                          onViewDetail ? () => onViewDetail(doc.id) : undefined
-                        }
                         onShare={() => setShareDoc(doc)}
                       />
                     </div>

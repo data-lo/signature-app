@@ -88,8 +88,6 @@ export interface DocumentsListConfig {
   scope: 'participant' | 'creator';
   status?: ParticipantStatus.Pending | ParticipantStatus.Signed;
   limit: number;
-  /** La acción "FIRMAR" solo aplica donde el usuario todavía tiene que firmar. */
-  canSign: boolean;
   showMyTurnFilter: boolean;
   showStatusFilter: boolean;
 }
@@ -103,14 +101,12 @@ export const DOCUMENTS_LIST_CONFIG: Record<
     scope: 'participant',
     status: ParticipantStatus.Pending,
     limit: 25,
-    canSign: true,
     showMyTurnFilter: true,
     showStatusFilter: false,
   },
   sent: {
     scope: 'creator',
     limit: 10,
-    canSign: false,
     showMyTurnFilter: false,
     showStatusFilter: true,
   },
@@ -118,7 +114,6 @@ export const DOCUMENTS_LIST_CONFIG: Record<
     scope: 'participant',
     status: ParticipantStatus.Signed,
     limit: 25,
-    canSign: false,
     showMyTurnFilter: true,
     showStatusFilter: false,
   },
