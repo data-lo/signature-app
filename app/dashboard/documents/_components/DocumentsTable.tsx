@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table';
 import DocumentsFilterButton from './DocumentsFilterButton';
 import DocumentRowActions from './DocumentRowActions';
+import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import {
   EMPTY_DOCUMENTS_FILTERS,
@@ -135,6 +136,8 @@ export default function DocumentsTable({
   showStatusFilter,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
+  const [participantsDoc, setParticipantsDoc] =
+    useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
 
   return (
@@ -255,10 +258,18 @@ export default function DocumentsTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    {/* Descargar y compartir son acciones sobre el documento, no maneras de
-                      abrirlo: el clic se detiene acá para que usarlas no navegue también al
-                      detalle. Incluye la activación por teclado del menú, que también emite un
-                      clic sobre el disparador. */}
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                      />
+                      <span>{STATUS_LABELS[doc.status]}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {/* Las acciones del menú operan sobre el documento o lo consultan en un
+                      modal, pero ninguna es una manera de abrirlo: el clic se detiene acá para
+                      que usarlas no navegue también al detalle. Incluye la activación por
+                      teclado del menú, que también emite un clic sobre el disparador. */}
                     <div
                       className="flex items-center justify-end gap-1"
                       onClick={(event) => event.stopPropagation()}
@@ -266,6 +277,7 @@ export default function DocumentsTable({
                       <DocumentRowActions
                         isDownloading={isDownloading}
                         onDownload={() => downloadMutation.mutate(doc.id)}
+                        onViewParticipants={() => setParticipantsDoc(doc)}
                         onShare={() => setShareDoc(doc)}
                       />
                     </div>
@@ -335,6 +347,12 @@ export default function DocumentsTable({
         documentId={shareDoc?.id ?? null}
         fileName={shareDoc?.fileName}
         onOpenChange={(open) => !open && setShareDoc(null)}
+      />
+
+      <DocumentParticipantsDialog
+        documentId={participantsDoc?.id ?? null}
+        fileName={participantsDoc?.fileName}
+        onOpenChange={(open) => !open && setParticipantsDoc(null)}
       />
     </div>
   );

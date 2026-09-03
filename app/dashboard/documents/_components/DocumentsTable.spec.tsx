@@ -2,16 +2,16 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsTable, { type DocumentListItem } from './DocumentsTable';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { DocumentStatus, SignatureType } from '@/lib/enums/document';
+import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
+import {
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDownloadDocument');
-jest.mock('../[documentId]/_hooks/useDocumentDetail', () => ({
-  useDocumentDetail: () => ({
-    data: undefined,
-    isLoading: false,
-    isError: false,
-  }),
-}));
+jest.mock('../[documentId]/_hooks/useDocumentDetail');
 jest.mock('./PdfPreview', () => ({
   __esModule: true,
   default: () => <div>PDF preview</div>,
@@ -22,6 +22,29 @@ jest.mock('react-hot-toast', () => ({
 }));
 
 const mockedUseDownloadDocument = useDownloadDocument as jest.Mock;
+const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
+
+/** Detalle mínimo del documento: el modal de participantes solo lee `participants`. */
+function buildDetail(participants: unknown[] = []) {
+  return {
+    data: { id: 'doc-1', participants },
+    isLoading: false,
+    isError: false,
+  };
+}
+
+function buildParticipant(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'part-1',
+    userId: null,
+    email: 'juan.perez@empresa.com',
+    name: 'Juan Pérez',
+    role: ParticipantRole.Signer,
+    status: ParticipantStatus.Pending,
+    cancellationReason: null,
+    ...overrides,
+  };
+}
 
 function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
   return {
@@ -73,6 +96,7 @@ describe('DocumentsTable', () => {
       isPending: false,
       variables: undefined,
     });
+    mockedUseDocumentDetail.mockReturnValue(buildDetail([buildParticipant()]));
   });
 
   describe('estructura de tabla compartida por las tres secciones', () => {
@@ -172,7 +196,7 @@ describe('DocumentsTable', () => {
   });
 
   describe('menú de acciones', () => {
-    it('deja en el menú de tres puntos sólo Descargar y Compartir', async () => {
+    it('concentra Descargar, Ver participantes y Compartir en el menú de tres puntos', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
@@ -184,7 +208,7 @@ describe('DocumentsTable', () => {
         within(menu)
           .getAllByRole('menuitem')
           .map((item) => item.textContent?.trim()),
-      ).toEqual(['Descargar', 'Compartir']);
+      ).toEqual(['Descargar', 'Ver participantes', 'Compartir']);
     });
 
     it('bug corregido: "Descargar" de un documento firmado dispara la descarga en vez de no hacer nada', async () => {
@@ -398,6 +422,22 @@ describe('DocumentsTable', () => {
       ).toBeInTheDocument();
       expect(onRowSelect).not.toHaveBeenCalled();
     });
+
+    it('ver participantes desde el menú no dispara la navegación de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
+      );
+
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(onRowSelect).not.toHaveBeenCalled();
+    });
   });
 
   /**
@@ -450,6 +490,43 @@ describe('DocumentsTable', () => {
       expect(
         within(row).getByRole('button', { name: /acciones del documento/i }),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Consultar participantes desde las acciones del documento": la tabla solo abre el
+   * modal con el documento de la fila; lo que se muestra dentro se prueba en
+   * DocumentParticipantsDialog.spec.
+   */
+  describe('ver participantes', () => {
+    it('abre el modal de participantes del documento de esa fila', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ id: 'doc-9' })]} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
+      );
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Participantes')).toBeInTheDocument();
+      expect(within(dialog).getByText('Juan Pérez')).toBeInTheDocument();
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        'doc-9',
+        expect.objectContaining({ enabled: true }),
+      );
+    });
+
+    /** Cerrado no consulta: el detalle solo se pide cuando alguien abre el modal. */
+    it('no consulta el detalle mientras el modal está cerrado', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        '',
+        expect.objectContaining({ enabled: false }),
+      );
     });
   });
 

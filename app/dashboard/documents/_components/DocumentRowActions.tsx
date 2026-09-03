@@ -1,6 +1,6 @@
 'use client';
 
-import { FileDown, MoreVertical, Share2 } from 'lucide-react';
+import { FileDown, MoreVertical, Share2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,6 +13,8 @@ interface DocumentRowActionsProps {
   /** true mientras se resuelve la URL de descarga de ESTE documento (no de otro de la lista). */
   isDownloading?: boolean;
   onDownload: () => void;
+  /** Abre el modal con las personas involucradas en el documento, agrupadas por rol. */
+  onViewParticipants: () => void;
   onShare: () => void;
 }
 
@@ -20,14 +22,15 @@ interface DocumentRowActionsProps {
  * Menú de acciones por fila, idéntico en las tres secciones del módulo (Por firmar, Enviados para
  * firma, Completados).
  *
- * Sólo quedan las acciones que hacen algo distinto de abrir el documento: descargar y compartir.
- * "Firmar" y "Ver detalle" se retiraron porque ambas llevaban a `/dashboard/documents/:id` y esa
- * navegación ahora la hace el clic sobre la fila entera; tenerlas también en el menú era ofrecer
- * tres caminos al mismo lugar.
+ * Sólo quedan las acciones que hacen algo distinto de abrir el documento: descargar, consultar
+ * participantes y compartir. "Firmar" y "Ver detalle" se retiraron porque ambas llevaban a
+ * `/dashboard/documents/:id` y esa navegación ahora la hace el clic sobre la fila entera; tenerlas
+ * también en el menú era ofrecer tres caminos al mismo lugar.
  */
 export default function DocumentRowActions({
   isDownloading = false,
   onDownload,
+  onViewParticipants,
   onShare,
 }: DocumentRowActionsProps) {
   return (
@@ -47,6 +50,12 @@ export default function DocumentRowActions({
         <DropdownMenuItem disabled={isDownloading} onClick={onDownload}>
           <FileDown className="size-4" />
           {isDownloading ? 'Descargando...' : 'Descargar'}
+        </DropdownMenuItem>
+        {/* Consultar quién participa es lo único que queda del grupo "mirar el documento sin
+          salir de la lista": el resto de ese grupo se fue con la navegación por fila. */}
+        <DropdownMenuItem onClick={onViewParticipants}>
+          <Users className="size-4" />
+          Ver participantes
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onShare}>
           <Share2 className="size-4" />
