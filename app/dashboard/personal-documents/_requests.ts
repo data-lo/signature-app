@@ -1,5 +1,6 @@
 import apiClient from '@/lib/axios';
 import type {
+  ChangePasswordFormValues,
   PersonalDocumentsFormValues,
   UpdatePersonalInfoFormValues,
 } from './_schemas';
@@ -60,5 +61,20 @@ export async function updatePersonalInformationRequest(
   await apiClient.put('/api/v1/users/me/personal-information', {
     phoneNumber: values.phoneNumber || undefined,
     secondaryEmail: values.secondaryEmail || undefined,
+  });
+}
+
+/**
+ * Manda la confirmación además de la contraseña nueva porque el backend también valida que
+ * coincidan (`ChangeMyPasswordDto`): la comprobación del formulario es para el usuario, no un
+ * reemplazo de la del servidor.
+ */
+export async function changePasswordRequest(
+  values: ChangePasswordFormValues,
+): Promise<void> {
+  await apiClient.put('/api/v1/users/me/password', {
+    currentPassword: values.currentPassword,
+    newPassword: values.newPassword,
+    confirmPassword: values.confirmPassword,
   });
 }

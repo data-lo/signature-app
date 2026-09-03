@@ -3,6 +3,7 @@
 import { Loader2 } from 'lucide-react';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import UserInfoCard from './UserInfoCard';
+import PasswordCard from './PasswordCard';
 
 export default function PersonalDocumentsView() {
   const { data: user, isLoading, isError } = useCurrentUser();
@@ -27,6 +28,7 @@ export default function PersonalDocumentsView() {
   return (
     <div className="flex w-full flex-col items-center gap-6">
       <UserInfoCard user={user} />
+      <PasswordCard />
     </div>
   );
 }

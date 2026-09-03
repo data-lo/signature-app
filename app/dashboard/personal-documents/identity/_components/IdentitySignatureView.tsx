@@ -57,10 +57,7 @@ export default function IdentitySignatureView() {
   const { signingCredentialStatus: status } = data;
 
   return (
-    <div
-      id="signature-documents"
-      className="flex w-full flex-col gap-6"
-    >
+    <div id="signature-documents" className="flex w-full flex-col gap-6">
       <header>
         <p className="text-sm text-muted-foreground">
           Aquí puedes iniciar el proceso de verificación de identidad y
