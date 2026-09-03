@@ -26,13 +26,14 @@ import {
 } from '@/components/ui/table';
 import DocumentsFilterButton from './DocumentsFilterButton';
 import DocumentRowActions from './DocumentRowActions';
+import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import {
   EMPTY_DOCUMENTS_FILTERS,
   type DocumentsFilters,
 } from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { formatLongDateTime } from '@/lib/format-datetime';
+import { formatShortDate } from '@/lib/format-datetime';
 import { DocumentStatus, SignatureType } from '@/lib/enums/document';
 
 export interface DocumentListItem {
@@ -53,6 +54,11 @@ export interface DocumentListItem {
    */
   signatureType?: SignatureType | null;
   createdAt: string;
+  /**
+   * Momento en que el documento quedó firmado por TODOS sus firmantes; null mientras el flujo
+   * sigue abierto (o si el backend todavía no lo informa, como en el endpoint antiguo).
+   */
+  signedAt?: string | null;
 }
 
 const STATUS_LABELS: Record<DocumentStatus, string> = {
@@ -75,6 +81,9 @@ const SIGNATURE_TYPE_LABELS: Record<SignatureType, string> = {
   [SignatureType.Fiel]: 'E.Firma',
 };
 
+/** Lo que muestra "Fecha de firma" mientras el documento no está firmado por todos. */
+const UNSIGNED_DATE_LABEL = 'No disponible';
+
 const STATUS_DOT: Record<DocumentStatus, string> = {
   [DocumentStatus.Created]: 'bg-amber-400',
   [DocumentStatus.Pending]: 'bg-amber-400',
@@ -92,8 +101,12 @@ interface DocumentsTableProps {
   hasNextPage?: boolean;
   hasPrevPage?: boolean;
   onPageChange?: (page: number) => void;
-  onSignClick?: (documentId: string) => void;
-  onViewDetail?: (documentId: string) => void;
+  /**
+   * Navegación al detalle del documento, disparada al seleccionar la fila (clic en cualquier
+   * punto de ella, o Enter/Espacio sobre el nombre del documento). Ausente sólo si la vista
+   * contenedora no ofrece esa ruta: entonces las filas no son seleccionables.
+   */
+  onRowSelect?: (documentId: string) => void;
   filters?: DocumentsFilters;
   onFiltersChange?: (filters: DocumentsFilters) => void;
   showMyTurnFilter?: boolean;
@@ -116,23 +129,16 @@ export default function DocumentsTable({
   hasNextPage = false,
   hasPrevPage = false,
   onPageChange,
-  onSignClick,
-  onViewDetail,
+  onRowSelect,
   filters,
   onFiltersChange,
   showMyTurnFilter,
   showStatusFilter,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
+  const [participantsDoc, setParticipantsDoc] =
+    useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
-
-  /**
-   * Un documento es firmable si la sección ofrece esa acción (`onSignClick`, que sólo llega en
-   * "Por firmar") y todavía está en progreso. Es la misma condición que gobernaba el botón de
-   * texto anterior: mudar la acción al menú no cambió a quién se le ofrece.
-   */
-  const canSignDocument = (doc: DocumentListItem) =>
-    onSignClick != null && doc.status === DocumentStatus.Pending;
 
   return (
     <div className="flex-1 min-w-0">
@@ -156,9 +162,10 @@ export default function DocumentsTable({
                 <SortableHeader>Documento</SortableHeader>
               </TableHead>
               <TableHead>Creado por</TableHead>
+              <TableHead>Estatus</TableHead>
               <TableHead>Fecha de creación</TableHead>
+              <TableHead>Fecha de firma</TableHead>
               <TableHead>Tipo de firma</TableHead>
-              <TableHead>Estado de firma</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -167,16 +174,45 @@ export default function DocumentsTable({
               const isDownloading =
                 downloadMutation.isPending &&
                 downloadMutation.variables === doc.id;
+              /**
+               * "No disponible" cubre los dos casos en que no hay fecha de firma que mostrar: el
+               * documento todavía no está firmado por todos, o el backend no la informó (endpoint
+               * antiguo, dato ilegible). Se lee mejor que un guion en una columna que la mayoría
+               * de las veces está vacía.
+               */
+              const signedAtLabel = formatShortDate(
+                doc.signedAt,
+                UNSIGNED_DATE_LABEL,
+              );
 
               return (
-                <TableRow key={doc.id}>
+                <TableRow
+                  key={doc.id}
+                  // La fila entera es el camino al detalle del documento. `TableRow` ya resalta
+                  // en hover; el cursor de mano es lo que anuncia que además se puede activar.
+                  className={onRowSelect ? 'cursor-pointer' : undefined}
+                  onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
+                >
                   <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
                     <div className="flex items-start gap-1.5">
                       <span
                         className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
                       />
                       <span className="min-w-0 flex-1 break-words">
-                        {doc.fileName}
+                        {onRowSelect ? (
+                          // El botón no lleva `onClick` propio: existe para que la fila sea
+                          // alcanzable con Tab y activable con Enter/Espacio, que emiten un clic
+                          // y éste sube hasta el manejador de la fila. Así la tabla conserva su
+                          // semántica (un `tr` no es un control) sin dejar fuera al teclado.
+                          <button
+                            type="button"
+                            className="rounded-sm text-left break-words outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                          >
+                            {doc.fileName}
+                          </button>
+                        ) : (
+                          doc.fileName
+                        )}
                       </span>
                     </div>
                   </TableCell>
@@ -190,8 +226,27 @@ export default function DocumentsTable({
                       )}
                     </div>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                      />
+                      <span>{STATUS_LABELS[doc.status]}</span>
+                    </div>
+                  </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {formatLongDateTime(doc.createdAt)}
+                    {formatShortDate(doc.createdAt)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <span
+                      className={
+                        signedAtLabel === UNSIGNED_DATE_LABEL
+                          ? 'text-muted-foreground'
+                          : undefined
+                      }
+                    >
+                      {signedAtLabel}
+                    </span>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {doc.signatureType ? (
@@ -211,22 +266,18 @@ export default function DocumentsTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      {/* Todas las acciones viven en el menú, incluida firmar: era el último
-                        botón de texto suelto de la columna. La condición de elegibilidad no
-                        cambió al mudarla — sigue siendo "esta sección permite firmar y el
-                        documento está en progreso"—, sólo cambió dónde se dibuja. */}
+                    {/* Las acciones del menú operan sobre el documento o lo consultan en un
+                      modal, pero ninguna es una manera de abrirlo: el clic se detiene acá para
+                      que usarlas no navegue también al detalle. Incluye la activación por
+                      teclado del menú, que también emite un clic sobre el disparador. */}
+                    <div
+                      className="flex items-center justify-end gap-1"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <DocumentRowActions
-                        onSign={
-                          canSignDocument(doc)
-                            ? () => onSignClick?.(doc.id)
-                            : undefined
-                        }
                         isDownloading={isDownloading}
                         onDownload={() => downloadMutation.mutate(doc.id)}
-                        onViewDetail={
-                          onViewDetail ? () => onViewDetail(doc.id) : undefined
-                        }
+                        onViewParticipants={() => setParticipantsDoc(doc)}
                         onShare={() => setShareDoc(doc)}
                       />
                     </div>
@@ -296,6 +347,12 @@ export default function DocumentsTable({
         documentId={shareDoc?.id ?? null}
         fileName={shareDoc?.fileName}
         onOpenChange={(open) => !open && setShareDoc(null)}
+      />
+
+      <DocumentParticipantsDialog
+        documentId={participantsDoc?.id ?? null}
+        fileName={participantsDoc?.fileName}
+        onOpenChange={(open) => !open && setParticipantsDoc(null)}
       />
     </div>
   );

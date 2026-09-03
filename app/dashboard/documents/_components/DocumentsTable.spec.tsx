@@ -2,16 +2,16 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsTable, { type DocumentListItem } from './DocumentsTable';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { DocumentStatus, SignatureType } from '@/lib/enums/document';
+import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
+import {
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDownloadDocument');
-jest.mock('../[documentId]/_hooks/useDocumentDetail', () => ({
-  useDocumentDetail: () => ({
-    data: undefined,
-    isLoading: false,
-    isError: false,
-  }),
-}));
+jest.mock('../[documentId]/_hooks/useDocumentDetail');
 jest.mock('./PdfPreview', () => ({
   __esModule: true,
   default: () => <div>PDF preview</div>,
@@ -22,6 +22,29 @@ jest.mock('react-hot-toast', () => ({
 }));
 
 const mockedUseDownloadDocument = useDownloadDocument as jest.Mock;
+const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
+
+/** Detalle mínimo del documento: el modal de participantes solo lee `participants`. */
+function buildDetail(participants: unknown[] = []) {
+  return {
+    data: { id: 'doc-1', participants },
+    isLoading: false,
+    isError: false,
+  };
+}
+
+function buildParticipant(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'part-1',
+    userId: null,
+    email: 'juan.perez@empresa.com',
+    name: 'Juan Pérez',
+    role: ParticipantRole.Signer,
+    status: ParticipantStatus.Pending,
+    cancellationReason: null,
+    ...overrides,
+  };
+}
 
 function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
   return {
@@ -35,8 +58,24 @@ function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
     totalPages: 1,
     status: DocumentStatus.Signed,
     createdAt: new Date(2026, 2, 15, 23, 55).toISOString(),
+    signedAt: new Date(2026, 4, 10, 9, 30).toISOString(),
     ...overrides,
   };
+}
+
+/**
+ * Celda de la única fila renderizada que corresponde a la columna `header`, ubicada por la
+ * posición de ese encabezado: así las aserciones siguen valiendo si el orden vuelve a cambiar.
+ */
+function dataCell(header: string): HTMLElement {
+  const headers = screen.getAllByRole('columnheader');
+  const columnIndex = headers.findIndex(
+    (columnHeader) => columnHeader.textContent?.trim() === header,
+  );
+  expect(columnIndex).toBeGreaterThan(-1);
+
+  const [row] = screen.getAllByRole('row').slice(1);
+  return within(row).getAllByRole('cell')[columnIndex];
 }
 
 /** Abre el menú de tres puntos de la única fila renderizada y devuelve su contenido. */
@@ -57,10 +96,11 @@ describe('DocumentsTable', () => {
       isPending: false,
       variables: undefined,
     });
+    mockedUseDocumentDetail.mockReturnValue(buildDetail([buildParticipant()]));
   });
 
   describe('estructura de tabla compartida por las tres secciones', () => {
-    it('renderiza las columnas Documento / Creado por / Fecha de creación / Tipo de firma / Estado de firma / Acciones', () => {
+    it('renderiza las columnas en el orden Documento / Creado por / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const headers = screen
@@ -70,9 +110,10 @@ describe('DocumentsTable', () => {
       expect(headers).toEqual([
         'Documento',
         'Creado por',
+        'Estatus',
         'Fecha de creación',
+        'Fecha de firma',
         'Tipo de firma',
-        'Estado de firma',
         'Acciones',
       ]);
     });
@@ -95,20 +136,70 @@ describe('DocumentsTable', () => {
       expect(screen.queryByText(/RFC:/)).not.toBeInTheDocument();
     });
 
-    it('usa el formato de fecha legible y contextual en "Fecha de creación"', () => {
+    it('muestra el nombre de quien creó el documento en "Creado por"', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
-      expect(
-        screen.getByText('Domingo 15 de marzo, 11:55 PM'),
-      ).toBeInTheDocument();
+      expect(dataCell('Creado por')).toHaveTextContent('Creador Uno');
+    });
+  });
+
+  /**
+   * Historia "Reordenar y ajustar datos en las tablas de documentos": las dos fechas se muestran
+   * en DD/MM/YYYY, que es lo que se compara de un vistazo en un listado. El formato largo
+   * ("Domingo 15 de marzo, 11:55 PM") sigue en las pantallas de detalle y evidencia.
+   */
+  describe('fechas', () => {
+    it('muestra la fecha de creación en formato DD/MM/YYYY', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataCell('Fecha de creación')).toHaveTextContent('15/03/2026');
+    });
+
+    it('muestra la fecha de firma en formato DD/MM/YYYY', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('10/05/2026');
+    });
+
+    it('rellena con ceros los días y meses de un solo dígito', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ createdAt: new Date(2026, 0, 2, 8, 5).toISOString() }),
+          ]}
+        />,
+      );
+
+      expect(dataCell('Fecha de creación')).toHaveTextContent('02/01/2026');
+    });
+
+    it('muestra "No disponible" en "Fecha de firma" mientras el documento no está firmado', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ status: DocumentStatus.Pending, signedAt: null }),
+          ]}
+        />,
+      );
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('No disponible');
+    });
+
+    /** Documentos del endpoint antiguo: la fila se ve completa igual, sin fecha inventada. */
+    it('también muestra "No disponible" si el backend no informa la fecha de firma', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ signedAt: undefined })]} />,
+      );
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('No disponible');
     });
   });
 
   describe('menú de acciones', () => {
-    it('concentra Descargar, Ver detalle y Compartir en el menú de tres puntos', async () => {
+    it('concentra Descargar, Ver participantes y Compartir en el menú de tres puntos', async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onViewDetail={jest.fn()} />,
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
       );
 
       const menu = await openRowMenu(user);
@@ -117,28 +208,7 @@ describe('DocumentsTable', () => {
         within(menu)
           .getAllByRole('menuitem')
           .map((item) => item.textContent?.trim()),
-      ).toEqual(['Descargar', 'Ver detalle', 'Compartir']);
-    });
-
-    /**
-     * El diseño fija tres acciones también para documentos ya firmados: la previsualización en
-     * diálogo que vivía aquí se retiró porque "Ver detalle" lleva al mismo visor del PDF.
-     */
-    it('un documento firmado no agrega una cuarta acción de previsualización', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-          onViewDetail={jest.fn()}
-        />,
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);
-      expect(
-        within(menu).queryByRole('menuitem', { name: /previsualizar/i }),
-      ).not.toBeInTheDocument();
+      ).toEqual(['Descargar', 'Ver participantes', 'Compartir']);
     });
 
     it('bug corregido: "Descargar" de un documento firmado dispara la descarga en vez de no hacer nada', async () => {
@@ -155,21 +225,6 @@ describe('DocumentsTable', () => {
       );
 
       expect(downloadMutate).toHaveBeenCalledWith('doc-1');
-    });
-
-    it('"Ver detalle" navega al documento', async () => {
-      const user = userEvent.setup();
-      const onViewDetail = jest.fn();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onViewDetail={onViewDetail} />,
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: /ver detalle/i }),
-      );
-
-      expect(onViewDetail).toHaveBeenCalledWith('doc-1');
     });
 
     it('muestra "Descargando..." y deshabilita la acción mientras la descarga de ese documento está en curso', async () => {
@@ -207,122 +262,181 @@ describe('DocumentsTable', () => {
     });
 
     /**
-     * Historia "Reubicar acción de firma": firmar era un botón de texto propio al lado del menú,
-     * el último resto del reparto anterior de acciones. Ahora vive dentro del menú como el
-     * resto, y la columna sólo contiene el disparador de tres puntos.
+     * Historia "Hacer seleccionables las filas": firmar y ver detalle salieron del menú porque
+     * las dos abrían `/dashboard/documents/:id`, que es lo que ahora hace la fila.
      */
-    describe('acción Firmar', () => {
-      it('ya no se ofrece como botón de texto en la fila', () => {
+    it.each([/^firmar$/i, /ver detalle/i])(
+      'ya no ofrece %s en el menú',
+      async (name) => {
+        const user = userEvent.setup();
         renderWithProviders(
           <DocumentsTable
             documents={[buildDoc({ status: DocumentStatus.Pending })]}
-            onSignClick={jest.fn()}
+            onRowSelect={jest.fn()}
           />,
         );
 
+        const menu = await openRowMenu(user);
+
         expect(
-          screen.queryByRole('button', { name: /^firmar$/i }),
+          within(menu).queryByRole('menuitem', { name }),
         ).not.toBeInTheDocument();
-        expect(
-          screen.getByRole('button', { name: /acciones del documento/i }),
-        ).toBeInTheDocument();
-      });
+      },
+    );
 
-      it('se ofrece dentro del menú de acciones para un documento firmable', async () => {
+    it('tampoco ofrece firmar como botón de texto en la fila', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Pending })]}
+          onRowSelect={jest.fn()}
+        />,
+      );
+
+      expect(
+        screen.queryByRole('button', { name: /^firmar$/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /acciones del documento/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Hacer seleccionables las filas en tablas de documentos": la fila entera es el
+   * camino al detalle, y las acciones que quedan no deben dispararlo.
+   */
+  describe('fila seleccionable', () => {
+    /** La única fila de datos renderizada (la primera de `getAllByRole('row')` es el encabezado). */
+    function dataRow(): HTMLElement {
+      return screen.getAllByRole('row')[1];
+    }
+
+    it('navega al detalle al hacer clic en cualquier punto de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9' })]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      await user.click(within(dataRow()).getByText('Creador Uno'));
+
+      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+    });
+
+    /**
+     * Las columnas que se reordenaron y las fechas que cambiaron de formato viven dentro de la
+     * fila, no al lado: activarlas navega igual que cualquier otro punto de ella.
+     */
+    it.each(['Estatus', 'Fecha de creación', 'Fecha de firma'])(
+      'navega también al hacer clic en la columna %s',
+      async (header) => {
         const user = userEvent.setup();
+        const onRowSelect = jest.fn();
         renderWithProviders(
           <DocumentsTable
-            documents={[buildDoc({ status: DocumentStatus.Pending })]}
-            onSignClick={jest.fn()}
+            documents={[buildDoc({ id: 'doc-9' })]}
+            onRowSelect={onRowSelect}
           />,
         );
 
-        const menu = await openRowMenu(user);
+        await user.click(dataCell(header));
 
-        expect(
-          within(menu).getByRole('menuitem', { name: /^firmar$/i }),
-        ).toBeInTheDocument();
-      });
+        expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+      },
+    );
 
-      /** El flujo no cambió: sigue siendo la misma navegación al detalle del documento. */
-      it('al elegirla dispara onSignClick con el id del documento', async () => {
-        const onSignClick = jest.fn();
-        const user = userEvent.setup();
-        renderWithProviders(
-          <DocumentsTable
-            documents={[
-              buildDoc({ id: 'doc-9', status: DocumentStatus.Pending }),
-            ]}
-            onSignClick={onSignClick}
-          />,
-        );
+    it('indica que la fila es seleccionable con el cursor de mano', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
+      );
 
-        const menu = await openRowMenu(user);
-        await user.click(
-          within(menu).getByRole('menuitem', { name: /^firmar$/i }),
-        );
+      expect(dataRow()).toHaveClass('cursor-pointer');
+    });
 
-        expect(onSignClick).toHaveBeenCalledWith('doc-9');
-      });
+    /** El nombre del documento es un botón real para que la fila se alcance con Tab. */
+    it('permite abrir el documento con el teclado', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9' })]}
+          onRowSelect={onRowSelect}
+        />,
+      );
 
-      /** Secciones sin firma (Enviados, Completados) no reciben `onSignClick`. */
-      it('no aparece si la sección no ofrece firmar', async () => {
-        const user = userEvent.setup();
-        renderWithProviders(
-          <DocumentsTable
-            documents={[buildDoc({ status: DocumentStatus.Pending })]}
-          />,
-        );
+      await user.tab();
+      expect(
+        screen.getByRole('button', { name: 'contrato.pdf' }),
+      ).toHaveFocus();
 
-        const menu = await openRowMenu(user);
+      await user.keyboard('{Enter}');
+      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+    });
 
-        expect(
-          within(menu).queryByRole('menuitem', { name: /^firmar$/i }),
-        ).not.toBeInTheDocument();
-      });
+    it('no hace la fila seleccionable si la vista no ofrece la navegación', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
-      it.each([
-        DocumentStatus.Signed,
-        DocumentStatus.Rejected,
-        DocumentStatus.Cancelled,
-        DocumentStatus.Expired,
-        DocumentStatus.Created,
-        DocumentStatus.CancellationPending,
-      ])('no aparece para un documento en %s', async (status) => {
-        const user = userEvent.setup();
-        renderWithProviders(
-          <DocumentsTable
-            documents={[buildDoc({ status })]}
-            onSignClick={jest.fn()}
-          />,
-        );
+      expect(dataRow()).not.toHaveClass('cursor-pointer');
+      expect(
+        screen.queryByRole('button', { name: 'contrato.pdf' }),
+      ).not.toBeInTheDocument();
 
-        const menu = await openRowMenu(user);
+      // Sin `onRowSelect` la fila es texto: el clic no rompe nada ni navega a ningún lado.
+      await user.click(within(dataRow()).getByText('contrato.pdf'));
+    });
 
-        expect(
-          within(menu).queryByRole('menuitem', { name: /^firmar$/i }),
-        ).not.toBeInTheDocument();
-      });
+    it('descargar desde el menú no dispara la navegación de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+      );
 
-      /** Las demás acciones del menú siguen intactas y en su orden. */
-      it('no desplaza ni altera las demás acciones del menú', async () => {
-        const user = userEvent.setup();
-        renderWithProviders(
-          <DocumentsTable
-            documents={[buildDoc({ status: DocumentStatus.Pending })]}
-            onSignClick={jest.fn()}
-            onViewDetail={jest.fn()}
-          />,
-        );
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /descargar/i }),
+      );
 
-        const menu = await openRowMenu(user);
+      expect(downloadMutate).toHaveBeenCalledWith('doc-1');
+      expect(onRowSelect).not.toHaveBeenCalled();
+    });
 
-        expect(
-          within(menu)
-            .getAllByRole('menuitem')
-            .map((item) => item.textContent?.trim()),
-        ).toEqual(['Firmar', 'Descargar', 'Ver detalle', 'Compartir']);
-      });
+    it('compartir desde el menú no dispara la navegación de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /compartir/i }),
+      );
+
+      expect(
+        await screen.findByLabelText(/enlace público del documento/i),
+      ).toBeInTheDocument();
+      expect(onRowSelect).not.toHaveBeenCalled();
+    });
+
+    it('ver participantes desde el menú no dispara la navegación de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
+      );
+
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(onRowSelect).not.toHaveBeenCalled();
     });
   });
 
@@ -331,18 +445,6 @@ describe('DocumentsTable', () => {
    * a partir de los firmantes del documento; acá solo se traduce a la etiqueta de la columna.
    */
   describe('columna Tipo de firma', () => {
-    /** Celda de "Tipo de firma" de la única fila renderizada, por su posición en el encabezado. */
-    function signatureTypeCell(): HTMLElement {
-      const headers = screen.getAllByRole('columnheader');
-      const columnIndex = headers.findIndex(
-        (header) => header.textContent?.trim() === 'Tipo de firma',
-      );
-      expect(columnIndex).toBeGreaterThan(-1);
-
-      const [row] = screen.getAllByRole('row').slice(1);
-      return within(row).getAllByRole('cell')[columnIndex];
-    }
-
     it('muestra "Simple" para un documento de firma simple', () => {
       renderWithProviders(
         <DocumentsTable
@@ -350,7 +452,7 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      expect(signatureTypeCell()).toHaveTextContent('Simple');
+      expect(dataCell('Tipo de firma')).toHaveTextContent('Simple');
     });
 
     it('muestra "E.Firma" para un documento de firma avanzada', () => {
@@ -360,7 +462,7 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      expect(signatureTypeCell()).toHaveTextContent('E.Firma');
+      expect(dataCell('Tipo de firma')).toHaveTextContent('E.Firma');
     });
 
     // Documentos creados antes de que se registrara el tipo de firma: la fila se sigue viendo
@@ -370,7 +472,7 @@ describe('DocumentsTable', () => {
         <DocumentsTable documents={[buildDoc({ signatureType: null })]} />,
       );
 
-      expect(signatureTypeCell()).toHaveTextContent('—');
+      expect(dataCell('Tipo de firma')).toHaveTextContent('—');
     });
 
     // Criterio "la nueva columna no afecta la visualización, filtros ni acciones existentes".
@@ -388,6 +490,43 @@ describe('DocumentsTable', () => {
       expect(
         within(row).getByRole('button', { name: /acciones del documento/i }),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Consultar participantes desde las acciones del documento": la tabla solo abre el
+   * modal con el documento de la fila; lo que se muestra dentro se prueba en
+   * DocumentParticipantsDialog.spec.
+   */
+  describe('ver participantes', () => {
+    it('abre el modal de participantes del documento de esa fila', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ id: 'doc-9' })]} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
+      );
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Participantes')).toBeInTheDocument();
+      expect(within(dialog).getByText('Juan Pérez')).toBeInTheDocument();
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        'doc-9',
+        expect.objectContaining({ enabled: true }),
+      );
+    });
+
+    /** Cerrado no consulta: el detalle solo se pide cuando alguien abre el modal. */
+    it('no consulta el detalle mientras el modal está cerrado', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        '',
+        expect.objectContaining({ enabled: false }),
+      );
     });
   });
 
