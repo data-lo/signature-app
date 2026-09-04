@@ -42,6 +42,7 @@ const RESET_STATE = {
   user: null,
   accountsList: [],
   activeAccount: null,
+  billingByAccountId: {},
 };
 
 describe('derivePersonalConfigured', () => {
@@ -264,8 +265,73 @@ describe('useAuthStore', () => {
     });
   });
 
+  describe('billingByAccountId', () => {
+    /**
+     * Un usuario tiene varias cuentas a la vez y cada una su propio plan: guardarlo indexado es
+     * lo que permite cambiar de cuenta sin perder lo ya consultado de la anterior.
+     */
+    it('guarda el estado de cada cuenta por separado', () => {
+      useAuthStore.getState().setBillingState('account-1', {
+        billingProfileId: 'perfil-1',
+        hasActiveSubscription: true,
+        currentPlanType: 'plus',
+      });
+      useAuthStore.getState().setBillingState('account-org', {
+        billingProfileId: 'perfil-org',
+        hasActiveSubscription: false,
+        currentPlanType: null,
+      });
+
+      expect(useAuthStore.getState().billingByAccountId).toEqual({
+        'account-1': {
+          billingProfileId: 'perfil-1',
+          hasActiveSubscription: true,
+          currentPlanType: 'plus',
+        },
+        'account-org': {
+          billingProfileId: 'perfil-org',
+          hasActiveSubscription: false,
+          currentPlanType: null,
+        },
+      });
+    });
+
+    it('sobrescribe la entrada de una cuenta sin tocar las demás', () => {
+      useAuthStore.getState().setBillingState('account-1', {
+        billingProfileId: 'perfil-1',
+        hasActiveSubscription: false,
+        currentPlanType: null,
+      });
+      useAuthStore.getState().setBillingState('account-org', {
+        billingProfileId: 'perfil-org',
+        hasActiveSubscription: true,
+        currentPlanType: 'premium',
+      });
+
+      // El webhook activó el perfil personal: sólo cambia esa entrada.
+      useAuthStore.getState().setBillingState('account-1', {
+        billingProfileId: 'perfil-1',
+        hasActiveSubscription: true,
+        currentPlanType: 'basic',
+      });
+
+      expect(useAuthStore.getState().billingByAccountId['account-1']).toEqual({
+        billingProfileId: 'perfil-1',
+        hasActiveSubscription: true,
+        currentPlanType: 'basic',
+      });
+      expect(
+        useAuthStore.getState().billingByAccountId['account-org'],
+      ).toEqual({
+        billingProfileId: 'perfil-org',
+        hasActiveSubscription: true,
+        currentPlanType: 'premium',
+      });
+    });
+  });
+
   describe('logout', () => {
-    it('resetea token, user, accountsList y activeAccount', () => {
+    it('resetea token, user, accountsList, activeAccount y el estado de facturación', () => {
       useAuthStore.getState().setAuth('jwt-token', buildProfile());
       useAuthStore.getState().setAccountsList([buildAccount()]);
       useAuthStore.getState().setActiveAccount({
@@ -273,6 +339,11 @@ describe('useAuthStore', () => {
         accountType: 'ORGANIZATION',
         organizationId: 'account-1',
         roleId: null,
+      });
+      useAuthStore.getState().setBillingState('account-1', {
+        billingProfileId: 'perfil-1',
+        hasActiveSubscription: true,
+        currentPlanType: 'plus',
       });
 
       useAuthStore.getState().logout();
