@@ -84,6 +84,70 @@ describe('SubscriptionStateCard', () => {
     });
   });
 
+  /**
+   * El estado con el que llega TODA cuenta recién creada, ahora que el alta deja su perfil
+   * gratuito. Es el caso más común de esta pantalla, no un borde.
+   */
+  describe('plan gratuito', () => {
+    it('lo presenta como el plan vigente, no como uno caducado', async () => {
+      givenBillingState({
+        billingProfileId: 'perfil-free',
+        hasActiveSubscription: false,
+        currentPlanType: 'free',
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
+      );
+      /**
+       * Lo que esta prueba existe para impedir: el plan gratuito comparte
+       * `hasActiveSubscription: false` con un plan de pago caducado, y caer en ese texto le
+       * diría a quien acaba de registrarse que su plan "no está vigente".
+       */
+      expect(screen.queryByText(/no está vigente/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/sin suscripción activa/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('deja contratar desde el plan gratuito', async () => {
+      givenBillingState({
+        billingProfileId: 'perfil-free',
+        hasActiveSubscription: false,
+        currentPlanType: 'free',
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole('link', { name: /ver planes/i }),
+        ).toHaveAttribute('href', '/dashboard/plans'),
+      );
+    });
+
+    /**
+     * Una organización comparte un solo perfil, así que su plan gratuito se ve igual: la
+     * tarjeta no distingue el tipo de cuenta, el backend ya resolvió el propietario.
+     */
+    it('se ve igual en una cuenta de organización', async () => {
+      givenActiveAccount(ORGANIZATION_ACCOUNT_ID, 'ORGANIZATION', 'org-1');
+      givenBillingState({
+        billingProfileId: 'perfil-free-org',
+        hasActiveSubscription: false,
+        currentPlanType: 'free',
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
+      );
+    });
+  });
+
   describe('perfil inexistente', () => {
     it('invita a contratar cuando la cuenta nunca ha pagado', async () => {
       givenBillingState({

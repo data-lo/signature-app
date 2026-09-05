@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useBillingState } from '@/lib/hooks/useBillingState';
+import { FREE_PLAN_TYPE } from '@/lib/api/billing';
 
 /**
  * El plan viene del catálogo del backend (`basic`, `plus`, ...), que es un conjunto abierto: se
@@ -71,9 +72,36 @@ export default function SubscriptionStateCard() {
   }
 
   /**
-   * Un plan sin suscripción vigente es el último que se contrató: el perfil quedó `INCOMPLETE`,
-   * `PAST_DUE` o `CANCELED`. Se nombra —ayuda a reconocer de qué se está hablando— pero el
-   * texto deja claro que hoy no habilita nada.
+   * El plan gratuito va ANTES del bloque de abajo y no puede caer en él.
+   *
+   * Los dos llegan con `hasActiveSubscription: false`, pero significan cosas opuestas: aquél es
+   * un plan de pago que dejó de estar vigente, y éste es el plan CON EL QUE LA CUENTA NACE, que
+   * está perfectamente vigente — sólo que no es de pago. Tratarlos igual le diría a cualquiera
+   * que acaba de registrarse que su plan "no está vigente", que es falso y además alarmante.
+   */
+  if (billing.currentPlanType === FREE_PLAN_TYPE) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan Gratuito</CardTitle>
+          <CardDescription>
+            Es el plan con el que empieza toda cuenta. Contrata un plan cuando
+            necesites más de lo que incluye.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button render={<Link href="/dashboard/plans" />} variant="brand">
+            Ver planes
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  /**
+   * Un plan de pago sin suscripción vigente es el último que se contrató: el perfil quedó
+   * `INCOMPLETE`, `PAST_DUE` o `CANCELED`. Se nombra —ayuda a reconocer de qué se está
+   * hablando— pero el texto deja claro que hoy no habilita nada.
    */
   if (billing.currentPlanType) {
     return (
