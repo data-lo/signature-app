@@ -10,31 +10,40 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useBillingState } from '@/lib/hooks/useBillingState';
-import { FREE_PLAN_TYPE } from '@/lib/api/billing';
+import { useSubscriptionState } from '../_hooks/useSubscriptionState';
+import type { BillingProfileStatus } from '../_interfaces/subscription-state.interface';
+
+/** El estado del perfil de facturación, rotulado para el usuario. */
+const STATUS_LABELS: Record<BillingProfileStatus, string> = {
+  FREE: 'Plan gratuito',
+  INCOMPLETE: 'Pendiente de confirmación',
+  ACTIVE: 'Activa',
+  PAST_DUE: 'Con un pago pendiente',
+  CANCELED: 'Cancelada',
+};
 
 /**
- * El plan viene del catálogo del backend (`basic`, `plus`, ...), que es un conjunto abierto: se
- * rotula capitalizando en vez de traducirlo con un mapa, para que dar de alta un plan nuevo no
- * obligue a desplegar esta app ni deje la tarjeta en blanco mientras tanto.
+ * El plan viene del catálogo del backend, que es un conjunto abierto: se rotula capitalizando en
+ * vez de traducirlo con un mapa, para que dar de alta un plan nuevo no obligue a desplegar esta
+ * app ni deje la tarjeta en blanco mientras tanto.
  */
 function planLabel(planType: string): string {
   return planType.charAt(0).toUpperCase() + planType.slice(1);
 }
 
 /**
- * Estado de la suscripción de la CUENTA ACTIVA.
+ * Estado actual de la suscripción de la CUENTA ACTIVA.
  *
  * Se lee del backend y no de la URL de retorno: es la única fuente que refleja lo que el webhook
- * ya confirmó. Justo después de pagar puede seguir diciendo "sin suscripción" durante unos
- * segundos, y eso es correcto — el aviso de arriba explica esa espera y es quien insiste.
+ * ya confirmó. Justo después de pagar puede seguir diciendo "pendiente" durante unos segundos, y
+ * eso es correcto — el aviso de arriba explica esa espera.
  *
- * Muestra el estado de la cuenta en la que el usuario está trabajando, no el del usuario: quien
- * tiene cuenta personal y organización ve uno u otro según el switcher, y cambiar de cuenta
- * redibuja esta tarjeta sola.
+ * Muestra el estado de la cuenta en la que se está trabajando, no el del usuario: quien tiene
+ * cuenta personal y organización ve uno u otro según el switcher, y cambiar de cuenta redibuja
+ * esta tarjeta sola porque la cuenta va en la `queryKey`.
  */
 export default function SubscriptionStateCard() {
-  const { data: billing, isPending, isError } = useBillingState();
+  const { data: subscription, isPending, isError } = useSubscriptionState();
 
   if (isPending) {
     return (
@@ -45,7 +54,7 @@ export default function SubscriptionStateCard() {
     );
   }
 
-  if (isError || !billing) {
+  if (isError || !subscription) {
     return (
       <p className="text-sm text-destructive">
         No se pudo cargar el estado de tu suscripción. Intenta de nuevo más
@@ -54,32 +63,32 @@ export default function SubscriptionStateCard() {
     );
   }
 
-  if (billing.hasActiveSubscription) {
+  if (!subscription.status) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>
-            {billing.currentPlanType
-              ? `Plan ${planLabel(billing.currentPlanType)}`
-              : 'Suscripción activa'}
-          </CardTitle>
+          <CardTitle>Sin suscripción activa</CardTitle>
           <CardDescription>
-            Tu suscripción está al corriente y puedes firmar documentos.
+            Todavía no has contratado ningún servicio.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <Button render={<Link href="/dashboard/plans" />} variant="brand">
+            Ver planes
+          </Button>
+        </CardContent>
       </Card>
     );
   }
 
   /**
-   * El plan gratuito va ANTES del bloque de abajo y no puede caer en él.
-   *
-   * Los dos llegan con `hasActiveSubscription: false`, pero significan cosas opuestas: aquél es
-   * un plan de pago que dejó de estar vigente, y éste es el plan CON EL QUE LA CUENTA NACE, que
-   * está perfectamente vigente — sólo que no es de pago. Tratarlos igual le diría a cualquiera
-   * que acaba de registrarse que su plan "no está vigente", que es falso y además alarmante.
+   * El plan gratuito va antes del bloque general y no puede caer en él: comparte
+   * `hasActiveSubscription: false` con un plan de pago caducado, pero significan lo contrario.
+   * Éste es el plan CON EL QUE LA CUENTA NACE y está perfectamente vigente — sólo que no es de
+   * pago. Decirle a quien acaba de registrarse que su plan "todavía no habilita" nada sería
+   * cierto a medias y alarmante del todo.
    */
-  if (billing.currentPlanType === FREE_PLAN_TYPE) {
+  if (subscription.status === 'FREE') {
     return (
       <Card>
         <CardHeader>
@@ -98,43 +107,33 @@ export default function SubscriptionStateCard() {
     );
   }
 
-  /**
-   * Un plan de pago sin suscripción vigente es el último que se contrató: el perfil quedó
-   * `INCOMPLETE`, `PAST_DUE` o `CANCELED`. Se nombra —ayuda a reconocer de qué se está
-   * hablando— pero el texto deja claro que hoy no habilita nada.
-   */
-  if (billing.currentPlanType) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Sin suscripción activa</CardTitle>
-          <CardDescription>
-            Tu plan {planLabel(billing.currentPlanType)} no está vigente, así que
-            todavía no habilita la firma de documentos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button render={<Link href="/dashboard/plans" />} variant="brand">
-            Ver planes
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sin suscripción activa</CardTitle>
+        <CardTitle>
+          {subscription.planType
+            ? `Plan ${planLabel(subscription.planType)} — ${STATUS_LABELS[subscription.status]}`
+            : STATUS_LABELS[subscription.status]}
+        </CardTitle>
         <CardDescription>
-          Todavía no has contratado ningún servicio.
+          {subscription.hasActiveSubscription
+            ? 'Tu suscripción está al corriente y puedes firmar documentos.'
+            : 'Tu suscripción todavía no habilita la firma de documentos.'}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Button render={<Link href="/dashboard/plans" />} variant="brand">
-          Ver planes
-        </Button>
-      </CardContent>
+
+      {subscription.currentPeriodEnd ? (
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Periodo vigente hasta{' '}
+            {new Date(subscription.currentPeriodEnd).toLocaleDateString(
+              'es-MX',
+              { dateStyle: 'long' },
+            )}
+            .
+          </p>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }

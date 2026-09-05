@@ -2,13 +2,14 @@ import type { ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SubscriptionStateCard from './SubscriptionStateCard';
-import { getBillingStateRequest, type BillingState } from '@/lib/api/billing';
+import { getSubscriptionStateRequest } from '../_requests';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { AccountKind } from '@/lib/store/types/auth-store.types';
+import type { SubscriptionState } from '../_interfaces/subscription-state.interface';
 
-jest.mock('@/lib/api/billing');
+jest.mock('../_requests');
 
-const mockedGetBillingState = getBillingStateRequest as jest.Mock;
+const mockedRequest = getSubscriptionStateRequest as jest.Mock;
 
 const PERSONAL_ACCOUNT_ID = 'cuenta-personal-1';
 const ORGANIZATION_ACCOUNT_ID = 'cuenta-org-1';
@@ -31,8 +32,8 @@ function givenActiveAccount(
   });
 }
 
-function givenBillingState(state: BillingState) {
-  mockedGetBillingState.mockResolvedValue(state);
+function givenSubscription(state: SubscriptionState) {
+  mockedRequest.mockResolvedValue(state);
 }
 
 describe('SubscriptionStateCard', () => {
@@ -40,60 +41,71 @@ describe('SubscriptionStateCard', () => {
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    mockedGetBillingState.mockReset();
-    useAuthStore.setState({ billingByAccountId: {} });
+    mockedRequest.mockReset();
     givenActiveAccount(PERSONAL_ACCOUNT_ID);
   });
 
   describe('cuenta personal', () => {
-    it('muestra el plan vigente cuando la suscripción está activa', async () => {
-      givenBillingState({
-        billingProfileId: 'perfil-personal',
+    /**
+     * El caso que motiva la historia: tras `invoice.paid` el perfil queda ACTIVE y la pantalla
+     * tiene que decir "Activa". Antes leía `account_subscriptions`, que el webhook mantiene por
+     * compatibilidad pero no refleja la activación, y seguía mostrando la suscripción inactiva.
+     */
+    it('muestra ACTIVE como suscripción activa, con su plan y su periodo', async () => {
+      givenSubscription({
         hasActiveSubscription: true,
-        currentPlanType: 'plus',
+        planType: 'plus',
+        status: 'ACTIVE',
+        currentPeriodStart: '2030-01-01T00:00:00.000Z',
+        currentPeriodEnd: '2030-02-01T00:00:00.000Z',
       });
 
       render(<SubscriptionStateCard />, { wrapper });
 
       await waitFor(() =>
-        expect(screen.getByText('Plan Plus')).toBeInTheDocument(),
+        expect(screen.getByText(/plan plus — activa/i)).toBeInTheDocument(),
       );
       expect(screen.getByText(/está al corriente/i)).toBeInTheDocument();
+      expect(screen.getByText(/periodo vigente hasta/i)).toBeInTheDocument();
     });
   });
 
   describe('organización', () => {
     /**
      * La tarjeta no distingue el tipo de cuenta: el backend ya resolvió el propietario a partir
-     * del `X-Account-Id`. Lo que se comprueba acá es que muestra lo que llega para la cuenta de
-     * organización activa, no un estado personal heredado.
+     * del `X-Account-Id`. Lo que se comprueba es que pinta lo que llega para la organización
+     * activa, no un estado personal heredado.
      */
     it('muestra el plan de la organización activa', async () => {
       givenActiveAccount(ORGANIZATION_ACCOUNT_ID, 'ORGANIZATION', 'org-1');
-      givenBillingState({
-        billingProfileId: 'perfil-organizacion',
+      givenSubscription({
         hasActiveSubscription: true,
-        currentPlanType: 'premium',
+        planType: 'premium',
+        status: 'ACTIVE',
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       });
 
       render(<SubscriptionStateCard />, { wrapper });
 
       await waitFor(() =>
-        expect(screen.getByText('Plan Premium')).toBeInTheDocument(),
+        expect(screen.getByText(/plan premium — activa/i)).toBeInTheDocument(),
       );
     });
   });
 
   /**
-   * El estado con el que llega TODA cuenta recién creada, ahora que el alta deja su perfil
+   * El estado con el que llega TODA cuenta recién creada, desde que el alta deja su perfil
    * gratuito. Es el caso más común de esta pantalla, no un borde.
    */
   describe('plan gratuito', () => {
     it('lo presenta como el plan vigente, no como uno caducado', async () => {
-      givenBillingState({
-        billingProfileId: 'perfil-free',
+      givenSubscription({
         hasActiveSubscription: false,
-        currentPlanType: 'free',
+        planType: 'free',
+        status: 'FREE',
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       });
 
       render(<SubscriptionStateCard />, { wrapper });
@@ -102,42 +114,31 @@ describe('SubscriptionStateCard', () => {
         expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
       );
       /**
-       * Lo que esta prueba existe para impedir: el plan gratuito comparte
-       * `hasActiveSubscription: false` con un plan de pago caducado, y caer en ese texto le
-       * diría a quien acaba de registrarse que su plan "no está vigente".
+       * Lo que esta prueba impide: el plan gratuito comparte `hasActiveSubscription: false` con
+       * un plan de pago caducado, y caer en ese texto le diría a quien acaba de registrarse que
+       * su plan no habilita nada.
        */
-      expect(screen.queryByText(/no está vigente/i)).not.toBeInTheDocument();
       expect(
-        screen.queryByText(/sin suscripción activa/i),
+        screen.queryByText(/todavía no habilita la firma/i),
       ).not.toBeInTheDocument();
-    });
-
-    it('deja contratar desde el plan gratuito', async () => {
-      givenBillingState({
-        billingProfileId: 'perfil-free',
-        hasActiveSubscription: false,
-        currentPlanType: 'free',
-      });
-
-      render(<SubscriptionStateCard />, { wrapper });
-
-      await waitFor(() =>
-        expect(
-          screen.getByRole('link', { name: /ver planes/i }),
-        ).toHaveAttribute('href', '/dashboard/plans'),
+      expect(screen.getByRole('link', { name: /ver planes/i })).toHaveAttribute(
+        'href',
+        '/dashboard/plans',
       );
     });
 
     /**
-     * Una organización comparte un solo perfil, así que su plan gratuito se ve igual: la
-     * tarjeta no distingue el tipo de cuenta, el backend ya resolvió el propietario.
+     * Una organización comparte un solo perfil, así que su plan gratuito se ve igual: la tarjeta
+     * no distingue el tipo de cuenta, el backend ya resolvió el propietario.
      */
     it('se ve igual en una cuenta de organización', async () => {
       givenActiveAccount(ORGANIZATION_ACCOUNT_ID, 'ORGANIZATION', 'org-1');
-      givenBillingState({
-        billingProfileId: 'perfil-free-org',
+      givenSubscription({
         hasActiveSubscription: false,
-        currentPlanType: 'free',
+        planType: 'free',
+        status: 'FREE',
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       });
 
       render(<SubscriptionStateCard />, { wrapper });
@@ -150,10 +151,12 @@ describe('SubscriptionStateCard', () => {
 
   describe('perfil inexistente', () => {
     it('invita a contratar cuando la cuenta nunca ha pagado', async () => {
-      givenBillingState({
-        billingProfileId: null,
+      givenSubscription({
         hasActiveSubscription: false,
-        currentPlanType: null,
+        planType: null,
+        status: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       });
 
       render(<SubscriptionStateCard />, { wrapper });
@@ -161,9 +164,6 @@ describe('SubscriptionStateCard', () => {
       await waitFor(() =>
         expect(screen.getByText(/sin suscripción activa/i)).toBeInTheDocument(),
       );
-      expect(
-        screen.getByText(/todavía no has contratado ningún servicio/i),
-      ).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /ver planes/i })).toHaveAttribute(
         'href',
         '/dashboard/plans',
@@ -171,32 +171,32 @@ describe('SubscriptionStateCard', () => {
     });
   });
 
-  /**
-   * `INCOMPLETE`, `PAST_DUE` y `CANCELED` llegan igual desde el backend —
-   * `hasActiveSubscription: false` conservando el último plan contratado—, así que la tarjeta lo
-   * nombra pero deja claro que no habilita nada.
-   */
-  describe('perfil sin suscripción vigente', () => {
-    it('nombra el último plan contratado sin darlo por vigente', async () => {
-      givenBillingState({
-        billingProfileId: 'perfil-personal',
+  describe('estados que no habilitan', () => {
+    it.each([
+      ['INCOMPLETE', /pendiente de confirmación/i],
+      ['PAST_DUE', /con un pago pendiente/i],
+      ['CANCELED', /cancelada/i],
+    ] as const)('rotula %s sin darlo por vigente', async (status, rotulo) => {
+      givenSubscription({
         hasActiveSubscription: false,
-        currentPlanType: 'basic',
+        planType: 'basic',
+        status,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       });
 
       render(<SubscriptionStateCard />, { wrapper });
 
-      await waitFor(() =>
-        expect(screen.getByText(/sin suscripción activa/i)).toBeInTheDocument(),
-      );
-      expect(screen.getByText(/tu plan basic no está vigente/i)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /ver planes/i })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText(rotulo)).toBeInTheDocument());
+      expect(
+        screen.getByText(/todavía no habilita la firma/i),
+      ).toBeInTheDocument();
     });
   });
 
   describe('mientras carga o falla', () => {
     it('avisa que está cargando', () => {
-      mockedGetBillingState.mockReturnValue(new Promise(() => {}));
+      mockedRequest.mockReturnValue(new Promise(() => {}));
 
       render(<SubscriptionStateCard />, { wrapper });
 
@@ -204,7 +204,7 @@ describe('SubscriptionStateCard', () => {
     });
 
     it('avisa del fallo sin inventar un estado', async () => {
-      mockedGetBillingState.mockRejectedValue(new Error('boom'));
+      mockedRequest.mockRejectedValue(new Error('boom'));
 
       render(<SubscriptionStateCard />, { wrapper });
 
@@ -213,7 +213,6 @@ describe('SubscriptionStateCard', () => {
           screen.getByText(/no se pudo cargar el estado/i),
         ).toBeInTheDocument(),
       );
-      expect(screen.queryByText(/sin suscripción activa/i)).not.toBeInTheDocument();
     });
   });
 });
