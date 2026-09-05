@@ -2,9 +2,11 @@ import type { ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import PaymentReturnNotice from './PaymentReturnNotice';
-import { getBillingStateRequest } from '@/lib/api/billing';
-import { useAuthStore } from '@/lib/store/useAuthStore';
+import { getSubscriptionStateRequest } from '../_requests';
+import { subscriptionStateQueryKey } from '../_hooks/useSubscriptionState';
 import { billingStateQueryKey } from '@/lib/hooks/useBillingState';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import type { SubscriptionState } from '../_interfaces/subscription-state.interface';
 
 /**
  * El mock lee la variable en cada llamada, así que basta con reasignarla entre pruebas. Mutar
@@ -16,20 +18,24 @@ let mockSearchParams = new URLSearchParams();
 jest.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
 }));
-jest.mock('@/lib/api/billing');
+jest.mock('../_requests');
 
-const mockedGetBillingState = getBillingStateRequest as jest.Mock;
+const mockedRequest = getSubscriptionStateRequest as jest.Mock;
 
-const ACCOUNT_ID = 'account-1';
-const SIN_PERFIL = {
-  billingProfileId: null,
+const ACCOUNT_ID = 'cuenta-1';
+const GRATUITA: SubscriptionState = {
   hasActiveSubscription: false,
-  currentPlanType: null,
+  planType: 'free',
+  status: 'FREE',
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
 };
-const ACTIVO = {
-  billingProfileId: 'perfil-1',
+const ACTIVA: SubscriptionState = {
   hasActiveSubscription: true,
-  currentPlanType: 'plus',
+  planType: 'plus',
+  status: 'ACTIVE',
+  currentPeriodStart: '2030-01-01T00:00:00.000Z',
+  currentPeriodEnd: '2030-02-01T00:00:00.000Z',
 };
 
 function givenQuery(query: string) {
@@ -38,13 +44,12 @@ function givenQuery(query: string) {
 
 let queryClient: QueryClient;
 
-function wrapper({ children }: { children: ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-}
-
 function renderNotice() {
+  function wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
   return render(<PaymentReturnNotice />, { wrapper });
 }
 
@@ -53,8 +58,8 @@ describe('PaymentReturnNotice', () => {
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    mockedGetBillingState.mockReset();
-    mockedGetBillingState.mockResolvedValue(SIN_PERFIL);
+    mockedRequest.mockReset();
+    mockedRequest.mockResolvedValue(GRATUITA);
     useAuthStore.setState({
       activeAccount: {
         id: ACCOUNT_ID,
@@ -83,19 +88,20 @@ describe('PaymentReturnNotice', () => {
   });
 
   describe('refresco del estado al volver de Stripe', () => {
-    it('consulta el estado de facturación de la cuenta activa', async () => {
-      givenQuery('payment=success&session_id=cs_test_1');
+    it('consulta la suscripción de la cuenta activa', async () => {
+      givenQuery('payment=success');
 
       renderNotice();
 
-      await waitFor(() => expect(mockedGetBillingState).toHaveBeenCalled());
+      await waitFor(() => expect(mockedRequest).toHaveBeenCalled());
     });
 
     /**
-     * Lo que hubiera en caché se pidió ANTES de ir a pagar, así que describe el estado anterior
-     * a la compra. Sin invalidarlo, el usuario vuelve y ve su estado viejo servido del caché.
+     * Las DOS consultas del perfil se invalidan: la de esta pantalla y la del estado global por
+     * cuenta. Salen del mismo `billing_profile`, así que refrescar sólo una dejaría al resto de
+     * la aplicación creyendo todavía que no hay plan.
      */
-    it('invalida lo cacheado de esa cuenta', async () => {
+    it('invalida tanto la suscripción como el estado global de esa cuenta', async () => {
       const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
       givenQuery('payment=success');
 
@@ -103,14 +109,17 @@ describe('PaymentReturnNotice', () => {
 
       await waitFor(() =>
         expect(invalidateQueries).toHaveBeenCalledWith({
-          queryKey: billingStateQueryKey(ACCOUNT_ID),
+          queryKey: subscriptionStateQueryKey(ACCOUNT_ID),
         }),
       );
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: billingStateQueryKey(ACCOUNT_ID),
+      });
     });
 
     /** El texto sólo cambia cuando el estado REAL —el que dejó el webhook— lo confirma. */
-    it('pasa a "Suscripción activa" cuando el webhook activa el perfil', async () => {
-      mockedGetBillingState.mockResolvedValue(ACTIVO);
+    it('pasa a "Suscripción activa" cuando el webhook la activa', async () => {
+      mockedRequest.mockResolvedValue(ACTIVA);
       givenQuery('payment=success');
 
       renderNotice();
@@ -124,7 +133,7 @@ describe('PaymentReturnNotice', () => {
     });
 
     /** Quien entra por el menú no acaba de pagar: no hay ningún cambio que esperar. */
-    it('no consulta ni invalida si no se viene de un pago', async () => {
+    it('no invalida nada si no se viene de un pago', async () => {
       const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
       givenQuery('payment=cancel');
 

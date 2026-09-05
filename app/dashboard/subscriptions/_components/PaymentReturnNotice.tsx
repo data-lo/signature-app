@@ -11,10 +11,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { billingStateQueryKey } from '@/lib/hooks/useBillingState';
 import {
-  billingStateQueryKey,
-  useBillingState,
-} from '@/lib/hooks/useBillingState';
+  subscriptionStateQueryKey,
+  useSubscriptionState,
+} from '../_hooks/useSubscriptionState';
 
 /** Valores que Stripe puede traer de vuelta en `?payment=`. */
 const PAYMENT_SUCCESS = 'success';
@@ -27,13 +28,15 @@ const PAYMENT_CANCEL = 'cancel';
  * `success_url`, y esa URL es manipulable: cualquiera puede escribirla a mano. Quien da el pago
  * por bueno es el webhook firmado, contra la base de datos.
  *
- * Por eso este componente, además de dibujar el aviso, es el que pide el estado de facturación
- * insistiendo: invalida lo que hubiera en caché —viene de antes de pagar, así que está viejo por
- * definición— y deja la consulta reintentando hasta que el webhook active el perfil o se agote
- * el plazo. El texto acompaña esa espera y cambia solo cuando el estado real lo confirma.
+ * Por eso este componente, además de dibujar el aviso, es el que pide el estado insistiendo:
+ * invalida lo que hubiera en caché —viene de antes de pagar, así que está viejo por definición—
+ * y deja la consulta reintentando hasta que el webhook active la suscripción o se agote el plazo.
  *
- * Sin parámetro no se dibuja nada ni se insiste: el usuario que entra por el menú no acaba de
- * pagar y no hay ningún cambio que esperar.
+ * Se invalidan LAS DOS consultas del perfil: la de esta pantalla y la del estado global por
+ * cuenta (`useBillingState`, que vive en `AuthProvider`). Salen del mismo `billing_profile`, así
+ * que refrescar sólo una dejaría al resto de la aplicación creyendo todavía que no hay plan.
+ *
+ * Sin parámetro no se dibuja nada ni se insiste: quien entra por el menú no acaba de pagar.
  */
 export default function PaymentReturnNotice() {
   const searchParams = useSearchParams();
@@ -42,24 +45,39 @@ export default function PaymentReturnNotice() {
 
   const queryClient = useQueryClient();
   const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
-  const { data: billing } = useBillingState({
+  const { data: subscription } = useSubscriptionState({
     awaitActivation: isReturningFromPayment,
   });
 
-  /**
-   * Lo cacheado se pidió antes de ir a pagar, así que describe el estado anterior a la compra.
-   * Se invalida una sola vez al volver; a partir de ahí insiste el `refetchInterval` del hook.
-   */
+  /** Lo cacheado se pidió antes de ir a pagar: describe el estado anterior a la compra. */
   useEffect(() => {
-    if (isReturningFromPayment && activeAccountId) {
+    if (!isReturningFromPayment || !activeAccountId) {
+      return;
+    }
+
+    void queryClient.invalidateQueries({
+      queryKey: subscriptionStateQueryKey(activeAccountId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: billingStateQueryKey(activeAccountId),
+    });
+  }, [isReturningFromPayment, activeAccountId, queryClient]);
+
+  /**
+   * En cuanto el webhook confirma, el estado global tiene que enterarse también: lo dibuja el
+   * menú y lo consultan los guards, y quedaría diciendo "sin plan" hasta el siguiente montaje.
+   */
+  const yaEstaActiva = subscription?.hasActiveSubscription ?? false;
+  useEffect(() => {
+    if (isReturningFromPayment && yaEstaActiva && activeAccountId) {
       void queryClient.invalidateQueries({
         queryKey: billingStateQueryKey(activeAccountId),
       });
     }
-  }, [isReturningFromPayment, activeAccountId, queryClient]);
+  }, [isReturningFromPayment, yaEstaActiva, activeAccountId, queryClient]);
 
   if (isReturningFromPayment) {
-    if (billing?.hasActiveSubscription) {
+    if (yaEstaActiva) {
       return (
         <Card className="border-emerald-500/50 bg-emerald-500/5">
           <CardHeader>
@@ -83,8 +101,8 @@ export default function PaymentReturnNotice() {
             Pago recibido
           </CardTitle>
           <CardDescription>
-            Estamos confirmando tu suscripción. En cuanto el proveedor nos avise,
-            verás el plan activo aquí mismo.
+            Estamos confirmando tu suscripción. En cuanto el proveedor nos
+            avise, verás el plan activo aquí mismo.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -100,8 +118,8 @@ export default function PaymentReturnNotice() {
             Pago cancelado
           </CardTitle>
           <CardDescription>
-            El pago fue cancelado y no se realizó ningún cargo. Puedes intentarlo
-            nuevamente cuando quieras.
+            El pago fue cancelado y no se realizó ningún cargo. Puedes
+            intentarlo nuevamente cuando quieras.
           </CardDescription>
         </CardHeader>
       </Card>

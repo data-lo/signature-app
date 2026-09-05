@@ -2,8 +2,6 @@ import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
-  ACTIVATION_POLL_INTERVAL_MS,
-  ACTIVATION_POLL_TIMEOUT_MS,
   billingStateQueryKey,
   useBillingState,
   useKnownBillingState,
@@ -154,10 +152,9 @@ describe('useBillingState', () => {
     it('useKnownBillingState lee del store sin disparar ninguna petición', () => {
       useAuthStore.setState({ billingByAccountId: { 'account-1': ACTIVO } });
 
-      const { result } = renderHook(
-        () => useKnownBillingState('account-1'),
-        { wrapper },
-      );
+      const { result } = renderHook(() => useKnownBillingState('account-1'), {
+        wrapper,
+      });
 
       expect(result.current).toEqual(ACTIVO);
       expect(mockedGetBillingState).not.toHaveBeenCalled();
@@ -171,94 +168,6 @@ describe('useBillingState', () => {
       );
 
       expect(result.current).toBeUndefined();
-    });
-  });
-
-  /**
-   * El retorno de Stripe no confirma nada: activa el perfil el webhook `invoice.paid`, que llega
-   * unos segundos después. Sin insistir, el usuario vuelve de pagar y ve "sin plan" hasta que
-   * recargue a mano.
-   */
-  describe('espera de la activación tras volver de Stripe', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    async function avanzar(ms: number) {
-      await act(async () => {
-        jest.advanceTimersByTime(ms);
-      });
-    }
-
-    it('reintenta hasta que el webhook activa el perfil, y entonces se detiene', async () => {
-      mockedGetBillingState
-        .mockResolvedValueOnce(SIN_PERFIL)
-        .mockResolvedValueOnce(SIN_PERFIL)
-        .mockResolvedValue(ACTIVO);
-
-      setActiveAccount('account-1');
-      const { result } = renderHook(
-        () => useBillingState({ awaitActivation: true }),
-        { wrapper },
-      );
-
-      await waitFor(() => expect(result.current.data).toEqual(SIN_PERFIL));
-
-      await avanzar(ACTIVATION_POLL_INTERVAL_MS);
-      await avanzar(ACTIVATION_POLL_INTERVAL_MS);
-
-      await waitFor(() =>
-        expect(result.current.data?.hasActiveSubscription).toBe(true),
-      );
-
-      const llamadasAlActivarse = mockedGetBillingState.mock.calls.length;
-      // Guarda contra un falso verde: si no hubiera reintentos, nunca se habría visto ACTIVO.
-      expect(llamadasAlActivarse).toBeGreaterThan(1);
-
-      // Ya está activo: no se vuelve a preguntar por más que pase el tiempo.
-      await avanzar(ACTIVATION_POLL_INTERVAL_MS * 5);
-
-      expect(mockedGetBillingState).toHaveBeenCalledTimes(llamadasAlActivarse);
-    });
-
-    /**
-     * El webhook puede no llegar nunca (una tarjeta rechazada después del checkout). Sin límite,
-     * la pestaña olvidada se queda pegándole al backend para siempre.
-     */
-    it('deja de reintentar al agotarse el plazo aunque siga inactivo', async () => {
-      setActiveAccount('account-1');
-      const { result } = renderHook(
-        () => useBillingState({ awaitActivation: true }),
-        { wrapper },
-      );
-
-      await waitFor(() => expect(result.current.data).toEqual(SIN_PERFIL));
-
-      await avanzar(ACTIVATION_POLL_TIMEOUT_MS + ACTIVATION_POLL_INTERVAL_MS);
-      const llamadasTrasElPlazo = mockedGetBillingState.mock.calls.length;
-      // Durante el plazo sí se insistió: sin esto la prueba pasaría igual sin reintentos.
-      expect(llamadasTrasElPlazo).toBeGreaterThan(1);
-
-      await avanzar(ACTIVATION_POLL_INTERVAL_MS * 10);
-
-      expect(mockedGetBillingState).toHaveBeenCalledTimes(llamadasTrasElPlazo);
-      expect(result.current.data?.hasActiveSubscription).toBe(false);
-    });
-
-    /** Fuera del retorno de Stripe no hay ningún cambio que esperar. */
-    it('no reintenta si no se está esperando la activación', async () => {
-      setActiveAccount('account-1');
-      const { result } = renderHook(() => useBillingState(), { wrapper });
-
-      await waitFor(() => expect(result.current.data).toEqual(SIN_PERFIL));
-
-      await avanzar(ACTIVATION_POLL_INTERVAL_MS * 5);
-
-      expect(mockedGetBillingState).toHaveBeenCalledTimes(1);
     });
   });
 });
