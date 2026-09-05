@@ -126,6 +126,27 @@ describe('SubscriptionStateCard', () => {
         '/dashboard/plans',
       );
     });
+
+    /**
+     * Una organización comparte un solo perfil, así que su plan gratuito se ve igual: la tarjeta
+     * no distingue el tipo de cuenta, el backend ya resolvió el propietario.
+     */
+    it('se ve igual en una cuenta de organización', async () => {
+      givenActiveAccount(ORGANIZATION_ACCOUNT_ID, 'ORGANIZATION', 'org-1');
+      givenSubscription({
+        hasActiveSubscription: false,
+        planType: 'free',
+        status: 'FREE',
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
+      );
+    });
   });
 
   describe('perfil inexistente', () => {

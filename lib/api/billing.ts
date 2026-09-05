@@ -29,6 +29,19 @@ export interface BillingState {
  * llame a esto debe incluir el id de la cuenta en su `queryKey` — si no, el caché serviría el
  * estado de la cuenta anterior después de cambiar de cuenta.
  */
+/**
+ * El plan con el que nace toda cuenta, personal u organización.
+ *
+ * Se administra ENTERAMENTE en nuestra base de datos: no tiene producto ni precio en Stripe, no
+ * aparece en el catálogo de `/payments/services` y no se contrata por Checkout. Hay que
+ * reconocerlo por su valor porque el contrato no lo distingue de otro modo — `currentPlanType`
+ * es una cadena abierta y `hasActiveSubscription` es false tanto para el plan gratuito como para
+ * uno de pago que caducó, que son dos situaciones opuestas de cara al usuario.
+ *
+ * Espejo de `FREE_PLAN_TYPE` en signature-server.
+ */
+export const FREE_PLAN_TYPE = 'free';
+
 export async function getBillingStateRequest(): Promise<BillingState> {
   const { data } = await apiClient.get<{
     success: boolean;
