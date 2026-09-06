@@ -22,6 +22,34 @@ export interface SubscriptionState {
    */
   planType: string | null;
   status: BillingProfileStatus | null;
+  /**
+   * La baja ya está programada para el final del periodo vigente.
+   *
+   * Convive con `hasActiveSubscription: true` a propósito, y por eso son dos campos y no uno: la
+   * suscripción sigue habilitando todo hasta `currentPeriodEnd` y lo único que cambia es que no
+   * se renovará. Colapsarlos dejaría a la pantalla sin poder distinguir "activa y se renueva" de
+   * "activa pero termina el día X", que es exactamente lo que el usuario necesita saber.
+   */
+  cancelAtPeriodEnd: boolean;
   currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+}
+
+/**
+ * Cómo queda la renovación después de programar la baja o de reanudarla.
+ *
+ * Espejo de `SubscriptionScheduleResponse` en signature-server, y lo devuelven LOS DOS endpoints
+ * —`/cancel` y `/resume`— con la misma forma: son la misma bandera en dos sentidos, y darles
+ * respuestas distintas haría que la tarjeta se dibujara distinto según por cuál hubiera pasado el
+ * usuario.
+ *
+ * Trae el estado ya actualizado, aunque igualmente se invalide la consulta después: describe el
+ * instante de la operación, y la fuente de verdad sigue siendo el backend.
+ */
+export interface SubscriptionSchedule {
+  status: BillingProfileStatus;
+  planType: string | null;
+  cancelAtPeriodEnd: boolean;
+  /** Fecha efectiva de término: hasta cuándo sigue habiendo servicio. */
   currentPeriodEnd: string | null;
 }

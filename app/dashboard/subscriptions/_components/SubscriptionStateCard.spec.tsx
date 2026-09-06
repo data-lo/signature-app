@@ -1,8 +1,15 @@
 import type { ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SubscriptionStateCard from './SubscriptionStateCard';
-import { getSubscriptionStateRequest } from '../_requests';
+import {
+  cancelSubscriptionRequest,
+  getSubscriptionStateRequest,
+  resumeSubscriptionRequest,
+} from '../_requests';
+import { subscriptionStateQueryKey } from '../_hooks/useSubscriptionState';
+import { billingStateQueryKey } from '@/lib/hooks/useBillingState';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { AccountKind } from '@/lib/store/types/auth-store.types';
 import type { SubscriptionState } from '../_interfaces/subscription-state.interface';
@@ -10,6 +17,8 @@ import type { SubscriptionState } from '../_interfaces/subscription-state.interf
 jest.mock('../_requests');
 
 const mockedRequest = getSubscriptionStateRequest as jest.Mock;
+const mockedCancel = cancelSubscriptionRequest as jest.Mock;
+const mockedResume = resumeSubscriptionRequest as jest.Mock;
 
 const PERSONAL_ACCOUNT_ID = 'cuenta-personal-1';
 const ORGANIZATION_ACCOUNT_ID = 'cuenta-org-1';
@@ -42,6 +51,20 @@ describe('SubscriptionStateCard', () => {
       defaultOptions: { queries: { retry: false } },
     });
     mockedRequest.mockReset();
+    mockedCancel.mockReset();
+    mockedResume.mockReset();
+    mockedCancel.mockResolvedValue({
+      status: 'ACTIVE',
+      planType: 'plus',
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: '2030-02-01T00:00:00.000Z',
+    });
+    mockedResume.mockResolvedValue({
+      status: 'ACTIVE',
+      planType: 'plus',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: '2030-02-01T00:00:00.000Z',
+    });
     givenActiveAccount(PERSONAL_ACCOUNT_ID);
   });
 
@@ -56,6 +79,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: true,
         planType: 'plus',
         status: 'ACTIVE',
+        cancelAtPeriodEnd: false,
         currentPeriodStart: '2030-01-01T00:00:00.000Z',
         currentPeriodEnd: '2030-02-01T00:00:00.000Z',
       });
@@ -82,6 +106,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: true,
         planType: 'premium',
         status: 'ACTIVE',
+        cancelAtPeriodEnd: false,
         currentPeriodStart: null,
         currentPeriodEnd: null,
       });
@@ -104,6 +129,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: false,
         planType: 'free',
         status: 'FREE',
+        cancelAtPeriodEnd: false,
         currentPeriodStart: null,
         currentPeriodEnd: null,
       });
@@ -137,6 +163,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: false,
         planType: 'free',
         status: 'FREE',
+        cancelAtPeriodEnd: false,
         currentPeriodStart: null,
         currentPeriodEnd: null,
       });
@@ -155,6 +182,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: false,
         planType: null,
         status: null,
+        cancelAtPeriodEnd: false,
         currentPeriodStart: null,
         currentPeriodEnd: null,
       });
@@ -171,6 +199,300 @@ describe('SubscriptionStateCard', () => {
     });
   });
 
+  describe('cancelación de la suscripción', () => {
+    /**
+     * Las dos condiciones de la historia: hay suscripción activa y todavía se renueva. Sólo
+     * entonces tiene sentido ofrecer la baja.
+     */
+    it('ofrece cancelar una suscripción activa que se renueva', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        planType: 'plus',
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: false,
+        currentPeriodStart: '2030-01-01T00:00:00.000Z',
+        currentPeriodEnd: '2030-02-01T00:00:00.000Z',
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: /cancelar suscripción/i }),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    /**
+     * Con la baja ya programada el botón desaparece: la suscripción sigue ACTIVE, así que sin
+     * esta regla se volvería a ofrecer un clic que el backend rechaza con 409.
+     */
+    it('oculta el botón cuando la cancelación ya está programada', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        planType: 'plus',
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: true,
+        currentPeriodStart: '2030-01-01T00:00:00.000Z',
+        currentPeriodEnd: '2030-02-01T00:00:00.000Z',
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(/no se renovará automáticamente/i),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole('button', { name: /cancelar suscripción/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * La fecha esperada se calcula con el mismo formateo en vez de escribirse a mano: el periodo
+     * llega en UTC y se muestra en la zona del navegador, así que un literal ataría la prueba a la
+     * zona horaria de quien la corra —`2030-02-01T00:00:00Z` es el 31 de enero en México—.
+     */
+    it('anuncia hasta cuándo seguirá activa', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        planType: 'plus',
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: true,
+        currentPeriodStart: '2030-01-01T00:00:00.000Z',
+        currentPeriodEnd: '2030-02-01T00:00:00.000Z',
+      });
+
+      const fecha = new Date('2030-02-01T00:00:00.000Z').toLocaleDateString(
+        'es-MX',
+        { dateStyle: 'long' },
+      );
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            `Tu suscripción seguirá activa hasta el ${fecha}. No se renovará automáticamente.`,
+          ),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    /**
+     * `CreateSubscriptionCheckoutUseCase` rechaza con 409 cualquier checkout sobre un perfil
+     * ACTIVE, y uno con la baja programada lo sigue estando: ofrecer "Ver planes" ahí mandaría al
+     * usuario a un error.
+     */
+    it('no ofrece contratar mientras la suscripción siga activa', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        planType: 'plus',
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: true,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(/no se renovará automáticamente/i),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole('link', { name: /ver planes/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** Sin fecha registrada se dice lo mismo sin inventarse un día. */
+    it('anuncia el término sin fecha cuando el periodo no la trae', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        planType: 'plus',
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: true,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(/hasta el final del periodo vigente/i),
+        ).toBeInTheDocument(),
+      );
+    });
+  });
+
+  describe('operar sobre la renovación', () => {
+    const ACTIVA = {
+      hasActiveSubscription: true,
+      planType: 'plus',
+      status: 'ACTIVE',
+      currentPeriodStart: '2030-01-01T00:00:00.000Z',
+      currentPeriodEnd: '2030-02-01T00:00:00.000Z',
+    } as const;
+
+    async function confirmarCancelacion() {
+      const user = userEvent.setup();
+      await user.click(
+        await screen.findByRole('button', { name: /cancelar suscripción/i }),
+      );
+      await user.click(
+        await screen.findByRole('button', { name: /sí, cancelar/i }),
+      );
+      return user;
+    }
+
+    it('programa la baja al confirmar el modal', async () => {
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: false });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await confirmarCancelacion();
+
+      await waitFor(() => expect(mockedCancel).toHaveBeenCalledTimes(1));
+    });
+
+    /**
+     * Las dos consultas salen del mismo `billing_profile`: `subscriptionState` dibuja esta
+     * pantalla y `billingState` alimenta el store global. Refrescar sólo una dejaría la
+     * aplicación diciendo dos cosas distintas del mismo perfil.
+     */
+    it('refresca las dos consultas de facturación de la cuenta activa', async () => {
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: false });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await confirmarCancelacion();
+
+      await waitFor(() =>
+        expect(invalidate).toHaveBeenCalledWith({
+          queryKey: subscriptionStateQueryKey(PERSONAL_ACCOUNT_ID),
+        }),
+      );
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: billingStateQueryKey(PERSONAL_ACCOUNT_ID),
+      });
+    });
+
+    /**
+     * El modal se cierra al confirmar, así que un fallo del proveedor no tiene dónde contarse si
+     * no es acá. Sin esto el usuario creería haber cancelado.
+     */
+    it('muestra en la tarjeta el fallo del proveedor', async () => {
+      mockedCancel.mockRejectedValue({
+        response: {
+          status: 502,
+          data: { message: 'El proveedor de pagos no está disponible.' },
+        },
+      });
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: false });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await confirmarCancelacion();
+
+      expect(
+        await screen.findByText(/el proveedor de pagos no está disponible/i),
+      ).toBeInTheDocument();
+    });
+
+    /** El 409 de "ya estaba cancelada" se cuenta con el mensaje del backend, no como avería. */
+    it('muestra el conflicto cuando la baja ya estaba programada', async () => {
+      mockedCancel.mockRejectedValue({
+        response: {
+          status: 409,
+          data: {
+            message:
+              'La cancelación de tu suscripción ya está programada para el final del periodo vigente.',
+          },
+        },
+      });
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: false });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await confirmarCancelacion();
+
+      expect(
+        await screen.findByText(
+          /ya está programada para el final del periodo/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * El camino de vuelta: sin él, quien programa la baja se queda sin ninguna acción -no puede
+     * cancelar ni contratar- y deshacerlo exigiría entrar al Dashboard de Stripe.
+     */
+    it('ofrece reanudar cuando la baja está programada', async () => {
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: true });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      const user = userEvent.setup();
+      await user.click(
+        await screen.findByRole('button', { name: /reanudar suscripción/i }),
+      );
+
+      await waitFor(() => expect(mockedResume).toHaveBeenCalledTimes(1));
+    });
+
+    /** Reanudar no le quita nada al usuario y se puede volver a cancelar: no lleva modal. */
+    it('reanuda sin pedir confirmación', async () => {
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: true });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      const user = userEvent.setup();
+      await user.click(
+        await screen.findByRole('button', { name: /reanudar suscripción/i }),
+      );
+
+      expect(
+        screen.queryByRole('heading', { name: /¿cancelar tu suscripción\?/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('no ofrece reanudar una suscripción que ya se renueva', async () => {
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: false });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: /cancelar suscripción/i }),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole('button', { name: /reanudar suscripción/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('informa mientras la operación está en curso', async () => {
+      let resolver: (value: unknown) => void = () => undefined;
+      mockedResume.mockReturnValue(
+        new Promise((resolve) => {
+          resolver = resolve;
+        }),
+      );
+      givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: true });
+      render(<SubscriptionStateCard />, { wrapper });
+
+      const user = userEvent.setup();
+      const boton = await screen.findByRole('button', {
+        name: /reanudar suscripción/i,
+      });
+      await user.click(boton);
+
+      expect(
+        await screen.findByText(/reanudando tu suscripción/i),
+      ).toBeInTheDocument();
+      expect(boton).toBeDisabled();
+
+      resolver({ cancelAtPeriodEnd: false });
+    });
+  });
+
   describe('estados que no habilitan', () => {
     it.each([
       ['INCOMPLETE', /pendiente de confirmación/i],
@@ -181,6 +503,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: false,
         planType: 'basic',
         status,
+        cancelAtPeriodEnd: false,
         currentPeriodStart: null,
         currentPeriodEnd: null,
       });

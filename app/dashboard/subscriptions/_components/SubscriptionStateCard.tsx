@@ -10,7 +10,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { getErrorMessage } from '@/lib/error-handler';
 import { useSubscriptionState } from '../_hooks/useSubscriptionState';
+import { useCancelSubscription } from '../_hooks/useCancelSubscription';
+import { useResumeSubscription } from '../_hooks/useResumeSubscription';
+import { formatPeriodEnd } from '../_utils/format-period-end';
+import CancelSubscriptionDialog from './CancelSubscriptionDialog';
 import type { BillingProfileStatus } from '../_interfaces/subscription-state.interface';
 
 /** El estado del perfil de facturación, rotulado para el usuario. */
@@ -44,6 +49,25 @@ function planLabel(planType: string): string {
  */
 export default function SubscriptionStateCard() {
   const { data: subscription, isPending, isError } = useSubscriptionState();
+
+  /**
+   * Las dos mutaciones viven acá y no en sus botones, porque acá es donde el usuario se queda: el
+   * modal de cancelación se cierra al confirmar, así que su estado de carga y su posible error
+   * tienen que dibujarse en la tarjeta o no se ven en ninguna parte.
+   *
+   * Van antes de las salidas tempranas de abajo por las reglas de los hooks, que no admiten que
+   * el número de llamadas cambie entre renders.
+   */
+  const cancelar = useCancelSubscription();
+  const reanudar = useResumeSubscription();
+
+  /**
+   * Se comparte un solo indicador entre las dos: sólo una puede estar disponible a la vez —el
+   * botón de cancelar aparece cuando NO hay baja programada y el de reanudar cuando SÍ—, así que
+   * no hay forma de que las dos estén en curso ni de que sus errores compitan.
+   */
+  const operacionEnCurso = cancelar.isPending || reanudar.isPending;
+  const falloDeOperacion = cancelar.error ?? reanudar.error;
 
   if (isPending) {
     return (
@@ -107,6 +131,25 @@ export default function SubscriptionStateCard() {
     );
   }
 
+  /**
+   * El botón de cancelar aparece SÓLO con una suscripción activa que todavía se renueva. Las dos
+   * condiciones son distintas y hacen falta las dos: con la baja ya programada la suscripción
+   * sigue activa, y volver a ofrecer "Cancelar" invitaría a un clic que el backend rechaza con un
+   * 409.
+   */
+  const puedeCancelar =
+    subscription.hasActiveSubscription && !subscription.cancelAtPeriodEnd;
+
+  /**
+   * Contratar sólo donde el backend lo permite. `CreateSubscriptionCheckoutUseCase` rechaza con
+   * 409 cualquier checkout sobre un perfil ACTIVE —incluido uno con la baja programada, que sigue
+   * ACTIVE hasta que termine el periodo—, así que ofrecerlo ahí sería mandar al usuario a un
+   * error. En INCOMPLETE, PAST_DUE y CANCELED sí se puede volver a contratar.
+   */
+  const puedeContratar = !subscription.hasActiveSubscription;
+
+  const fechaTermino = formatPeriodEnd(subscription.currentPeriodEnd);
+
   return (
     <Card>
       <CardHeader>
@@ -122,18 +165,73 @@ export default function SubscriptionStateCard() {
         </CardDescription>
       </CardHeader>
 
-      {subscription.currentPeriodEnd ? (
-        <CardContent>
+      <CardContent className="flex flex-col gap-4">
+        {/**
+         * Con la baja programada, este aviso SUSTITUYE al del periodo vigente en vez de sumarse:
+         * los dos hablan de la misma fecha, y decirla dos veces con distinta redacción haría dudar
+         * de si son dos cosas distintas. Éste dice además lo que el otro no: que no se renovará.
+         */}
+        {subscription.cancelAtPeriodEnd ? (
           <p className="text-sm text-muted-foreground">
-            Periodo vigente hasta{' '}
-            {new Date(subscription.currentPeriodEnd).toLocaleDateString(
-              'es-MX',
-              { dateStyle: 'long' },
-            )}
-            .
+            {fechaTermino
+              ? `Tu suscripción seguirá activa hasta el ${fechaTermino}. No se renovará automáticamente.`
+              : 'Tu suscripción seguirá activa hasta el final del periodo vigente. No se renovará automáticamente.'}
           </p>
-        </CardContent>
-      ) : null}
+        ) : fechaTermino ? (
+          <p className="text-sm text-muted-foreground">
+            Periodo vigente hasta {fechaTermino}.
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          {puedeCancelar ? (
+            <CancelSubscriptionDialog
+              currentPeriodEnd={subscription.currentPeriodEnd}
+              onConfirm={() => cancelar.mutate()}
+              disabled={operacionEnCurso}
+            />
+          ) : null}
+
+          {/**
+           * El camino de vuelta. Sin él, quien programa la baja se queda sin ninguna acción: no
+           * puede cancelar (ya está programada) ni contratar (el perfil sigue ACTIVE y el checkout
+           * lo rechaza con 409), y deshacerlo exigiría entrar al Dashboard de Stripe.
+           */}
+          {subscription.cancelAtPeriodEnd ? (
+            <Button
+              variant="brand"
+              onClick={() => reanudar.mutate()}
+              disabled={operacionEnCurso}
+            >
+              Reanudar suscripción
+            </Button>
+          ) : null}
+
+          {puedeContratar ? (
+            <Button render={<Link href="/dashboard/plans" />} variant="brand">
+              Ver planes
+            </Button>
+          ) : null}
+
+          {operacionEnCurso ? (
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              {cancelar.isPending
+                ? 'Cancelando tu suscripción...'
+                : 'Reanudando tu suscripción...'}
+            </span>
+          ) : null}
+        </div>
+
+        {falloDeOperacion ? (
+          <p role="alert" className="text-sm text-destructive">
+            {getErrorMessage(
+              falloDeOperacion,
+              'No pudimos actualizar tu suscripción. Intenta de nuevo en unos minutos.',
+            )}
+          </p>
+        ) : null}
+      </CardContent>
     </Card>
   );
 }
