@@ -59,6 +59,37 @@ export function formatLongDateTime(
 }
 
 /**
+ * Marca de tiempo Unix en MILISEGUNDOS, sólo dígitos (`1788791722000`).
+ *
+ * Es el formato con el que las hojas y constancias de firma muestran la fecha de firma. **No es
+ * una preferencia estética: es lo que permite que la pantalla y el PDF digan lo mismo.** Una
+ * fecha legible se rinde en la zona horaria de quien la mira, así que la misma firma se leía
+ * "15 de enero, 4:30 AM" en la vista pública y con otra hora en la hoja anexada al documento
+ * —que se generó en la zona del servidor—. El número es el instante, sin ninguna zona encima.
+ *
+ * Espejo de `formatSheetTimestamp` en signature-server, y con la misma unidad a propósito: los
+ * dos parten del mismo `signedAt`, así que imprimen exactamente el mismo número sin que nadie
+ * tenga que convertir.
+ *
+ * Devuelve `null` —y no el guion de `EMPTY_DATE_PLACEHOLDER`— cuando la fecha falta o no es
+ * parseable, porque quien lo consume oculta el renglón entero en ese caso: en una constancia, un
+ * renglón "Fecha de firma: —" afirma que se conoce el dato y está vacío, cuando lo cierto es que
+ * no hay nada que acreditar.
+ *
+ * @param isoDate fecha ISO tal como la devuelve el backend (`signedAt`).
+ */
+export function formatEpochMillis(
+  isoDate: string | Date | null | undefined,
+): string | null {
+  if (!isoDate) return null;
+
+  const date = isoDate instanceof Date ? isoDate : new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return String(date.getTime());
+}
+
+/**
  * Formato corto `DD/MM/YYYY` con el que las tablas de documentos muestran las fechas de creación
  * y de firma: en un listado se comparan fechas de un vistazo, y para eso el formato numérico
  * alineado pesa más que la frase legible de `formatLongDateTime` (que sigue siendo la de las
