@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useOnboardingProfile } from '@/lib/hooks/useOnboardingProfile';
 import { useAccountsCatalog } from '@/lib/hooks/useAccountsCatalog';
-import { useBillingState } from '@/lib/hooks/useBillingState';
+import { useBillingAccess } from '@/lib/hooks/useBillingAccess';
 import { getAuthToken } from '@/lib/cookies';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 
@@ -23,13 +23,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const { data: accounts } = useAccountsCatalog();
   const { data: profile } = useOnboardingProfile();
   /**
-   * Estado de facturación de la cuenta activa. Va acá y no en la pantalla de suscripciones
+   * Estado comercial de la cuenta activa —plan, saldo y beneficios—. Va acá y no en la pantalla
+   * de suscripciones
    * porque hace falta desde el momento de entrar —y en cada cuenta a la que se cambie—, no sólo
    * cuando alguien abre esa pantalla. El hook se encarga solo del cambio de cuenta: la cuenta
    * forma parte de su `queryKey`, así que elegir otra en el switcher dispara la consulta nueva
    * sin ningún efecto acá. No se lee su resultado en este componente; se guarda en el store.
    */
-  useBillingState();
+  useBillingAccess();
   const setAuth = useAuthStore((state) => state.setAuth);
   const setAccountsList = useAuthStore((state) => state.setAccountsList);
   const accountsList = useAuthStore((state) => state.accountsList);

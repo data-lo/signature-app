@@ -11,12 +11,12 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getErrorMessage } from '@/lib/error-handler';
-import { useSubscriptionState } from '../_hooks/useSubscriptionState';
+import { useBillingAccess } from '@/lib/hooks/useBillingAccess';
 import { useCancelSubscription } from '../_hooks/useCancelSubscription';
 import { useResumeSubscription } from '../_hooks/useResumeSubscription';
 import { formatPeriodEnd } from '../_utils/format-period-end';
 import CancelSubscriptionDialog from './CancelSubscriptionDialog';
-import type { BillingProfileStatus } from '../_interfaces/subscription-state.interface';
+import type { BillingProfileStatus } from '@/lib/api/billing';
 
 /** El estado del perfil de facturación, rotulado para el usuario. */
 const STATUS_LABELS: Record<BillingProfileStatus, string> = {
@@ -37,6 +37,32 @@ function planLabel(planType: string): string {
 }
 
 /**
+ * Documentos disponibles, con su tope por periodo cuando el plan lo fija.
+ *
+ * `documentsIncludedPerPeriod` nulo significa "no lo fija el plan" —se negocia por contrato— y
+ * entonces se calla en vez de inventar un número: anunciar un tope que no existe es peor que no
+ * anunciar ninguno. Un plan que incluye `0` por periodo (el gratuito, que en su lugar concede
+ * documentos de bienvenida) tampoco lo anuncia, porque "0 por periodo" no le dice nada útil a
+ * quien sí tiene saldo comprado.
+ */
+function SaldoDeDocumentos({
+  creditsAvailable,
+  documentsIncludedPerPeriod,
+}: {
+  creditsAvailable: number;
+  documentsIncludedPerPeriod: number | null;
+}) {
+  return (
+    <p className="text-sm text-muted-foreground">
+      Documentos disponibles: <strong>{creditsAvailable}</strong>
+      {documentsIncludedPerPeriod
+        ? ` de ${documentsIncludedPerPeriod} incluidos por periodo.`
+        : '.'}
+    </p>
+  );
+}
+
+/**
  * Estado actual de la suscripción de la CUENTA ACTIVA.
  *
  * Se lee del backend y no de la URL de retorno: es la única fuente que refleja lo que el webhook
@@ -48,7 +74,7 @@ function planLabel(planType: string): string {
  * esta tarjeta sola porque la cuenta va en la `queryKey`.
  */
 export default function SubscriptionStateCard() {
-  const { data: subscription, isPending, isError } = useSubscriptionState();
+  const { data: subscription, isPending, isError } = useBillingAccess();
 
   /**
    * Las dos mutaciones viven acá y no en sus botones, porque acá es donde el usuario se queda: el
@@ -122,10 +148,18 @@ export default function SubscriptionStateCard() {
             necesites más de lo que incluye.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button render={<Link href="/dashboard/plans" />} variant="brand">
-            Ver planes
-          </Button>
+        <CardContent className="flex flex-col gap-4">
+          <SaldoDeDocumentos
+            creditsAvailable={subscription.creditsAvailable}
+            documentsIncludedPerPeriod={
+              subscription.limits.documentsIncludedPerPeriod
+            }
+          />
+          <div>
+            <Button render={<Link href="/dashboard/plans" />} variant="brand">
+              Ver planes
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -154,8 +188,8 @@ export default function SubscriptionStateCard() {
     <Card>
       <CardHeader>
         <CardTitle>
-          {subscription.planType
-            ? `Plan ${planLabel(subscription.planType)} — ${STATUS_LABELS[subscription.status]}`
+          {subscription.currentPlanType
+            ? `Plan ${planLabel(subscription.currentPlanType)} — ${STATUS_LABELS[subscription.status]}`
             : STATUS_LABELS[subscription.status]}
         </CardTitle>
         <CardDescription>
@@ -166,6 +200,13 @@ export default function SubscriptionStateCard() {
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
+        <SaldoDeDocumentos
+          creditsAvailable={subscription.creditsAvailable}
+          documentsIncludedPerPeriod={
+            subscription.limits.documentsIncludedPerPeriod
+          }
+        />
+
         {/**
          * Con la baja programada, este aviso SUSTITUYE al del periodo vigente en vez de sumarse:
          * los dos hablan de la misma fecha, y decirla dos veces con distinta redacción haría dudar
