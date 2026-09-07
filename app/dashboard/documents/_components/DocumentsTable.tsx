@@ -258,14 +258,6 @@ export default function DocumentsTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                      />
-                      <span>{STATUS_LABELS[doc.status]}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
                     {/* Las acciones del menú operan sobre el documento o lo consultan en un
                       modal, pero ninguna es una manera de abrirlo: el clic se detiene acá para
                       que usarlas no navegue también al detalle. Incluye la activación por

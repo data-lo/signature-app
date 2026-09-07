@@ -27,6 +27,7 @@ const GRATUITA: SubscriptionState = {
   hasActiveSubscription: false,
   planType: 'free',
   status: 'FREE',
+  cancelAtPeriodEnd: false,
   currentPeriodStart: null,
   currentPeriodEnd: null,
 };
@@ -34,6 +35,7 @@ const ACTIVA: SubscriptionState = {
   hasActiveSubscription: true,
   planType: 'plus',
   status: 'ACTIVE',
+  cancelAtPeriodEnd: false,
   currentPeriodStart: '2030-01-01T00:00:00.000Z',
   currentPeriodEnd: '2030-02-01T00:00:00.000Z',
 };
