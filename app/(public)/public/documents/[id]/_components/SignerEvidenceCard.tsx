@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { formatLongDateTime } from '@/lib/format-datetime';
+import { formatEpochMillis } from '@/lib/format-datetime';
 import { cn } from '@/lib/utils';
 import { SignatureType } from '@/lib/enums/document';
 import type { PublicSigner } from '../_requests';
@@ -85,9 +85,14 @@ export function SignerEvidenceCard({
 
         <InfoRow
           label="Fecha de firma"
-          // El backend manda UTC; se formatea en la zona de quien consulta, igual que la
-          // constancia de firma avanzada del QR.
-          value={signer.signedAt ? formatLongDateTime(signer.signedAt) : null}
+          /**
+           * Marca Unix en milisegundos, el MISMO número que imprime la hoja anexada al PDF (ver
+           * `formatSheetTimestamp` en signature-server). Antes se formateaba en la zona de quien
+           * consulta, así que la pantalla y el documento mostraban horas distintas del mismo
+           * instante y no había forma de contrastarlos.
+           */
+          value={formatEpochMillis(signer.signedAt)}
+          mono
         />
         {/* Sin renglón de geolocalización (historia "Ocultar geolocalización en hojas de firma y
             vistas públicas"): esta pantalla la abre cualquiera con el id, sin sesión. El backend
