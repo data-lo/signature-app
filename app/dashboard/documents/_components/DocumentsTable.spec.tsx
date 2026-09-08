@@ -2,6 +2,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsTable, { type DocumentListItem } from './DocumentsTable';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
+import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
 import {
   DocumentStatus,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDownloadDocument');
+jest.mock('../_hooks/useArchiveCompletedDocument');
 jest.mock('../[documentId]/_hooks/useDocumentDetail');
 jest.mock('./PdfPreview', () => ({
   __esModule: true,
@@ -22,6 +24,8 @@ jest.mock('react-hot-toast', () => ({
 }));
 
 const mockedUseDownloadDocument = useDownloadDocument as jest.Mock;
+const mockedUseArchiveCompletedDocument =
+  useArchiveCompletedDocument as jest.Mock;
 const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
 
 /** Detalle mínimo del documento: el modal de participantes solo lee `participants`. */
@@ -88,9 +92,16 @@ async function openRowMenu(user: ReturnType<typeof userEvent.setup>) {
 
 describe('DocumentsTable', () => {
   const downloadMutate = jest.fn();
+  const archiveMutate = jest.fn();
 
   beforeEach(() => {
     downloadMutate.mockReset();
+    archiveMutate.mockReset();
+    mockedUseArchiveCompletedDocument.mockReturnValue({
+      mutate: archiveMutate,
+      isPending: false,
+      variables: undefined,
+    });
     mockedUseDownloadDocument.mockReturnValue({
       mutate: downloadMutate,
       isPending: false,
@@ -305,6 +316,106 @@ describe('DocumentsTable', () => {
    * Historia "Hacer seleccionables las filas en tablas de documentos": la fila entera es el
    * camino al detalle, y las acciones que quedan no deben dispararlo.
    */
+  /**
+   * Archivar es la única acción del menú que depende de la sección Y del documento: la ofrece
+   * Completados, y sólo sobre lo que ya está firmado por todos.
+   */
+  describe('archivar', () => {
+    it('ofrece "Archivar" en la sección de completados', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+          showArchiveAction
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu)
+          .getAllByRole('menuitem')
+          .map((item) => item.textContent?.trim()),
+      ).toEqual(['Descargar', 'Ver participantes', 'Compartir', 'Archivar']);
+    });
+
+    it('archiva el documento de esa fila', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9', status: DocumentStatus.Signed })]}
+          showArchiveAction
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(within(menu).getByRole('menuitem', { name: 'Archivar' }));
+
+      expect(archiveMutate).toHaveBeenCalledWith('doc-9');
+    });
+
+    it('no ofrece archivar en las secciones que no lo habilitan', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * El backend rechaza archivar cualquier cosa que no esté en `signed`, así que ofrecerlo sobre
+     * un documento cancelado sólo produciría un error que el usuario no puede evitar.
+     */
+    it.each([
+      DocumentStatus.Pending,
+      DocumentStatus.Cancelled,
+      DocumentStatus.CancellationPending,
+      DocumentStatus.Rejected,
+    ])(
+      'no ofrece archivar un documento en estatus %s aunque la sección lo habilite',
+      async (status) => {
+        const user = userEvent.setup();
+        renderWithProviders(
+          <DocumentsTable documents={[buildDoc({ status })]} showArchiveAction />,
+        );
+
+        const menu = await openRowMenu(user);
+
+        expect(
+          within(menu).queryByRole('menuitem', { name: /archivar/i }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it('muestra "Archivando..." y deshabilita la acción mientras ese documento se archiva', async () => {
+      mockedUseArchiveCompletedDocument.mockReturnValue({
+        mutate: archiveMutate,
+        isPending: true,
+        variables: 'doc-1',
+      });
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+          showArchiveAction
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: /archivando/i }),
+      ).toHaveAttribute('data-disabled');
+    });
+  });
+
   describe('fila seleccionable', () => {
     /** La única fila de datos renderizada (la primera de `getAllByRole('row')` es el encabezado). */
     function dataRow(): HTMLElement {
