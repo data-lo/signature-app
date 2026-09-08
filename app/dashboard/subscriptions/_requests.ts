@@ -1,24 +1,15 @@
 import apiClient from '@/lib/axios';
-import type {
-  SubscriptionSchedule,
-  SubscriptionState,
-} from './_interfaces/subscription-state.interface';
+import type { SubscriptionSchedule } from './_interfaces/subscription-state.interface';
 
 /**
- * La cuenta consultada NO viaja como parámetro: el interceptor de `apiClient` manda la cuenta
- * activa del store en `X-Account-Id`, igual que en el resto de la aplicación. Por eso quien
- * llame a esto tiene que incluir el id de la cuenta en su `queryKey` — si no, el caché serviría
- * la suscripción de la cuenta anterior después de cambiar de cuenta.
+ * Acá NO hay consulta de estado, y es a propósito: la lee `useBillingAccess`
+ * (`GET /payments/billing-state`), que responde plan, saldo, beneficios y límites de la cuenta
+ * activa en una sola petición. El endpoint que vivía acá —`GET /payments/subscription`— quedó
+ * deprecado en el backend: describía el mismo perfil con menos campos y obligaba a decidir qué
+ * habilitar a partir del nombre del plan.
+ *
+ * Lo que queda son las dos MUTACIONES de la suscripción, que siguen siendo suyas.
  */
-export async function getSubscriptionStateRequest(): Promise<SubscriptionState> {
-  const { data } = await apiClient.get<{
-    success: boolean;
-    message: string;
-    data: SubscriptionState;
-  }>('/api/v1/payments/subscription');
-
-  return data.data;
-}
 
 /**
  * Programa la baja de la suscripción de la cuenta activa para el final del periodo.

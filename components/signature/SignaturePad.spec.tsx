@@ -435,6 +435,80 @@ describe('SignaturePad', () => {
     expect(context.scale).toHaveBeenCalledWith(2, 2);
   });
 
+  describe('color de la tinta', () => {
+    /**
+     * El trazo se dibuja en azul, no en negro. Se afirma el valor exacto a propósito: es el color
+     * que acaba en el PNG, en MinIO y en el PDF —ninguna etapa posterior lo recolorea—, así que
+     * este literal es el contrato de qué color tiene una firma.
+     */
+    it('dibuja en azul', () => {
+      const context = stubCanvas(true);
+      render(<SignaturePad />);
+
+      expect(context.strokeStyle).toBe('#1D4ED8');
+    });
+
+    /**
+     * El toque sin arrastre se pinta con `fill`, no con `stroke`, y por eso necesita su propio
+     * color: si sólo se configurara `strokeStyle`, los puntos de una firma saldrían del color por
+     * omisión del canvas —negro— y la rúbrica quedaría de dos colores.
+     */
+    it('pinta del mismo azul el punto de un toque sin arrastre', () => {
+      const context = stubCanvas(true);
+      render(<SignaturePad />);
+
+      drawStroke(screen.getByRole('img'));
+
+      expect(context.fill).toHaveBeenCalled();
+      expect(context.fillStyle).toBe('#1D4ED8');
+    });
+
+    /**
+     * Cambiar el tamaño del búfer RESETEA el estado del contexto, `strokeStyle` incluido. Sin
+     * volver a aplicar la tinta, girar el teléfono a media firma seguiría el trazo en negro sobre
+     * lo ya dibujado en azul.
+     */
+    it('vuelve a aplicar la tinta cuando el búfer se rehace', () => {
+      const context = stubCanvas(true);
+      render(<SignaturePad />);
+
+      // Lo que hace el navegador al redimensionar el búfer: devolver el contexto a sus valores
+      // por omisión.
+      context.strokeStyle = '#000000';
+      context.fillStyle = '#000000';
+      window.devicePixelRatio = 3;
+
+      act(() => {
+        window.dispatchEvent(new Event('orientationchange'));
+      });
+
+      expect(context.strokeStyle).toBe('#1D4ED8');
+      expect(context.fillStyle).toBe('#1D4ED8');
+    });
+
+    /**
+     * La tinta no puede depender de que el búfer cambie de tamaño. Con la asignación dentro del
+     * camino de redimensionado, un canvas que ya tuviera el tamaño pedido salía de `resize` sin
+     * configurar el contexto y dibujaba con el `strokeStyle` por omisión —negro—. Mientras la
+     * tinta fue negra, ese camino acertaba por casualidad.
+     */
+    it('aplica la tinta aunque el búfer no cambie de tamaño', () => {
+      const context = stubCanvas(true);
+      render(<SignaturePad />);
+      const escaladosIniciales = context.scale.mock.calls.length;
+
+      context.strokeStyle = '#000000';
+
+      act(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+
+      expect(context.strokeStyle).toBe('#1D4ED8');
+      // Y sin rehacer el búfer: el trazo del usuario sigue intacto.
+      expect(context.scale).toHaveBeenCalledTimes(escaladosIniciales);
+    });
+  });
+
   /** Sin `touch-action: none`, arrastrar el dedo desplaza la página en vez de dibujar. */
   it('desactiva los gestos táctiles del navegador sobre el canvas', () => {
     stubCanvas(true);

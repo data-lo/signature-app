@@ -37,6 +37,10 @@ import {
  * **El PNG sale con fondo transparente.** La rúbrica se estampa encima del PDF, así que un fondo
  * blanco taparía el texto del documento. Por eso el canvas nunca se rellena: sólo se dibuja el
  * trazo.
+ *
+ * **La tinta es azul y se decide acá, en `STROKE_COLOR`.** Lo que se dibuja en este canvas es lo
+ * que se exporta, lo que se guarda y lo que se estampa en el documento: ninguna etapa posterior
+ * recolorea la imagen.
  */
 
 export interface SignaturePadHandle {
@@ -66,6 +70,58 @@ interface SignaturePadProps {
 const TRIM_PADDING = 12;
 
 const STROKE_WIDTH = 2.6;
+
+/**
+ * Color de la tinta, azul y fijo.
+ *
+ * **Es el único sitio donde se decide el color de una firma.** Lo que se dibuja acá es
+ * exactamente lo que acaba estampado en el documento: el PNG conserva el color de los píxeles del
+ * canvas, MinIO guarda esos bytes tal cual y `document-signing.service.ts` los incrusta con
+ * `embedPng` sin teñir ni recolorear nada. No hay ninguna otra etapa que decidir, y por eso
+ * tampoco hay que buscar el color en el backend: cambiar esta constante cambia el trazo en
+ * pantalla, la imagen guardada y la firma del PDF a la vez.
+ *
+ * **Fijo y no configurable** porque el color no es una preferencia del usuario sino un rasgo de
+ * la firma: dejar elegir tinta obligaría a guardarla, a versionarla y a decidir qué pasa con las
+ * firmas que ya existen. Si algún día se ofrece, el parámetro entra por aquí.
+ *
+ * Azul y no negro para que la rúbrica se distinga del texto impreso del documento, que es la
+ * convención de la firma en tinta sobre papel — un trazo negro sobre un contrato negro se lee
+ * como parte del documento y no como algo que alguien puso a mano encima.
+ *
+ * `#1D4ED8` es el azul 700 de Tailwind, la escala que ya usa el resto de la interfaz. Se escribe
+ * como literal y no como token del tema porque el canvas pinta con `strokeStyle`, que necesita un
+ * color resuelto: una variable CSS acabaría en `strokeStyle` como cadena inválida y el navegador
+ * la ignoraría en silencio dejando el trazo NEGRO —el valor por omisión del contexto—, que es
+ * justamente el fallo que este cambio corrige.
+ *
+ * **Las firmas ya guardadas conservan su trazo negro.** Esto sólo pinta lo que se dibuja de
+ * ahora en adelante; los PNG que ya están en MinIO no se tocan (y no podrían tocarse sin
+ * reescribir documentos ya firmados).
+ */
+const STROKE_COLOR = '#1D4ED8';
+
+/**
+ * Deja el contexto listo para dibujar tinta: grosor, remates redondeados y color.
+ *
+ * Se aplica tanto al montar como cada vez que el búfer del canvas se rehace, porque cambiar
+ * `canvas.width` o `canvas.height` **resetea el estado del contexto** a sus valores por omisión
+ * —entre ellos un `strokeStyle` negro—. Sin volver a aplicarlo, girar el teléfono a media firma
+ * dejaría el resto del trazo en negro sobre lo ya dibujado en azul.
+ *
+ * `fillStyle` va junto al `strokeStyle` y con el mismo valor porque el toque sin arrastre se
+ * pinta como un círculo relleno (ver `handlePointerDown`): son la misma tinta con dos APIs, y
+ * separarlos permitiría que el punto de una firma saliera de otro color que sus trazos.
+ */
+function applyInkTo(context: CanvasRenderingContext2D | null) {
+  if (!context) return;
+
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.lineWidth = STROKE_WIDTH;
+  context.strokeStyle = STROKE_COLOR;
+  context.fillStyle = STROKE_COLOR;
+}
 
 const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
   function SignaturePad(
@@ -117,7 +173,23 @@ const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
       const targetHeight = Math.round(height * ratio);
 
       /**
-       * Si el búfer ya tiene el tamaño que corresponde no se toca nada.
+       * La tinta se aplica ANTES de decidir si hay que redimensionar, y en su propia función,
+       * porque el color no depende del tamaño del búfer: sólo se pierde cuando el búfer se
+       * rehace, pero tiene que estar puesto desde el primer trazo aunque no se rehaga nunca.
+       *
+       * Con la asignación dentro del camino de redimensionado, el color quedaba a merced de una
+       * coincidencia: si el búfer ya tuviera por casualidad el tamaño pedido, la función salía
+       * antes de configurar el contexto y el trazo se dibujaba con el `strokeStyle` por omisión
+       * del canvas —que es NEGRO—. Mientras la tinta fue negra ese camino daba el resultado
+       * correcto por accidente y nada lo delataba.
+       *
+       * Es idempotente y cuesta cuatro asignaciones, así que repetirlo en cada `resize` —que en
+       * el celular se dispara constantemente al desplazar— no tiene coste apreciable.
+       */
+      applyInkTo(canvas.getContext('2d'));
+
+      /**
+       * Si el búfer ya tiene el tamaño que corresponde no se toca nada MÁS.
        *
        * Rehacerlo implica borrar el trazo y repintarlo desde una imagen, que carga de forma
        * asíncrona: en el celular, donde la barra de direcciones aparece y desaparece al desplazar,
@@ -144,11 +216,14 @@ const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
       const context = canvas.getContext('2d');
       if (!context) return;
 
+      /**
+       * `scale` sí va sólo acá, y no con el resto: **no es idempotente**. Cada llamada multiplica
+       * la transformación vigente, así que aplicarlo en cada `resize` iría encogiendo el trazo
+       * hasta hacerlo invisible. Redimensionar el búfer es justo lo que devuelve la matriz a la
+       * identidad, y por eso este es el único momento en que corresponde volver a escalar.
+       */
       context.scale(ratio, ratio);
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      context.lineWidth = STROKE_WIDTH;
-      context.strokeStyle = '#111827';
+      applyInkTo(context);
 
       if (previous) {
         const image = new Image();
@@ -215,7 +290,6 @@ const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
       if (context) {
         context.beginPath();
         context.arc(point.x, point.y, STROKE_WIDTH / 2, 0, Math.PI * 2);
-        context.fillStyle = context.strokeStyle;
         context.fill();
       }
 

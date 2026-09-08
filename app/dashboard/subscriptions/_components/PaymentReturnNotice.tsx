@@ -3,19 +3,14 @@
 import { useEffect } from 'react';
 import { CheckCircle2, Info, Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useAuthStore } from '@/lib/store/useAuthStore';
-import { billingStateQueryKey } from '@/lib/hooks/useBillingState';
-import {
-  subscriptionStateQueryKey,
-  useSubscriptionState,
-} from '../_hooks/useSubscriptionState';
+import { useBillingAccess } from '@/lib/hooks/useBillingAccess';
+import { useInvalidateBillingAccess } from '../_hooks/useInvalidateBillingAccess';
 
 /** Valores que Stripe puede traer de vuelta en `?payment=`. */
 const PAYMENT_SUCCESS = 'success';
@@ -32,9 +27,10 @@ const PAYMENT_CANCEL = 'cancel';
  * invalida lo que hubiera en caché —viene de antes de pagar, así que está viejo por definición—
  * y deja la consulta reintentando hasta que el webhook active la suscripción o se agote el plazo.
  *
- * Se invalidan LAS DOS consultas del perfil: la de esta pantalla y la del estado global por
- * cuenta (`useBillingState`, que vive en `AuthProvider`). Salen del mismo `billing_profile`, así
- * que refrescar sólo una dejaría al resto de la aplicación creyendo todavía que no hay plan.
+ * Se invalida `billingAccess`, que es la consulta única del perfil: la comparten esta pantalla y
+ * el estado global que alimenta al resto de la aplicación (`AuthProvider`), así que refrescarla
+ * los pone al día a la vez. Antes eran dos consultas del mismo perfil y había que acordarse de
+ * invalidar las dos.
  *
  * Sin parámetro no se dibuja nada ni se insiste: quien entra por el menú no acaba de pagar.
  */
@@ -43,38 +39,21 @@ export default function PaymentReturnNotice() {
   const payment = searchParams.get('payment');
   const isReturningFromPayment = payment === PAYMENT_SUCCESS;
 
-  const queryClient = useQueryClient();
-  const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
-  const { data: subscription } = useSubscriptionState({
+  const invalidarEstado = useInvalidateBillingAccess();
+  const { data: billing } = useBillingAccess({
     awaitActivation: isReturningFromPayment,
   });
 
   /** Lo cacheado se pidió antes de ir a pagar: describe el estado anterior a la compra. */
   useEffect(() => {
-    if (!isReturningFromPayment || !activeAccountId) {
+    if (!isReturningFromPayment) {
       return;
     }
 
-    void queryClient.invalidateQueries({
-      queryKey: subscriptionStateQueryKey(activeAccountId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: billingStateQueryKey(activeAccountId),
-    });
-  }, [isReturningFromPayment, activeAccountId, queryClient]);
+    void invalidarEstado();
+  }, [isReturningFromPayment, invalidarEstado]);
 
-  /**
-   * En cuanto el webhook confirma, el estado global tiene que enterarse también: lo dibuja el
-   * menú y lo consultan los guards, y quedaría diciendo "sin plan" hasta el siguiente montaje.
-   */
-  const yaEstaActiva = subscription?.hasActiveSubscription ?? false;
-  useEffect(() => {
-    if (isReturningFromPayment && yaEstaActiva && activeAccountId) {
-      void queryClient.invalidateQueries({
-        queryKey: billingStateQueryKey(activeAccountId),
-      });
-    }
-  }, [isReturningFromPayment, yaEstaActiva, activeAccountId, queryClient]);
+  const yaEstaActiva = billing?.hasActiveSubscription ?? false;
 
   if (isReturningFromPayment) {
     if (yaEstaActiva) {
