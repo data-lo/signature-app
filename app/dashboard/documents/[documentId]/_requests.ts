@@ -78,10 +78,24 @@ export interface SignDocumentPayload {
  * para poder recibir `.key`/`.cer` cuando la firma es electrónica avanzada (FIEL) — mandar el
  * PATCH sin body/Content-Type rompía a multer ("Boundary not found").
  */
+export interface SignDocumentResponseData {
+  id: string;
+  /**
+   * `true` si esta firma era la última que faltaba y el documento quedó completo; `false` si
+   * todavía quedan participantes pendientes.
+   *
+   * Lo decide el backend, que es quien sabe cuántos firmantes faltaban: deducirlo acá desde el
+   * detalle cargado en la pantalla sería leer el estado ANTERIOR a esta firma. La confirmación
+   * que se le muestra al firmante depende de este dato, así que equivocarlo significa prometerle
+   * un documento en "Completados" que todavía no está ahí.
+   */
+  documentCompleted: boolean;
+}
+
 export async function signDocumentRequest(
   documentId: string,
   payload: SignDocumentPayload,
-): Promise<void> {
+): Promise<SignDocumentResponseData> {
   const formData = new FormData();
   formData.append('geolocation', JSON.stringify(payload.geolocation));
 
@@ -90,7 +104,13 @@ export async function signDocumentRequest(
     formData.append('key', payload.advancedSignature.keyFile);
     formData.append('cer', payload.advancedSignature.cerFile);
   }
-  await apiClient.patch(`/api/v1/document/${documentId}/sign`, formData);
+  const { data } = await apiClient.patch<{
+    success: boolean;
+    message: string;
+    data: SignDocumentResponseData;
+  }>(`/api/v1/document/${documentId}/sign`, formData);
+
+  return data.data;
 }
 
 /**

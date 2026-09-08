@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
@@ -25,6 +26,8 @@ import {
   rejectDocumentSchema,
   type RejectDocumentFormValues,
 } from '../_schemas';
+import type { SignDocumentResponseData } from '../_requests';
+import { DOCUMENTS_SECTIONS } from '../../_config/sections';
 import DocumentView from './DocumentView';
 import type { AdvancedSignatureSubmitValues } from './AdvancedSignatureDialog';
 
@@ -72,7 +75,16 @@ export default function DocumentViewSection({
     useState<GeolocationCoords | null>(null);
   const [showAdvancedSignatureDialog, setShowAdvancedSignatureDialog] =
     useState(false);
+  /**
+   * Desenlace de la firma que acaba de registrarse, o `null` mientras no se haya firmado en esta
+   * visita. Guarda `documentCompleted` en vez de mirar el detalle recargado porque ese llega
+   * después —y por otra petición—: el acuse tiene que poder dibujarse en el instante en que la
+   * firma queda registrada, no cuando el detalle se ponga al día.
+   */
+  const [signatureOutcome, setSignatureOutcome] =
+    useState<SignDocumentResponseData | null>(null);
 
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const { data: document, isLoading, isError } = useDocumentDetail(documentId);
   const {
@@ -139,7 +151,27 @@ export default function DocumentViewSection({
       return;
     }
 
-    signMutation.mutate({ geolocation: coords });
+    signMutation.mutate({ geolocation: coords }, { onSuccess: showSignatureReceipt });
+  }
+
+  /**
+   * Abre el acuse de la firma. La pantalla NO navega todavía: hasta que el firmante cierre el
+   * modal sigue viendo el documento que acaba de firmar, que es el contexto en el que la
+   * confirmación significa algo.
+   */
+  function showSignatureReceipt(data: SignDocumentResponseData) {
+    setSignatureOutcome(data);
+  }
+
+  /**
+   * Cerrar el acuse retoma lo que la pantalla hacía antes de que existiera: volver a "Por
+   * firmar". El documento recién firmado ya no le corresponde a este usuario —o pasó a
+   * Completados, o quedó esperando a los demás—, así que dejarlo en el detalle sería dejarlo
+   * mirando una pantalla sin ninguna acción disponible.
+   */
+  function handleSignatureReceiptClose() {
+    setSignatureOutcome(null);
+    router.push(DOCUMENTS_SECTIONS['to-sign'].href);
   }
 
   function handleAdvancedSignatureSubmit(
@@ -150,9 +182,12 @@ export default function DocumentViewSection({
     signMutation.mutate(
       { geolocation: advancedSignatureCoords, advancedSignature: values },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          // El diálogo de e.firma se cierra antes de abrir el acuse: son dos modales, y
+          // apilarlos dejaría la confirmación detrás del formulario que acaba de enviarse.
           setShowAdvancedSignatureDialog(false);
           setAdvancedSignatureCoords(null);
+          showSignatureReceipt(data);
         },
       },
     );
@@ -265,6 +300,13 @@ export default function DocumentViewSection({
         onOpenChange: setShowAdvancedSignatureDialog,
         onSubmit: handleAdvancedSignatureSubmit,
         isConfirming: signMutation.isPending,
+      }}
+      signatureSuccessDialog={{
+        open: signatureOutcome !== null,
+        // Sólo se lee con el modal abierto; el `?? false` es para el instante en que se cierra y
+        // el estado vuelve a null mientras el diálogo todavía anima su salida.
+        documentCompleted: signatureOutcome?.documentCompleted ?? false,
+        onClose: handleSignatureReceiptClose,
       }}
     />
   );
