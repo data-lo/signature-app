@@ -1,6 +1,6 @@
 import type { CurrentUser } from '@/lib/api/auth';
 import type { AccountData } from '@/lib/api/accounts';
-import type { BillingState } from '@/lib/api/billing';
+import type { BillingAccess } from '@/lib/api/billing';
 import type { SigningCredentialStatus } from '@/lib/enums/identity';
 
 export type AccountKind = 'PERSONAL' | 'ORGANIZATION';
@@ -65,7 +65,7 @@ export interface ActiveAccountSlice {
   setActiveAccount: (account: AccountListEntry | ActiveAccount) => void;
 }
 
-// Slice 4: estado de facturación por cuenta (cargado desde /payments/billing-state)
+// Slice 4: estado comercial por cuenta (cargado desde /payments/billing-state)
 export interface BillingSlice {
   /**
    * Indexado por `accountId` —la cuenta activa, no el propietario facturable— porque es la
@@ -74,8 +74,8 @@ export interface BillingSlice {
    * entrada con el mismo contenido; es el precio de no tener que resolver el propietario en el
    * cliente, que es justo lo que el backend existe para decidir.
    */
-  billingByAccountId: Record<string, BillingState>;
-  setBillingState: (accountId: string, billingState: BillingState) => void;
+  billingByAccountId: Record<string, BillingAccess>;
+  setBillingAccess: (accountId: string, billingAccess: BillingAccess) => void;
 }
 
 export type AuthState = AuthSlice &

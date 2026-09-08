@@ -2,7 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { cancelSubscriptionRequest } from '../_requests';
-import { useInvalidateSubscriptionQueries } from './useInvalidateSubscriptionQueries';
+import { useInvalidateBillingAccess } from './useInvalidateBillingAccess';
 
 /**
  * Programa la baja de la suscripción de la cuenta activa.
@@ -16,7 +16,7 @@ import { useInvalidateSubscriptionQueries } from './useInvalidateSubscriptionQue
  * donde el usuario se queda.
  */
 export function useCancelSubscription() {
-  const invalidate = useInvalidateSubscriptionQueries();
+  const invalidate = useInvalidateBillingAccess();
 
   return useMutation({
     mutationFn: cancelSubscriptionRequest,
