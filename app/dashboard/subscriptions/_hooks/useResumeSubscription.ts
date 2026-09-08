@@ -2,7 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { resumeSubscriptionRequest } from '../_requests';
-import { useInvalidateSubscriptionQueries } from './useInvalidateSubscriptionQueries';
+import { useInvalidateBillingAccess } from './useInvalidateBillingAccess';
 
 /**
  * Deshace una baja programada: la suscripción vuelve a renovarse.
@@ -13,7 +13,7 @@ import { useInvalidateSubscriptionQueries } from './useInvalidateSubscriptionQue
  * obstáculo más entre alguien y arreglar lo que acaba de hacer sin querer.
  */
 export function useResumeSubscription() {
-  const invalidate = useInvalidateSubscriptionQueries();
+  const invalidate = useInvalidateBillingAccess();
 
   return useMutation({
     mutationFn: resumeSubscriptionRequest,

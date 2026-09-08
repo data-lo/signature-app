@@ -2,11 +2,10 @@ import type { ReactNode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import PaymentReturnNotice from './PaymentReturnNotice';
-import { getSubscriptionStateRequest } from '../_requests';
-import { subscriptionStateQueryKey } from '../_hooks/useSubscriptionState';
-import { billingStateQueryKey } from '@/lib/hooks/useBillingState';
+import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
+import { getBillingAccessRequest } from '@/lib/api/billing';
+import { buildBillingAccess } from '@/lib/api/billing.fixtures';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import type { SubscriptionState } from '../_interfaces/subscription-state.interface';
 
 /**
  * El mock lee la variable en cada llamada, así que basta con reasignarla entre pruebas. Mutar
@@ -18,27 +17,22 @@ let mockSearchParams = new URLSearchParams();
 jest.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
 }));
-jest.mock('../_requests');
+jest.mock('@/lib/api/billing');
 
-const mockedRequest = getSubscriptionStateRequest as jest.Mock;
+const mockedRequest = getBillingAccessRequest as jest.Mock;
 
 const ACCOUNT_ID = 'cuenta-1';
-const GRATUITA: SubscriptionState = {
+const GRATUITA = buildBillingAccess({
   hasActiveSubscription: false,
-  planType: 'free',
+  currentPlanType: 'free',
   status: 'FREE',
-  cancelAtPeriodEnd: false,
-  currentPeriodStart: null,
-  currentPeriodEnd: null,
-};
-const ACTIVA: SubscriptionState = {
-  hasActiveSubscription: true,
-  planType: 'plus',
-  status: 'ACTIVE',
-  cancelAtPeriodEnd: false,
+  billingSource: null,
+  creditsAvailable: 0,
+});
+const ACTIVA = buildBillingAccess({
   currentPeriodStart: '2030-01-01T00:00:00.000Z',
   currentPeriodEnd: '2030-02-01T00:00:00.000Z',
-};
+});
 
 function givenQuery(query: string) {
   mockSearchParams = new URLSearchParams(query);
@@ -90,7 +84,7 @@ describe('PaymentReturnNotice', () => {
   });
 
   describe('refresco del estado al volver de Stripe', () => {
-    it('consulta la suscripción de la cuenta activa', async () => {
+    it('consulta el estado comercial de la cuenta activa', async () => {
       givenQuery('payment=success');
 
       renderNotice();
@@ -99,11 +93,12 @@ describe('PaymentReturnNotice', () => {
     });
 
     /**
-     * Las DOS consultas del perfil se invalidan: la de esta pantalla y la del estado global por
-     * cuenta. Salen del mismo `billing_profile`, así que refrescar sólo una dejaría al resto de
-     * la aplicación creyendo todavía que no hay plan.
+     * Lo cacheado se pidió antes de ir a pagar, así que describe el estado anterior a la compra.
+     * Se invalida la consulta única del perfil, que comparten esta pantalla y el estado global:
+     * antes eran dos y refrescar sólo una dejaba al resto de la aplicación creyendo que no hay
+     * plan.
      */
-    it('invalida tanto la suscripción como el estado global de esa cuenta', async () => {
+    it('invalida el estado comercial de esa cuenta', async () => {
       const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
       givenQuery('payment=success');
 
@@ -111,12 +106,9 @@ describe('PaymentReturnNotice', () => {
 
       await waitFor(() =>
         expect(invalidateQueries).toHaveBeenCalledWith({
-          queryKey: subscriptionStateQueryKey(ACCOUNT_ID),
+          queryKey: billingAccessQueryKey(ACCOUNT_ID),
         }),
       );
-      expect(invalidateQueries).toHaveBeenCalledWith({
-        queryKey: billingStateQueryKey(ACCOUNT_ID),
-      });
     });
 
     /** El texto sólo cambia cuando el estado REAL —el que dejó el webhook— lo confirma. */

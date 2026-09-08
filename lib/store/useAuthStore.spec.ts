@@ -1,4 +1,5 @@
 import { useAuthStore } from './useAuthStore';
+import { buildBillingAccess } from '@/lib/api/billing.fixtures';
 import {
   derivePersonalConfigured,
   isSigningCredentialConfigured,
@@ -266,67 +267,49 @@ describe('useAuthStore', () => {
   });
 
   describe('billingByAccountId', () => {
+    const PERSONAL = buildBillingAccess({
+      billingProfileId: 'perfil-1',
+      currentPlanType: 'plus',
+    });
+    const ORGANIZACION = buildBillingAccess({
+      billingProfileId: 'perfil-org',
+      currentPlanType: 'premium',
+      actions: { customBranding: true },
+    });
+
     /**
-     * Un usuario tiene varias cuentas a la vez y cada una su propio plan: guardarlo indexado es
-     * lo que permite cambiar de cuenta sin perder lo ya consultado de la anterior.
+     * Un usuario tiene varias cuentas a la vez y cada una su propio plan, su propio saldo y sus
+     * propios beneficios: guardarlo indexado es lo que permite cambiar de cuenta sin perder lo
+     * ya consultado de la anterior.
      */
     it('guarda el estado de cada cuenta por separado', () => {
-      useAuthStore.getState().setBillingState('account-1', {
-        billingProfileId: 'perfil-1',
-        hasActiveSubscription: true,
-        currentPlanType: 'plus',
-      });
-      useAuthStore.getState().setBillingState('account-org', {
-        billingProfileId: 'perfil-org',
-        hasActiveSubscription: false,
-        currentPlanType: null,
-      });
+      useAuthStore.getState().setBillingAccess('account-1', PERSONAL);
+      useAuthStore.getState().setBillingAccess('account-org', ORGANIZACION);
 
       expect(useAuthStore.getState().billingByAccountId).toEqual({
-        'account-1': {
-          billingProfileId: 'perfil-1',
-          hasActiveSubscription: true,
-          currentPlanType: 'plus',
-        },
-        'account-org': {
-          billingProfileId: 'perfil-org',
-          hasActiveSubscription: false,
-          currentPlanType: null,
-        },
+        'account-1': PERSONAL,
+        'account-org': ORGANIZACION,
       });
     });
 
     it('sobrescribe la entrada de una cuenta sin tocar las demás', () => {
-      useAuthStore.getState().setBillingState('account-1', {
-        billingProfileId: 'perfil-1',
-        hasActiveSubscription: false,
-        currentPlanType: null,
-      });
-      useAuthStore.getState().setBillingState('account-org', {
-        billingProfileId: 'perfil-org',
-        hasActiveSubscription: true,
-        currentPlanType: 'premium',
-      });
+      useAuthStore
+        .getState()
+        .setBillingAccess(
+          'account-1',
+          buildBillingAccess({ hasActiveSubscription: false, status: 'FREE' }),
+        );
+      useAuthStore.getState().setBillingAccess('account-org', ORGANIZACION);
 
       // El webhook activó el perfil personal: sólo cambia esa entrada.
-      useAuthStore.getState().setBillingState('account-1', {
-        billingProfileId: 'perfil-1',
-        hasActiveSubscription: true,
-        currentPlanType: 'basic',
-      });
+      useAuthStore.getState().setBillingAccess('account-1', PERSONAL);
 
-      expect(useAuthStore.getState().billingByAccountId['account-1']).toEqual({
-        billingProfileId: 'perfil-1',
-        hasActiveSubscription: true,
-        currentPlanType: 'basic',
-      });
+      expect(useAuthStore.getState().billingByAccountId['account-1']).toEqual(
+        PERSONAL,
+      );
       expect(
         useAuthStore.getState().billingByAccountId['account-org'],
-      ).toEqual({
-        billingProfileId: 'perfil-org',
-        hasActiveSubscription: true,
-        currentPlanType: 'premium',
-      });
+      ).toEqual(ORGANIZACION);
     });
   });
 
@@ -340,11 +323,9 @@ describe('useAuthStore', () => {
         organizationId: 'account-1',
         roleId: null,
       });
-      useAuthStore.getState().setBillingState('account-1', {
-        billingProfileId: 'perfil-1',
-        hasActiveSubscription: true,
-        currentPlanType: 'plus',
-      });
+      useAuthStore
+        .getState()
+        .setBillingAccess('account-1', buildBillingAccess());
 
       useAuthStore.getState().logout();
 
