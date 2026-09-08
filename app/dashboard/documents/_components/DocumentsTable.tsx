@@ -24,17 +24,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import DocumentsFilterButton from './DocumentsFilterButton';
 import DocumentRowActions from './DocumentRowActions';
 import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
-import {
-  EMPTY_DOCUMENTS_FILTERS,
-  type DocumentsFilters,
-} from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { formatShortDate } from '@/lib/format-datetime';
-import { DocumentStatus, SignatureType } from '@/lib/enums/document';
+import {
+  DocumentParticipation,
+  DocumentStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 
 export interface DocumentListItem {
   id: string;
@@ -59,6 +58,14 @@ export interface DocumentListItem {
    * sigue abierto (o si el backend todavía no lo informa, como en el endpoint antiguo).
    */
   signedAt?: string | null;
+  /**
+   * Qué papel juega en este documento el usuario en sesión. Lo calcula el backend por fila y es
+   * personal: dos personas ven valores distintos para el mismo documento.
+   *
+   * Con la lista segmentada no hacía falta —la sección lo decía— y por eso puede faltar en los
+   * datos de una respuesta anterior; la tabla lo trata entonces como "participante".
+   */
+  participation?: DocumentParticipation;
 }
 
 const STATUS_LABELS: Record<DocumentStatus, string> = {
@@ -81,6 +88,16 @@ const SIGNATURE_TYPE_LABELS: Record<SignatureType, string> = {
   [SignatureType.Fiel]: 'E.Firma',
 };
 
+/**
+ * Por qué este documento está en mi lista. Es la columna que sustituye a la sección: antes lo
+ * decía la pantalla en la que uno estaba, y ahora tiene que decirlo cada fila.
+ */
+const PARTICIPATION_LABELS: Record<DocumentParticipation, string> = {
+  [DocumentParticipation.RequiresMySignature]: 'Requiere tu firma',
+  [DocumentParticipation.CreatedByMe]: 'Creado por ti',
+  [DocumentParticipation.Participant]: 'Participas',
+};
+
 /** Lo que muestra "Fecha de firma" mientras el documento no está firmado por todos. */
 const UNSIGNED_DATE_LABEL = 'No disponible';
 
@@ -98,8 +115,6 @@ interface DocumentsTableProps {
   documents: DocumentListItem[];
   page?: number;
   totalPages?: number;
-  hasNextPage?: boolean;
-  hasPrevPage?: boolean;
   onPageChange?: (page: number) => void;
   /**
    * Navegación al detalle del documento, disparada al seleccionar la fila (clic en cualquier
@@ -107,10 +122,6 @@ interface DocumentsTableProps {
    * contenedora no ofrece esa ruta: entonces las filas no son seleccionables.
    */
   onRowSelect?: (documentId: string) => void;
-  filters?: DocumentsFilters;
-  onFiltersChange?: (filters: DocumentsFilters) => void;
-  showMyTurnFilter?: boolean;
-  showStatusFilter?: boolean;
 }
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
@@ -126,32 +137,24 @@ export default function DocumentsTable({
   documents,
   page = 1,
   totalPages = 1,
-  hasNextPage = false,
-  hasPrevPage = false,
   onPageChange,
   onRowSelect,
-  filters,
-  onFiltersChange,
-  showMyTurnFilter,
-  showStatusFilter,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
     useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
 
+  /**
+   * Si hay página anterior o siguiente se deduce de dónde estamos: el endpoint unificado devuelve
+   * `page` y `totalPages` y ya no manda `hasNextPage`/`hasPrevPage`. Eran dos campos que repetían
+   * lo mismo, y dos fuentes para un mismo hecho terminan discrepando.
+   */
+  const hasPrevPage = page > 1;
+  const hasNextPage = page < totalPages;
+
   return (
     <div className="flex-1 min-w-0">
-      {onFiltersChange && (
-        <div className="mb-3 flex items-center justify-end">
-          <DocumentsFilterButton
-            filters={filters ?? EMPTY_DOCUMENTS_FILTERS}
-            onApply={onFiltersChange}
-            showMyTurnFilter={showMyTurnFilter}
-            showStatusFilter={showStatusFilter}
-          />
-        </div>
-      )}
       {/* La tabla vive dentro de una tarjeta con borde y encabezado gris, igual en las tres
           secciones; `components/ui/table` se deja intacto porque también lo usa MembersTable. */}
       <div className="overflow-hidden rounded-xl border border-border">
@@ -162,6 +165,7 @@ export default function DocumentsTable({
                 <SortableHeader>Documento</SortableHeader>
               </TableHead>
               <TableHead>Creado por</TableHead>
+              <TableHead>Participación</TableHead>
               <TableHead>Estatus</TableHead>
               <TableHead>Fecha de creación</TableHead>
               <TableHead>Fecha de firma</TableHead>
@@ -225,6 +229,13 @@ export default function DocumentsTable({
                         </span>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {
+                      PARTICIPATION_LABELS[
+                        doc.participation ?? DocumentParticipation.Participant
+                      ]
+                    }
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">

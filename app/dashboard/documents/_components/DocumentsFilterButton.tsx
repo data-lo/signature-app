@@ -8,52 +8,40 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import DocumentsFilterPanel, {
-  EMPTY_DOCUMENTS_FILTERS,
-  type DocumentsFilters,
-} from './DocumentsFilterPanel';
+import DocumentsFilterPanel from './DocumentsFilterPanel';
+import { activeFilterChips, type DocumentsFilters } from '../_config/filters';
 
 interface DocumentsFilterButtonProps {
   filters: DocumentsFilters;
-  onApply: (filters: DocumentsFilters) => void;
-  showMyTurnFilter?: boolean;
-  showStatusFilter?: boolean;
+  onChange: (filters: DocumentsFilters) => void;
 }
 
-function countActiveFilters(filters: DocumentsFilters): number {
-  return Object.entries(filters).filter(([key, value]) => {
-    const emptyValue = EMPTY_DOCUMENTS_FILTERS[key as keyof DocumentsFilters];
-    return value !== emptyValue;
-  }).length;
-}
-
+/**
+ * Acceso a los filtros, con la cuenta de los que están puestos.
+ *
+ * El popover NO se cierra al elegir: los filtros se acumulan y cerrarlo tras cada selección
+ * obligaría a reabrirlo para poner el siguiente. Antes se cerraba porque había un botón "Aplicar"
+ * que marcaba el final de la edición; sin él, el final lo decide quien filtra.
+ *
+ * La cuenta sale de los mismos chips que se pintan fuera, así que el número del botón y los chips
+ * de abajo nunca pueden discrepar.
+ */
 export default function DocumentsFilterButton({
   filters,
-  onApply,
-  showMyTurnFilter,
-  showStatusFilter,
+  onChange,
 }: DocumentsFilterButtonProps) {
   const [open, setOpen] = useState(false);
-  const activeCount = countActiveFilters(filters);
+  const activeCount = activeFilterChips(filters).length;
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Filtrar documentos"
-            className="relative"
-          >
+          <Button variant="outline" className="relative gap-2">
             <SlidersHorizontal />
+            Filtros
             {activeCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+              <span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
                 {activeCount}
               </span>
             )}
@@ -61,15 +49,7 @@ export default function DocumentsFilterButton({
         }
       />
       <PopoverContent className="w-96" align="end">
-        <DocumentsFilterPanel
-          initialFilters={filters}
-          showMyTurnFilter={showMyTurnFilter}
-          showStatusFilter={showStatusFilter}
-          onApply={(next) => {
-            onApply(next);
-            setOpen(false);
-          }}
-        />
+        <DocumentsFilterPanel filters={filters} onChange={onChange} />
       </PopoverContent>
     </Popover>
   );

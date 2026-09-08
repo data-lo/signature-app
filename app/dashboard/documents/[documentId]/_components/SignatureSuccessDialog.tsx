@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DocumentView } from '@/lib/enums/document';
 import { DOCUMENTS_SECTIONS } from '../../_config/sections';
 
 interface SignatureSuccessDialogProps {
@@ -82,9 +83,17 @@ export default function SignatureSuccessDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             Cerrar
           </Button>
+          {/* Lleva al listado unificado con el recorte de completados ya puesto. Antes apuntaba
+            a la sección "Completados", que era una ruta propia; ahora es un filtro de la única
+            pantalla de documentos, y el `?view=` es lo que conserva el destino que el texto
+            promete. */}
           <Button
             nativeButton={false}
-            render={<Link href={DOCUMENTS_SECTIONS.completed.href} />}
+            render={
+              <Link
+                href={`${DOCUMENTS_SECTIONS.list.href}?view=${DocumentView.Completed}`}
+              />
+            }
           >
             Ver documentos completados
           </Button>

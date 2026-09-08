@@ -15,7 +15,7 @@ export function useRequestCancellation(documentId: string) {
       queryClient.invalidateQueries({
         queryKey: ['documentDetail', documentId],
       });
-      queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: (error) => {
       toast.error(

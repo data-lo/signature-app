@@ -36,7 +36,7 @@ export function useSignDocument(documentId: string) {
       queryClient.invalidateQueries({
         queryKey: ['documentFileUrl', documentId],
       });
-      queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: (error) => {
       toast.error(

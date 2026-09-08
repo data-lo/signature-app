@@ -99,8 +99,8 @@ describe('DocumentsTable', () => {
     mockedUseDocumentDetail.mockReturnValue(buildDetail([buildParticipant()]));
   });
 
-  describe('estructura de tabla compartida por las tres secciones', () => {
-    it('renderiza las columnas en el orden Documento / Creado por / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
+  describe('estructura de la tabla', () => {
+    it('renderiza las columnas en el orden Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const headers = screen
@@ -110,6 +110,7 @@ describe('DocumentsTable', () => {
       expect(headers).toEqual([
         'Documento',
         'Creado por',
+        'Participación',
         'Estatus',
         'Fecha de creación',
         'Fecha de firma',

@@ -24,8 +24,8 @@ export function useRejectDocument(documentId: string) {
       queryClient.invalidateQueries({
         queryKey: ['documentFileUrl', documentId],
       });
-      queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
-      router.push(DOCUMENTS_SECTIONS['to-sign'].href);
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      router.push(DOCUMENTS_SECTIONS.list.href);
     },
     onError: (error) => {
       toast.error(

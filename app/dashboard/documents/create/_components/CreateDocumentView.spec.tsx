@@ -181,7 +181,10 @@ describe('CreateDocumentView', () => {
 
     it('con showCreatedDocuments={false}, la sección de documentos creados no se renderiza', () => {
       mockedUseDocuments.mockReturnValue({
-        data: { documents: [], meta: { total: 0 } },
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+        },
       });
 
       renderWithProviders(<CreateDocumentView showCreatedDocuments={false} />);
@@ -358,7 +361,10 @@ describe('CreateDocumentView', () => {
       const setDocumentsCount = jest.fn();
       mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
       mockedUseDocuments.mockReturnValue({
-        data: { documents: [], meta: { total: 3 } },
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
+        },
       });
 
       renderWithProviders(<CreateDocumentView />);
@@ -370,7 +376,10 @@ describe('CreateDocumentView', () => {
       const setDocumentsCount = jest.fn();
       mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
       mockedUseDocuments.mockReturnValue({
-        data: { documents: [], meta: { total: 3 } },
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
+        },
       });
 
       renderWithProviders(<CreateDocumentView trackDocumentsCount={false} />);
