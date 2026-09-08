@@ -5,18 +5,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SubscriptionStateCard from './SubscriptionStateCard';
 import {
   cancelSubscriptionRequest,
-  getSubscriptionStateRequest,
   resumeSubscriptionRequest,
 } from '../_requests';
-import { subscriptionStateQueryKey } from '../_hooks/useSubscriptionState';
-import { billingStateQueryKey } from '@/lib/hooks/useBillingState';
+import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
+import { getBillingAccessRequest, type BillingAccess } from '@/lib/api/billing';
+import { buildBillingAccess } from '@/lib/api/billing.fixtures';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { AccountKind } from '@/lib/store/types/auth-store.types';
-import type { SubscriptionState } from '../_interfaces/subscription-state.interface';
 
 jest.mock('../_requests');
+jest.mock('@/lib/api/billing');
 
-const mockedRequest = getSubscriptionStateRequest as jest.Mock;
+const mockedRequest = getBillingAccessRequest as jest.Mock;
 const mockedCancel = cancelSubscriptionRequest as jest.Mock;
 const mockedResume = resumeSubscriptionRequest as jest.Mock;
 
@@ -41,8 +41,14 @@ function givenActiveAccount(
   });
 }
 
-function givenSubscription(state: SubscriptionState) {
-  mockedRequest.mockResolvedValue(state);
+/**
+ * Se completa con `buildBillingAccess` en vez de escribir el objeto entero en cada prueba: la
+ * respuesta trae ahora acciones, límites y saldo, y repetirlos veinte veces haría que agregar un
+ * campo al contrato obligara a tocar veinte literales — con el riesgo de que alguno quedara
+ * describiendo una forma que el backend ya no manda.
+ */
+function givenSubscription(state: Partial<BillingAccess>) {
+  mockedRequest.mockResolvedValue(buildBillingAccess(state));
 }
 
 describe('SubscriptionStateCard', () => {
@@ -77,7 +83,7 @@ describe('SubscriptionStateCard', () => {
     it('muestra ACTIVE como suscripción activa, con su plan y su periodo', async () => {
       givenSubscription({
         hasActiveSubscription: true,
-        planType: 'plus',
+        currentPlanType: 'plus',
         status: 'ACTIVE',
         cancelAtPeriodEnd: false,
         currentPeriodStart: '2030-01-01T00:00:00.000Z',
@@ -104,7 +110,7 @@ describe('SubscriptionStateCard', () => {
       givenActiveAccount(ORGANIZATION_ACCOUNT_ID, 'ORGANIZATION', 'org-1');
       givenSubscription({
         hasActiveSubscription: true,
-        planType: 'premium',
+        currentPlanType: 'premium',
         status: 'ACTIVE',
         cancelAtPeriodEnd: false,
         currentPeriodStart: null,
@@ -127,7 +133,7 @@ describe('SubscriptionStateCard', () => {
     it('lo presenta como el plan vigente, no como uno caducado', async () => {
       givenSubscription({
         hasActiveSubscription: false,
-        planType: 'free',
+        currentPlanType: 'free',
         status: 'FREE',
         cancelAtPeriodEnd: false,
         currentPeriodStart: null,
@@ -161,7 +167,7 @@ describe('SubscriptionStateCard', () => {
       givenActiveAccount(ORGANIZATION_ACCOUNT_ID, 'ORGANIZATION', 'org-1');
       givenSubscription({
         hasActiveSubscription: false,
-        planType: 'free',
+        currentPlanType: 'free',
         status: 'FREE',
         cancelAtPeriodEnd: false,
         currentPeriodStart: null,
@@ -180,7 +186,7 @@ describe('SubscriptionStateCard', () => {
     it('invita a contratar cuando la cuenta nunca ha pagado', async () => {
       givenSubscription({
         hasActiveSubscription: false,
-        planType: null,
+        currentPlanType: null,
         status: null,
         cancelAtPeriodEnd: false,
         currentPeriodStart: null,
@@ -207,7 +213,7 @@ describe('SubscriptionStateCard', () => {
     it('ofrece cancelar una suscripción activa que se renueva', async () => {
       givenSubscription({
         hasActiveSubscription: true,
-        planType: 'plus',
+        currentPlanType: 'plus',
         status: 'ACTIVE',
         cancelAtPeriodEnd: false,
         currentPeriodStart: '2030-01-01T00:00:00.000Z',
@@ -230,7 +236,7 @@ describe('SubscriptionStateCard', () => {
     it('oculta el botón cuando la cancelación ya está programada', async () => {
       givenSubscription({
         hasActiveSubscription: true,
-        planType: 'plus',
+        currentPlanType: 'plus',
         status: 'ACTIVE',
         cancelAtPeriodEnd: true,
         currentPeriodStart: '2030-01-01T00:00:00.000Z',
@@ -257,7 +263,7 @@ describe('SubscriptionStateCard', () => {
     it('anuncia hasta cuándo seguirá activa', async () => {
       givenSubscription({
         hasActiveSubscription: true,
-        planType: 'plus',
+        currentPlanType: 'plus',
         status: 'ACTIVE',
         cancelAtPeriodEnd: true,
         currentPeriodStart: '2030-01-01T00:00:00.000Z',
@@ -288,7 +294,7 @@ describe('SubscriptionStateCard', () => {
     it('no ofrece contratar mientras la suscripción siga activa', async () => {
       givenSubscription({
         hasActiveSubscription: true,
-        planType: 'plus',
+        currentPlanType: 'plus',
         status: 'ACTIVE',
         cancelAtPeriodEnd: true,
         currentPeriodStart: null,
@@ -311,7 +317,7 @@ describe('SubscriptionStateCard', () => {
     it('anuncia el término sin fecha cuando el periodo no la trae', async () => {
       givenSubscription({
         hasActiveSubscription: true,
-        planType: 'plus',
+        currentPlanType: 'plus',
         status: 'ACTIVE',
         cancelAtPeriodEnd: true,
         currentPeriodStart: null,
@@ -331,7 +337,7 @@ describe('SubscriptionStateCard', () => {
   describe('operar sobre la renovación', () => {
     const ACTIVA = {
       hasActiveSubscription: true,
-      planType: 'plus',
+      currentPlanType: 'plus',
       status: 'ACTIVE',
       currentPeriodStart: '2030-01-01T00:00:00.000Z',
       currentPeriodEnd: '2030-02-01T00:00:00.000Z',
@@ -358,11 +364,11 @@ describe('SubscriptionStateCard', () => {
     });
 
     /**
-     * Las dos consultas salen del mismo `billing_profile`: `subscriptionState` dibuja esta
-     * pantalla y `billingState` alimenta el store global. Refrescar sólo una dejaría la
-     * aplicación diciendo dos cosas distintas del mismo perfil.
+     * Una sola consulta describe el perfil y la comparte todo el árbol, así que refrescarla pone
+     * al día la tarjeta y el estado global a la vez. Va con la cuenta en la llave para no tirar
+     * lo consultado en la otra cuenta del mismo usuario.
      */
-    it('refresca las dos consultas de facturación de la cuenta activa', async () => {
+    it('refresca el estado comercial de la cuenta activa', async () => {
       const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
       givenSubscription({ ...ACTIVA, cancelAtPeriodEnd: false });
       render(<SubscriptionStateCard />, { wrapper });
@@ -371,12 +377,9 @@ describe('SubscriptionStateCard', () => {
 
       await waitFor(() =>
         expect(invalidate).toHaveBeenCalledWith({
-          queryKey: subscriptionStateQueryKey(PERSONAL_ACCOUNT_ID),
+          queryKey: billingAccessQueryKey(PERSONAL_ACCOUNT_ID),
         }),
       );
-      expect(invalidate).toHaveBeenCalledWith({
-        queryKey: billingStateQueryKey(PERSONAL_ACCOUNT_ID),
-      });
     });
 
     /**
@@ -493,6 +496,67 @@ describe('SubscriptionStateCard', () => {
     });
   });
 
+  describe('saldo de documentos', () => {
+    it('muestra el saldo disponible y el tope incluido por periodo', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        currentPlanType: 'premium',
+        status: 'ACTIVE',
+        creditsAvailable: 18,
+        limits: { documentsIncludedPerPeriod: 60, maxOrganizationMembers: null },
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      expect(
+        await screen.findByText(/de 60 incluidos por periodo/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText('18')).toBeInTheDocument();
+    });
+
+    /**
+     * Un tope nulo significa "no lo fija el plan" —se negocia por contrato—, así que se calla en
+     * vez de inventar un número: anunciar un límite que no existe es peor que no anunciar ninguno.
+     */
+    it('no anuncia tope cuando el plan no lo fija', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        currentPlanType: 'enterprise',
+        status: 'ACTIVE',
+        creditsAvailable: 5,
+        limits: {
+          documentsIncludedPerPeriod: null,
+          maxOrganizationMembers: null,
+        },
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      expect(
+        await screen.findByText(/documentos disponibles/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/incluidos por periodo/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('también lo muestra en el plan gratuito', async () => {
+      givenSubscription({
+        hasActiveSubscription: false,
+        currentPlanType: 'free',
+        status: 'FREE',
+        creditsAvailable: 3,
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await waitFor(() =>
+        expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
+      );
+      expect(screen.getByText('3')).toBeInTheDocument();
+    });
+  });
+
   describe('estados que no habilitan', () => {
     it.each([
       ['INCOMPLETE', /pendiente de confirmación/i],
@@ -501,7 +565,7 @@ describe('SubscriptionStateCard', () => {
     ] as const)('rotula %s sin darlo por vigente', async (status, rotulo) => {
       givenSubscription({
         hasActiveSubscription: false,
-        planType: 'basic',
+        currentPlanType: 'basic',
         status,
         cancelAtPeriodEnd: false,
         currentPeriodStart: null,
