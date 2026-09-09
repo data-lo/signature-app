@@ -90,6 +90,12 @@ export interface DocumentsListConfig {
   limit: number;
   showMyTurnFilter: boolean;
   showStatusFilter: boolean;
+  /**
+   * Ofrece "Archivar" en el menú de la fila. Sólo en Completados: es la pantalla desde la que
+   * tiene sentido quitarse de encima un documento con el que ya se terminó, y la tabla la
+   * comprueba además contra el estatus de cada documento (archivar exige `signed`).
+   */
+  showArchiveAction: boolean;
 }
 
 /** Diferencias de consulta y de tabla entre secciones; el resto de la vista es idéntico. */
@@ -103,12 +109,14 @@ export const DOCUMENTS_LIST_CONFIG: Record<
     limit: 25,
     showMyTurnFilter: true,
     showStatusFilter: false,
+    showArchiveAction: false,
   },
   sent: {
     scope: 'creator',
     limit: 10,
     showMyTurnFilter: false,
     showStatusFilter: true,
+    showArchiveAction: false,
   },
   completed: {
     scope: 'participant',
@@ -116,5 +124,6 @@ export const DOCUMENTS_LIST_CONFIG: Record<
     limit: 25,
     showMyTurnFilter: true,
     showStatusFilter: false,
+    showArchiveAction: true,
   },
 };

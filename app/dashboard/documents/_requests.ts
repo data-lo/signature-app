@@ -50,6 +50,32 @@ export async function getDocumentFileUrlRequest(
   return data;
 }
 
+/** Lo que devuelve archivar: el documento y desde cuándo quedó archivado para este usuario. */
+export interface ArchivedDocument {
+  documentId: string;
+  archived: boolean;
+  archivedAt: string;
+}
+
+/**
+ * Archiva un documento completado para el USUARIO EN SESIÓN.
+ *
+ * No cambia el documento ni lo esconde de los demás participantes: el backend sólo guarda la
+ * preferencia del par documento-usuario, y a partir de ahí el listado deja de devolverlo a quien
+ * archivó. Es idempotente, así que reintentar tras un fallo de red no duplica nada.
+ */
+export async function archiveDocumentRequest(
+  documentId: string,
+): Promise<ArchivedDocument> {
+  const { data } = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: ArchivedDocument;
+  }>(`/api/v1/document/${documentId}/archive`);
+
+  return data.data;
+}
+
 export interface GetDocumentsParams {
   /** Documentos donde el usuario participa como colaborador (Por firmar/Completados). */
   participantEmail?: string;

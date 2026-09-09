@@ -19,6 +19,7 @@ import DocumentSignaturePlacementSection from './DocumentSignaturePlacementSecti
 import DocumentRequestSummary from './DocumentRequestSummary';
 import CreatedDocumentsSection from './CreatedDocumentsSection';
 import DocumentSentDialog from './DocumentSentDialog';
+import SmartSearchDialog from './SmartSearchDialog';
 import { Form } from '@/components/form/form';
 
 interface CreateDocumentViewProps {
@@ -63,12 +64,20 @@ export default function CreateDocumentView({
   showCreatedDocuments = true,
 }: CreateDocumentViewProps = {}) {
   const [isSentDialogOpen, setIsSentDialogOpen] = useState(false);
+  /**
+   * Se abre cuando el formulario ya validó y sólo falta decidir si el documento entra a Búsqueda
+   * Inteligente. Es el paso previo a `DocumentSentDialog`: aquél confirma lo que YA se envió,
+   * éste pregunta con qué enviarlo (ver `SmartSearchDialog`).
+   */
+  const [isSmartSearchDialogOpen, setIsSmartSearchDialogOpen] =
+    useState(false);
   const [openSections, setOpenSections] = useState<string[]>(
     DEFAULT_OPEN_SECTIONS,
   );
   const fileSelection = useDocumentFileSelection();
   const createDocumentForm = useCreateDocumentForm({
     file: fileSelection.file,
+    onValidated: () => setIsSmartSearchDialogOpen(true),
     // `onSubmitted` ya significa "el envío salió bien" (limpia el archivo cargado), así que es
     // el punto natural para abrir la confirmación sin cambiar el contrato de los hooks.
     onSubmitted: () => {
@@ -198,6 +207,20 @@ export default function CreateDocumentView({
         filters={createdDocuments.filters}
         onFiltersChange={createdDocuments.handleFiltersChange}
         onPageChange={createdDocuments.setPage}
+      />
+
+      {/**
+        * El orden importa: primero se decide la indexación y sólo entonces se manda el
+        * documento. Por eso este modal va antes del de confirmación, que anuncia un envío ya
+        * hecho y no puede cambiarlo.
+        */}
+      <SmartSearchDialog
+        open={isSmartSearchDialogOpen}
+        onOpenChange={setIsSmartSearchDialogOpen}
+        onDecide={(isIndexable) => {
+          setIsSmartSearchDialogOpen(false);
+          void createDocumentForm.submitWith(isIndexable);
+        }}
       />
 
       <DocumentSentDialog

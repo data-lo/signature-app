@@ -33,6 +33,7 @@ import {
   type DocumentsFilters,
 } from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
+import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import { formatShortDate } from '@/lib/format-datetime';
 import { DocumentStatus, SignatureType } from '@/lib/enums/document';
 
@@ -111,6 +112,12 @@ interface DocumentsTableProps {
   onFiltersChange?: (filters: DocumentsFilters) => void;
   showMyTurnFilter?: boolean;
   showStatusFilter?: boolean;
+  /**
+   * Ofrece "Archivar" en el menú de cada fila. Sólo lo enciende la sección de Completados; aun
+   * encendido, la acción se muestra únicamente en los documentos firmados por todos, que son los
+   * únicos que el backend deja archivar.
+   */
+  showArchiveAction?: boolean;
 }
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
@@ -134,11 +141,13 @@ export default function DocumentsTable({
   onFiltersChange,
   showMyTurnFilter,
   showStatusFilter,
+  showArchiveAction = false,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
     useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
+  const archiveMutation = useArchiveCompletedDocument();
 
   return (
     <div className="flex-1 min-w-0">
@@ -174,6 +183,16 @@ export default function DocumentsTable({
               const isDownloading =
                 downloadMutation.isPending &&
                 downloadMutation.variables === doc.id;
+              const isArchiving =
+                archiveMutation.isPending &&
+                archiveMutation.variables === doc.id;
+              /**
+               * La sección decide si la acción existe; el estatus, si aplica a ESTE documento.
+               * Las dos condiciones hacen falta: "Enviados para firma" también lista documentos
+               * firmados, y Completados puede mostrar uno cancelado tras haberse firmado.
+               */
+              const canArchive =
+                showArchiveAction && doc.status === DocumentStatus.Signed;
               /**
                * "No disponible" cubre los dos casos en que no hay fecha de firma que mostrar: el
                * documento todavía no está firmado por todos, o el backend no la informó (endpoint
@@ -271,6 +290,12 @@ export default function DocumentsTable({
                         onDownload={() => downloadMutation.mutate(doc.id)}
                         onViewParticipants={() => setParticipantsDoc(doc)}
                         onShare={() => setShareDoc(doc)}
+                        onArchive={
+                          canArchive
+                            ? () => archiveMutation.mutate(doc.id)
+                            : undefined
+                        }
+                        isArchiving={isArchiving}
                       />
                     </div>
                   </TableCell>

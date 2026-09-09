@@ -1,6 +1,6 @@
 'use client';
 
-import { FileDown, MoreVertical, Share2, Users } from 'lucide-react';
+import { Archive, FileDown, MoreVertical, Share2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,6 +16,15 @@ interface DocumentRowActionsProps {
   /** Abre el modal con las personas involucradas en el documento, agrupadas por rol. */
   onViewParticipants: () => void;
   onShare: () => void;
+  /**
+   * Archiva el documento para el usuario en sesión. Ausente cuando la acción no corresponde —otra
+   * sección, o un documento que todavía no está firmado por todos—: entonces el menú ni la
+   * menciona, en vez de mostrarla deshabilitada. Una opción apagada invita a preguntarse qué
+   * falta para encenderla, y aquí la respuesta sería "estar en otra pantalla".
+   */
+  onArchive?: () => void;
+  /** true mientras se archiva ESTE documento (no otro de la lista). */
+  isArchiving?: boolean;
 }
 
 /**
@@ -23,15 +32,17 @@ interface DocumentRowActionsProps {
  * firma, Completados).
  *
  * Sólo quedan las acciones que hacen algo distinto de abrir el documento: descargar, consultar
- * participantes y compartir. "Firmar" y "Ver detalle" se retiraron porque ambas llevaban a
- * `/dashboard/documents/:id` y esa navegación ahora la hace el clic sobre la fila entera; tenerlas
- * también en el menú era ofrecer tres caminos al mismo lugar.
+ * participantes, compartir y —en Completados— archivar. "Firmar" y "Ver detalle" se retiraron
+ * porque ambas llevaban a `/dashboard/documents/:id` y esa navegación ahora la hace el clic sobre
+ * la fila entera; tenerlas también en el menú era ofrecer tres caminos al mismo lugar.
  */
 export default function DocumentRowActions({
   isDownloading = false,
   onDownload,
   onViewParticipants,
   onShare,
+  onArchive,
+  isArchiving = false,
 }: DocumentRowActionsProps) {
   return (
     <DropdownMenu>
@@ -61,6 +72,15 @@ export default function DocumentRowActions({
           <Share2 className="size-4" />
           Compartir
         </DropdownMenuItem>
+        {/* Va al final y separada del resto por su efecto: las de arriba consultan o copian el
+          documento, ésta lo saca de la lista. Es reversible en el fondo —la preferencia guarda
+          una fecha, no borra nada— pero todavía no hay pantalla para deshacerlo. */}
+        {onArchive && (
+          <DropdownMenuItem disabled={isArchiving} onClick={onArchive}>
+            <Archive className="size-4" />
+            {isArchiving ? 'Archivando...' : 'Archivar'}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
