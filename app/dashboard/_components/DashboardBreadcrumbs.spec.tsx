@@ -35,6 +35,10 @@ describe('DashboardBreadcrumbs', () => {
     ).not.toBeInTheDocument();
   });
 
+  /**
+   * "Documentos" pasó de agrupador muerto a enlace: mientras el módulo estuvo partido en tres
+   * secciones no había ninguna pantalla de "Documentos" a la que llevar, y ahora sí.
+   */
   it('en el detalle de un documento usa el nombre del archivo como último nivel una vez cargado', () => {
     mockUsePathname.mockReturnValue('/dashboard/documents/doc-1');
     mockedUseDocumentDetail.mockReturnValue({
@@ -43,9 +47,10 @@ describe('DashboardBreadcrumbs', () => {
 
     renderWithProviders(<DashboardBreadcrumbs />);
 
-    expect(
-      screen.queryByRole('link', { name: 'Documentos' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Documentos' })).toHaveAttribute(
+      'href',
+      '/dashboard/documents',
+    );
     expect(screen.getByText('contrato.pdf')).toHaveAttribute(
       'aria-current',
       'page',
@@ -61,62 +66,42 @@ describe('DashboardBreadcrumbs', () => {
     expect(screen.queryByText('doc-1')).not.toBeInTheDocument();
   });
 
-  it.each([
-    ['/dashboard/documents/create', 'Nuevo documento'],
-    ['/dashboard/documents/to-sign', 'Por firmar'],
-    ['/dashboard/documents/sent', 'Enviados para firma'],
-    ['/dashboard/documents/completed', 'Completados'],
-  ])(
-    'en %s muestra "Documentos / %s": el agrupador sin enlace y la sección como página actual',
-    (pathname, sectionLabel) => {
-      mockUsePathname.mockReturnValue(pathname);
+  /** El listado es el nivel padre: repetirlo como hijo diría "Documentos / Documentos". */
+  it('en el listado unificado muestra un solo nivel, y es la página actual', () => {
+    mockUsePathname.mockReturnValue('/dashboard/documents');
 
-      renderWithProviders(<DashboardBreadcrumbs />);
+    renderWithProviders(<DashboardBreadcrumbs />);
 
-      const group = screen.getByText('Documentos');
-      expect(group).toHaveAttribute('aria-disabled', 'true');
-      expect(group).not.toHaveAttribute('aria-current');
-      expect(
-        screen.queryByRole('link', { name: 'Documentos' }),
-      ).not.toBeInTheDocument();
+    expect(screen.getByText('Documentos')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Documentos' }),
+    ).not.toBeInTheDocument();
+  });
 
-      expect(screen.getByText(sectionLabel)).toHaveAttribute(
-        'aria-current',
-        'page',
-      );
-      expect(
-        screen.queryByRole('link', { name: sectionLabel }),
-      ).not.toBeInTheDocument();
+  it('en el alta muestra "Documentos / Nuevo documento", con el padre enlazado al listado', () => {
+    mockUsePathname.mockReturnValue('/dashboard/documents/create');
 
-      // Bug corregido: cada sección es un solo segmento bajo /dashboard/documents, así que
-      // también matchea el patrón del detalle — no debe dispararse ningún GET /document/:id.
-      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
-        '',
-        expect.objectContaining({ enabled: false }),
-      );
-    },
-  );
+    renderWithProviders(<DashboardBreadcrumbs />);
 
-  it.each([
-    ['/dashboard/documents', 'Por firmar'],
-    ['/dashboard/documents/created', 'Enviados para firma'],
-  ])(
-    'la ruta anterior %s muestra el breadcrumb de su ruta nueva mientras redirige, sin interpretarla como id de documento',
-    (legacyPathname, sectionLabel) => {
-      mockUsePathname.mockReturnValue(legacyPathname);
+    expect(screen.getByRole('link', { name: 'Documentos' })).toHaveAttribute(
+      'href',
+      '/dashboard/documents',
+    );
+    expect(screen.getByText('Nuevo documento')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
 
-      renderWithProviders(<DashboardBreadcrumbs />);
-
-      expect(screen.getByText(sectionLabel)).toHaveAttribute(
-        'aria-current',
-        'page',
-      );
-      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
-        '',
-        expect.objectContaining({ enabled: false }),
-      );
-    },
-  );
+    // Bug corregido: `/create` es un solo segmento bajo /dashboard/documents, así que también
+    // matchea el patrón del detalle — no debe dispararse ningún GET /document/:id.
+    expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+      '',
+      expect.objectContaining({ enabled: false }),
+    );
+  });
 
   it('no renderiza nada para una ruta sin breadcrumbs configurados', () => {
     mockUsePathname.mockReturnValue('/dashboard/unknown-route');

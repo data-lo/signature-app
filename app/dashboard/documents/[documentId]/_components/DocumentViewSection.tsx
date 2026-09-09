@@ -164,14 +164,13 @@ export default function DocumentViewSection({
   }
 
   /**
-   * Cerrar el acuse retoma lo que la pantalla hacía antes de que existiera: volver a "Por
-   * firmar". El documento recién firmado ya no le corresponde a este usuario —o pasó a
-   * Completados, o quedó esperando a los demás—, así que dejarlo en el detalle sería dejarlo
-   * mirando una pantalla sin ninguna acción disponible.
+   * Cerrar el acuse retoma lo que la pantalla hacía antes de que existiera: volver al listado de
+   * documentos. El documento recién firmado ya no espera nada de este usuario, así que dejarlo en
+   * el detalle sería dejarlo mirando una pantalla sin ninguna acción disponible.
    */
   function handleSignatureReceiptClose() {
     setSignatureOutcome(null);
-    router.push(DOCUMENTS_SECTIONS['to-sign'].href);
+    router.push(DOCUMENTS_SECTIONS.list.href);
   }
 
   function handleAdvancedSignatureSubmit(

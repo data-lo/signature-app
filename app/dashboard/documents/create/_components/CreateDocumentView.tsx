@@ -34,7 +34,7 @@ interface CreateDocumentViewProps {
    */
   trackDocumentsCount?: boolean;
   /** Cuando es `false`, oculta la tabla de documentos creados bajo el formulario: esa lista ya
-   * tiene su propia entrada en el Sidebar ("Enviados para firma", `/dashboard/documents/sent`). */
+   * se puede consultar en el listado de documentos, con el recorte "Creados por mí". */
   showCreatedDocuments?: boolean;
 }
 
@@ -204,8 +204,6 @@ export default function CreateDocumentView({
       <CreatedDocumentsSection
         state={sections.createdDocuments}
         documents={createdDocuments.createdDocumentsQuery.data}
-        filters={createdDocuments.filters}
-        onFiltersChange={createdDocuments.handleFiltersChange}
         onPageChange={createdDocuments.setPage}
       />
 

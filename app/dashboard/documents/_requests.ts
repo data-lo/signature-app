@@ -1,24 +1,22 @@
 import apiClient from '@/lib/axios';
 import type { DocumentListItem } from './_components/DocumentsTable';
 import {
-  EMPTY_DOCUMENTS_FILTERS,
-  buildDocumentsFilterParams,
+  DEFAULT_DOCUMENTS_FILTERS,
+  buildDocumentsQueryParams,
   type DocumentsFilters,
-} from './_components/DocumentsFilterPanel';
-import type { DocumentStatus, ParticipantStatus } from '@/lib/enums/document';
+} from './_config/filters';
 
-export interface DocumentsMeta {
-  total: number;
+/** Dónde está parada la lista dentro del total. Espejo de la respuesta del endpoint unificado. */
+export interface DocumentsPagination {
   page: number;
   limit: number;
+  total: number;
   totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
 }
 
 export interface DocumentsResult {
-  documents: DocumentListItem[];
-  meta: DocumentsMeta;
+  items: DocumentListItem[];
+  pagination: DocumentsPagination;
 }
 
 export interface DocumentFileUrl {
@@ -77,41 +75,36 @@ export async function archiveDocumentRequest(
 }
 
 export interface GetDocumentsParams {
-  /** Documentos donde el usuario participa como colaborador (Por firmar/Completados). */
-  participantEmail?: string;
-  /** Documentos creados/enviados por el usuario (Enviados para firma). */
-  email?: string;
-  status?: DocumentStatus | ParticipantStatus.Pending | ParticipantStatus.Signed;
+  filters?: DocumentsFilters;
   page?: number;
   limit?: number;
-  filters?: DocumentsFilters;
 }
 
-/** Endpoint único de listado de documentos (`GET /document`), usado por las tres vistas
- * (Por firmar, Enviados para firma, Completados) variando solo los parámetros de filtrado. */
+/**
+ * El ÚNICO listado de documentos (`GET /document`).
+ *
+ * Antes esta función servía a tres pantallas y cada una le pasaba su receta: "Por firmar" mandaba
+ * el correo del usuario como `participantEmail` más `status=pending`, "Enviados para firma"
+ * mandaba `email`, y "Completados" repetía la primera con otro estado. El servidor no sabía qué
+ * significaba ninguna de las tres —obedecía la combinación— así que el criterio de cada sección
+ * vivía en el cliente y ninguna podía combinarse con otra.
+ *
+ * Ahora se manda lo que el usuario quiere ver (`view`, `search`, filtros) y el recorte lo
+ * resuelve el backend. El correo ya no viaja: lo resuelve el servidor a partir del token, que
+ * además es la única forma de que nadie pueda pedir la bandeja ajena escribiendo otro correo.
+ */
 export async function getDocumentsRequest({
-  participantEmail,
-  email,
-  status,
+  filters = DEFAULT_DOCUMENTS_FILTERS,
   page = 1,
-  limit = 10,
-  filters = EMPTY_DOCUMENTS_FILTERS,
+  limit = 25,
 }: GetDocumentsParams): Promise<DocumentsResult> {
-  const { data } = await apiClient.get<{
-    success: boolean;
-    message: string;
-    data: DocumentListItem[];
-    meta: DocumentsMeta;
-  }>('/api/v1/document', {
+  const { data } = await apiClient.get<DocumentsResult>('/api/v1/document', {
     params: {
-      participantEmail,
-      email,
-      status,
+      ...buildDocumentsQueryParams(filters),
       page,
       limit,
-      ...buildDocumentsFilterParams(filters),
     },
   });
 
-  return { documents: data.data, meta: data.meta };
+  return data;
 }

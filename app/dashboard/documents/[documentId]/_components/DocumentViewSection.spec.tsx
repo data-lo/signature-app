@@ -864,8 +864,9 @@ describe('DocumentViewSection', () => {
    * según si esta firma cerró el documento o todavía faltan participantes.
    */
   describe('confirmación tras firmar', () => {
-    const COMPLETED_SECTION = '/dashboard/documents/completed';
-    const TO_SIGN_SECTION = '/dashboard/documents/to-sign';
+    // Las secciones se unificaron: el destino es el listado único, con su recorte en `?view=`.
+    const COMPLETED_VIEW = '/dashboard/documents?view=completed';
+    const DOCUMENTS_LIST = '/dashboard/documents';
 
     /** Hace que `signMutate` se comporte como una firma exitosa con el desenlace indicado. */
     function resolveSignatureWith(documentCompleted: boolean) {
@@ -961,18 +962,18 @@ describe('DocumentViewSection', () => {
       ).toBeInTheDocument();
     });
 
-    it('al cerrar, sigue con el comportamiento normal de la pantalla y vuelve a "Por firmar"', async () => {
+    it('al cerrar, sigue con el comportamiento normal de la pantalla y vuelve al listado', async () => {
       const { user, dialog } = await sign(false);
 
       await user.click(within(dialog).getByRole('button', { name: /^cerrar$/i }));
 
-      expect(push).toHaveBeenCalledWith(TO_SIGN_SECTION);
+      expect(push).toHaveBeenCalledWith(DOCUMENTS_LIST);
       await waitFor(() =>
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
       );
     });
 
-    it('ofrece ir a la sección de documentos completados', async () => {
+    it('ofrece ir al listado con el recorte de completados ya aplicado', async () => {
       const { dialog } = await sign(true);
 
       // Es un enlace real (`<a href>`) con apariencia y rol de botón, igual que el resto de las
@@ -981,7 +982,7 @@ describe('DocumentViewSection', () => {
         name: /ver documentos completados/i,
       });
       expect(action.tagName).toBe('A');
-      expect(action).toHaveAttribute('href', COMPLETED_SECTION);
+      expect(action).toHaveAttribute('href', COMPLETED_VIEW);
     });
 
     it('si la firma falla, no muestra ninguna confirmación', async () => {

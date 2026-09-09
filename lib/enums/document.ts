@@ -35,6 +35,34 @@ export enum ParticipantRole {
   Creator = 'creator',
 }
 
+/**
+ * Espejo de DOCUMENT_VIEW_ENUM (signature-server/src/document/enum/document-view.enum.ts).
+ *
+ * Es el recorte del listado unificado. Sustituye a las tres rutas segmentadas: lo que antes era
+ * "en qué pantalla estoy" ahora es un filtro que viaja al servidor, y por eso puede combinarse
+ * con la búsqueda y con el resto de los filtros.
+ */
+export enum DocumentView {
+  RequiresMySignature = 'requires_my_signature',
+  CreatedByMe = 'created_by_me',
+  Completed = 'completed',
+  All = 'all',
+}
+
+/**
+ * Espejo de DOCUMENT_PARTICIPATION_ENUM
+ * (signature-server/src/document/enum/document-participation.enum.ts).
+ *
+ * Qué papel juega el usuario en cada documento del listado. Lo calcula el servidor por fila y es
+ * personal: sin secciones que lo expliquen, es lo que dice por qué ese documento está en la
+ * lista.
+ */
+export enum DocumentParticipation {
+  RequiresMySignature = 'requires_my_signature',
+  CreatedByMe = 'created_by_me',
+  Participant = 'participant',
+}
+
 /** Espejo de SIGNATURE_TYPE_ENUM (signature-server/src/document/enum/signature-type.enum.ts). */
 export enum SignatureType {
   Simple = 'simple',
