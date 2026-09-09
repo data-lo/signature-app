@@ -27,7 +27,7 @@ export default function DocumentsView({ type, title }: DocumentsViewProps) {
   const router = useRouter();
   const { page, setPage, filters, handleFiltersChange } =
     useDocumentsListState();
-  const { limit, showMyTurnFilter, showStatusFilter } =
+  const { limit, showMyTurnFilter, showStatusFilter, showArchiveAction } =
     DOCUMENTS_LIST_CONFIG[type];
 
   const documentsQuery = useDocuments({
@@ -56,6 +56,7 @@ export default function DocumentsView({ type, title }: DocumentsViewProps) {
         onFiltersChange={handleFiltersChange}
         showMyTurnFilter={showMyTurnFilter}
         showStatusFilter={showStatusFilter}
+        showArchiveAction={showArchiveAction}
       />
     </PageContainer>
   );
