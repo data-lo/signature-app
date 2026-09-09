@@ -123,16 +123,6 @@ interface DocumentsTableProps {
    * contenedora no ofrece esa ruta: entonces las filas no son seleccionables.
    */
   onRowSelect?: (documentId: string) => void;
-  filters?: DocumentsFilters;
-  onFiltersChange?: (filters: DocumentsFilters) => void;
-  showMyTurnFilter?: boolean;
-  showStatusFilter?: boolean;
-  /**
-   * Ofrece "Archivar" en el menú de cada fila. Sólo lo enciende la sección de Completados; aun
-   * encendido, la acción se muestra únicamente en los documentos firmados por todos, que son los
-   * únicos que el backend deja archivar.
-   */
-  showArchiveAction?: boolean;
 }
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
@@ -150,11 +140,6 @@ export default function DocumentsTable({
   totalPages = 1,
   onPageChange,
   onRowSelect,
-  filters,
-  onFiltersChange,
-  showMyTurnFilter,
-  showStatusFilter,
-  showArchiveAction = false,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
@@ -199,12 +184,15 @@ export default function DocumentsTable({
                 archiveMutation.isPending &&
                 archiveMutation.variables === doc.id;
               /**
-               * La sección decide si la acción existe; el estatus, si aplica a ESTE documento.
-               * Las dos condiciones hacen falta: "Enviados para firma" también lista documentos
-               * firmados, y Completados puede mostrar uno cancelado tras haberse firmado.
+               * Sólo se archiva lo que ya está firmado por todos, que es lo único que el backend
+               * deja archivar.
+               *
+               * Antes esta condición tenía una mitad más —la sección tenía que ser "Completados"—
+               * porque la acción vivía únicamente en esa pantalla. Con la lista unificada ya no
+               * hay sección que consultar: la misma tabla muestra a la vez lo pendiente y lo
+               * firmado, así que el estatus de CADA documento es lo único que puede decidirlo.
                */
-              const canArchive =
-                showArchiveAction && doc.status === DocumentStatus.Signed;
+              const canArchive = doc.status === DocumentStatus.Signed;
               /**
                * "No disponible" cubre los dos casos en que no hay fecha de firma que mostrar: el
                * documento todavía no está firmado por todos, o el backend no la informó (endpoint

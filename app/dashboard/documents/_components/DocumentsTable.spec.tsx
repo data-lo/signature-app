@@ -208,7 +208,11 @@ describe('DocumentsTable', () => {
   });
 
   describe('menú de acciones', () => {
-    it('concentra Descargar, Ver participantes y Compartir en el menú de tres puntos', async () => {
+    /**
+     * `buildDoc()` construye un documento ya firmado por todos, así que su menú incluye
+     * "Archivar"; ver el `describe('archivar')` para cuándo aparece y cuándo no.
+     */
+    it('concentra Descargar, Ver participantes, Compartir y Archivar en el menú de tres puntos', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
@@ -220,7 +224,7 @@ describe('DocumentsTable', () => {
         within(menu)
           .getAllByRole('menuitem')
           .map((item) => item.textContent?.trim()),
-      ).toEqual(['Descargar', 'Ver participantes', 'Compartir']);
+      ).toEqual(['Descargar', 'Ver participantes', 'Compartir', 'Archivar']);
     });
 
     it('bug corregido: "Descargar" de un documento firmado dispara la descarga en vez de no hacer nada', async () => {
@@ -318,26 +322,27 @@ describe('DocumentsTable', () => {
    * camino al detalle, y las acciones que quedan no deben dispararlo.
    */
   /**
-   * Archivar es la única acción del menú que depende de la sección Y del documento: la ofrece
-   * Completados, y sólo sobre lo que ya está firmado por todos.
+   * Archivar es la única acción del menú que depende del documento y no sólo de la fila: se
+   * ofrece sobre lo que ya está firmado por todos, y sobre nada más.
+   *
+   * Antes dependía además de la sección —vivía sólo en "Completados"—, pero con la lista
+   * unificada la misma tabla muestra a la vez lo pendiente y lo firmado, así que el estatus de
+   * cada documento es lo único que queda por consultar.
    */
   describe('archivar', () => {
-    it('ofrece "Archivar" en la sección de completados', async () => {
+    it('ofrece "Archivar" en un documento firmado por todos', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <DocumentsTable
           documents={[buildDoc({ status: DocumentStatus.Signed })]}
-          showArchiveAction
         />,
       );
 
       const menu = await openRowMenu(user);
 
       expect(
-        within(menu)
-          .getAllByRole('menuitem')
-          .map((item) => item.textContent?.trim()),
-      ).toEqual(['Descargar', 'Ver participantes', 'Compartir', 'Archivar']);
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      ).toBeInTheDocument();
     });
 
     it('archiva el documento de esa fila', async () => {
@@ -345,7 +350,6 @@ describe('DocumentsTable', () => {
       renderWithProviders(
         <DocumentsTable
           documents={[buildDoc({ id: 'doc-9', status: DocumentStatus.Signed })]}
-          showArchiveAction
         />,
       );
 
@@ -353,21 +357,6 @@ describe('DocumentsTable', () => {
       await user.click(within(menu).getByRole('menuitem', { name: 'Archivar' }));
 
       expect(archiveMutate).toHaveBeenCalledWith('doc-9');
-    });
-
-    it('no ofrece archivar en las secciones que no lo habilitan', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-        />,
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).queryByRole('menuitem', { name: /archivar/i }),
-      ).not.toBeInTheDocument();
     });
 
     /**
@@ -380,11 +369,11 @@ describe('DocumentsTable', () => {
       DocumentStatus.CancellationPending,
       DocumentStatus.Rejected,
     ])(
-      'no ofrece archivar un documento en estatus %s aunque la sección lo habilite',
+      'no ofrece archivar un documento en estatus %s',
       async (status) => {
         const user = userEvent.setup();
         renderWithProviders(
-          <DocumentsTable documents={[buildDoc({ status })]} showArchiveAction />,
+          <DocumentsTable documents={[buildDoc({ status })]} />,
         );
 
         const menu = await openRowMenu(user);
@@ -405,7 +394,6 @@ describe('DocumentsTable', () => {
       renderWithProviders(
         <DocumentsTable
           documents={[buildDoc({ status: DocumentStatus.Signed })]}
-          showArchiveAction
         />,
       );
 
