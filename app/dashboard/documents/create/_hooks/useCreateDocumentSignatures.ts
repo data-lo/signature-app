@@ -39,6 +39,7 @@ export function useCreateDocumentSignatures() {
       signatureType,
       requiresTwoFactorAuth,
       collaborators,
+      isIndexable,
     }: CreateDocumentSignaturesInput) =>
       createDocumentSignaturesRequest({
         file,
@@ -47,6 +48,7 @@ export function useCreateDocumentSignatures() {
           requiresApproval,
           isSequential: requiresOrder,
           signatureType,
+          isIndexable,
         },
         collaborators: toCollaboratorPayloads(
           collaborators,

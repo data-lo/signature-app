@@ -44,27 +44,8 @@ export default function DocumentsView() {
   const router = useRouter();
   const { page, setPage, filters, handleFiltersChange } =
     useDocumentsListState();
-
-  /**
-   * Lo tecleado se guarda aparte de los filtros y sólo baja a ellos tras la pausa. Si el input
-   * leyera de `filters.search`, cada tecla dispararía consulta y re-render, y el cursor
-   * competiría con la respuesta que va llegando.
-   */
-  const [searchInput, setSearchInput] = useState(filters.search);
-
-  useEffect(() => {
-    if (searchInput === filters.search) return;
-
-    const timeout = setTimeout(
-      () => handleFiltersChange({ ...filters, search: searchInput }),
-      SEARCH_DEBOUNCE_MS,
-    );
-    return () => clearTimeout(timeout);
-    // `filters` y `handleFiltersChange` se leen dentro del timeout, pero no van en las
-    // dependencias: incluirlos reprogramaría la pausa en cada cambio de cualquier filtro. La
-    // comparación de arriba es la que corta el ciclo.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchInput, filters.search]);
+  const { limit, showMyTurnFilter, showStatusFilter, showArchiveAction } =
+    DOCUMENTS_LIST_CONFIG[type];
 
   const documentsQuery = useDocuments({
     filters,
@@ -122,6 +103,11 @@ export default function DocumentsView() {
         totalPages={result?.pagination.totalPages}
         onPageChange={setPage}
         onRowSelect={(id) => router.push(`/dashboard/documents/${id}`)}
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        showMyTurnFilter={showMyTurnFilter}
+        showStatusFilter={showStatusFilter}
+        showArchiveAction={showArchiveAction}
       />
     </PageContainer>
   );
