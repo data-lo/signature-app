@@ -67,9 +67,19 @@ function renderFileUrlWith<T>(useMutationHook: () => T) {
 describe('invalidación de la URL del archivo al cambiar el estatus del documento', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedSignDocumentRequest.mockResolvedValue(undefined);
+    mockedSignDocumentRequest.mockResolvedValue({
+      id: DOCUMENT_ID,
+      documentCompleted: false,
+    });
     mockedRejectDocumentRequest.mockResolvedValue(undefined);
     mockedConfirmCancellationRequest.mockResolvedValue(undefined);
+    /**
+     * `mockReset` y no sólo el `clearAllMocks` de arriba: aquél limpia el registro de llamadas
+     * pero NO la cola de `mockResolvedValueOnce`, así que cada prueba que no la consumiera dejaba
+     * su valor pendiente para la siguiente — y la siguiente recibía la URL original dos veces
+     * seguidas, fallando por una razón que no tiene nada que ver con lo que prueba.
+     */
+    mockedGetDocumentFileUrlRequest.mockReset();
     mockedGetDocumentFileUrlRequest
       .mockResolvedValueOnce({ secureUrl: ORIGINAL_URL, expiresIn: 86400 })
       .mockResolvedValue({ secureUrl: SIGNED_URL, expiresIn: 86400 });
@@ -92,6 +102,49 @@ describe('invalidación de la URL del archivo al cambiar el estatus del document
       expect(result.current.fileUrl.data?.secureUrl).toBe(SIGNED_URL),
     );
     expect(mockedGetDocumentFileUrlRequest).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * Historia "Mostrar confirmación al firmar un documento": la navegación se fue de aquí al
+   * cierre del modal de confirmación (ver `DocumentViewSection`). Hecha en el `onSuccess` de la
+   * mutación, desmontaba la pantalla en el mismo instante en que la firma quedaba registrada y no
+   * dejaba dónde dibujar el acuse.
+   */
+  it('al firmar NO navega: la pantalla sigue en pie para mostrar la confirmación', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSignDocument(DOCUMENT_ID), {
+      wrapper,
+    });
+
+    result.current.mutate({
+      geolocation: { latitude: 19.4326, longitude: -99.1332 },
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  /** El desenlace que el modal necesita para elegir qué texto mostrar viaja tal cual al llamador. */
+  it('al firmar devuelve si el documento quedó completo', async () => {
+    mockedSignDocumentRequest.mockResolvedValue({
+      id: DOCUMENT_ID,
+      documentCompleted: true,
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSignDocument(DOCUMENT_ID), {
+      wrapper,
+    });
+
+    result.current.mutate({
+      geolocation: { latitude: 19.4326, longitude: -99.1332 },
+    });
+
+    await waitFor(() =>
+      expect(result.current.data).toEqual({
+        id: DOCUMENT_ID,
+        documentCompleted: true,
+      }),
+    );
   });
 
   it('al rechazar: vuelve a pedir la URL (el documento cambia a rejected_documents)', async () => {
