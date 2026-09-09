@@ -40,6 +40,18 @@ interface UseBillingAccessOptions {
    * fuera de ese momento no hay ningún cambio de estado que esperar.
    */
   awaitActivation?: boolean;
+  /**
+   * Insiste durante el plazo tras comprar documentos sueltos, para que el saldo aparezca solo
+   * cuando el webhook lo acredite.
+   *
+   * **No tiene condición de parada propia, y ésa es la diferencia real con `awaitActivation`.**
+   * Aquélla puede preguntar "¿ya está activa?" porque la respuesta es un booleano del propio
+   * estado; acá lo que cambia es un NÚMERO, y saber si ya subió exigiría conocer el saldo
+   * anterior a la compra — que se pierde al volver de Stripe, porque el navegador recarga la
+   * página entera y el caché nace vacío. Así que se insiste el plazo completo y el número que se
+   * pinta es siempre el real: en cuanto el webhook acredita, la siguiente vuelta lo trae.
+   */
+  awaitCredits?: boolean;
 }
 
 /**
@@ -59,7 +71,9 @@ interface UseBillingAccessOptions {
  */
 export function useBillingAccess({
   awaitActivation = false,
+  awaitCredits = false,
 }: UseBillingAccessOptions = {}) {
+  const esperando = awaitActivation || awaitCredits;
   const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
   const setBillingAccess = useAuthStore((state) => state.setBillingAccess);
 
@@ -70,10 +84,8 @@ export function useBillingAccess({
    */
   const deadline = useRef<number | null>(null);
   useEffect(() => {
-    deadline.current = awaitActivation
-      ? Date.now() + ACTIVATION_POLL_TIMEOUT_MS
-      : null;
-  }, [awaitActivation]);
+    deadline.current = esperando ? Date.now() + ACTIVATION_POLL_TIMEOUT_MS : null;
+  }, [esperando]);
 
   const query = useQuery({
     queryKey: billingAccessQueryKey(activeAccountId),
@@ -90,11 +102,15 @@ export function useBillingAccess({
      * el resto del árbol lee el mismo dato sin provocar peticiones.
      */
     refetchInterval: (currentQuery) => {
-      if (!awaitActivation) {
+      if (!esperando) {
         return false;
       }
-      // Ya llegó el webhook: dejar de insistir es el resultado esperado, no un abandono.
-      if (currentQuery.state.data?.hasActiveSubscription) {
+      /**
+       * Ya llegó el webhook: dejar de insistir es el resultado esperado, no un abandono. Sólo
+       * aplica a la activación — una compra de documentos no tiene un booleano equivalente que
+       * mirar (ver `awaitCredits`), así que agota el plazo.
+       */
+      if (awaitActivation && currentQuery.state.data?.hasActiveSubscription) {
         return false;
       }
       if (deadline.current === null || Date.now() >= deadline.current) {

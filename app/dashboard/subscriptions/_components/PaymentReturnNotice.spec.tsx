@@ -164,4 +164,48 @@ describe('PaymentReturnNotice', () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  /**
+   * La compra de documentos vuelve por `?purchase=` y no por `?payment=`: las dos vueltas esperan
+   * cosas distintas, y compartir el parámetro haría que comprar documentos teniendo ya un plan
+   * anunciara "Suscripción activa".
+   */
+  describe('retorno de una compra de documentos', () => {
+    it('acusa el pago sin afirmar que el saldo ya se acreditó', async () => {
+      givenQuery('purchase=credits&session_id=cs_test_1');
+      mockedRequest.mockResolvedValue(ACTIVA);
+
+      renderNotice();
+
+      expect(await screen.findByText('Pago recibido')).toBeInTheDocument();
+      expect(
+        screen.getByText(/tus documentos aparecerán en el saldo/i),
+      ).toBeInTheDocument();
+      // Aunque la suscripción esté activa, esta vuelta NO habla de la suscripción.
+      expect(screen.queryByText('Suscripción activa')).not.toBeInTheDocument();
+    });
+
+    /** Lo cacheado se pidió antes de comprar: describe el saldo anterior a la compra. */
+    it('refresca el estado de facturación al volver', async () => {
+      givenQuery('purchase=credits&session_id=cs_test_1');
+      mockedRequest.mockResolvedValue(GRATUITA);
+
+      renderNotice();
+
+      await waitFor(() => expect(mockedRequest).toHaveBeenCalled());
+    });
+
+    it('avisa de la compra cancelada sin hablar de la suscripción', async () => {
+      givenQuery('purchase=cancel');
+      mockedRequest.mockResolvedValue(GRATUITA);
+
+      renderNotice();
+
+      expect(await screen.findByText('Compra cancelada')).toBeInTheDocument();
+      expect(
+        screen.getByText(/no se realizó ningún cargo/i),
+      ).toBeInTheDocument();
+    });
+  });
+
 });

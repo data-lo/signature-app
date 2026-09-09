@@ -1,5 +1,6 @@
 import apiClient from '@/lib/axios';
 import type { SubscriptionSchedule } from './_interfaces/subscription-state.interface';
+import type { DocumentCreditOffer } from './_interfaces/document-credit-offer.interface';
 
 /**
  * Acá NO hay consulta de estado, y es a propósito: la lee `useBillingAccess`
@@ -43,6 +44,50 @@ export async function resumeSubscriptionRequest(): Promise<SubscriptionSchedule>
     message: string;
     data: SubscriptionSchedule;
   }>('/api/v1/payments/subscription/resume');
+
+  return data.data;
+}
+
+/**
+ * Paquetes de documentos que la cuenta activa puede comprar según su plan vigente.
+ *
+ * Sin parámetros: qué ofertas corresponden lo decide por completo el backend a partir del
+ * `X-Account-Id` que manda el interceptor. Pasar el plan desde acá permitiría pedir las tarifas
+ * de Premium desde una cuenta Free, que es justo lo que la regla impide.
+ *
+ * Una lista vacía es una respuesta normal —ese plan no tiene paquetes configurados— y no un
+ * error: la pantalla la dibuja como tal.
+ */
+export async function getDocumentCreditOffersRequest(): Promise<
+  DocumentCreditOffer[]
+> {
+  const { data } = await apiClient.get<{
+    success: boolean;
+    message: string;
+    data: DocumentCreditOffer[];
+  }>('/api/v1/payments/document-credit-offers');
+
+  return data.data;
+}
+
+/**
+ * Abre el Checkout para comprar uno de esos paquetes.
+ *
+ * Viaja el id del catálogo LOCAL y no un `price_...` de Stripe: así el backend puede validar la
+ * compra contra su catálogo —que el paquete exista, esté activo y sea del plan vigente— antes de
+ * tocar al proveedor, y el precio que se cobra sale de una fila suya y no de esta petición.
+ *
+ * Responde 404 si el paquete no le corresponde a la cuenta, incluido el caso de alguien que
+ * manipule el `catalogPriceId` para intentar comprar el de otro plan.
+ */
+export async function createDocumentCreditCheckoutRequest(
+  catalogPriceId: string,
+): Promise<{ checkoutUrl: string }> {
+  const { data } = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: { checkoutUrl: string };
+  }>('/api/v1/payments/document-credits/checkout', { catalogPriceId });
 
   return data.data;
 }

@@ -16,6 +16,7 @@ import { useCancelSubscription } from '../_hooks/useCancelSubscription';
 import { useResumeSubscription } from '../_hooks/useResumeSubscription';
 import { formatPeriodEnd } from '../_utils/format-period-end';
 import CancelSubscriptionDialog from './CancelSubscriptionDialog';
+import AddDocumentsDialog from './AddDocumentsDialog';
 import type { BillingProfileStatus } from '@/lib/api/billing';
 
 /** El estado del perfil de facturación, rotulado para el usuario. */
@@ -155,10 +156,16 @@ export default function SubscriptionStateCard() {
               subscription.limits.documentsIncludedPerPeriod
             }
           />
-          <div>
+          {/**
+           * Comprar documentos sueltos también desde el plan gratuito: es una compra única que no
+           * crea ni modifica ninguna suscripción, así que no exige tener plan de pago. Qué
+           * paquetes le corresponden —y a qué precio— lo decide el backend según su plan.
+           */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button render={<Link href="/dashboard/plans" />} variant="brand">
               Ver planes
             </Button>
+            <AddDocumentsDialog />
           </div>
         </CardContent>
       </Card>
@@ -225,6 +232,16 @@ export default function SubscriptionStateCard() {
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
+          {/**
+           * Va el primero de la fila y no detrás de "Cancelar": es la acción que un usuario con
+           * plan vigente busca aquí, y la baja no debería ser lo primero que encuentre.
+           *
+           * No depende de `puedeCancelar` ni de `cancelAtPeriodEnd`: los paquetes siguen
+           * disponibles con la baja programada, porque el plan sigue activo hasta el fin del
+           * periodo y su tarifa sigue siendo la suya.
+           */}
+          <AddDocumentsDialog />
+
           {puedeCancelar ? (
             <CancelSubscriptionDialog
               currentPeriodEnd={subscription.currentPeriodEnd}
