@@ -3,7 +3,7 @@
  */
 import { AuditXmlDownloadError, downloadAuditXml } from './download-audit-xml';
 
-const URL_AUDITORIA = '/api/document/public/doc-1/audit-xml';
+const URL_AUDITORIA = '/api/v1/document/public/doc-1/audit-xml';
 const NOMBRE = 'auditoria-doc-1.xml';
 
 const XML_VALIDO = `<?xml version="1.0" encoding="UTF-8"?>
