@@ -549,7 +549,7 @@ describe('PublicDocumentView', () => {
         );
 
         expect(mockedDownloadAuditXml).toHaveBeenCalledWith(
-          '/api/v1/document/public/doc-1/audit-xml',
+          '/api/api/v1/document/public/doc-1/audit-xml',
           'auditoria-doc-1.xml',
         );
       });
@@ -629,7 +629,7 @@ describe('PublicDocumentView', () => {
         await user.click(screen.getByRole('button', { name: /xml canónico/i }));
 
         expect(mockedDownloadCanonicalXml).toHaveBeenCalledWith(
-          '/api/v1/document/public/doc-1/seal/canonical',
+          '/api/api/v1/document/public/doc-1/seal/canonical',
           'cadena-canonica-doc-1.xml',
         );
       });
