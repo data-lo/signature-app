@@ -182,13 +182,16 @@ function CompletedVerification({
               value={data.conservationRecord.tsaCertificate}
               mono
             />
+            {/* Mismas etiquetas que la tabla NOM-151 de la hoja de firmas anexada al PDF: es la
+                misma constancia vista desde dos sitios, y rotularla distinto obliga a quien
+                contrasta pantalla y documento a deducir que hablan del mismo renglón. */}
             <InfoRow
-              label="Número de serie"
+              label="Número de Serie"
               value={data.conservationRecord.serialNumber}
               mono
             />
             <InfoRow
-              label="Fecha de emisión"
+              label="Emitido"
               value={
                 data.conservationRecord.issuedAt
                   ? formatLongDateTime(data.conservationRecord.issuedAt)

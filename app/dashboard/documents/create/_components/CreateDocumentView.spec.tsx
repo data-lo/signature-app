@@ -97,6 +97,25 @@ async function selectSignatureType(
   await user.click(screen.getByRole('option', { name: optionName }));
 }
 
+/**
+ * Envía la solicitud completa: pulsa "Enviar solicitud de firma" y responde el modal de Búsqueda
+ * Inteligente, que desde la historia "Renombrar isIndexable" se interpone entre el botón y el
+ * envío real. Por omisión elige agregar, que es la opción por defecto del producto.
+ */
+async function submitRequest(
+  user: ReturnType<typeof userEvent.setup>,
+  { addToSmartSearch = true }: { addToSmartSearch?: boolean } = {},
+) {
+  await user.click(
+    screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+  );
+  await user.click(
+    await screen.findByRole('button', {
+      name: addToSmartSearch ? /agregar a búsqueda inteligente/i : /^no agregar$/i,
+    }),
+  );
+}
+
 describe('CreateDocumentView', () => {
   const mutate = jest.fn();
 
@@ -181,7 +200,10 @@ describe('CreateDocumentView', () => {
 
     it('con showCreatedDocuments={false}, la sección de documentos creados no se renderiza', () => {
       mockedUseDocuments.mockReturnValue({
-        data: { documents: [], meta: { total: 0 } },
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+        },
       });
 
       renderWithProviders(<CreateDocumentView showCreatedDocuments={false} />);
@@ -358,7 +380,10 @@ describe('CreateDocumentView', () => {
       const setDocumentsCount = jest.fn();
       mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
       mockedUseDocuments.mockReturnValue({
-        data: { documents: [], meta: { total: 3 } },
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
+        },
       });
 
       renderWithProviders(<CreateDocumentView />);
@@ -370,7 +395,10 @@ describe('CreateDocumentView', () => {
       const setDocumentsCount = jest.fn();
       mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount });
       mockedUseDocuments.mockReturnValue({
-        data: { documents: [], meta: { total: 3 } },
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 10, total: 3, totalPages: 1 },
+        },
       });
 
       renderWithProviders(<CreateDocumentView trackDocumentsCount={false} />);
@@ -405,7 +433,7 @@ describe('CreateDocumentView', () => {
       await addSigner(user);
       await selectSignatureType(user, /firma simple/i);
 
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await submitRequest(user);
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -433,7 +461,7 @@ describe('CreateDocumentView', () => {
       await addSigner(user);
       await selectSignatureType(user, /firma electrónica avanzada/i);
 
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await submitRequest(user);
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({ signatureType: 'ADVANCED' }),
@@ -460,7 +488,7 @@ describe('CreateDocumentView', () => {
       expect(trigger).toHaveTextContent('Firma Electrónica Avanzada (e.firma)');
       expect(trigger).not.toHaveTextContent('ADVANCED');
 
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await submitRequest(user);
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({ signatureType: 'ADVANCED' }),
@@ -483,7 +511,7 @@ describe('CreateDocumentView', () => {
         screen.getByText(/firmarás este documento con tu perfil personal/i),
       ).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await submitRequest(user);
 
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -519,7 +547,7 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await selectSignatureType(user, /firma simple/i);
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await submitRequest(user);
 
       const dialog = await screen.findByRole('alertdialog');
       expect(dialog).toHaveTextContent(/solicitud de firma enviada/i);
@@ -545,7 +573,7 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await selectSignatureType(user, /firma simple/i);
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await submitRequest(user);
 
       expect(mutate).toHaveBeenCalled();
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -607,6 +635,135 @@ describe('CreateDocumentView', () => {
       await user.click(screen.getByRole('button', { name: /espectador/i }));
 
       expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Búsqueda Inteligente', () => {
+    /**
+     * El modal se interpone entre el botón y el envío: preguntar después de mandar el documento
+     * no serviría de nada, porque la decisión viaja en la misma petición que lo crea.
+     */
+    it('pregunta antes de enviar, no después', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
+      await user.click(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      );
+
+      const dialog = await screen.findByRole('alertdialog');
+      expect(dialog).toHaveTextContent(
+        /¿deseas agregar este documento a la búsqueda inteligente\?/i,
+      );
+      expect(dialog).toHaveTextContent(
+        /podrás encontrarlo más rápido mediante búsquedas inteligentes y precisas/i,
+      );
+      // Todavía no se mandó nada: el envío espera a la decisión.
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('al agregarlo, envía isIndexable en true', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
+      await submitRequest(user);
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({ isIndexable: true }),
+        expect.anything(),
+      );
+    });
+
+    /**
+     * "No agregar" NO cancela el envío: el documento se crea igual, sólo que fuera de la
+     * indexación. Por eso se afirman las dos cosas —el valor y que la mutación corrió—.
+     */
+    it('al no agregarlo, el documento se envía igual con isIndexable en false', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
+      await submitRequest(user, { addToSmartSearch: false });
+
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isIndexable: false,
+          // El resto de la solicitud no cambia: excluirlo de la búsqueda no lo mutila.
+          signatureType: 'SIMPLE',
+          collaborators: [expect.objectContaining({ email: 'juan.perez@mail.com' })],
+        }),
+        expect.anything(),
+      );
+    });
+
+    /**
+     * El modal aparece ANTES del último modal del flujo (la confirmación de envío), y no a la
+     * vez: son dos pasos, y ver los dos superpuestos dejaría al usuario decidiendo sobre un
+     * documento que ya se anunció como enviado.
+     */
+    it('la confirmación de envío llega después de decidir, no antes', async () => {
+      const mutateWithSuccess = jest.fn((_vars, opts) => opts?.onSuccess?.());
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: mutateWithSuccess,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
+      await user.click(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      );
+
+      // Primero el de Búsqueda Inteligente, y sin rastro del de confirmación.
+      expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+        /búsqueda inteligente/i,
+      );
+      expect(
+        screen.queryByText(/solicitud de firma enviada/i),
+      ).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /agregar a búsqueda inteligente/i }),
+      );
+
+      expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+        /solicitud de firma enviada/i,
+      );
+    });
+
+    /**
+     * Con el formulario incompleto no se pregunta nada: pedirle una decisión sobre la indexación
+     * a quien todavía tiene errores sería pedirla sobre un documento que no se va a mandar.
+     */
+    it('no pregunta si el formulario todavía no es válido', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await selectSignatureType(user, /firma simple/i);
+      await openSection(user, /añadir participantes/i);
+      await user.click(screen.getByRole('button', { name: /^firmante$/i }));
+
+      await user.click(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      );
+
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(mutate).not.toHaveBeenCalled();
     });
   });
 

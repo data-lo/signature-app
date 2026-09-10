@@ -14,7 +14,7 @@ export const CREATE_DOCUMENT_ERROR_MESSAGE =
   'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.';
 
 /**
- * Escenario 4 de la historia: tras un envío exitoso, `mutate` invalida `myDocuments` (la tabla
+ * Escenario 4 de la historia: tras un envío exitoso, `mutate` invalida `documents` (la tabla
  * se refresca sola por el refetch de React Query) — la limpieza del formulario y del widget de
  * carga la maneja el caller en `onSuccess` (ver `useCreateDocumentForm`), porque solo él tiene
  * la instancia del formulario y el estado del archivo.
@@ -39,6 +39,7 @@ export function useCreateDocumentSignatures() {
       signatureType,
       requiresTwoFactorAuth,
       collaborators,
+      isIndexable,
     }: CreateDocumentSignaturesInput) =>
       createDocumentSignaturesRequest({
         file,
@@ -47,6 +48,7 @@ export function useCreateDocumentSignatures() {
           requiresApproval,
           isSequential: requiresOrder,
           signatureType,
+          isIndexable,
         },
         collaborators: toCollaboratorPayloads(
           collaborators,
@@ -57,7 +59,7 @@ export function useCreateDocumentSignatures() {
           toRequiresDifferentSignatures(signatureType),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myDocuments'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error, CREATE_DOCUMENT_ERROR_MESSAGE));

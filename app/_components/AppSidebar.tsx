@@ -33,7 +33,6 @@ import { useLogout } from '@/lib/hooks/useLogout';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import {
-  DOCUMENTS_GROUP_LABEL,
   DOCUMENTS_NAV_SECTIONS,
   DOCUMENTS_SECTIONS,
 } from '@/app/dashboard/documents/_config/sections';
@@ -47,7 +46,13 @@ interface NavItem {
 }
 
 interface NavGroup {
-  label: string;
+  /** Identidad estable del grupo; también sirve de `key` cuando no lleva encabezado. */
+  key: string;
+  /**
+   * Encabezado del grupo. Opcional: el de documentos no lo lleva porque su entrada principal se
+   * llama igual, y "Documentos > Documentos" es un nivel que no informa de nada.
+   */
+  label?: string;
   items: NavItem[];
   /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
   orgOnly?: boolean;
@@ -55,10 +60,11 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: DOCUMENTS_GROUP_LABEL,
+    key: 'documents',
     // Nombres y rutas salen de la configuración compartida del módulo, la misma que usa
-    // DashboardBreadcrumbs: cada sección tiene su propia ruta, así que el estado activo es
-    // simplemente la coincidencia exacta del pathname.
+    // DashboardBreadcrumbs. Son dos entradas —la lista y el alta— desde que las tres secciones
+    // segmentadas se unificaron en una sola pantalla; el estado activo sigue siendo la
+    // coincidencia exacta del pathname.
     items: DOCUMENTS_NAV_SECTIONS.map((section) => ({
       label: section.label,
       href: section.href,
@@ -67,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     })),
   },
   {
+    key: 'payments',
     label: 'Pagos',
     items: [
       {
@@ -84,6 +91,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    key: 'settings',
     label: 'Configuración',
     items: [
       {
@@ -102,6 +110,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    key: 'organization',
     label: 'Organización',
     orgOnly: true,
     items: [
@@ -166,8 +175,10 @@ export default function AppSidebar() {
           (group) =>
             !group.orgOnly || activeAccount?.accountType === 'ORGANIZATION',
         ).map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+          <SidebarGroup key={group.key}>
+            {group.label && (
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            )}
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (

@@ -1,24 +1,22 @@
 import apiClient from '@/lib/axios';
 import type { DocumentListItem } from './_components/DocumentsTable';
 import {
-  EMPTY_DOCUMENTS_FILTERS,
-  buildDocumentsFilterParams,
+  DEFAULT_DOCUMENTS_FILTERS,
+  buildDocumentsQueryParams,
   type DocumentsFilters,
-} from './_components/DocumentsFilterPanel';
-import type { DocumentStatus, ParticipantStatus } from '@/lib/enums/document';
+} from './_config/filters';
 
-export interface DocumentsMeta {
-  total: number;
+/** Dónde está parada la lista dentro del total. Espejo de la respuesta del endpoint unificado. */
+export interface DocumentsPagination {
   page: number;
   limit: number;
+  total: number;
   totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
 }
 
 export interface DocumentsResult {
-  documents: DocumentListItem[];
-  meta: DocumentsMeta;
+  items: DocumentListItem[];
+  pagination: DocumentsPagination;
 }
 
 export interface DocumentFileUrl {
@@ -50,42 +48,63 @@ export async function getDocumentFileUrlRequest(
   return data;
 }
 
-export interface GetDocumentsParams {
-  /** Documentos donde el usuario participa como colaborador (Por firmar/Completados). */
-  participantEmail?: string;
-  /** Documentos creados/enviados por el usuario (Enviados para firma). */
-  email?: string;
-  status?: DocumentStatus | ParticipantStatus.Pending | ParticipantStatus.Signed;
-  page?: number;
-  limit?: number;
-  filters?: DocumentsFilters;
+/** Lo que devuelve archivar: el documento y desde cuándo quedó archivado para este usuario. */
+export interface ArchivedDocument {
+  documentId: string;
+  archived: boolean;
+  archivedAt: string;
 }
 
-/** Endpoint único de listado de documentos (`GET /document`), usado por las tres vistas
- * (Por firmar, Enviados para firma, Completados) variando solo los parámetros de filtrado. */
-export async function getDocumentsRequest({
-  participantEmail,
-  email,
-  status,
-  page = 1,
-  limit = 10,
-  filters = EMPTY_DOCUMENTS_FILTERS,
-}: GetDocumentsParams): Promise<DocumentsResult> {
-  const { data } = await apiClient.get<{
+/**
+ * Archiva un documento completado para el USUARIO EN SESIÓN.
+ *
+ * No cambia el documento ni lo esconde de los demás participantes: el backend sólo guarda la
+ * preferencia del par documento-usuario, y a partir de ahí el listado deja de devolverlo a quien
+ * archivó. Es idempotente, así que reintentar tras un fallo de red no duplica nada.
+ */
+export async function archiveDocumentRequest(
+  documentId: string,
+): Promise<ArchivedDocument> {
+  const { data } = await apiClient.post<{
     success: boolean;
     message: string;
-    data: DocumentListItem[];
-    meta: DocumentsMeta;
-  }>('/api/v1/document', {
+    data: ArchivedDocument;
+  }>(`/api/v1/document/${documentId}/archive`);
+
+  return data.data;
+}
+
+export interface GetDocumentsParams {
+  filters?: DocumentsFilters;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * El ÚNICO listado de documentos (`GET /document`).
+ *
+ * Antes esta función servía a tres pantallas y cada una le pasaba su receta: "Por firmar" mandaba
+ * el correo del usuario como `participantEmail` más `status=pending`, "Enviados para firma"
+ * mandaba `email`, y "Completados" repetía la primera con otro estado. El servidor no sabía qué
+ * significaba ninguna de las tres —obedecía la combinación— así que el criterio de cada sección
+ * vivía en el cliente y ninguna podía combinarse con otra.
+ *
+ * Ahora se manda lo que el usuario quiere ver (`view`, `search`, filtros) y el recorte lo
+ * resuelve el backend. El correo ya no viaja: lo resuelve el servidor a partir del token, que
+ * además es la única forma de que nadie pueda pedir la bandeja ajena escribiendo otro correo.
+ */
+export async function getDocumentsRequest({
+  filters = DEFAULT_DOCUMENTS_FILTERS,
+  page = 1,
+  limit = 25,
+}: GetDocumentsParams): Promise<DocumentsResult> {
+  const { data } = await apiClient.get<DocumentsResult>('/api/v1/document', {
     params: {
-      participantEmail,
-      email,
-      status,
+      ...buildDocumentsQueryParams(filters),
       page,
       limit,
-      ...buildDocumentsFilterParams(filters),
     },
   });
 
-  return { documents: data.data, meta: data.meta };
+  return data;
 }

@@ -24,17 +24,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import DocumentsFilterButton from './DocumentsFilterButton';
 import DocumentRowActions from './DocumentRowActions';
 import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
-import {
-  EMPTY_DOCUMENTS_FILTERS,
-  type DocumentsFilters,
-} from './DocumentsFilterPanel';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
+import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import { formatShortDate } from '@/lib/format-datetime';
-import { DocumentStatus, SignatureType } from '@/lib/enums/document';
+import {
+  DocumentParticipation,
+  DocumentStatus,
+  SignatureType,
+} from '@/lib/enums/document';
 
 export interface DocumentListItem {
   id: string;
@@ -59,6 +59,14 @@ export interface DocumentListItem {
    * sigue abierto (o si el backend todavía no lo informa, como en el endpoint antiguo).
    */
   signedAt?: string | null;
+  /**
+   * Qué papel juega en este documento el usuario en sesión. Lo calcula el backend por fila y es
+   * personal: dos personas ven valores distintos para el mismo documento.
+   *
+   * Con la lista segmentada no hacía falta —la sección lo decía— y por eso puede faltar en los
+   * datos de una respuesta anterior; la tabla lo trata entonces como "participante".
+   */
+  participation?: DocumentParticipation;
 }
 
 const STATUS_LABELS: Record<DocumentStatus, string> = {
@@ -81,6 +89,16 @@ const SIGNATURE_TYPE_LABELS: Record<SignatureType, string> = {
   [SignatureType.Fiel]: 'E.Firma',
 };
 
+/**
+ * Por qué este documento está en mi lista. Es la columna que sustituye a la sección: antes lo
+ * decía la pantalla en la que uno estaba, y ahora tiene que decirlo cada fila.
+ */
+const PARTICIPATION_LABELS: Record<DocumentParticipation, string> = {
+  [DocumentParticipation.RequiresMySignature]: 'Requiere tu firma',
+  [DocumentParticipation.CreatedByMe]: 'Creado por ti',
+  [DocumentParticipation.Participant]: 'Participas',
+};
+
 /** Lo que muestra "Fecha de firma" mientras el documento no está firmado por todos. */
 const UNSIGNED_DATE_LABEL = 'No disponible';
 
@@ -98,8 +116,6 @@ interface DocumentsTableProps {
   documents: DocumentListItem[];
   page?: number;
   totalPages?: number;
-  hasNextPage?: boolean;
-  hasPrevPage?: boolean;
   onPageChange?: (page: number) => void;
   /**
    * Navegación al detalle del documento, disparada al seleccionar la fila (clic en cualquier
@@ -107,10 +123,6 @@ interface DocumentsTableProps {
    * contenedora no ofrece esa ruta: entonces las filas no son seleccionables.
    */
   onRowSelect?: (documentId: string) => void;
-  filters?: DocumentsFilters;
-  onFiltersChange?: (filters: DocumentsFilters) => void;
-  showMyTurnFilter?: boolean;
-  showStatusFilter?: boolean;
 }
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
@@ -126,32 +138,25 @@ export default function DocumentsTable({
   documents,
   page = 1,
   totalPages = 1,
-  hasNextPage = false,
-  hasPrevPage = false,
   onPageChange,
   onRowSelect,
-  filters,
-  onFiltersChange,
-  showMyTurnFilter,
-  showStatusFilter,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
     useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
+  const archiveMutation = useArchiveCompletedDocument();
+
+  /**
+   * Si hay página anterior o siguiente se deduce de dónde estamos: el endpoint unificado devuelve
+   * `page` y `totalPages` y ya no manda `hasNextPage`/`hasPrevPage`. Eran dos campos que repetían
+   * lo mismo, y dos fuentes para un mismo hecho terminan discrepando.
+   */
+  const hasPrevPage = page > 1;
+  const hasNextPage = page < totalPages;
 
   return (
     <div className="flex-1 min-w-0">
-      {onFiltersChange && (
-        <div className="mb-3 flex items-center justify-end">
-          <DocumentsFilterButton
-            filters={filters ?? EMPTY_DOCUMENTS_FILTERS}
-            onApply={onFiltersChange}
-            showMyTurnFilter={showMyTurnFilter}
-            showStatusFilter={showStatusFilter}
-          />
-        </div>
-      )}
       {/* La tabla vive dentro de una tarjeta con borde y encabezado gris, igual en las tres
           secciones; `components/ui/table` se deja intacto porque también lo usa MembersTable. */}
       <div className="overflow-hidden rounded-xl border border-border">
@@ -162,6 +167,7 @@ export default function DocumentsTable({
                 <SortableHeader>Documento</SortableHeader>
               </TableHead>
               <TableHead>Creado por</TableHead>
+              <TableHead>Participación</TableHead>
               <TableHead>Estatus</TableHead>
               <TableHead>Fecha de creación</TableHead>
               <TableHead>Fecha de firma</TableHead>
@@ -174,6 +180,19 @@ export default function DocumentsTable({
               const isDownloading =
                 downloadMutation.isPending &&
                 downloadMutation.variables === doc.id;
+              const isArchiving =
+                archiveMutation.isPending &&
+                archiveMutation.variables === doc.id;
+              /**
+               * Sólo se archiva lo que ya está firmado por todos, que es lo único que el backend
+               * deja archivar.
+               *
+               * Antes esta condición tenía una mitad más —la sección tenía que ser "Completados"—
+               * porque la acción vivía únicamente en esa pantalla. Con la lista unificada ya no
+               * hay sección que consultar: la misma tabla muestra a la vez lo pendiente y lo
+               * firmado, así que el estatus de CADA documento es lo único que puede decidirlo.
+               */
+              const canArchive = doc.status === DocumentStatus.Signed;
               /**
                * "No disponible" cubre los dos casos en que no hay fecha de firma que mostrar: el
                * documento todavía no está firmado por todos, o el backend no la informó (endpoint
@@ -226,6 +245,13 @@ export default function DocumentsTable({
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {
+                      PARTICIPATION_LABELS[
+                        doc.participation ?? DocumentParticipation.Participant
+                      ]
+                    }
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <span
@@ -258,14 +284,6 @@ export default function DocumentsTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                      />
-                      <span>{STATUS_LABELS[doc.status]}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
                     {/* Las acciones del menú operan sobre el documento o lo consultan en un
                       modal, pero ninguna es una manera de abrirlo: el clic se detiene acá para
                       que usarlas no navegue también al detalle. Incluye la activación por
@@ -279,6 +297,12 @@ export default function DocumentsTable({
                         onDownload={() => downloadMutation.mutate(doc.id)}
                         onViewParticipants={() => setParticipantsDoc(doc)}
                         onShare={() => setShareDoc(doc)}
+                        onArchive={
+                          canArchive
+                            ? () => archiveMutation.mutate(doc.id)
+                            : undefined
+                        }
+                        isArchiving={isArchiving}
                       />
                     </div>
                   </TableCell>

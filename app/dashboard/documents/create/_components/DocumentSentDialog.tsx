@@ -11,6 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DocumentView } from '@/lib/enums/document';
+import { DOCUMENT_VIEW_LABELS } from '../../_config/filters';
 import { DOCUMENTS_SECTIONS } from '../../_config/sections';
 
 interface DocumentSentDialogProps {
@@ -24,8 +26,8 @@ interface DocumentSentDialogProps {
  * confirmación trae información que el usuario necesita retener —que le llegará un correo y
  * dónde seguir el estado—, así que no puede desvanecerse sola a los pocos segundos.
  *
- * El nombre de la sección se toma de `DOCUMENTS_SECTIONS` y no se escribe a mano, para que
- * coincida siempre con lo que dice el sidebar al que se le está mandando al usuario.
+ * El nombre del recorte se toma de `DOCUMENT_VIEW_LABELS` y no se escribe a mano, para que
+ * coincida con el filtro que el enlace deja aplicado al llegar al listado.
  */
 export default function DocumentSentDialog({
   open,
@@ -56,10 +58,10 @@ export default function DocumentSentDialog({
                   descripción, y aquí el <a> va dentro de un <p>: se aplica a mano para que se
                   vea como enlace y no como texto plano. */}
               <Link
-                href={DOCUMENTS_SECTIONS.sent.href}
+                href={`${DOCUMENTS_SECTIONS.list.href}?view=${DocumentView.CreatedByMe}`}
                 className="font-medium text-emerald-600 hover:underline hover:underline-offset-3 dark:text-emerald-400"
               >
-                {DOCUMENTS_SECTIONS.sent.label}
+                {DOCUMENT_VIEW_LABELS[DocumentView.CreatedByMe]}
               </Link>
               .
             </p>

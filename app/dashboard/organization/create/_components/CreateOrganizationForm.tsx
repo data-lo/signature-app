@@ -13,6 +13,15 @@ import {
 import { FieldGroup } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  ORGANIZATION_ACCOUNT_TOOLTIP,
+  useCanCreateOrganization,
+} from '@/lib/hooks/useCanCreateOrganization';
+import {
   createOrganizationSchema,
   type CreateOrganizationFormValues,
 } from '../_schemas';
@@ -30,6 +39,29 @@ export default function CreateOrganizationForm() {
   });
 
   const createOrganizationMutation = useCreateOrganization();
+  const canCreateOrganization = useCanCreateOrganization();
+
+  /**
+   * El formulario también se bloquea, y no sólo la opción del menú que lleva hasta él: a esta
+   * pantalla se llega igual escribiendo la URL, y ahí un botón que envía para recibir un 403 le
+   * hace escribir a la cuenta gratuita el nombre y la razón social de una organización que nunca
+   * se va a crear.
+   *
+   * Va en `aria-disabled` y no en `disabled` por lo de siempre: un botón deshabilitado de verdad
+   * no recibe puntero ni foco, así que el tooltip que explica el bloqueo no se vería nunca.
+   * `handleSubmit` lo vuelve a comprobar porque el botón no es la única forma de enviar —Enter en
+   * cualquier campo también lo hace— y prevenir el clic no cubre ese camino.
+   */
+  const blockedSubmitButton = (
+    <Button
+      type="submit"
+      className="w-full aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+      aria-disabled={true}
+      onClick={(event) => event.preventDefault()}
+    >
+      Crear organización
+    </Button>
+  );
 
   return (
     <Card className="max-w-xl w-full">
@@ -43,9 +75,12 @@ export default function CreateOrganizationForm() {
       </CardHeader>
       <CardContent>
         <Form
-          onSubmit={handleSubmit((values) =>
-            createOrganizationMutation.mutate(values),
-          )}
+          onSubmit={handleSubmit((values) => {
+            if (!canCreateOrganization) {
+              return;
+            }
+            createOrganizationMutation.mutate(values);
+          })}
         >
           <FieldGroup>
             <TextField
@@ -64,15 +99,22 @@ export default function CreateOrganizationForm() {
               {...register('organizationName')}
             />
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={!isValid || createOrganizationMutation.isPending}
-            >
-              {createOrganizationMutation.isPending
-                ? 'Creando organización...'
-                : 'Crear organización'}
-            </Button>
+            {canCreateOrganization ? (
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={!isValid || createOrganizationMutation.isPending}
+              >
+                {createOrganizationMutation.isPending
+                  ? 'Creando organización...'
+                  : 'Crear organización'}
+              </Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger className="w-full" render={blockedSubmitButton} />
+                <TooltipContent>{ORGANIZATION_ACCOUNT_TOOLTIP}</TooltipContent>
+              </Tooltip>
+            )}
           </FieldGroup>
         </Form>
       </CardContent>

@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
 import { getErrorMessage } from '@/lib/error-handler';
+import { DocumentView } from '@/lib/enums/document';
 import { useDocuments } from '../../_hooks/useDocuments';
-import { useDocumentsListState } from '../../_hooks/useDocumentsListState';
-import { DOCUMENTS_LIST_CONFIG } from '../../_config/sections';
+import { DEFAULT_DOCUMENTS_FILTERS } from '../../_config/filters';
+
+/** Cuántos documentos enviados se listan dentro de la pantalla de creación. */
+const CREATED_DOCUMENTS_PAGE_SIZE = 10;
 
 interface UseCreatedDocumentsParams {
   /**
@@ -18,29 +21,43 @@ interface UseCreatedDocumentsParams {
 }
 
 /**
- * Listado de documentos creados por el usuario en sesión: paginación, filtros, la consulta y la
- * publicación del conteo global. Se extrae de la pantalla para que `CreateDocumentView` no tenga
- * que coordinar tres piezas de estado que solo le importan a esta tabla.
+ * Los documentos que el usuario ya envió a firma, dentro de la pantalla de creación.
+ *
+ * Es el mismo listado unificado con el recorte `created_by_me`, no una consulta aparte. Antes
+ * pedía `type: 'sent'`, que el backend traducía a "creados por mí O donde participo": la tabla de
+ * "tus documentos" acababa mostrando también documentos ajenos que el usuario sólo firmaba, y el
+ * badge del navbar los contaba. Ahora significa lo que dice.
  */
 export function useCreatedDocuments({
   trackDocumentsCount,
 }: UseCreatedDocumentsParams) {
-  const { page, setPage, filters, handleFiltersChange } =
-    useDocumentsListState();
-  // Mismo listado que la sección "Enviados para firma" (`/dashboard/documents/sent`): comparten
-  // `type` y `limit`, así que también comparten caché de React Query.
+  /**
+   * La página se lleva acá y no con `useDocumentsListState`, que es el estado de la PANTALLA de
+   * documentos: aquél lee además el recorte inicial de `?view=`, y esta tabla no se configura por
+   * la URL — vive dentro del formulario de creación, donde ese parámetro no significa nada.
+   */
+  const [page, setPage] = useState(1);
+  /**
+   * Filtros fijos: esta tabla no ofrece filtrado propio —para eso está la pantalla de
+   * documentos— y dejarlos constantes evita que la queryKey cambie en cada render y vuelva a
+   * consultar sola.
+   */
+  const filters = useMemo(
+    () => ({ ...DEFAULT_DOCUMENTS_FILTERS, view: DocumentView.CreatedByMe }),
+    [],
+  );
+
   const createdDocumentsQuery = useDocuments({
-    type: 'sent',
-    page,
-    limit: DOCUMENTS_LIST_CONFIG.sent.limit,
     filters,
+    page,
+    limit: CREATED_DOCUMENTS_PAGE_SIZE,
   });
   const { setDocumentsCount } = useDocumentsCount();
 
   const createdDocuments = createdDocumentsQuery.data;
   useEffect(() => {
     if (createdDocuments && trackDocumentsCount) {
-      setDocumentsCount(createdDocuments.meta.total);
+      setDocumentsCount(createdDocuments.pagination.total);
     }
   }, [createdDocuments, trackDocumentsCount, setDocumentsCount]);
 
@@ -48,8 +65,6 @@ export function useCreatedDocuments({
     createdDocumentsQuery,
     page,
     setPage,
-    filters,
-    handleFiltersChange,
     errorMessage: createdDocumentsQuery.isError
       ? getErrorMessage(
           createdDocumentsQuery.error,

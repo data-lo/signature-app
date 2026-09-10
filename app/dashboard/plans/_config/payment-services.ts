@@ -12,26 +12,11 @@ const INTERVAL_LABELS: Record<string, { one: string; many: string }> = {
 };
 
 /**
- * Formatea el importe con la moneda que reporta Stripe.
- *
- * Stripe entrega centavos (`unitAmount: 49900` = $499.00) y el código ISO en minúsculas, que
- * `Intl` exige en mayúsculas. Se divide entre 100 porque todas las monedas que manejamos son de
- * dos decimales; si alguna vez se vendiera en una de cero decimales (JPY, CLP), este es el
- * único lugar que hay que ajustar.
+ * El formateo de importes se comparte con la compra de documentos desde suscripciones, así que
+ * vive en `lib/format-currency`. Se re-exporta desde aquí para no tocar a quien ya lo importaba
+ * de este módulo, y para que siga habiendo UNA sola implementación.
  */
-export function formatAmount(
-  unitAmount: number | null,
-  currency: string,
-): string {
-  if (unitAmount === null) {
-    return 'Precio a consultar';
-  }
-
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(unitAmount / 100);
-}
+export { formatAmount } from '@/lib/format-currency';
 
 /**
  * "al mes", "cada 3 meses", o cadena vacía en un pago único.

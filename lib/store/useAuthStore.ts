@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { createAuthSlice } from './auth.slice';
 import { createAccountsListSlice } from './accounts-list.slice';
 import { createActiveAccountSlice } from './active-account.slice';
+import { createBillingSlice } from './billing.slice';
 import type { AuthState } from './types/auth-store.types';
 
 // createJSONStorage invoca su getter de inmediato (no de forma perezosa) al
@@ -29,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
       ...createAuthSlice(...a),
       ...createAccountsListSlice(...a),
       ...createActiveAccountSlice(...a),
+      ...createBillingSlice(...a),
     }),
     {
       name: 'auth-storage',
