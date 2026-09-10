@@ -34,7 +34,7 @@ export default function AccountSwitcher() {
   const accountsList = useAuthStore((state) => state.accountsList);
   const activeAccount = useAuthStore((state) => state.activeAccount);
   const setActiveAccount = useAuthStore((state) => state.setActiveAccount);
-  const puedeCrearOrganizacion = useCanCreateOrganization();
+  const canCreateOrganization = useCanCreateOrganization();
 
   function handleSelect(account: AccountListEntry) {
     setActiveAccount(account);
@@ -57,17 +57,17 @@ export default function AccountSwitcher() {
    * `closeOnClick={false}` cierra el círculo: si el menú se cerrara al pulsar, el tooltip se
    * iría con él y pulsar parecería un fallo en vez de un bloqueo.
    */
-  const crearOrganizacion = (
+  const createOrganizationItem = (
     <DropdownMenuItem
-      aria-disabled={!puedeCrearOrganizacion}
-      closeOnClick={puedeCrearOrganizacion}
+      aria-disabled={!canCreateOrganization}
+      closeOnClick={canCreateOrganization}
       className={
-        puedeCrearOrganizacion
+        canCreateOrganization
           ? undefined
           : 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50'
       }
       onClick={(event) => {
-        if (!puedeCrearOrganizacion) {
+        if (!canCreateOrganization) {
           event.preventDefault();
           return;
         }
@@ -104,11 +104,11 @@ export default function AccountSwitcher() {
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        {puedeCrearOrganizacion ? (
-          crearOrganizacion
+        {canCreateOrganization ? (
+          createOrganizationItem
         ) : (
           <Tooltip>
-            <TooltipTrigger render={crearOrganizacion} />
+            <TooltipTrigger render={createOrganizationItem} />
             <TooltipContent>{ORGANIZATION_ACCOUNT_TOOLTIP}</TooltipContent>
           </Tooltip>
         )}

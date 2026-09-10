@@ -39,7 +39,7 @@ export default function CreateOrganizationForm() {
   });
 
   const createOrganizationMutation = useCreateOrganization();
-  const puedeCrearOrganizacion = useCanCreateOrganization();
+  const canCreateOrganization = useCanCreateOrganization();
 
   /**
    * El formulario también se bloquea, y no sólo la opción del menú que lleva hasta él: a esta
@@ -52,7 +52,7 @@ export default function CreateOrganizationForm() {
    * `handleSubmit` lo vuelve a comprobar porque el botón no es la única forma de enviar —Enter en
    * cualquier campo también lo hace— y prevenir el clic no cubre ese camino.
    */
-  const botonBloqueado = (
+  const blockedSubmitButton = (
     <Button
       type="submit"
       className="w-full aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
@@ -76,7 +76,7 @@ export default function CreateOrganizationForm() {
       <CardContent>
         <Form
           onSubmit={handleSubmit((values) => {
-            if (!puedeCrearOrganizacion) {
+            if (!canCreateOrganization) {
               return;
             }
             createOrganizationMutation.mutate(values);
@@ -99,7 +99,7 @@ export default function CreateOrganizationForm() {
               {...register('organizationName')}
             />
 
-            {puedeCrearOrganizacion ? (
+            {canCreateOrganization ? (
               <Button
                 type="submit"
                 className="w-full"
@@ -111,7 +111,7 @@ export default function CreateOrganizationForm() {
               </Button>
             ) : (
               <Tooltip>
-                <TooltipTrigger className="w-full" render={botonBloqueado} />
+                <TooltipTrigger className="w-full" render={blockedSubmitButton} />
                 <TooltipContent>{ORGANIZATION_ACCOUNT_TOOLTIP}</TooltipContent>
               </Tooltip>
             )}

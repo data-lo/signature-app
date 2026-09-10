@@ -149,7 +149,7 @@ describe('AccountSwitcher', () => {
    * terminar en un 403.
    */
   describe('creación de organizaciones según el plan', () => {
-    async function abrirMenu(user: ReturnType<typeof userEvent.setup>) {
+    async function openMenu(user: ReturnType<typeof userEvent.setup>) {
       await user.click(screen.getByText('Mi cuenta personal'));
       return screen.findByRole('menuitem', { name: /crear organización/i });
     }
@@ -160,7 +160,7 @@ describe('AccountSwitcher', () => {
       setBillingDe(PERSONAL.id, false);
       render(<AccountSwitcher />);
 
-      expect(await abrirMenu(user)).toHaveAttribute('aria-disabled', 'true');
+      expect(await openMenu(user)).toHaveAttribute('aria-disabled', 'true');
     });
 
     it('no navega al pulsar la opción deshabilitada', async () => {
@@ -169,7 +169,7 @@ describe('AccountSwitcher', () => {
       setBillingDe(PERSONAL.id, false);
       render(<AccountSwitcher />);
 
-      await user.click(await abrirMenu(user));
+      await user.click(await openMenu(user));
 
       expect(push).not.toHaveBeenCalled();
     });
@@ -181,7 +181,7 @@ describe('AccountSwitcher', () => {
       setBillingDe(PERSONAL.id, false);
       render(<AccountSwitcher />);
 
-      await user.hover(await abrirMenu(user));
+      await user.hover(await openMenu(user));
 
       expect(
         await screen.findByText(ORGANIZATION_ACCOUNT_TOOLTIP),
@@ -195,9 +195,9 @@ describe('AccountSwitcher', () => {
       setBillingDe(PERSONAL.id, false);
       render(<AccountSwitcher />);
 
-      const opcion = await abrirMenu(user);
+      const option = await openMenu(user);
       // El foco lo mueve el menú por dentro (navegación por lista), así que va envuelto en `act`.
-      await act(async () => opcion.focus());
+      await act(async () => option.focus());
 
       expect(
         await screen.findByText(ORGANIZATION_ACCOUNT_TOOLTIP),
@@ -210,9 +210,9 @@ describe('AccountSwitcher', () => {
       setBillingDe(PERSONAL.id, true);
       render(<AccountSwitcher />);
 
-      const opcion = await abrirMenu(user);
+      const option = await openMenu(user);
 
-      expect(opcion).not.toHaveAttribute('aria-disabled', 'true');
+      expect(option).not.toHaveAttribute('aria-disabled', 'true');
       expect(
         screen.queryByText(ORGANIZATION_ACCOUNT_TOOLTIP),
       ).not.toBeInTheDocument();
@@ -240,7 +240,7 @@ describe('AccountSwitcher', () => {
       });
       render(<AccountSwitcher />);
 
-      expect(await abrirMenu(user)).toHaveAttribute('aria-disabled', 'true');
+      expect(await openMenu(user)).toHaveAttribute('aria-disabled', 'true');
 
       await user.click(
         await screen.findByRole('menuitem', {

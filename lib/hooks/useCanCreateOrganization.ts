@@ -37,10 +37,10 @@ export const ORGANIZATION_ACCOUNT_TOOLTIP = 'No disponible en plan Free';
  *
  * @example
  * ```tsx
- * const puedeCrearOrganizacion = useCanCreateOrganization();
+ * const canCreateOrganization = useCanCreateOrganization();
  *
  * <Tooltip>
- *   <TooltipTrigger render={<Button aria-disabled={!puedeCrearOrganizacion} />} />
+ *   <TooltipTrigger render={<Button aria-disabled={!canCreateOrganization} />} />
  *   <TooltipContent>{ORGANIZATION_ACCOUNT_TOOLTIP}</TooltipContent>
  * </Tooltip>;
  * ```
