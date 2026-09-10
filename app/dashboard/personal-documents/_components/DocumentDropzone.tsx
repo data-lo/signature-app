@@ -17,7 +17,7 @@ interface DocumentDropzoneProps {
   file: File | null;
   error?: string;
   onFileChange: (file: File | null) => void;
-  /** Espeja el límite real del backend para este campo (ver src/shared/constants/file-upload.constants.ts en signature-server). */
+  /** Espeja el límite real del backend para este campo (ver src/common/constants/file-upload.constants.ts en signature-server). */
   maxFileSizeMB: number;
 }
 

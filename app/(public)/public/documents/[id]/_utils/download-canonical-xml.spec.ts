@@ -6,7 +6,7 @@ import {
   downloadCanonicalXml,
 } from './download-canonical-xml';
 
-const URL_ARTEFACTO = '/api/document/public/doc-1/seal/canonical';
+const URL_ARTEFACTO = '/api/v1/document/public/doc-1/seal/canonical';
 const NOMBRE = 'cadena-canonica-doc-1.xml';
 
 /** Lo que responde el backend: la cadena canónica envuelta en XML (ver `seal-artifacts.ts`). */
