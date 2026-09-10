@@ -25,13 +25,24 @@ export async function downloadCanonicalXml(
 
   try {
     response = await fetch(url, { headers: { Accept: 'application/xml' } });
-  } catch {
+  } catch (error) {
+    console.error('[XML canónico] Error de red al descargar', { url, error });
     throw new CanonicalXmlDownloadError(
       'No se pudo conectar para obtener el XML canónico. Revisa tu conexión e inténtalo de nuevo.',
     );
   }
 
   if (!response.ok) {
+    const responseBody =
+      typeof response.text === 'function'
+        ? await response.text().catch(() => null)
+        : null;
+    console.error('[XML canónico] El backend rechazó la descarga', {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      responseBody,
+    });
     /**
      * 404 es el caso esperado y frecuente: el documento no tiene constancia, o la tiene sin cadena
      * canónica. Se distingue del resto para no culpar al usuario de un fallo del servidor.
