@@ -2,6 +2,40 @@ import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import MembersTable from './MembersTable';
 import type { OrganizationMember } from '@/lib/api/organization-members';
+import type { RolePermission } from '@/lib/api/roles';
+
+const CATALOG_PERMISSIONS: RolePermission[] = [
+  {
+    id: 'permission-create',
+    key: 'DOCUMENT.CREATE',
+    resource: 'DOCUMENT',
+    action: 'CREATE',
+    scope: 'ANY',
+    description:
+      'Crear documentos o borradores dentro de la organización activa.',
+    isStaticCatalog: true,
+  },
+  {
+    id: 'permission-sign-self',
+    key: 'DOCUMENT.SIGN_SELF',
+    resource: 'DOCUMENT',
+    action: 'SIGN',
+    scope: 'SELF',
+    description: 'Firmar en nombre propio e incluirse como firmante.',
+    isStaticCatalog: true,
+  },
+];
+
+/** La rejilla CRUD heredada del seed de roles: llega en la respuesta pero no se pinta. */
+const INTERNAL_PERMISSION: RolePermission = {
+  id: 'permission-organization-read',
+  key: 'ORGANIZATION.READ',
+  resource: 'ORGANIZATION',
+  action: 'READ',
+  scope: 'ANY',
+  description: 'Consultar un recurso existente — Cuentas de tipo organización',
+  isStaticCatalog: false,
+};
 
 const MEMBERS: OrganizationMember[] = [
   {
@@ -11,6 +45,9 @@ const MEMBERS: OrganizationMember[] = [
     rfc: 'XAXX010101000',
     role: { id: 'admin-role-1', name: 'ADMIN' },
     joinedAt: '2023-10-25T10:00:00Z',
+    status: 'active',
+    isActive: true,
+    permissions: [...CATALOG_PERMISSIONS, INTERNAL_PERMISSION],
   },
   {
     accountId: 'account-2',
@@ -19,6 +56,9 @@ const MEMBERS: OrganizationMember[] = [
     rfc: null,
     role: null,
     joinedAt: null,
+    status: 'removed',
+    isActive: false,
+    permissions: [],
   },
 ];
 
@@ -32,18 +72,58 @@ describe('MembersTable', () => {
     expect(screen.getByText('25/10/2023')).toBeInTheDocument();
   });
 
-  it('muestra "—" cuando rfc/rol/fecha de ingreso son null', () => {
+  it('muestra el estado de cada membresía', () => {
+    render(<MembersTable members={MEMBERS} canManage={false} />);
+
+    expect(screen.getByText('Activo')).toBeInTheDocument();
+    expect(screen.getByText('Dado de baja')).toBeInTheDocument();
+  });
+
+  /**
+   * Los permisos internos de administración no cuentan: la columna responde "qué puede hacer esta
+   * persona", y `ORGANIZATION.READ` no es una capacidad que el administrador reconozca.
+   */
+  it('cuenta sólo los permisos del catálogo estático', () => {
+    render(<MembersTable members={MEMBERS} canManage={false} />);
+
+    expect(
+      screen.getByRole('button', { name: '2 permisos' }),
+    ).toBeInTheDocument();
+  });
+
+  it('al abrir el detalle lista los permisos derivados del rol', async () => {
+    const user = userEvent.setup();
+    render(<MembersTable members={MEMBERS} canManage={false} />);
+
+    await user.click(screen.getByRole('button', { name: '2 permisos' }));
+
+    expect(
+      await screen.findByText(
+        'Crear documentos o borradores dentro de la organización activa.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Firmar en nombre propio e incluirse como firmante.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Consultar un recurso existente — Cuentas de tipo organización',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it('muestra "—" cuando rfc/rol/permisos/fecha de ingreso son null o vacíos', () => {
     render(<MembersTable members={MEMBERS} canManage={false} />);
 
     expect(screen.getByText('sin-datos@empresa.com')).toBeInTheDocument();
-    expect(screen.getAllByText('—')).toHaveLength(3);
+    expect(screen.getAllByText('—')).toHaveLength(4);
   });
 
   it('no renderiza la columna de acciones cuando canManage es false', () => {
     render(<MembersTable members={MEMBERS} canManage={false} />);
 
     expect(
-      screen.queryByRole('button', { name: '' }),
+      screen.queryByRole('button', { name: /acciones de/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryAllByRole('menuitem')).toHaveLength(0);
   });
@@ -55,14 +135,17 @@ describe('MembersTable', () => {
       <MembersTable members={MEMBERS} canManage onEditRole={onEditRole} />,
     );
 
-    const [firstRowTrigger] = screen.getAllByRole('button');
-    await user.click(firstRowTrigger);
-    await user.click(await screen.findByRole('menuitem', { name: /editar rol/i }));
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones de admin@empresa.com' }),
+    );
+    await user.click(
+      await screen.findByRole('menuitem', { name: /editar rol/i }),
+    );
 
     expect(onEditRole).toHaveBeenCalledWith(MEMBERS[0]);
   });
 
-  it('al elegir "Configurar permisos" llama a onConfigurePermissions con el miembro de esa fila', async () => {
+  it('al elegir "Etiquetas del catálogo" llama a onConfigurePermissions con el miembro de esa fila', async () => {
     const user = userEvent.setup();
     const onConfigurePermissions = jest.fn();
     render(
@@ -73,10 +156,11 @@ describe('MembersTable', () => {
       />,
     );
 
-    const [firstRowTrigger] = screen.getAllByRole('button');
-    await user.click(firstRowTrigger);
     await user.click(
-      await screen.findByRole('menuitem', { name: /configurar permisos/i }),
+      screen.getByRole('button', { name: 'Acciones de admin@empresa.com' }),
+    );
+    await user.click(
+      await screen.findByRole('menuitem', { name: /etiquetas del catálogo/i }),
     );
 
     expect(onConfigurePermissions).toHaveBeenCalledWith(MEMBERS[0]);
@@ -87,10 +171,27 @@ describe('MembersTable', () => {
     const onRemove = jest.fn();
     render(<MembersTable members={MEMBERS} canManage onRemove={onRemove} />);
 
-    const [firstRowTrigger] = screen.getAllByRole('button');
-    await user.click(firstRowTrigger);
-    await user.click(await screen.findByRole('menuitem', { name: /eliminar/i }));
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones de admin@empresa.com' }),
+    );
+    await user.click(
+      await screen.findByRole('menuitem', { name: /eliminar/i }),
+    );
 
     expect(onRemove).toHaveBeenCalledWith(MEMBERS[0]);
+  });
+
+  /** Dar de baja a quien ya está dado de baja no tiene efecto; la opción se deshabilita. */
+  it('deshabilita "Eliminar" en una membresía ya dada de baja', async () => {
+    const user = userEvent.setup();
+    render(<MembersTable members={MEMBERS} canManage onRemove={jest.fn()} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones de sin-datos@empresa.com' }),
+    );
+
+    expect(
+      await screen.findByRole('menuitem', { name: /eliminar/i }),
+    ).toHaveAttribute('data-disabled');
   });
 });

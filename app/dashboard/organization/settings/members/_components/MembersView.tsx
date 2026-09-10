@@ -8,10 +8,13 @@ import { useUpdateMemberRole } from '../_hooks/useUpdateMemberRole';
 import { useRemoveMember } from '../_hooks/useRemoveMember';
 import { useUpdateMemberPermissions } from '../_hooks/useUpdateMemberPermissions';
 import MembersTable from './MembersTable';
+import AddMemberModal from './AddMemberModal';
 import InviteMemberModal from './InviteMemberModal';
 import EditRoleModal from './EditRoleModal';
 import RemoveMemberDialog from './RemoveMemberDialog';
 import ConfigureMemberPermissionsModal from './ConfigureMemberPermissionsModal';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { OrganizationMember } from '@/lib/api/organization-members';
 
 export default function MembersView() {
@@ -24,16 +27,23 @@ export default function MembersView() {
     useState<OrganizationMember | null>(null);
   const [configuringPermissionsMember, setConfiguringPermissionsMember] =
     useState<OrganizationMember | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const organizationId = activeAccount?.organizationId ?? null;
-  const {
-    data: members,
-    isLoading: membersLoading,
-  } = useOrganizationMembers(organizationId, isAdmin);
+  const { data: members, isLoading: membersLoading } = useOrganizationMembers(
+    organizationId,
+    isAdmin,
+    showInactive,
+  );
   const updateRoleMutation = useUpdateMemberRole(organizationId);
   const removeMemberMutation = useRemoveMember(organizationId);
   const updateMemberPermissionsMutation = useUpdateMemberPermissions();
 
+  /*
+    Las tres guardas de siempre: la pantalla es de la organización ACTIVA, y sólo para quien puede
+    administrarla. Una cuenta personal no tiene membresías que gestionar, así que ni siquiera se
+    intenta pedir la lista — el backend respondería 403.
+  */
   if (activeAccount?.accountType !== 'ORGANIZATION') {
     return (
       <p className="text-sm text-muted-foreground">
@@ -80,20 +90,36 @@ export default function MembersView() {
   return (
     <div className="flex flex-col gap-4">
       {/*
-        "Invitar miembro" vive acá desde la historia "Reubicar botón Invitar miembro" (antes
-        estaba en la pantalla de creación de documento): dar de alta a alguien es parte de
-        administrar el equipo, no de armar un documento. Al quedar dentro de esta vista hereda
-        además sus dos guardas — cuenta de tipo ORGANIZATION y rol de administrador—, que es lo
-        que el backend ya exigía para `POST /organizations/invite`.
+        Dos caminos de alta, a propósito: "Agregar miembro" da de alta de una vez a quien ya tiene
+        cuenta, e "Invitar miembro" manda el correo a quien todavía no está registrado. El primero
+        vive acá desde la historia "Reubicar botón Invitar miembro" (antes estaba en la pantalla de
+        creación de documento): dar de alta a alguien es parte de administrar el equipo, no de
+        armar un documento. Al quedar dentro de esta vista heredan sus dos guardas —cuenta de tipo
+        ORGANIZATION y rol de administrador—, que es lo que el backend ya exige.
       */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">Miembros</h1>
           <p className="text-sm text-muted-foreground">
             Administra los miembros de tu organización, sus roles y su acceso.
+            Los permisos de cada persona son los de su rol.
           </p>
         </div>
-        <InviteMemberModal />
+        <div className="flex items-center gap-2">
+          <InviteMemberModal />
+          <AddMemberModal organizationId={organizationId} />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Switch
+          id="show-inactive-members"
+          checked={showInactive}
+          onCheckedChange={(checked) => setShowInactive(checked === true)}
+        />
+        <Label htmlFor="show-inactive-members" className="text-sm font-normal">
+          Mostrar miembros dados de baja
+        </Label>
       </div>
 
       {membersLoading ? (

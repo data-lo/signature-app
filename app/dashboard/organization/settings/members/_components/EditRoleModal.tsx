@@ -20,7 +20,15 @@ import {
 } from '@/components/ui/select';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import type { OrganizationMember } from '@/lib/api/organization-members';
+import RolePermissionsPreview from './RolePermissionsPreview';
 
+/**
+ * Cambio de rol de una membresía existente.
+ *
+ * Debajo del selector se listan los permisos del rol elegido: cambiar de rol es cambiar lo que
+ * esa persona puede hacer, y la historia pide que eso se vea ANTES de confirmar. Lo que se guarda
+ * es el rol; la pantalla nunca escribe permisos sueltos por miembro.
+ */
 interface EditRoleModalProps {
   member: OrganizationMember | null;
   onOpenChange: (open: boolean) => void;
@@ -46,6 +54,8 @@ export default function EditRoleModal({
     value: role.id,
     label: role.name,
   }));
+
+  const selectedRole = roles?.find((role) => role.id === roleId);
 
   function handleConfirm() {
     if (!member || !roleId) return;
@@ -76,7 +86,9 @@ export default function EditRoleModal({
           >
             <SelectTrigger id="edit-role-select" className="w-full">
               <SelectValue
-                placeholder={rolesLoading ? 'Cargando roles...' : 'Selecciona un rol'}
+                placeholder={
+                  rolesLoading ? 'Cargando roles...' : 'Selecciona un rol'
+                }
               />
             </SelectTrigger>
             <SelectContent>
@@ -88,6 +100,12 @@ export default function EditRoleModal({
             </SelectContent>
           </Select>
         </Field>
+
+        <RolePermissionsPreview
+          roleName={selectedRole?.name}
+          permissions={selectedRole?.permissions ?? []}
+          loading={rolesLoading}
+        />
 
         <DialogFooter>
           <Button

@@ -16,6 +16,15 @@ import { useOrganizationPermissions } from '@/lib/hooks/useOrganizationPermissio
 import { useMemberPermissions } from '../_hooks/useMemberPermissions';
 import type { OrganizationMember } from '@/lib/api/organization-members';
 
+/**
+ * Asignación de las etiquetas de `organization_permissions`.
+ *
+ * Es un sistema PARALELO al RBAC y no una extensión: son nombres libres que cada organización
+ * define ("puede aprobar gastos") y que no dan acceso técnico a ningún endpoint. Los permisos
+ * efectivos vienen del rol (`role_permissions`), y por eso el texto de este modal evita hablar de
+ * "permisos" a secas — presentarlo como control de acceso haría creer que aquí se abre o cierra
+ * algo que en realidad se decide en el rol.
+ */
 interface ConfigureMemberPermissionsModalProps {
   member: OrganizationMember | null;
   organizationId: string | null;
@@ -65,10 +74,12 @@ export default function ConfigureMemberPermissionsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Configurar permisos</DialogTitle>
+          <DialogTitle>Etiquetas del catálogo de la organización</DialogTitle>
           <DialogDescription>
-            Selecciona los permisos que tendrá {member?.email} dentro de la
-            organización.
+            Marca las etiquetas del catálogo propio de tu organización que
+            aplican a {member?.email}. Son informativas y NO otorgan accesos: lo
+            que esta persona puede hacer lo define su rol, en &quot;Editar
+            Rol&quot;.
           </DialogDescription>
         </DialogHeader>
 
@@ -76,7 +87,7 @@ export default function ConfigureMemberPermissionsModal({
           <p className="text-sm text-muted-foreground">Cargando permisos...</p>
         ) : !permissions?.length ? (
           <p className="text-sm text-muted-foreground">
-            Esta organización todavía no tiene permisos en su catálogo.
+            Esta organización todavía no tiene etiquetas en su catálogo.
           </p>
         ) : (
           <div className="flex flex-col gap-3">

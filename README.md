@@ -165,7 +165,9 @@ Cada mini-flujo muta **solo su propia bandera**, sin esperar a un refetch:
 `lib/axios.ts` inyecta en cada request `X-Account-Id` (si hay `activeAccount`) y `X-Organization-Id` (solo si `activeAccount.accountType === 'ORGANIZATION'`). El backend ya lee y valida `X-Account-Id` para `POST /api/v1/document`/`GET /api/v1/document` (documentos scopeados por la cuenta activa) y para todo el módulo `organizations`/`account-member` (ver README de `signature-server`) — el resto de los endpoints de documento (detalle, firma/rechazo/cancelación) todavía no lo leen. `X-Organization-Id` no lo lee ningún endpoint del backend todavía (ver Pendientes).
 
 **Gestión de miembros y permisos de la organización activa** (`/dashboard/organization/settings/`, accesible solo si `activeAccount.accountType === 'ORGANIZATION'`): un `layout.tsx` propio con tabs "Miembros"/"Permisos" envuelve dos rutas —
-- **`members/`** (`MembersView`): tabla de miembros (correo/RFC/rol/fecha de ingreso) con menú de acciones ("Editar Rol"/"Eliminar"/"Configurar permisos" vía `ConfigureMemberPermissionsModal`), gateada por `useIsOrganizationAdmin()`.
+- **`members/`** (`MembersView`): tabla de miembros (correo/RFC/rol/**estado**/**permisos derivados**/fecha de ingreso) con menú de acciones ("Editar Rol"/"Eliminar"/"Etiquetas del catálogo" vía `ConfigureMemberPermissionsModal`), gateada por `useIsOrganizationAdmin()`. Dos altas conviven a propósito: **"Agregar miembro"** (`AddMemberModal` → `POST /api/v1/organizations/members`) da de alta de una vez a quien ya tiene cuenta, e **"Invitar miembro"** (`InviteMemberModal`) manda el correo a quien todavía no está registrado; si el correo no corresponde a ningún usuario, el backend lo dice y el mensaje remite a la invitación.
+
+  Los **permisos son los del rol**: la pantalla nunca guarda permisos sueltos por persona. `RolePermissionsPreview` los lista debajo del selector de rol —en el alta y en "Editar Rol"— para que la asignación se confirme viendo lo que habilita, y la columna "Permisos" de la tabla los muestra por miembro en un `Popover`. En ambos sitios se listan sólo los del catálogo estático (`isStaticCatalog`); la rejilla CRUD interna que arrastra ADMIN se resume en una línea en vez de llenar la pantalla de ruido. El interruptor "Mostrar miembros dados de baja" pide `?includeInactive=true`, que es lo que permite entender por qué un correo dado de baja ya no se puede volver a agregar.
 - **`permissions/`** (`PermissionsView`): catálogo de "permisos" **administrativos de la organización** (`OrganizationPermissionEntity`/`AccountPermissionEntity` en el backend) — nombres libres definidos por el ADMIN (p. ej. "puede aprobar gastos") que **no otorgan ningún acceso técnico real**; son un sistema deliberadamente paralelo al RBAC (`roles`/`role_permissions`) que sí gobierna la autorización de cada endpoint (ver README de `signature-server`). `PermissionsTable` + `CreatePermissionModal`/`EditPermissionModal`/`DeletePermissionDialog`, hooks en `_hooks/` (`useCreateOrganizationPermission`/`useUpdateOrganizationPermission`/`useDeleteOrganizationPermission`) contra `lib/api/organization-permissions.ts`. La asignación por miembro (`ConfigureMemberPermissionsModal`, en la pestaña Miembros) comparte el hook `useOrganizationPermissions` (vive en `lib/hooks/`, no en `_hooks/` de una sola ruta, porque lo consumen ambas pestañas) y usa `useMemberPermissions`/`useUpdateMemberPermissions` para leer/reemplazar (`GET`/`PATCH /api/v1/organizations/members/:accountId/permissions`) la lista de permisos de un miembro.
 
 **Invitar miembros a la organización activa** (`/dashboard/documents/create`, `InviteMemberModal` — solo se renderiza si `activeAccount.accountType === 'ORGANIZATION'`): al abrir el modal, `useSystemRoles()` consulta `GET /api/v1/roles` (deshabilitada hasta que el modal está abierto) para poblar el `Select` de rol. Al enviar, `useInviteMember()` llama `POST /api/v1/organizations/invite` (`{email, roleId}`) y cierra el modal al éxito. **Ya no es un alcance delimitado que solo valida**: el backend hoy persiste la invitación (`OrganizationInvitationEntity`), publica el evento en Kafka y envía el correo real con el link a `/join` — ver README de `signature-server`, este README quedó desactualizado en ese punto hasta esta ronda.
@@ -219,7 +221,7 @@ app/
     │   ├── create/                 → "/dashboard/organization/create" — CreateOrganizationForm → POST /api/v1/organizations
     │   └── settings/
     │       ├── layout.tsx           → tabs "Miembros"/"Permisos"
-    │       ├── members/             → "/dashboard/organization/settings/members" — MembersView/MembersTable/EditRoleModal/RemoveMemberDialog/ConfigureMemberPermissionsModal
+    │       ├── members/             → "/dashboard/organization/settings/members" — MembersView/MembersTable/AddMemberModal/EditRoleModal/RolePermissionsPreview/RemoveMemberDialog/ConfigureMemberPermissionsModal
     │       └── permissions/         → "/dashboard/organization/settings/permissions" — PermissionsView, catálogo de permisos administrativos de la organización (ver sección 3.3)
     ├── documents/
     │   ├── _config/sections.ts      → fuente única de nombres/rutas/consulta de cada sección (la usan AppSidebar, DashboardBreadcrumbs y los page.tsx)
@@ -306,7 +308,8 @@ Cookie `token` (1 día, `sameSite: 'lax'`, `secure` solo en producción). `logou
 
 | Función | Endpoint |
 |---|---|
-| `getOrganizationMembersRequest` | `GET /api/v1/organizations/:organizationId/members` |
+| `getOrganizationMembersRequest` | `GET /api/v1/organizations/:organizationId/members` (`?includeInactive`) |
+| `addOrganizationMemberRequest` | `POST /api/v1/organizations/members` (`{email, roleId, position?}`) |
 | `updateMemberRoleRequest` | `PATCH /api/v1/organizations/members/:accountId/role` |
 | `removeMemberRequest` | `DELETE /api/v1/organizations/members/:accountId` |
 
