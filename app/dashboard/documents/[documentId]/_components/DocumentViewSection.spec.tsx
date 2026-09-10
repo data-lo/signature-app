@@ -22,6 +22,16 @@ import {
   SignatureType,
 } from '@/lib/enums/document';
 
+/**
+ * La pantalla navega a "Por firmar" al cerrar el acuse de la firma (ver
+ * `handleSignatureReceiptClose`), así que necesita un router. `push` se inspecciona en las
+ * pruebas del modal.
+ */
+const push = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+}));
+
 jest.mock('../_hooks/useDocumentDetail');
 jest.mock('../../_hooks/useDocumentFileUrl');
 jest.mock('../_hooks/useSignDocument');
@@ -169,6 +179,7 @@ describe('DocumentViewSection', () => {
   const confirmCancellationMutate = jest.fn();
 
   beforeEach(() => {
+    push.mockReset();
     signMutate.mockReset();
     rejectMutate.mockReset();
     requestCancellationMutate.mockReset();
@@ -258,7 +269,11 @@ describe('DocumentViewSection', () => {
     );
 
     await waitFor(() =>
-      expect(signMutate).toHaveBeenCalledWith({ geolocation: DEFAULT_COORDS }),
+      expect(signMutate).toHaveBeenCalledWith(
+        { geolocation: DEFAULT_COORDS },
+        // El segundo argumento es el `onSuccess` que abre el acuse de la firma.
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      ),
     );
     expect(mockedToast).not.toHaveBeenCalled();
   });
@@ -842,6 +857,159 @@ describe('DocumentViewSection', () => {
     expect(screen.queryByText(/stale-detail-url/i)).not.toBeInTheDocument();
   });
 
+  /**
+   * Historia "Mostrar confirmación al firmar un documento": firmar era la acción más consecuente
+   * del producto y su único acuse era un toast que se desvanecía mientras la pantalla ya estaba
+   * navegando a otra sección. Ahora la confirmación espera a que la lean, y dice cosas distintas
+   * según si esta firma cerró el documento o todavía faltan participantes.
+   */
+  describe('confirmación tras firmar', () => {
+    // Las secciones se unificaron: el destino es el listado único, con su recorte en `?view=`.
+    const COMPLETED_VIEW = '/dashboard/documents?view=completed';
+    const DOCUMENTS_LIST = '/dashboard/documents';
+
+    /** Hace que `signMutate` se comporte como una firma exitosa con el desenlace indicado. */
+    function resolveSignatureWith(documentCompleted: boolean) {
+      signMutate.mockImplementation(
+        (
+          _payload: unknown,
+          options?: { onSuccess?: (data: unknown) => void },
+        ) => options?.onSuccess?.({ id: 'doc-1', documentCompleted }),
+      );
+    }
+
+    async function sign(documentCompleted: boolean) {
+      resolveSignatureWith(documentCompleted);
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ canSign: true, canReject: true }),
+        isLoading: false,
+        isError: false,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      return { user, dialog: await screen.findByRole('dialog') };
+    }
+
+    it('con participantes pendientes: confirma la firma y anuncia el aviso posterior', async () => {
+      const { dialog } = await sign(false);
+
+      expect(
+        within(dialog).getByText(/este documento ha sido firmado por ti/i),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          /te notificaremos cuando el documento se haya completado/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          /podrás consultarlo en la sección de documentos completados cuando todas las firmas hayan sido registradas/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * El punto de tener dos textos: con firmas pendientes el documento NO está en Completados
+     * todavía, y mandar ahí al firmante a buscarlo sería mandarlo a una lista vacía.
+     */
+    it('con participantes pendientes: NO afirma que el documento ya esté en completados', async () => {
+      const { dialog } = await sign(false);
+
+      expect(
+        within(dialog).queryByText(
+          /^puedes consultarlo en la sección de documentos completados\.$/i,
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/firmado y completado correctamente/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('cuando esta firma completa el documento: lo confirma y lo da por disponible en completados', async () => {
+      const { dialog } = await sign(true);
+
+      expect(
+        within(dialog).getByText(
+          /este documento ha sido firmado y completado correctamente/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          /puedes consultarlo en la sección de documentos completados/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/te notificaremos/i),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * Regresión de la historia: antes se navegaba dentro del `onSuccess` de la mutación, así que
+     * la vista se desmontaba en el mismo instante en que la firma quedaba registrada y no había
+     * dónde dibujar la confirmación.
+     */
+    it('no navega antes de mostrar la confirmación', async () => {
+      await sign(false);
+
+      expect(push).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('button', { name: /^cerrar$/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('al cerrar, sigue con el comportamiento normal de la pantalla y vuelve al listado', async () => {
+      const { user, dialog } = await sign(false);
+
+      await user.click(within(dialog).getByRole('button', { name: /^cerrar$/i }));
+
+      expect(push).toHaveBeenCalledWith(DOCUMENTS_LIST);
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      );
+    });
+
+    it('ofrece ir al listado con el recorte de completados ya aplicado', async () => {
+      const { dialog } = await sign(true);
+
+      // Es un enlace real (`<a href>`) con apariencia y rol de botón, igual que el resto de las
+      // acciones de navegación del producto: así conserva abrir en otra pestaña y copiar destino.
+      const action = within(dialog).getByRole('button', {
+        name: /ver documentos completados/i,
+      });
+      expect(action.tagName).toBe('A');
+      expect(action).toHaveAttribute('href', COMPLETED_VIEW);
+    });
+
+    it('si la firma falla, no muestra ninguna confirmación', async () => {
+      signMutate.mockImplementation(
+        (
+          _payload: unknown,
+          options?: { onError?: (error: Error) => void },
+        ) => options?.onError?.(new Error('500')),
+      );
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ canSign: true, canReject: true }),
+        isLoading: false,
+        isError: false,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      await waitFor(() => expect(signMutate).toHaveBeenCalled());
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+  });
+
   describe('firma electrónica avanzada (FIEL)', () => {
     function renderFielDocument() {
       mockedUseDocumentDetail.mockReturnValue({
@@ -924,6 +1092,54 @@ describe('DocumentViewSection', () => {
         },
         expect.anything(),
       );
+    });
+
+    /**
+     * Dos modales para una sola acción: el formulario de e.firma tiene que irse antes de que
+     * llegue el acuse, o la confirmación quedaría detrás del formulario que acaba de enviarse.
+     */
+    it('al firmar con e.firma, cierra el formulario y muestra la confirmación de la firma', async () => {
+      signMutate.mockImplementation(
+        (
+          _payload: unknown,
+          options?: { onSuccess?: (data: unknown) => void },
+        ) => options?.onSuccess?.({ id: 'doc-1', documentCompleted: true }),
+      );
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+      const efirmaDialog = await screen.findByRole('dialog');
+      await user.click(
+        within(efirmaDialog).getByRole('button', {
+          name: /seleccionar archivo \.key/i,
+        }),
+      );
+      await user.click(
+        within(efirmaDialog).getByRole('button', {
+          name: /seleccionar archivo \.cer/i,
+        }),
+      );
+      await user.type(
+        within(efirmaDialog).getByLabelText(/contraseña de la llave privada/i),
+        'MiContraseña123',
+      );
+      await user.click(
+        within(efirmaDialog).getByRole('button', { name: /firmar documento/i }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            /este documento ha sido firmado y completado correctamente/i,
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByLabelText(/contraseña de la llave privada/i),
+      ).not.toBeInTheDocument();
     });
 
     it('cancelar el diálogo de e.firma lo cierra sin firmar', async () => {

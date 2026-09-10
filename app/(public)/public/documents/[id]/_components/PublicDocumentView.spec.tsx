@@ -341,7 +341,9 @@ describe('PublicDocumentView', () => {
 
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
-        expect(screen.getByText(/fecha de emisión/i)).toBeInTheDocument();
+        // "Emitido" y "Número de Serie": las mismas etiquetas que la tabla NOM-151 de la hoja
+        // anexada al PDF, para que se reconozcan como el mismo renglón.
+        expect(screen.getByText(/^emitido$/i)).toBeInTheDocument();
         // tsaCertificate y serialNumber (los del token RFC 3161) llegan en null: ese renglón
         // exacto no se pinta — distinto de "Serie/Emisión del certificado (TSA)", que sí se
         // pintan porque vienen de integrityTsaCertificate (ver el describe de más abajo).
@@ -415,6 +417,63 @@ describe('PublicDocumentView', () => {
             screen.queryByText(/emisión del certificado \(tsa\)/i),
           ).not.toBeInTheDocument();
         });
+      });
+    });
+
+    describe('fecha de firma', () => {
+      /**
+       * El mismo número que imprime la hoja de firmas anexada al PDF (ver `formatSheetTimestamp`
+       * en signature-server): las dos salen del mismo `signedAt`, así que quien contrasta la
+       * pantalla contra el documento compara dos valores idénticos. Antes cada una se rendía en
+       * la zona horaria de quien la miraba y mostraban horas distintas del mismo instante.
+       */
+      it('se muestra como marca Unix en milisegundos, sólo dígitos', () => {
+        mockData(buildCompleted({ signers: [buildSigner()] }));
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        const card = screen
+          .getByText('Isaay Sosa')
+          .closest('[data-slot="signer-evidence"]');
+        const evidence = within(card as HTMLElement);
+
+        expect(
+          evidence.getByText(
+            String(new Date('2026-03-15T23:55:00.000Z').getTime()),
+          ),
+        ).toBeInTheDocument();
+      });
+
+      /** Lo que esta prueba impide es volver a un formato legible o ISO en la constancia. */
+      it('no muestra la fecha localizada ni en ISO', () => {
+        mockData(buildCompleted({ signers: [buildSigner()] }));
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        const card = screen
+          .getByText('Isaay Sosa')
+          .closest('[data-slot="signer-evidence"]');
+        const evidence = within(card as HTMLElement);
+
+        expect(evidence.queryByText(/de marzo/i)).not.toBeInTheDocument();
+        expect(evidence.queryByText(/T23:55/)).not.toBeInTheDocument();
+      });
+
+      /**
+       * Un firmante sin fecha registrada no estampa un renglón vacío: en una constancia, "Fecha
+       * de firma: —" afirma que el dato se conoce y está en blanco.
+       */
+      it('omite el renglón cuando el firmante no tiene fecha', () => {
+        mockData(buildCompleted({ signers: [buildSigner({ signedAt: null })] }));
+
+        renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+        const card = screen
+          .getByText('Isaay Sosa')
+          .closest('[data-slot="signer-evidence"]');
+        const evidence = within(card as HTMLElement);
+
+        expect(evidence.queryByText(/fecha de firma/i)).not.toBeInTheDocument();
       });
     });
 

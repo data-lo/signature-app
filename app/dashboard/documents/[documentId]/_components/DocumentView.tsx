@@ -21,6 +21,7 @@ import DocumentSummaryCard from './DocumentSummaryCard';
 import RejectDocumentForm from './RejectDocumentForm';
 import ShareDocumentLinkAction from './ShareDocumentLinkAction';
 import SignatureRequiredDialog from './SignatureRequiredDialog';
+import SignatureSuccessDialog from './SignatureSuccessDialog';
 import type { SignatureVerificationProps } from './SignatureVerificationCard';
 
 export interface DocumentViewProps {
@@ -81,6 +82,13 @@ export interface DocumentViewProps {
     onSubmit: (values: AdvancedSignatureSubmitValues) => void;
     isConfirming: boolean;
   };
+
+  /** Acuse de la firma recién registrada; cerrado mientras no se haya firmado en esta visita. */
+  signatureSuccessDialog: {
+    open: boolean;
+    documentCompleted: boolean;
+    onClose: () => void;
+  };
 }
 
 /**
@@ -103,6 +111,7 @@ export default function DocumentView({
   cancellation,
   signatureRequiredDialog,
   advancedSignatureDialog,
+  signatureSuccessDialog,
 }: DocumentViewProps) {
   if (isLoading) {
     return (
@@ -203,6 +212,12 @@ export default function DocumentView({
       <SignatureRequiredDialog
         open={signatureRequiredDialog.open}
         onOpenChange={signatureRequiredDialog.onOpenChange}
+      />
+
+      <SignatureSuccessDialog
+        open={signatureSuccessDialog.open}
+        documentCompleted={signatureSuccessDialog.documentCompleted}
+        onClose={signatureSuccessDialog.onClose}
       />
 
       <AdvancedSignatureDialog

@@ -58,7 +58,14 @@ describe('AdvancedSignatureView', () => {
 
     expect(screen.getByText('MANUEL BALDERRAMA CHAVEZ')).toBeInTheDocument();
     expect(screen.getByText('BACM800101ABC')).toBeInTheDocument();
-    expect(screen.getByText(/2026/)).toBeInTheDocument();
+    /**
+     * La fecha va como marca Unix en milisegundos, el mismo número que imprime la hoja de firmas
+     * del PDF: quien verifica desde otro huso horario leía antes una hora distinta de la que
+     * tiene impresa en el documento que está contrastando.
+     */
+    expect(
+      screen.getByText(String(new Date('2026-08-14T18:24:11.000Z').getTime())),
+    ).toBeInTheDocument();
     expect(screen.getByText('contrato.pdf')).toBeInTheDocument();
     expect(screen.getByText('00001000000512345678')).toBeInTheDocument();
   });

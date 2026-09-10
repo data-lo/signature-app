@@ -58,6 +58,15 @@ export interface DocumentDataPayload {
   isSequential: boolean;
   /** Tipo de firma exigido a TODOS los firmantes del documento — única fuente de verdad del flujo. */
   signatureType: DocumentSignatureType;
+  /**
+   * Si el documento entra a Búsqueda Inteligente (ver `SmartSearchDialog`).
+   *
+   * Se manda siempre, aunque el backend lo trate como opcional y asigne `true` cuando falta: acá
+   * SIEMPRE hay una decisión del usuario —el modal no deja pasar sin una— y omitirla haría que el
+   * valor enviado dependiera de cuál de las dos eligió, que es justo la ambigüedad que el default
+   * del backend existe para resolver en los clientes que no preguntan.
+   */
+  isIndexable: boolean;
 }
 
 /** Solicitud completa que arma `createDocumentSignaturesRequest` (un solo multipart). */
@@ -82,4 +91,10 @@ export interface CreateDocumentSignaturesInput {
   signatureType: DocumentSignatureType;
   requiresTwoFactorAuth: boolean;
   collaborators: CollaboratorFormValues[];
+  /**
+   * No sale del formulario sino del modal que se muestra al enviar (ver `SmartSearchDialog`), y
+   * por eso entra por acá y no por `CreateDocumentSignaturesFormValues`: no es configuración que
+   * el usuario capture y revise en el resumen, es la última decisión antes de mandar.
+   */
+  isIndexable: boolean;
 }

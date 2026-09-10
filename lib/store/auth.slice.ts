@@ -55,5 +55,8 @@ export const createAuthSlice: StateCreator<AuthState, [], [], AuthSlice> = (
       user: null,
       accountsList: [],
       activeAccount: null,
+      // Se vacía junto con el resto: son las cuentas del usuario que se va, y dejarlas haría
+      // que la siguiente sesión mostrara el plan de la anterior hasta la primera respuesta.
+      billingByAccountId: {},
     }),
 });

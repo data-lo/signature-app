@@ -11,30 +11,37 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { useDocumentDetail } from '../documents/[documentId]/_hooks/useDocumentDetail';
-import {
-  DOCUMENTS_GROUP_LABEL,
-  DOCUMENTS_LEGACY_ROUTES,
-  DOCUMENTS_NAV_SECTIONS,
-} from '../documents/_config/sections';
+import { DOCUMENTS_SECTIONS } from '../documents/_config/sections';
 
 interface Crumb {
   label: string;
-  /** Sin `href` el nivel no es interactivo: o es un agrupador (p. ej. "Documentos", que no
-   * tiene página propia) o es la página actual, que siempre va al final. */
+  /** Sin `href` el nivel no es interactivo: o es un agrupador sin página propia, o es la página
+   * actual, que siempre va al final. */
   href?: string;
 }
 
-/** "Documentos" es solo un agrupador visual: se muestra sin enlace en todo el módulo. */
-const DOCUMENTS_GROUP_CRUMB: Crumb = { label: DOCUMENTS_GROUP_LABEL };
+/**
+ * "Documentos" como nivel padre, y AHORA CON ENLACE.
+ *
+ * Mientras el módulo estuvo partido en tres secciones, este nivel era un agrupador muerto: no
+ * había ninguna pantalla de "Documentos" a la que llevar, sólo un menú con tres rutas hermanas.
+ * Con una sola lista, el padre es una página real y el breadcrumb puede hacer lo que promete.
+ */
+const DOCUMENTS_PARENT_CRUMB: Crumb = {
+  label: DOCUMENTS_SECTIONS.list.label,
+  href: DOCUMENTS_SECTIONS.list.href,
+};
 
-/** Breadcrumbs del módulo de documentos, derivados de la misma configuración que alimenta el
- * sidebar para que el nombre de la sección coincida exactamente en ambos componentes. */
-const DOCUMENTS_CRUMBS: Record<string, Crumb[]> = Object.fromEntries(
-  DOCUMENTS_NAV_SECTIONS.map((section) => [
-    section.href,
-    [DOCUMENTS_GROUP_CRUMB, { label: section.label }],
-  ]),
-);
+/** Breadcrumbs del módulo, derivados de la misma configuración que alimenta el sidebar para que
+ * los nombres coincidan exactamente en ambos componentes. */
+const DOCUMENTS_CRUMBS: Record<string, Crumb[]> = {
+  // El listado es el nivel padre: repetirlo como hijo diría "Documentos / Documentos".
+  [DOCUMENTS_SECTIONS.list.href]: [{ label: DOCUMENTS_SECTIONS.list.label }],
+  [DOCUMENTS_SECTIONS.create.href]: [
+    DOCUMENTS_PARENT_CRUMB,
+    { label: DOCUMENTS_SECTIONS.create.label },
+  ],
+};
 
 /** Mapa estático ruta -> jerarquía de breadcrumbs, alineado con las etiquetas usadas en
  * AppSidebar y en las tabs de configuración de organización para mantener nombres consistentes. */
@@ -70,24 +77,23 @@ const STATIC_CRUMBS: Record<string, Crumb[]> = {
 const DOCUMENT_DETAIL_PATTERN = /^\/dashboard\/documents\/([^/]+)$/;
 
 function useCrumbs(pathname: string): Crumb[] {
-  // Las rutas anteriores del módulo solo redirigen (ver sus page.tsx): mientras la redirección
-  // ocurre se muestran los breadcrumbs de su ruta nueva, en vez de nada o de un id inexistente.
-  const resolvedPathname = DOCUMENTS_LEGACY_ROUTES[pathname] ?? pathname;
-  const staticCrumbs = STATIC_CRUMBS[resolvedPathname];
+  // Las rutas de las secciones anteriores ya no llegan hasta acá: las redirige el servidor al
+  // listado unificado (ver `next.config.ts`), así que el navegador nunca renderiza esa ruta.
+  const staticCrumbs = STATIC_CRUMBS[pathname];
   // Solo se interpreta como un id de documento si la ruta no coincide con ninguna ruta estática
-  // conocida (bug corregido: "/dashboard/documents/create" y las demás secciones también
-  // matchean DOCUMENT_DETAIL_PATTERN por ser un solo segmento, lo que disparaba un
-  // GET /document/create|to-sign|... inexistente y rompía sus propios breadcrumbs estáticos).
+  // conocida (bug corregido: "/dashboard/documents/create" también matchea
+  // DOCUMENT_DETAIL_PATTERN por ser un solo segmento, lo que disparaba un GET /document/create
+  // inexistente y rompía sus propios breadcrumbs estáticos).
   const documentId = staticCrumbs
     ? undefined
-    : resolvedPathname.match(DOCUMENT_DETAIL_PATTERN)?.[1];
+    : pathname.match(DOCUMENT_DETAIL_PATTERN)?.[1];
   const { data: document } = useDocumentDetail(documentId ?? '', {
     enabled: !!documentId,
   });
 
   if (documentId) {
     return [
-      DOCUMENTS_GROUP_CRUMB,
+      DOCUMENTS_PARENT_CRUMB,
       { label: document?.fileName ?? 'Detalle del documento' },
     ];
   }

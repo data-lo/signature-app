@@ -3,6 +3,7 @@
 import { Loader2, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatEpochMillis } from '@/lib/format-datetime';
 import { useAdvancedSignature } from '../_hooks/useAdvancedSignature';
 
 interface AdvancedSignatureViewProps {
@@ -22,22 +23,6 @@ function Row({ label, value }: { label: string; value: string | null }) {
       <span className="text-sm break-words text-foreground">{value}</span>
     </div>
   );
-}
-
-/**
- * Fecha y hora en la zona horaria de quien consulta. El backend la manda en UTC (ISO 8601): se
- * formatea acá y no allá porque quien escanea el QR puede estar en cualquier lado, y una fecha de
- * firma solo es verificable si se lee en una zona conocida — por eso se incluye el nombre de la
- * zona junto a la hora.
- */
-function formatSignedAt(isoDate: string): string {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return isoDate;
-
-  return new Intl.DateTimeFormat('es-MX', {
-    dateStyle: 'long',
-    timeStyle: 'long',
-  }).format(date);
 }
 
 /**
@@ -97,7 +82,16 @@ export default function AdvancedSignatureView({
         <CardContent className="flex flex-col">
           <Row label="Firmante" value={data.signerName} />
           <Row label="RFC" value={data.rfc} />
-          <Row label="Fecha y hora de firma" value={formatSignedAt(data.signedAt)} />
+          {/**
+            * Marca Unix en milisegundos, el mismo número que la hoja de firmas del PDF y que la
+            * vista pública del documento. Antes se rendía con `Intl` en la zona de quien escanea
+            * el QR: quien verificaba desde otro huso leía una hora distinta de la impresa en el
+            * documento que tenía delante, que es justo lo que una constancia no puede permitirse.
+            */}
+          <Row
+            label="Fecha y hora de firma"
+            value={formatEpochMillis(data.signedAt)}
+          />
           <Row label="Documento" value={data.fileName} />
           <Row
             label="Número de serie del certificado"

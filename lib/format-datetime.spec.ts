@@ -1,5 +1,6 @@
 import {
   EMPTY_DATE_PLACEHOLDER,
+  formatEpochMillis,
   formatLongDateTime,
   formatShortDate,
 } from './format-datetime';
@@ -74,5 +75,46 @@ describe('formatShortDate', () => {
     expect(formatShortDate(new Date(2026, 4, 10), 'No disponible')).toBe(
       '10/05/2026',
     );
+  });
+});
+
+/**
+ * Es el formato de la fecha de firma en hojas y constancias. A diferencia de sus vecinas, esta
+ * función NO depende de la zona horaria de quien la ejecuta —de eso se trata—, así que aquí sí se
+ * usan literales ISO en UTC: el resultado tiene que ser idéntico corra donde corra.
+ */
+describe('formatEpochMillis', () => {
+  it('devuelve la marca Unix en milisegundos, sólo dígitos', () => {
+    expect(formatEpochMillis('2026-09-07T14:35:22.000Z')).toBe('1788791722000');
+    expect(formatEpochMillis('2026-09-07T14:35:22.000Z')).toMatch(/^\d+$/);
+  });
+
+  it('acepta lo mismo un Date que la cadena ISO del backend', () => {
+    const iso = '2026-01-15T10:30:00.000Z';
+
+    expect(formatEpochMillis(new Date(iso))).toBe(formatEpochMillis(iso));
+  });
+
+  /**
+   * La clave de todo el cambio: el mismo instante da el mismo número aunque se escriba con otro
+   * desfase. Con una fecha legible, estos dos literales se imprimían distinto y la pantalla no
+   * coincidía con el PDF.
+   */
+  it('da el mismo número para el mismo instante escrito en otro huso', () => {
+    expect(formatEpochMillis('2026-09-07T14:35:22.000Z')).toBe(
+      formatEpochMillis('2026-09-07T08:35:22.000-06:00'),
+    );
+  });
+
+  /**
+   * `null` y no el guion de `EMPTY_DATE_PLACEHOLDER`: quien lo consume oculta el renglón entero,
+   * y "Fecha de firma: —" en una constancia afirma que el dato se conoce y está vacío.
+   */
+  it('devuelve null cuando no hay fecha o no es parseable', () => {
+    expect(formatEpochMillis(null)).toBeNull();
+    expect(formatEpochMillis(undefined)).toBeNull();
+    expect(formatEpochMillis('')).toBeNull();
+    expect(formatEpochMillis('no es una fecha')).toBeNull();
+    expect(EMPTY_DATE_PLACEHOLDER).not.toBeNull();
   });
 });
