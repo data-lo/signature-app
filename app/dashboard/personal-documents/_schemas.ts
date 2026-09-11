@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Espeja los límites reales del backend (src/shared/constants/file-upload.constants.ts en
+// Espeja los límites reales del backend (src/common/constants/file-upload.constants.ts en
 // signature-server): 10MB para imágenes de buena calidad, 20MB para PDFs de buena calidad —
 // la INE acepta ambos formatos, así que usa el límite más generoso de los dos.
 const MAX_INE_SIZE_BYTES = 20 * 1024 * 1024;

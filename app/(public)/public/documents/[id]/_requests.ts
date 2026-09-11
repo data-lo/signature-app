@@ -139,7 +139,7 @@ export function sealArtifactDownloadUrl(
   documentId: string,
   artifact: SealArtifact,
 ): string {
-  return `/api/document/public/${documentId}/seal/${artifact}`;
+  return `/api/api/v1/document/public/${documentId}/seal/${artifact}`;
 }
 
 /**
@@ -151,5 +151,5 @@ export function sealArtifactDownloadUrl(
  * el backend arma en el momento de pedirlo.
  */
 export function auditXmlDownloadUrl(documentId: string): string {
-  return `/api/document/public/${documentId}/audit-xml`;
+  return `/api/api/v1/document/public/${documentId}/audit-xml`;
 }

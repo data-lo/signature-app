@@ -28,13 +28,27 @@ export async function downloadAuditXml(
 
   try {
     response = await fetch(url, { headers: { Accept: 'application/xml' } });
-  } catch {
+  } catch (error) {
+    console.error('[XML de auditoría] Error de red al descargar', {
+      url,
+      error,
+    });
     throw new AuditXmlDownloadError(
       'No se pudo conectar para obtener el XML de auditoría. Revisa tu conexión e inténtalo de nuevo.',
     );
   }
 
   if (!response.ok) {
+    const responseBody =
+      typeof response.text === 'function'
+        ? await response.text().catch(() => null)
+        : null;
+    console.error('[XML de auditoría] El backend rechazó la descarga', {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      responseBody,
+    });
     throw new AuditXmlDownloadError(errorMessage(response.status));
   }
 
