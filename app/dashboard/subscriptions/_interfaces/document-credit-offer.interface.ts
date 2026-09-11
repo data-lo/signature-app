@@ -23,3 +23,17 @@ export interface DocumentCreditOffer {
    */
   stripePriceId: string | null;
 }
+
+/**
+ * Lo que se manda para abrir el Checkout de documentos: la oferta y cuántas unidades se compran.
+ *
+ * Espejo de `CreateDocumentCreditCheckoutDto` en signature-server. **Son los dos únicos campos**:
+ * el importe y los documentos a recibir los calcula el backend desde su catálogo, así que mandarlos
+ * sólo abriría la puerta a que alguien creyera que cuentan.
+ */
+export interface DocumentCreditCheckoutInput {
+  /** Id del catálogo LOCAL de la oferta elegida. */
+  catalogPriceId: string;
+  /** Unidades de la oferta, ya como número entero entre 1 y el máximo por compra. */
+  quantity: number;
+}

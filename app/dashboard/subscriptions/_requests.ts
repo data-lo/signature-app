@@ -1,6 +1,9 @@
 import apiClient from '@/lib/axios';
 import type { SubscriptionSchedule } from './_interfaces/subscription-state.interface';
-import type { DocumentCreditOffer } from './_interfaces/document-credit-offer.interface';
+import type {
+  DocumentCreditCheckoutInput,
+  DocumentCreditOffer,
+} from './_interfaces/document-credit-offer.interface';
 
 /**
  * Acá NO hay consulta de estado, y es a propósito: la lee `useBillingAccess`
@@ -78,16 +81,40 @@ export async function getDocumentCreditOffersRequest(): Promise<
  * tocar al proveedor, y el precio que se cobra sale de una fila suya y no de esta petición.
  *
  * Responde 404 si el paquete no le corresponde a la cuenta, incluido el caso de alguien que
- * manipule el `catalogPriceId` para intentar comprar el de otro plan.
+ * manipule el `catalogPriceId` para intentar comprar el de otro plan, y 400 con
+ * `field: 'quantity'` si la cantidad no es válida.
+ *
+ * **Viajan sólo `catalogPriceId` y `quantity`**, y la cantidad ya como número: el formulario la
+ * transformó al validar. Se reconstruye el cuerpo en vez de reenviar el objeto recibido para que
+ * ningún campo de más llegue al backend. Ni el importe ni los documentos a recibir salen de aquí:
+ * los calcula el backend desde su catálogo.
+ *
+ * @param input - Oferta del catálogo local y unidades a comprar.
+ * @returns La URL hospedada de Checkout a la que hay que mandar el navegador.
+ *
+ * @throws {AxiosError} Si el backend rechaza la compra: 400 (cantidad), 404 (oferta) o 502
+ *   (proveedor de pagos).
+ *
+ * @example
+ * ```ts
+ * const { checkoutUrl } = await createDocumentCreditCheckoutRequest({
+ *   catalogPriceId: '7f3c1f6e-2b4a-4c8d-9e15-0a1b2c3d4e5f',
+ *   quantity: 5,
+ * });
+ * ```
  */
-export async function createDocumentCreditCheckoutRequest(
-  catalogPriceId: string,
-): Promise<{ checkoutUrl: string }> {
+export async function createDocumentCreditCheckoutRequest({
+  catalogPriceId,
+  quantity,
+}: DocumentCreditCheckoutInput): Promise<{ checkoutUrl: string }> {
   const { data } = await apiClient.post<{
     success: boolean;
     message: string;
     data: { checkoutUrl: string };
-  }>('/api/v1/payments/document-credits/checkout', { catalogPriceId });
+  }>('/api/v1/payments/document-credits/checkout', {
+    catalogPriceId,
+    quantity,
+  });
 
   return data.data;
 }
