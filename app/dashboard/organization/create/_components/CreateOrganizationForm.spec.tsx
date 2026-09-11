@@ -4,7 +4,6 @@ import CreateOrganizationForm from './CreateOrganizationForm';
 import { useCreateOrganization } from '../_hooks/useCreateOrganization';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { buildBillingAccess } from '@/lib/api/billing.fixtures';
-import { ORGANIZATION_ACCOUNT_TOOLTIP } from '@/lib/hooks/useCanCreateOrganization';
 
 jest.mock('../_hooks/useCreateOrganization');
 
@@ -13,27 +12,15 @@ const mockedUseCreateOrganization = useCreateOrganization as jest.Mock;
 const ACCOUNT_ID = 'account-1';
 
 /**
- * A esta pantalla se puede llegar escribiendo la URL, así que el formulario mira el plan de la
- * cuenta activa igual que el menú que lleva hasta él (ver `useCanCreateOrganization`).
+ * Llena los dos campos obligatorios del formulario.
+ *
+ * @param user - Sesión de `userEvent`.
+ * @returns Nada.
+ *
+ * @example
+ * await fillForm(user);
  */
-function setBilling(organizationAccount: boolean) {
-  useAuthStore.setState({
-    activeAccount: {
-      id: ACCOUNT_ID,
-      accountType: 'PERSONAL',
-      organizationId: null,
-      roleId: 'OWNER',
-    },
-    billingByAccountId: {
-      [ACCOUNT_ID]: buildBillingAccess({
-        currentPlanType: organizationAccount ? 'plus' : 'free',
-        actions: { organizationAccount },
-      }),
-    },
-  });
-}
-
-async function llenarFormulario(user: ReturnType<typeof userEvent.setup>) {
+async function fillForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/nombre de visualización/i), 'Acme');
   await user.type(
     screen.getByLabelText(/razón social/i),
@@ -50,7 +37,15 @@ describe('CreateOrganizationForm', () => {
       mutate,
       isPending: false,
     });
-    setBilling(true);
+    useAuthStore.setState({
+      activeAccount: {
+        id: ACCOUNT_ID,
+        accountType: 'PERSONAL',
+        organizationId: null,
+        roleId: 'OWNER',
+      },
+      billingByAccountId: {},
+    });
   });
 
   it('mantiene el botón deshabilitado hasta llenar ambos campos obligatorios', async () => {
@@ -79,14 +74,7 @@ describe('CreateOrganizationForm', () => {
     const user = userEvent.setup();
     renderWithProviders(<CreateOrganizationForm />);
 
-    await user.type(
-      screen.getByLabelText(/nombre de visualización/i),
-      'Acme',
-    );
-    await user.type(
-      screen.getByLabelText(/razón social/i),
-      'Acme Corp S.A. de C.V.',
-    );
+    await fillForm(user);
     await user.click(
       screen.getByRole('button', { name: /crear organización/i }),
     );
@@ -106,27 +94,45 @@ describe('CreateOrganizationForm', () => {
     ).toBeDisabled();
   });
 
-  describe('cuando el plan no incluye la cuenta empresarial', () => {
-    beforeEach(() => {
-      setBilling(false);
+  /**
+   * Crear organizaciones ya no depende del plan: ni botón bloqueado, ni aviso, ni validación local
+   * que impida enviar.
+   */
+  describe('sin restricción de plan', () => {
+    it('envía la solicitud con la cuenta activa en plan Free', async () => {
+      const user = userEvent.setup();
+      useAuthStore.setState({
+        billingByAccountId: {
+          [ACCOUNT_ID]: buildBillingAccess({
+            currentPlanType: 'free',
+            hasActiveSubscription: false,
+            actions: { organizationAccount: false },
+          }),
+        },
+      });
+      renderWithProviders(<CreateOrganizationForm />);
+
+      await fillForm(user);
+      const submitButton = screen.getByRole('button', {
+        name: /crear organización/i,
+      });
+      expect(submitButton).not.toHaveAttribute('aria-disabled', 'true');
+      await user.click(submitButton);
+
+      expect(mutate).toHaveBeenCalledTimes(1);
     });
 
-    /**
-     * `aria-disabled` y no `disabled`: un botón deshabilitado de verdad no recibe puntero ni
-     * foco, y el tooltip que explica el bloqueo no se vería nunca.
-     */
-    it('deja el botón deshabilitado aunque el formulario sea válido', async () => {
+    it('envía la solicitud aunque todavía no se conozca el estado comercial', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateOrganizationForm />);
 
-      await llenarFormulario(user);
+      await fillForm(user);
+      await user.type(screen.getByLabelText(/razón social/i), '{Enter}');
 
-      expect(
-        screen.getByRole('button', { name: /crear organización/i }),
-      ).toHaveAttribute('aria-disabled', 'true');
+      expect(mutate).toHaveBeenCalledTimes(1);
     });
 
-    it('explica el bloqueo al pasar el cursor', async () => {
+    it('ya no muestra el aviso "No disponible en plan Free"', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateOrganizationForm />);
 
@@ -135,31 +141,8 @@ describe('CreateOrganizationForm', () => {
       );
 
       expect(
-        await screen.findByText(ORGANIZATION_ACCOUNT_TOOLTIP),
-      ).toBeInTheDocument();
-    });
-
-    it('no envía nada al pulsar el botón', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<CreateOrganizationForm />);
-
-      await llenarFormulario(user);
-      await user.click(
-        screen.getByRole('button', { name: /crear organización/i }),
-      );
-
-      expect(mutate).not.toHaveBeenCalled();
-    });
-
-    /** El botón no es la única forma de enviar: Enter en un campo también dispara el submit. */
-    it('tampoco envía al pulsar Enter en un campo', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<CreateOrganizationForm />);
-
-      await llenarFormulario(user);
-      await user.type(screen.getByLabelText(/razón social/i), '{Enter}');
-
-      expect(mutate).not.toHaveBeenCalled();
+        screen.queryByText('No disponible en plan Free'),
+      ).not.toBeInTheDocument();
     });
   });
 });
