@@ -68,7 +68,9 @@ export default function PermissionsView() {
         <div>
           <h1 className="text-lg font-semibold">Permisos</h1>
           <p className="text-sm text-muted-foreground">
-            Administra el catálogo de permisos de tu organización.
+            Administra el catálogo propio de tu organización. Son etiquetas
+            informativas y no otorgan accesos: lo que cada persona puede hacer
+            lo define su rol, en la pestaña Miembros.
           </p>
         </div>
         <CreatePermissionModal organizationId={organizationId as string} />
