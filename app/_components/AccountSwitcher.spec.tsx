@@ -1,17 +1,18 @@
 import userEvent from '@testing-library/user-event';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AccountSwitcher from './AccountSwitcher';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { buildBillingAccess } from '@/lib/api/billing.fixtures';
-import { ORGANIZATION_ACCOUNT_TOOLTIP } from '@/lib/hooks/useCanCreateOrganization';
+import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
 import type {
   AccountListEntry,
   ActiveAccount,
 } from '@/lib/store/types/auth-store.types';
 
-const push = jest.fn();
+const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 const PERSONAL: AccountListEntry = {
@@ -32,21 +33,17 @@ const ORG: AccountListEntry = {
   status: 'ACTIVE',
 };
 
-/**
- * Deja en el store el estado comercial de una cuenta, que es de donde el selector saca si puede
- * ofrecer la creación de organizaciones (ver `useCanCreateOrganization`).
- */
-function setBillingDe(accountId: string, organizationAccount: boolean) {
-  useAuthStore.setState({
-    billingByAccountId: {
-      [accountId]: buildBillingAccess({
-        currentPlanType: organizationAccount ? 'plus' : 'free',
-        actions: { organizationAccount },
-      }),
-    },
-  });
-}
+let queryClient: QueryClient;
 
+/**
+ * Deja una cuenta como la activa en el store.
+ *
+ * @param entry - Cuenta del catálogo, o `null` para ninguna.
+ * @returns Nada.
+ *
+ * @example
+ * setActiveAccount(PERSONAL);
+ */
 function setActiveAccount(entry: AccountListEntry | null) {
   const activeAccount: ActiveAccount | null = entry
     ? {
@@ -59,36 +56,66 @@ function setActiveAccount(entry: AccountListEntry | null) {
   useAuthStore.setState({ activeAccount });
 }
 
+/**
+ * Monta el selector con un `QueryClient` que la prueba puede inspeccionar.
+ *
+ * @returns El resultado del render.
+ *
+ * @example
+ * renderSwitcher();
+ */
+function renderSwitcher() {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AccountSwitcher />
+    </QueryClientProvider>,
+  );
+}
+
+/**
+ * Abre el menú desde la cuenta personal y devuelve la opción "Crear organización".
+ *
+ * @param user - Sesión de `userEvent`.
+ * @returns La opción del menú.
+ *
+ * @example
+ * const option = await openMenu(user);
+ */
+async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByText('Mi cuenta personal'));
+  return screen.findByRole('menuitem', { name: /crear organización/i });
+}
+
 describe('AccountSwitcher', () => {
   beforeEach(() => {
-    push.mockReset();
+    mockPush.mockReset();
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     useAuthStore.setState({
       accountsList: [PERSONAL, ORG],
       activeAccount: null,
       billingByAccountId: {},
     });
-    // Salvo que la prueba diga lo contrario, la cuenta activa tiene plan: lo que se mira en la
-    // mayoría de los casos es el catálogo de cuentas, no el bloqueo comercial.
-    setBillingDe(PERSONAL.id, true);
   });
 
   it('muestra "Cuenta" cuando activeAccount no coincide con ninguna entrada del catálogo', () => {
     setActiveAccount({ ...PERSONAL, id: 'no-existe' });
-    render(<AccountSwitcher />);
+    renderSwitcher();
 
     expect(screen.getByText('Cuenta')).toBeInTheDocument();
   });
 
   it('muestra "Mi cuenta personal" cuando la cuenta activa es PERSONAL', () => {
     setActiveAccount(PERSONAL);
-    render(<AccountSwitcher />);
+    renderSwitcher();
 
     expect(screen.getByText('Mi cuenta personal')).toBeInTheDocument();
   });
 
   it('muestra el nombre de la organización cuando la cuenta activa es ORGANIZATION', () => {
     setActiveAccount(ORG);
-    render(<AccountSwitcher />);
+    renderSwitcher();
 
     expect(screen.getByText('Acme Corp S.A. de C.V.')).toBeInTheDocument();
   });
@@ -96,7 +123,7 @@ describe('AccountSwitcher', () => {
   it('lista todas las cuentas del catálogo y marca la activa como "Actual"', async () => {
     const user = userEvent.setup();
     setActiveAccount(PERSONAL);
-    render(<AccountSwitcher />);
+    renderSwitcher();
 
     await user.click(screen.getByText('Mi cuenta personal'));
 
@@ -118,7 +145,7 @@ describe('AccountSwitcher', () => {
   it('al elegir otra cuenta, la vuelve la activa en el store', async () => {
     const user = userEvent.setup();
     setActiveAccount(PERSONAL);
-    render(<AccountSwitcher />);
+    renderSwitcher();
 
     await user.click(screen.getByText('Mi cuenta personal'));
     await user.click(
@@ -130,128 +157,87 @@ describe('AccountSwitcher', () => {
     expect(useAuthStore.getState().activeAccount?.id).toBe('org-1');
   });
 
-  it('"Crear organización" navega a /organization/create', async () => {
+  /**
+   * Cambiar de cuenta no puede reutilizar lo cacheado de la última visita: se tira y se vuelve a
+   * pedir, para que las rutas se habiliten con el estado comercial vigente de esa cuenta.
+   */
+  it('al elegir otra cuenta, descarta su estado comercial cacheado para volver a consultarlo', async () => {
     const user = userEvent.setup();
     setActiveAccount(PERSONAL);
-    render(<AccountSwitcher />);
+    queryClient.setQueryData(
+      billingAccessQueryKey(ORG.id),
+      buildBillingAccess({ currentPlanType: 'plus' }),
+    );
+    renderSwitcher();
 
     await user.click(screen.getByText('Mi cuenta personal'));
     await user.click(
-      await screen.findByRole('menuitem', { name: /crear organización/i }),
+      await screen.findByRole('menuitem', { name: /acme corp/i }),
     );
 
-    expect(push).toHaveBeenCalledWith('/dashboard/organization/create');
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(billingAccessQueryKey(ORG.id)),
+      ).toBeUndefined(),
+    );
+  });
+
+  it('"Crear organización" navega a /organization/create', async () => {
+    const user = userEvent.setup();
+    setActiveAccount(PERSONAL);
+    renderSwitcher();
+
+    await user.click(await openMenu(user));
+
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/organization/create');
   });
 
   /**
-   * La cuenta empresarial se paga. El bloqueo de acá es sólo experiencia de usuario —quien
-   * autoriza es el endpoint—, pero es el que evita mandar a llenar un formulario que va a
-   * terminar en un 403.
+   * Crear organizaciones ya no depende del plan: la opción está disponible para cualquier usuario,
+   * sin bloqueo ni aviso de plan Free.
    */
-  describe('creación de organizaciones según el plan', () => {
-    async function openMenu(user: ReturnType<typeof userEvent.setup>) {
-      await user.click(screen.getByText('Mi cuenta personal'));
-      return screen.findByRole('menuitem', { name: /crear organización/i });
-    }
-
-    it('deshabilita la opción cuando el plan no incluye la cuenta empresarial', async () => {
-      const user = userEvent.setup();
-      setActiveAccount(PERSONAL);
-      setBillingDe(PERSONAL.id, false);
-      render(<AccountSwitcher />);
-
-      expect(await openMenu(user)).toHaveAttribute('aria-disabled', 'true');
-    });
-
-    it('no navega al pulsar la opción deshabilitada', async () => {
-      const user = userEvent.setup();
-      setActiveAccount(PERSONAL);
-      setBillingDe(PERSONAL.id, false);
-      render(<AccountSwitcher />);
-
-      await user.click(await openMenu(user));
-
-      expect(push).not.toHaveBeenCalled();
-    });
-
-    /** El tooltip es la única explicación que recibe el usuario, así que dice exactamente esto. */
-    it('explica el bloqueo al pasar el cursor', async () => {
-      const user = userEvent.setup();
-      setActiveAccount(PERSONAL);
-      setBillingDe(PERSONAL.id, false);
-      render(<AccountSwitcher />);
-
-      await user.hover(await openMenu(user));
-
-      expect(
-        await screen.findByText(ORGANIZATION_ACCOUNT_TOOLTIP),
-      ).toBeInTheDocument();
-    });
-
-    /** Con teclado tiene que decir lo mismo: por eso el bloqueo no usa `disabled`. */
-    it('explica el bloqueo también al enfocar con el teclado', async () => {
-      const user = userEvent.setup();
-      setActiveAccount(PERSONAL);
-      setBillingDe(PERSONAL.id, false);
-      render(<AccountSwitcher />);
-
-      const option = await openMenu(user);
-      // El foco lo mueve el menú por dentro (navegación por lista), así que va envuelto en `act`.
-      await act(async () => option.focus());
-
-      expect(
-        await screen.findByText(ORGANIZATION_ACCOUNT_TOOLTIP),
-      ).toBeInTheDocument();
-    });
-
-    it('habilita la opción cuando el plan sí la incluye', async () => {
-      const user = userEvent.setup();
-      setActiveAccount(PERSONAL);
-      setBillingDe(PERSONAL.id, true);
-      render(<AccountSwitcher />);
-
-      const option = await openMenu(user);
-
-      expect(option).not.toHaveAttribute('aria-disabled', 'true');
-      expect(
-        screen.queryByText(ORGANIZATION_ACCOUNT_TOOLTIP),
-      ).not.toBeInTheDocument();
-    });
-
-    /**
-     * El estado comercial vive indexado por cuenta, así que cambiar de cuenta activa recalcula
-     * el bloqueo sin ningún efecto explícito ni petición nueva. Es el caso de quien tiene su
-     * cuenta personal en Free y una organización con plan.
-     */
-    it('recalcula el estado al cambiar de cuenta activa', async () => {
+  describe('creación de organizaciones sin restricción de plan', () => {
+    it('está disponible con la cuenta activa en plan Free', async () => {
       const user = userEvent.setup();
       setActiveAccount(PERSONAL);
       useAuthStore.setState({
         billingByAccountId: {
           [PERSONAL.id]: buildBillingAccess({
             currentPlanType: 'free',
+            hasActiveSubscription: false,
             actions: { organizationAccount: false },
-          }),
-          [ORG.id]: buildBillingAccess({
-            currentPlanType: 'plus',
-            actions: { organizationAccount: true },
           }),
         },
       });
-      render(<AccountSwitcher />);
+      renderSwitcher();
 
-      expect(await openMenu(user)).toHaveAttribute('aria-disabled', 'true');
+      const option = await openMenu(user);
+      expect(option).not.toHaveAttribute('aria-disabled', 'true');
 
-      await user.click(
-        await screen.findByRole('menuitem', {
-          name: /acme corp s\.a\. de c\.v\./i,
-        }),
-      );
-      await user.click(screen.getByText('Acme Corp S.A. de C.V.'));
+      await user.click(option);
+      expect(mockPush).toHaveBeenCalledWith('/dashboard/organization/create');
+    });
+
+    it('está disponible aunque todavía no se conozca el estado comercial', async () => {
+      const user = userEvent.setup();
+      setActiveAccount(PERSONAL);
+      renderSwitcher();
+
+      await user.click(await openMenu(user));
+
+      expect(mockPush).toHaveBeenCalledWith('/dashboard/organization/create');
+    });
+
+    it('ya no muestra el aviso "No disponible en plan Free"', async () => {
+      const user = userEvent.setup();
+      setActiveAccount(PERSONAL);
+      renderSwitcher();
+
+      await user.hover(await openMenu(user));
 
       expect(
-        await screen.findByRole('menuitem', { name: /crear organización/i }),
-      ).not.toHaveAttribute('aria-disabled', 'true');
+        screen.queryByText('No disponible en plan Free'),
+      ).not.toBeInTheDocument();
     });
   });
 });
