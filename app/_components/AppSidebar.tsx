@@ -39,6 +39,7 @@ import {
   DOCUMENTS_NAV_SECTIONS,
   DOCUMENTS_SECTIONS,
 } from '@/app/dashboard/documents/_config/sections';
+import { NAV_GROUP_LABELS } from '@/app/dashboard/_config/nav-groups';
 import AccountSwitcher from './AccountSwitcher';
 
 interface NavItem {
@@ -59,8 +60,10 @@ export interface NavGroup {
   /** Identidad estable del grupo; también sirve de `key` cuando no lleva encabezado. */
   key: string;
   /**
-   * Encabezado del grupo. Opcional: el de documentos no lo lleva porque su entrada principal se
-   * llama igual, y "Documentos > Documentos" es un nivel que no informa de nada.
+   * Encabezado del grupo, de `NAV_GROUP_LABELS` para que diga exactamente lo mismo que el primer
+   * nivel del breadcrumb de sus pantallas. Opcional: el de documentos no lo lleva porque su
+   * entrada principal se llama igual, y "Documentos > Documentos" es un nivel que no informa de
+   * nada.
    */
   label?: string;
   items: NavItem[];
@@ -86,7 +89,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: 'payments',
-    label: 'Pagos',
+    label: NAV_GROUP_LABELS.payments,
     availableWithoutPlan: true,
     items: [
       {
@@ -105,7 +108,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: 'settings',
-    label: 'Configuración',
+    label: NAV_GROUP_LABELS.settings,
     items: [
       {
         label: 'Información personal',
@@ -124,7 +127,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: 'organization',
-    label: 'Organización',
+    label: NAV_GROUP_LABELS.organization,
     orgOnly: true,
     items: [
       {
