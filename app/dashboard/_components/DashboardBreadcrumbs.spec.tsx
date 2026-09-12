@@ -1,6 +1,7 @@
 import { renderWithProviders, screen } from '@/test-utils';
 import DashboardBreadcrumbs from './DashboardBreadcrumbs';
 import { useDocumentDetail } from '../documents/[documentId]/_hooks/useDocumentDetail';
+import { NAV_GROUP_LABELS } from '../_config/nav-groups';
 
 const mockUsePathname = jest.fn();
 
@@ -132,6 +133,62 @@ describe('DashboardBreadcrumbs', () => {
       '',
       expect.objectContaining({ enabled: false }),
     );
+  });
+
+  /**
+   * Pagos y Configuración agrupan pantallas hermanas en el menú, pero hasta ahora sus breadcrumbs
+   * empezaban directamente por la pantalla: "Planes" a secas no dice de qué módulo cuelga, y
+   * "Información personal" e "Identidad y firma" se leían como dos secciones sueltas en vez de
+   * como dos pantallas de Configuración.
+   */
+  describe('módulo como primer nivel', () => {
+    it.each([
+      ['/dashboard/plans', 'Pagos', 'Planes'],
+      ['/dashboard/subscriptions', 'Pagos', 'Suscripciones'],
+      ['/dashboard/personal-documents', 'Configuración', 'Información personal'],
+    ])('en %s muestra "%s / %s"', (pathname, group, page) => {
+      mockUsePathname.mockReturnValue(pathname);
+
+      renderWithProviders(<DashboardBreadcrumbs />);
+
+      // El módulo no es clickeable: no tiene pantalla propia a la que llevar.
+      expect(screen.getByText(group)).toHaveAttribute('aria-disabled', 'true');
+      expect(screen.queryByRole('link', { name: group })).not.toBeInTheDocument();
+
+      expect(screen.getByText(page)).toHaveAttribute('aria-current', 'page');
+      expect(screen.queryByRole('link', { name: page })).not.toBeInTheDocument();
+    });
+
+    /** Tres niveles: el módulo, la pantalla padre —que sí es una página real— y la actual. */
+    it('en Identidad y firma muestra "Configuración / Información personal / Identidad y firma"', () => {
+      mockUsePathname.mockReturnValue('/dashboard/personal-documents/identity');
+
+      renderWithProviders(<DashboardBreadcrumbs />);
+
+      expect(screen.getByText('Configuración')).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+      expect(
+        screen.getByRole('link', { name: 'Información personal' }),
+      ).toHaveAttribute('href', '/dashboard/personal-documents');
+      expect(screen.getByText('Identidad y firma')).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    });
+
+    /**
+     * Los nombres salen de la misma constante que rotula los grupos del menú lateral, así que
+     * renombrar el módulo en un sitio no puede dejar el otro con el nombre viejo.
+     */
+    it('usa exactamente los rótulos del menú lateral', () => {
+      mockUsePathname.mockReturnValue('/dashboard/plans');
+
+      renderWithProviders(<DashboardBreadcrumbs />);
+
+      expect(screen.getByText(NAV_GROUP_LABELS.payments)).toBeInTheDocument();
+    });
   });
 
   it('no renderiza nada para una ruta sin breadcrumbs configurados', () => {
