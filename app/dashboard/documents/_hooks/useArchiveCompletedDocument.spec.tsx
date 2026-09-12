@@ -56,7 +56,12 @@ describe('useArchiveCompletedDocument', () => {
    * La fila desaparece por refetch: el backend ya excluye del listado lo que este usuario
    * archivó, así que invalidar trae la lista buena con su paginación recalculada. Se invalida la
    * clave raíz porque el documento puede estar cacheado en varias combinaciones de
-   * cuenta/sección/página/filtros a la vez (ver `useDocuments`).
+   * cuenta/filtros/página a la vez (ver `useDocuments`).
+   *
+   * La clave se comprueba literal, y no con `expect.anything()`, porque el fallo que esta prueba
+   * dejó pasar fue exactamente ése: el hook invalidaba `['myDocuments']` —el nombre anterior a la
+   * unificación del listado— y la prueba afirmaba el mismo valor equivocado, así que ninguna de
+   * las dos notaba que no se refrescaba nada.
    */
   it('invalida el listado de documentos para que la fila archivada desaparezca', async () => {
     const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
@@ -68,7 +73,7 @@ describe('useArchiveCompletedDocument', () => {
 
     await waitFor(() =>
       expect(invalidateQueries).toHaveBeenCalledWith({
-        queryKey: ['myDocuments'],
+        queryKey: ['documents'],
       }),
     );
   });
