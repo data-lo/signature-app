@@ -26,10 +26,15 @@ describe('visibleNavGroups', () => {
     ).toEqual(['documents', 'payments', 'settings', 'organization']);
   });
 
-  /** Sólo Planes y Suscripciones: el resto la guarda lo mandaría de vuelta a Planes. */
-  it('a una organización sin plan sólo le muestra Pagos', () => {
+  /**
+   * Pagos y Organización. Lo operativo —documentos y firmas— sí queda fuera: la guarda lo
+   * mandaría de vuelta a Planes. La administración se queda porque quien crea la organización es
+   * su administrador desde el alta, y un menú con una sola opción en la organización que acaba de
+   * crear no le deja hacer nada de lo que su rol le permite.
+   */
+  it('a una organización sin plan le muestra Pagos y su administración', () => {
     expect(
       visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: true }),
-    ).toEqual(['payments']);
+    ).toEqual(['payments', 'organization']);
   });
 });

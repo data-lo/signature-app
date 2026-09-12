@@ -10,9 +10,15 @@ import {
 } from '@/lib/billing/organization-plan-access';
 import { useOrganizationPlanAccess } from '@/lib/hooks/useOrganizationPlanAccess';
 
-/** Lo que se le dice a quien está en una organización que todavía no contrata un plan. */
+/**
+ * Lo que se le dice a quien está en una organización que todavía no contrata un plan.
+ *
+ * Ya no menciona la configuración de la organización: administrarla —miembros y permisos— no
+ * depende del plan, así que prometer que el plan la habilita contradice lo que la persona tiene
+ * delante en el menú.
+ */
 export const ORGANIZATION_WITHOUT_PLAN_MESSAGE =
-  'Esta organización todavía no tiene un plan. Contrata uno para habilitar documentos, firmas y la configuración de la organización.';
+  'Esta organización todavía no tiene un plan. Contrata uno para habilitar documentos y firmas; mientras tanto puedes administrar a sus miembros y sus permisos.';
 
 /**
  * Aviso de organización sin plan, sobre Planes y Suscripciones.
@@ -67,12 +73,14 @@ function PlanAccessLoader() {
  *
  * Tres casos:
  *
- * - **Planes, Suscripciones y Crear organización** se muestran siempre; si la cuenta es una
- *   organización sin plan, con un aviso encima que explica por qué no puede hacer nada más.
+ * - **Planes, Suscripciones, Crear organización y la administración de la organización**
+ *   (miembros y permisos) se muestran siempre; si la cuenta es una organización sin plan, con un
+ *   aviso encima que explica qué le falta por habilitar.
  * - **Cualquier otra ruta** espera a conocer el estado comercial de la cuenta activa y, mientras
  *   tanto, no muestra su contenido: pintarlo para esconderlo medio segundo después dejaría ver —y
  *   pulsar— lo que no se puede usar.
- * - **Una organización sin plan** que intenta abrir una ruta operativa se manda a Planes.
+ * - **Una organización sin plan** que intenta abrir una ruta operativa —documentos y firmas, lo
+ *   que se paga— se manda a Planes.
  *
  * Cambiar de cuenta en el selector resetea el estado comercial de la cuenta destino (ver
  * `useSwitchActiveAccount`), así que esta guarda vuelve a esperar y decide con la respuesta nueva:

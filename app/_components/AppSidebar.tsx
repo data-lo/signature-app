@@ -66,7 +66,10 @@ export interface NavGroup {
   items: NavItem[];
   /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
   orgOnly?: boolean;
-  /** Visible también para una organización sin plan: son las pantallas donde lo contrata. */
+  /**
+   * Visible también para una organización sin plan: las pantallas donde lo contrata (Pagos) y
+   * las de administración de la organización, que no dependen del plan.
+   */
   availableWithoutPlan?: boolean;
 }
 
@@ -126,6 +129,14 @@ export const NAV_GROUPS: NavGroup[] = [
     key: 'organization',
     label: 'Organización',
     orgOnly: true,
+    /**
+     * Visible también sin plan: quien crea una organización queda como su administrador en el
+     * acto, y esconderle la administración hasta que pague lo dejaba con un menú de una sola
+     * opción —Planes— en la organización que acaba de crear. Lo que el plan habilita es operar
+     * (documentos y firmas); repartir accesos es administrarla, y el backend nunca lo condicionó
+     * al plan.
+     */
+    availableWithoutPlan: true,
     items: [
       {
         label: 'Administrar miembros',
@@ -153,10 +164,11 @@ export const NAV_GROUPS: NavGroup[] = [
  * Filtra los grupos del menú que se muestran para la cuenta activa.
  *
  * Los grupos de organización sólo aparecen con una organización activa. Si esa organización todavía
- * no tiene plan, sólo quedan los grupos marcados `availableWithoutPlan` (Pagos): las rutas
- * operativas no se ofrecen porque la guarda las mandaría de vuelta a Planes. Mientras se consulta
- * el plan (`lockedWithoutPlan` en `false`) se muestra el menú completo, para que no se reacomode
- * con cada cambio de cuenta.
+ * no tiene plan, sólo quedan los grupos marcados `availableWithoutPlan` —Pagos, donde lo contrata,
+ * y Organización, que su administrador puede usar desde el alta—: las rutas operativas no se
+ * ofrecen porque la guarda las mandaría de vuelta a Planes. Mientras se consulta el plan
+ * (`lockedWithoutPlan` en `false`) se muestra el menú completo, para que no se reacomode con cada
+ * cambio de cuenta.
  *
  * @param groups - Todos los grupos del menú.
  * @param options.accountType - Tipo de la cuenta activa; `undefined` mientras se rehidrata.
@@ -165,7 +177,7 @@ export const NAV_GROUPS: NavGroup[] = [
  *
  * @example
  * ```ts
- * visibleNavGroups(NAV_GROUPS, { accountType: 'ORGANIZATION', lockedWithoutPlan: true }); // sólo Pagos
+ * visibleNavGroups(NAV_GROUPS, { accountType: 'ORGANIZATION', lockedWithoutPlan: true }); // Pagos y Organización
  * ```
  */
 export function visibleNavGroups(
