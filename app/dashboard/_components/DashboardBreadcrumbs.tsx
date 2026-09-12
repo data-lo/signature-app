@@ -48,18 +48,10 @@ const DOCUMENTS_CRUMBS: Record<string, Crumb[]> = {
 const STATIC_CRUMBS: Record<string, Crumb[]> = {
   ...DOCUMENTS_CRUMBS,
   '/dashboard/organization/create': [{ label: 'Crear organización' }],
-  '/dashboard/organization/settings/members': [
-    {
-      label: 'Organización',
-      href: '/dashboard/organization/settings/members',
-    },
-    { label: 'Administrar miembros' },
-  ],
+  // "Organización" quedó sin página propia al mudarse Administrar miembros a su ruta con
+  // `organizationId`: ya no hay una URL fija a la que llevar, así que es un agrupador sin enlace.
   '/dashboard/organization/settings/permissions': [
-    {
-      label: 'Organización',
-      href: '/dashboard/organization/settings/members',
-    },
+    { label: 'Organización' },
     { label: 'Permisos' },
   ],
   '/dashboard/personal-documents': [{ label: 'Información personal' }],
@@ -75,6 +67,14 @@ const STATIC_CRUMBS: Record<string, Crumb[]> = {
 };
 
 const DOCUMENT_DETAIL_PATTERN = /^\/dashboard\/documents\/([^/]+)$/;
+
+/**
+ * Administrar miembros, cuya ruta lleva el `organizationId`. No puede entrar en el mapa estático
+ * por eso mismo, y no hace falta resolver el nombre de la organización: el nivel que se muestra
+ * es la sección, no la organización.
+ */
+const ORGANIZATION_MEMBERS_PATTERN =
+  /^\/dashboard\/organizations\/[^/]+\/members$/;
 
 function useCrumbs(pathname: string): Crumb[] {
   // Las rutas de las secciones anteriores ya no llegan hasta acá: las redirige el servidor al
@@ -96,6 +96,10 @@ function useCrumbs(pathname: string): Crumb[] {
       DOCUMENTS_PARENT_CRUMB,
       { label: document?.fileName ?? 'Detalle del documento' },
     ];
+  }
+
+  if (ORGANIZATION_MEMBERS_PATTERN.test(pathname)) {
+    return [{ label: 'Organización' }, { label: 'Administrar miembros' }];
   }
 
   return staticCrumbs ?? [];

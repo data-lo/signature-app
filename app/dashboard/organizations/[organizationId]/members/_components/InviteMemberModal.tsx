@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UserPlus } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,19 +19,44 @@ import {
 import { FieldGroup } from '@/components/ui/field';
 import { FormInput } from '@/components/form/form-input';
 import { FormSelect } from '@/components/form/form-select';
+import { Form } from '@/components/form/form';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
-import { useInviteMember } from '../_hooks/useInviteMember';
+import { inviteOrganizationMemberAction } from '@/app/server-actions/organizations/invite-organization-member.server-action';
 import { inviteMemberSchema, type InviteMemberFormValues } from '../_schemas';
-import { Form } from '@/components/form/form';
 
-export default function InviteMemberModal() {
+interface InviteMemberModalProps {
+  organizationId: string;
+}
+
+/**
+ * Invitación por correo de alguien que todavía no tiene cuenta.
+ *
+ * El envío va por Server Action y no por `apiClient`: la petición sale del servidor de Next con
+ * la cookie de sesión, y el navegador nunca habla directamente con el backend. El
+ * `activeAccount.id` se lee del store y se pasa como argumento porque el backend resuelve la
+ * organización desde ese header y el servidor no puede leer `localStorage`.
+ *
+ * Tras invitar se refresca la ruta: la persona invitada aparece en el listado con el estado
+ * "Invitación pendiente", que es la confirmación que el administrador espera ver.
+ *
+ * @param props - Organización activa, para revalidar su sección al terminar.
+ * @returns El botón de invitar con su formulario en un modal.
+ * @throws Nada: el Server Action devuelve el rechazo como resultado y aquí se avisa.
+ *
+ * @example
+ * ```tsx
+ * <InviteMemberModal organizationId={organizationId} />
+ * ```
+ */
+export default function InviteMemberModal({
+  organizationId,
+}: InviteMemberModalProps) {
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const activeAccount = useAuthStore((state) => state.activeAccount);
-  // Consulta y mutación como instancias con nombre: `systemRolesQuery.isLoading` no se confunde
-  // con `inviteMemberMutation.isPending` ni obliga a renombrar `data` con alias.
   const systemRolesQuery = useSystemRoles(open);
-  const inviteMemberMutation = useInviteMember();
 
   const {
     control,
@@ -46,6 +73,8 @@ export default function InviteMemberModal() {
     return null;
   }
 
+  const accountId = activeAccount.id;
+
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
     if (!nextOpen) {
@@ -54,8 +83,21 @@ export default function InviteMemberModal() {
   }
 
   function onSubmit(values: InviteMemberFormValues) {
-    inviteMemberMutation.mutate(values, {
-      onSuccess: () => handleOpenChange(false),
+    startTransition(async () => {
+      const result = await inviteOrganizationMemberAction(
+        accountId,
+        organizationId,
+        values,
+      );
+
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success('Invitación enviada correctamente');
+      handleOpenChange(false);
+      router.refresh();
     });
   }
 
@@ -69,8 +111,8 @@ export default function InviteMemberModal() {
         <DialogHeader>
           <DialogTitle>Invitar miembro</DialogTitle>
           <DialogDescription>
-            Ingresa el correo del nuevo miembro y selecciona su rol dentro de
-            la organización.
+            Ingresa el correo del nuevo miembro y selecciona su rol dentro de la
+            organización.
           </DialogDescription>
         </DialogHeader>
         <Form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -108,17 +150,12 @@ export default function InviteMemberModal() {
               type="button"
               variant="outline"
               onClick={() => handleOpenChange(false)}
-              disabled={inviteMemberMutation.isPending}
+              disabled={isPending}
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={!isValid || inviteMemberMutation.isPending}
-            >
-              {inviteMemberMutation.isPending
-                ? 'Enviando...'
-                : 'Enviar invitación'}
+            <Button type="submit" disabled={!isValid || isPending}>
+              {isPending ? 'Enviando...' : 'Enviar invitación'}
             </Button>
           </DialogFooter>
         </Form>

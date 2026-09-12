@@ -16,23 +16,54 @@ describe('DashboardBreadcrumbs', () => {
     mockedUseDocumentDetail.mockReturnValue({ data: undefined });
   });
 
-  it('en una ruta estática muestra los niveles anteriores como links y el actual como no interactivo', () => {
+  /**
+   * "Organización" dejó de ser un enlace al mudarse Administrar miembros a una ruta que lleva el
+   * `organizationId`: ya no hay una URL fija a la que llevar, así que es un agrupador sin página
+   * propia. Antes apuntaba a la ruta de miembros, que ya no existe.
+   */
+  it('en una ruta estática muestra el agrupador sin enlace y el nivel actual como no interactivo', () => {
     mockUsePathname.mockReturnValue(
       '/dashboard/organization/settings/permissions',
     );
     renderWithProviders(<DashboardBreadcrumbs />);
 
-    const orgLink = screen.getByRole('link', { name: 'Organización' });
-    expect(orgLink).toHaveAttribute(
-      'href',
-      '/dashboard/organization/settings/members',
+    expect(screen.getByText('Organización')).toHaveAttribute(
+      'aria-disabled',
+      'true',
     );
+    expect(
+      screen.queryByRole('link', { name: 'Organización' }),
+    ).not.toBeInTheDocument();
 
     const current = screen.getByText('Permisos');
     expect(current).toHaveAttribute('aria-current', 'page');
     expect(
       screen.queryByRole('link', { name: 'Permisos' }),
     ).not.toBeInTheDocument();
+  });
+
+  /**
+   * La ruta de Administrar miembros lleva el id de la organización, así que no puede entrar en el
+   * mapa estático de breadcrumbs y se resuelve por patrón. Sin esta prueba, la sección quedaría
+   * sin ningún breadcrumb y nadie lo notaría hasta verlo en pantalla.
+   */
+  it('resuelve por patrón los breadcrumbs de Administrar miembros, con el id en la ruta', () => {
+    mockUsePathname.mockReturnValue(
+      '/dashboard/organizations/org-1/members',
+    );
+
+    renderWithProviders(<DashboardBreadcrumbs />);
+
+    expect(screen.getByText('Organización')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByText('Administrar miembros')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    // El id de la organización es plomería de la ruta, no un nivel que el usuario reconozca.
+    expect(screen.queryByText('org-1')).not.toBeInTheDocument();
   });
 
   /**
