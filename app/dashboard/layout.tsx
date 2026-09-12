@@ -5,6 +5,7 @@ import AppSidebar from '../_components/AppSidebar';
 import { DocumentsCountProvider } from '../_components/DocumentsCountContext';
 import AuthProvider from './_components/AuthProvider';
 import DashboardBreadcrumbs from './_components/DashboardBreadcrumbs';
+import OrganizationPlanGuard from './_components/OrganizationPlanGuard';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -21,7 +22,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarTrigger />
             </header>
             <DashboardBreadcrumbs />
-            {children}
+            {/* Una organización sin plan sólo puede abrir Planes y Suscripciones; el resto espera
+                a conocer el estado comercial de la cuenta activa (ver OrganizationPlanGuard). */}
+            <OrganizationPlanGuard>{children}</OrganizationPlanGuard>
           </SidebarInset>
         </SidebarProvider>
       </AuthProvider>

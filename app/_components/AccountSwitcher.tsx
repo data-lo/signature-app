@@ -11,16 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import {
-  ORGANIZATION_ACCOUNT_TOOLTIP,
-  useCanCreateOrganization,
-} from '@/lib/hooks/useCanCreateOrganization';
+import { useSwitchActiveAccount } from '@/lib/hooks/useSwitchActiveAccount';
 import type { AccountListEntry } from '@/lib/store/types/auth-store.types';
 
 function labelFor(account: AccountListEntry): string {
@@ -29,54 +21,26 @@ function labelFor(account: AccountListEntry): string {
     : 'Mi cuenta personal';
 }
 
+/**
+ * Selector de cuenta activa y acceso a "Crear organización".
+ *
+ * Cambiar de cuenta pasa por `useSwitchActiveAccount`, que vuelve a consultar el estado comercial
+ * de la cuenta elegida: la guarda de rutas espera esa respuesta antes de habilitar nada, así que
+ * pasar a una organización sin plan la manda a Planes y volver a la cuenta personal restaura sus
+ * accesos.
+ *
+ * **"Crear organización" está disponible siempre**, sin depender del plan de la cuenta activa: crear
+ * organizaciones ya no se cobra —lo que se paga es usarlas—, y el backend tampoco lo rechaza por
+ * plan.
+ */
 export default function AccountSwitcher() {
   const router = useRouter();
   const accountsList = useAuthStore((state) => state.accountsList);
   const activeAccount = useAuthStore((state) => state.activeAccount);
-  const setActiveAccount = useAuthStore((state) => state.setActiveAccount);
-  const canCreateOrganization = useCanCreateOrganization();
-
-  function handleSelect(account: AccountListEntry) {
-    setActiveAccount(account);
-  }
+  const switchActiveAccount = useSwitchActiveAccount();
 
   const activeEntry = accountsList.find(
     (account) => account.id === activeAccount?.id,
-  );
-
-  /**
-   * La opción bloqueada NO usa el `disabled` del menú, y no es un descuido.
-   *
-   * Un elemento deshabilitado de verdad deja de recibir puntero y foco, así que el tooltip que
-   * explica el bloqueo no llegaría a verse nunca —ni con el ratón ni con el teclado— y el usuario
-   * se quedaría con una opción muerta y sin motivo. Con `aria-disabled` la opción sigue siendo
-   * accesible y anunciándose como deshabilitada, que es justo lo que hace falta: el lector de
-   * pantalla dice que no se puede, y el tooltip dice por qué. Es el mismo criterio que ya sigue
-   * el botón de comprar documentos (ver `AddDocumentsDialog`).
-   *
-   * `closeOnClick={false}` cierra el círculo: si el menú se cerrara al pulsar, el tooltip se
-   * iría con él y pulsar parecería un fallo en vez de un bloqueo.
-   */
-  const createOrganizationItem = (
-    <DropdownMenuItem
-      aria-disabled={!canCreateOrganization}
-      closeOnClick={canCreateOrganization}
-      className={
-        canCreateOrganization
-          ? undefined
-          : 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50'
-      }
-      onClick={(event) => {
-        if (!canCreateOrganization) {
-          event.preventDefault();
-          return;
-        }
-        router.push('/dashboard/organization/create');
-      }}
-    >
-      <Plus className="size-4" />
-      Crear organización
-    </DropdownMenuItem>
   );
 
   return (
@@ -92,7 +56,7 @@ export default function AccountSwitcher() {
           {accountsList.map((account) => (
             <DropdownMenuItem
               key={account.id}
-              onClick={() => handleSelect(account)}
+              onClick={() => switchActiveAccount(account)}
             >
               {labelFor(account)}
               {account.id === activeAccount?.id && (
@@ -104,14 +68,12 @@ export default function AccountSwitcher() {
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        {canCreateOrganization ? (
-          createOrganizationItem
-        ) : (
-          <Tooltip>
-            <TooltipTrigger render={createOrganizationItem} />
-            <TooltipContent>{ORGANIZATION_ACCOUNT_TOOLTIP}</TooltipContent>
-          </Tooltip>
-        )}
+        <DropdownMenuItem
+          onClick={() => router.push('/dashboard/organization/create')}
+        >
+          <Plus className="size-4" />
+          Crear organización
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
