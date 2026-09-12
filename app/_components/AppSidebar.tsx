@@ -74,14 +74,18 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     key: 'documents',
     // Nombres y rutas salen de la configuración compartida del módulo, la misma que usa
-    // DashboardBreadcrumbs. Son dos entradas —la lista y el alta— desde que las tres secciones
-    // segmentadas se unificaron en una sola pantalla; el estado activo sigue siendo la
-    // coincidencia exacta del pathname.
+    // DashboardBreadcrumbs. Una sola entrada: el módulo entero se representa con "Documentos".
+    // El alta dejó de ser una entrada hermana —se entra por el botón de la propia pantalla— y
+    // por eso no está en DOCUMENTS_NAV_SECTIONS.
     items: DOCUMENTS_NAV_SECTIONS.map((section) => ({
       label: section.label,
       href: section.href,
       icon: section.icon,
-      isActive: (pathname: string) => pathname === section.href,
+      // La entrada marca todo su sub-árbol, no sólo su propia ruta: el alta y el detalle de un
+      // documento son pantallas del módulo, y dejar "Documentos" apagado mientras se está
+      // dentro de él haría parecer que se salió de la sección.
+      isActive: (pathname: string) =>
+        pathname === section.href || pathname.startsWith(`${section.href}/`),
     })),
   },
   {
@@ -210,12 +214,14 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
+              // La marca lleva al inicio del producto: el listado de documentos. Antes apuntaba
+              // al alta, cuando crear era una entrada de menú por derecho propio.
               render={
                 <Link
                   href={
                     lockedWithoutPlan
                       ? PLANS_ROUTE
-                      : DOCUMENTS_SECTIONS.create.href
+                      : DOCUMENTS_SECTIONS.list.href
                   }
                 />
               }

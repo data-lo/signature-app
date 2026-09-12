@@ -185,11 +185,16 @@ describe('DocumentsView', () => {
     expect(push).toHaveBeenCalledWith('/dashboard/documents/doc-9');
   });
 
+  /**
+   * El alta salió del sidebar: este botón es el único acceso a la creación desde la navegación,
+   * así que si desaparece la pantalla queda sin manera de llegar al alta salvo tecleando la
+   * URL a mano.
+   */
   it('ofrece crear un documento desde la misma pantalla', () => {
     renderWithProviders(<DocumentsView />);
 
     expect(
-      screen.getByRole('button', { name: /nuevo documento/i }),
+      screen.getByRole('button', { name: /crear documento/i }),
     ).toHaveAttribute('href', '/dashboard/documents/create');
   });
 });

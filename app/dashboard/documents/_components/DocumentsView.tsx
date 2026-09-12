@@ -80,6 +80,9 @@ export default function DocumentsView() {
         <h1 className="text-lg font-semibold text-foreground">
           {DOCUMENTS_SECTIONS.list.label}
         </h1>
+        {/* Única puerta de entrada al alta desde la navegación: dejó de ser una entrada del
+          sidebar, así que se ofrece acá, sobre la bandeja a la que el documento nuevo va a
+          parar. La ruta es la misma de siempre y sigue abriéndose por URL directa. */}
         <Button
           nativeButton={false}
           render={<Link href={DOCUMENTS_SECTIONS.create.href} />}
