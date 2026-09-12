@@ -1,56 +1,31 @@
-'use client';
-
-import { useEffect, useState, type ReactNode } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { ReactNode } from 'react';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
 
-const SETTINGS_TABS = [
-  { value: '/dashboard/organization/settings/members', label: 'Miembros' },
-  { value: '/dashboard/organization/settings/permissions', label: 'Permisos' },
-];
-
 /**
- * Bug corregido: `TabsTrigger` con `nativeButton={false}` + `render={<Link />}` produce un
- * mismatch de hidratación (Base UI emite `type="button"`/`aria-disabled` en el HTML de SSR pero
- * los omite en el primer render del cliente). Como este nav es puramente decorativo/navegación
- * (no hay un panel que cambiar in-place, cada "tab" es una ruta distinta), se difiere su montaje
- * al cliente: el pase de hidratación no incluye el componente (coincide con el HTML del server,
- * que tampoco lo renderiza), y `useEffect` lo monta justo después — sin discrepancia posible.
+ * Contenedor de la configuración de la organización.
+ *
+ * Ya no dibuja pestañas. Las tenía mientras convivían aquí "Miembros" y "Permisos"; al mudarse la
+ * administración de miembros a su propia ruta renderizada en el servidor
+ * (`/dashboard/organizations/[organizationId]/members`), lo que quedaba era una barra de una sola
+ * pestaña: un control que no lleva a ningún otro sitio y que sólo ocupa espacio.
+ *
+ * Con las pestañas se fue también el montaje diferido al cliente que las acompañaba. Existía por
+ * un desajuste de hidratación de `TabsTrigger` con `render={<Link />}`, así que sin ellas este
+ * layout puede volver a ser un Server Component.
+ *
+ * @param props - Contenido de la ruta hija.
+ * @returns El contenedor de página con el contenido dentro.
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * // Envuelve a /dashboard/organization/settings/permissions
+ * ```
  */
 export default function OrganizationSettingsLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  return (
-    <PageContainer className="flex flex-col gap-6">
-      {mounted && (
-        <Tabs value={pathname} onValueChange={() => {}}>
-          <TabsList>
-            {SETTINGS_TABS.map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                nativeButton={false}
-                render={<Link href={tab.value} />}
-              >
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      )}
-
-      {children}
-    </PageContainer>
-  );
+  return <PageContainer className="flex flex-col gap-6">{children}</PageContainer>;
 }

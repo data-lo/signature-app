@@ -61,12 +61,10 @@ export async function getMemberPermissionsRequest(
   return data.data.permissionIds;
 }
 
-export async function updateMemberPermissionsRequest(
-  accountId: string,
-  permissionIds: string[],
-): Promise<void> {
-  await apiClient.patch(
-    `/api/v1/organizations/members/${accountId}/permissions`,
-    { permissionIds },
-  );
-}
+/*
+  `updateMemberPermissionsRequest` se fue con la migración de Administrar miembros a renderizado
+  en el servidor: esa escritura la hace ahora
+  `update-organization-member-permissions.server-action.ts`. `getMemberPermissionsRequest` sigue
+  aquí porque el modal de asignación lo consulta al abrirse, que es una consulta perezosa y no la
+  carga inicial de la sección.
+*/

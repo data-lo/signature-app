@@ -46,6 +46,13 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   isActive: (pathname: string) => boolean;
+  /**
+   * Destino que depende de la organización activa. Lo necesitan las secciones renderizadas en el
+   * servidor, que llevan el `organizationId` en la ruta porque el servidor no puede leer la
+   * cuenta activa: vive en `localStorage`. Sólo se usa en grupos `orgOnly`, donde esa cuenta
+   * existe por definición.
+   */
+  buildHref?: (organizationId: string) => string;
 }
 
 export interface NavGroup {
@@ -122,10 +129,14 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         label: 'Administrar miembros',
-        href: '/dashboard/organization/settings/members',
+        // Respaldo inerte: este grupo es `orgOnly`, así que `buildHref` siempre tiene con qué
+        // construir el destino real.
+        href: '/dashboard/documents',
+        buildHref: (organizationId) =>
+          `/dashboard/organizations/${organizationId}/members`,
         icon: Users,
         isActive: (pathname) =>
-          pathname === '/dashboard/organization/settings/members',
+          /^\/dashboard\/organizations\/[^/]+\/members$/.test(pathname),
       },
       {
         label: 'Permisos',
@@ -232,7 +243,15 @@ export default function AppSidebar() {
                     <SidebarMenuButton
                       isActive={item.isActive(pathname)}
                       tooltip={item.label}
-                      render={<Link href={item.href} />}
+                      render={
+                        <Link
+                          href={
+                            item.buildHref && activeAccount?.organizationId
+                              ? item.buildHref(activeAccount.organizationId)
+                              : item.href
+                          }
+                        />
+                      }
                     >
                       <item.icon />
                       <span>{item.label}</span>

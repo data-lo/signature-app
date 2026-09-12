@@ -1,4 +1,3 @@
-import apiClient from '@/lib/axios';
 import type { RolePermission } from '@/lib/api/roles';
 
 export interface OrganizationMemberRole {
@@ -32,47 +31,12 @@ export interface AddOrganizationMemberValues {
   position?: string;
 }
 
-export async function getOrganizationMembersRequest(
-  organizationId: string,
-  includeInactive = false,
-): Promise<OrganizationMember[]> {
-  const { data } = await apiClient.get<{
-    success: boolean;
-    message: string;
-    data: OrganizationMember[];
-  }>(`/api/v1/organizations/${organizationId}/members`, {
-    params: includeInactive ? { includeInactive: true } : undefined,
-  });
+/*
+  Este módulo quedó siendo sólo los tipos.
 
-  return data.data;
-}
-
-/**
- * Alta directa de alguien que YA tiene cuenta. La organización la resuelve el backend desde el
- * header `X-Account-Id` que inyecta el cliente de axios, así que aquí no se manda ningún
- * identificador de organización: es lo que impide dar de alta en una organización ajena.
- */
-export async function addOrganizationMemberRequest(
-  values: AddOrganizationMemberValues,
-): Promise<OrganizationMember> {
-  const { data } = await apiClient.post<{
-    success: boolean;
-    message: string;
-    data: OrganizationMember;
-  }>('/api/v1/organizations/members', values);
-
-  return data.data;
-}
-
-export async function updateMemberRoleRequest(
-  accountId: string,
-  roleId: string,
-): Promise<void> {
-  await apiClient.patch(`/api/v1/organizations/members/${accountId}/role`, {
-    roleId,
-  });
-}
-
-export async function removeMemberRequest(accountId: string): Promise<void> {
-  await apiClient.delete(`/api/v1/organizations/members/${accountId}`);
-}
+  Las funciones que pedían y modificaban miembros desde el navegador (`getOrganizationMembers`,
+  `addOrganizationMember`, `updateMemberRole`, `removeMember`) se fueron con la migración de la
+  pantalla a renderizado en el servidor: ahora esas llamadas salen del servidor de Next, con la
+  cookie de sesión, desde `app/server-actions/organizations/`. Los tipos se quedan porque los usan
+  tanto los Server Actions como los componentes cliente que reciben los datos ya resueltos.
+*/

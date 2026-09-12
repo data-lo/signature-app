@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UserRoundPlus } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,12 +22,12 @@ import { FormSelect } from '@/components/form/form-select';
 import { Form } from '@/components/form/form';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
-import { useAddMember } from '../_hooks/useAddMember';
+import { addOrganizationMemberAction } from '@/app/server-actions/organizations/add-organization-member.server-action';
 import { addMemberSchema, type AddMemberFormValues } from '../_schemas';
 import RolePermissionsPreview from './RolePermissionsPreview';
 
 interface AddMemberModalProps {
-  organizationId: string | null;
+  organizationId: string;
 }
 
 /**
@@ -34,18 +36,29 @@ interface AddMemberModalProps {
  * Convive con "Invitar miembro" y no lo reemplaza: la invitación es para quien todavía no está
  * registrado y depende de que acepte un correo; esto es para quien ya está dentro, donde esa
  * espera no aporta nada. Si el correo no corresponde a ningún usuario, el backend responde
- * diciéndolo y el mensaje sugiere usar la invitación.
+ * diciéndolo y el mensaje llega hasta el aviso —por eso el Server Action devuelve el motivo del
+ * rechazo en vez de lanzar—.
  *
  * Al elegir el rol se listan debajo los permisos que ese rol otorga, para que la asignación se
  * confirme viendo lo que habilita y no sólo el nombre del rol.
+ *
+ * @param props - Organización activa, para revalidar su sección al terminar.
+ * @returns El botón de agregar con su formulario en un modal.
+ * @throws Nada: el Server Action devuelve el rechazo como resultado y aquí se avisa.
+ *
+ * @example
+ * ```tsx
+ * <AddMemberModal organizationId={organizationId} />
+ * ```
  */
 export default function AddMemberModal({
   organizationId,
 }: AddMemberModalProps) {
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const activeAccount = useAuthStore((state) => state.activeAccount);
   const systemRolesQuery = useSystemRoles(open);
-  const addMemberMutation = useAddMember(organizationId);
 
   const {
     control,
@@ -68,6 +81,8 @@ export default function AddMemberModal({
     return null;
   }
 
+  const accountId = activeAccount.id;
+
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
     if (!nextOpen) {
@@ -76,14 +91,26 @@ export default function AddMemberModal({
   }
 
   function onSubmit(values: AddMemberFormValues) {
-    addMemberMutation.mutate(
-      {
-        email: values.email,
-        roleId: values.roleId,
-        position: values.position?.trim() ? values.position.trim() : undefined,
-      },
-      { onSuccess: () => handleOpenChange(false) },
-    );
+    startTransition(async () => {
+      const result = await addOrganizationMemberAction(
+        accountId,
+        organizationId,
+        {
+          email: values.email,
+          roleId: values.roleId,
+          position: values.position?.trim() ? values.position.trim() : undefined,
+        },
+      );
+
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success('Miembro agregado correctamente');
+      handleOpenChange(false);
+      router.refresh();
+    });
   }
 
   return (
@@ -151,15 +178,12 @@ export default function AddMemberModal({
               type="button"
               variant="outline"
               onClick={() => handleOpenChange(false)}
-              disabled={addMemberMutation.isPending}
+              disabled={isPending}
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={!isValid || addMemberMutation.isPending}
-            >
-              {addMemberMutation.isPending ? 'Agregando...' : 'Agregar'}
+            <Button type="submit" disabled={!isValid || isPending}>
+              {isPending ? 'Agregando...' : 'Agregar'}
             </Button>
           </DialogFooter>
         </Form>

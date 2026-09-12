@@ -12,9 +12,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useOrganizationPermissions } from '@/lib/hooks/useOrganizationPermissions';
 import { useMemberPermissions } from '../_hooks/useMemberPermissions';
 import type { OrganizationMember } from '@/lib/api/organization-members';
+import type { OrganizationPermission } from '@/lib/api/organization-permissions';
 
 /**
  * Asignación de las etiquetas de `organization_permissions`.
@@ -24,10 +24,19 @@ import type { OrganizationMember } from '@/lib/api/organization-members';
  * efectivos vienen del rol (`role_permissions`), y por eso el texto de este modal evita hablar de
  * "permisos" a secas — presentarlo como control de acceso haría creer que aquí se abre o cierra
  * algo que en realidad se decide en el rol.
+ *
+ * El catálogo de la organización llega como prop, ya resuelto en el servidor junto con los
+ * miembros: abrir este modal ya no dispara una consulta para pintarlo.
+ *
+ * Lo que sí se pide al abrir son las etiquetas que ESTE miembro tiene marcadas hoy. Es un dato
+ * por persona, así que traerlo en el render del servidor obligaría a una petición por fila para
+ * un panel que casi siempre no se abre. No es la carga inicial de la sección; es una consulta
+ * perezosa de un panel bajo demanda.
  */
 interface ConfigureMemberPermissionsModalProps {
   member: OrganizationMember | null;
-  organizationId: string | null;
+  /** Catálogo de la organización, resuelto en el servidor. */
+  permissions: OrganizationPermission[];
   onOpenChange: (open: boolean) => void;
   onConfirm: (accountId: string, permissionIds: string[]) => void;
   confirming?: boolean;
@@ -35,14 +44,12 @@ interface ConfigureMemberPermissionsModalProps {
 
 export default function ConfigureMemberPermissionsModal({
   member,
-  organizationId,
+  permissions,
   onOpenChange,
   onConfirm,
   confirming,
 }: ConfigureMemberPermissionsModalProps) {
   const open = member !== null;
-  const { data: permissions, isLoading: permissionsLoading } =
-    useOrganizationPermissions(organizationId, open);
   const { data: memberPermissionIds, isLoading: memberPermissionsLoading } =
     useMemberPermissions(member?.accountId ?? null, open);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -68,8 +75,6 @@ export default function ConfigureMemberPermissionsModal({
     onConfirm(member.accountId, Array.from(selectedIds));
   }
 
-  const isLoading = permissionsLoading || memberPermissionsLoading;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -83,9 +88,9 @@ export default function ConfigureMemberPermissionsModal({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading ? (
+        {memberPermissionsLoading ? (
           <p className="text-sm text-muted-foreground">Cargando permisos...</p>
-        ) : !permissions?.length ? (
+        ) : permissions.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Esta organización todavía no tiene etiquetas en su catálogo.
           </p>

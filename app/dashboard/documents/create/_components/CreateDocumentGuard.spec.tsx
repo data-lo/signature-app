@@ -41,7 +41,8 @@ describe('CreateDocumentGuard', () => {
 
   /**
    * Historia "Reubicar botón Invitar miembro": la gestión de usuarios del equipo se centralizó en
-   * /dashboard/organization/settings/members, así que crear un documento ya no ofrece ese atajo.
+   * /dashboard/organizations/[organizationId]/members, así que crear un documento ya no ofrece
+   * ese atajo.
    * Se afirma sin mockear nada: si alguien vuelve a montar el modal acá, esta prueba lo detecta
    * (un mock lo escondería detrás de un texto de reemplazo).
    */
