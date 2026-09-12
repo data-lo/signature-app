@@ -32,6 +32,9 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { useOrganizationPlanAccess } from '@/lib/hooks/useOrganizationPlanAccess';
+import { PLANS_ROUTE } from '@/lib/billing/organization-plan-access';
+import type { AccountKind } from '@/lib/store/types/auth-store.types';
 import {
   DOCUMENTS_NAV_SECTIONS,
   DOCUMENTS_SECTIONS,
@@ -52,7 +55,7 @@ interface NavItem {
   buildHref?: (organizationId: string) => string;
 }
 
-interface NavGroup {
+export interface NavGroup {
   /** Identidad estable del grupo; también sirve de `key` cuando no lleva encabezado. */
   key: string;
   /**
@@ -63,9 +66,11 @@ interface NavGroup {
   items: NavItem[];
   /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
   orgOnly?: boolean;
+  /** Visible también para una organización sin plan: son las pantallas donde lo contrata. */
+  availableWithoutPlan?: boolean;
 }
 
-const NAV_GROUPS: NavGroup[] = [
+export const NAV_GROUPS: NavGroup[] = [
   {
     key: 'documents',
     // Nombres y rutas salen de la configuración compartida del módulo, la misma que usa
@@ -82,6 +87,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     key: 'payments',
     label: 'Pagos',
+    availableWithoutPlan: true,
     items: [
       {
         label: 'Planes',
@@ -143,11 +149,43 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+/**
+ * Filtra los grupos del menú que se muestran para la cuenta activa.
+ *
+ * Los grupos de organización sólo aparecen con una organización activa. Si esa organización todavía
+ * no tiene plan, sólo quedan los grupos marcados `availableWithoutPlan` (Pagos): las rutas
+ * operativas no se ofrecen porque la guarda las mandaría de vuelta a Planes. Mientras se consulta
+ * el plan (`lockedWithoutPlan` en `false`) se muestra el menú completo, para que no se reacomode
+ * con cada cambio de cuenta.
+ *
+ * @param groups - Todos los grupos del menú.
+ * @param options.accountType - Tipo de la cuenta activa; `undefined` mientras se rehidrata.
+ * @param options.lockedWithoutPlan - Si la cuenta activa es una organización sin plan.
+ * @returns Los grupos visibles, en su orden original.
+ *
+ * @example
+ * ```ts
+ * visibleNavGroups(NAV_GROUPS, { accountType: 'ORGANIZATION', lockedWithoutPlan: true }); // sólo Pagos
+ * ```
+ */
+export function visibleNavGroups(
+  groups: NavGroup[],
+  {
+    accountType,
+    lockedWithoutPlan,
+  }: { accountType: AccountKind | undefined; lockedWithoutPlan: boolean },
+): NavGroup[] {
+  return groups
+    .filter((group) => !group.orgOnly || accountType === 'ORGANIZATION')
+    .filter((group) => !lockedWithoutPlan || group.availableWithoutPlan);
+}
+
 export default function AppSidebar() {
   const pathname = usePathname();
   const logoutMutation = useLogout();
   const { data: currentUser } = useCurrentUser();
   const activeAccount = useAuthStore((state) => state.activeAccount);
+  const lockedWithoutPlan = useOrganizationPlanAccess() === 'locked';
 
   /**
    * Bug corregido: este componente vive dentro de `<Suspense fallback={null}>` (ver
@@ -172,7 +210,15 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              render={<Link href={DOCUMENTS_SECTIONS.create.href} />}
+              render={
+                <Link
+                  href={
+                    lockedWithoutPlan
+                      ? PLANS_ROUTE
+                      : DOCUMENTS_SECTIONS.create.href
+                  }
+                />
+              }
             >
               <FileSignature className="text-emerald-500" />
               <span className="font-heading font-semibold">Firmalo</span>
@@ -182,10 +228,10 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {NAV_GROUPS.filter(
-          (group) =>
-            !group.orgOnly || activeAccount?.accountType === 'ORGANIZATION',
-        ).map((group) => (
+        {visibleNavGroups(NAV_GROUPS, {
+          accountType: activeAccount?.accountType,
+          lockedWithoutPlan,
+        }).map((group) => (
           <SidebarGroup key={group.key}>
             {group.label && (
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>

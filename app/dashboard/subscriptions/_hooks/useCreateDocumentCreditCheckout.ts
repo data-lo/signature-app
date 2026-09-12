@@ -10,8 +10,9 @@ import { createDocumentCreditCheckoutRequest } from '../_requests';
  * que pedirlas por adelantado dejaría al usuario con enlaces muertos y gastaría una llamada al
  * proveedor por cada paquete que ni siquiera va a comprar.
  *
- * **Sin `throwOnError`, a diferencia del catálogo de planes.** Aquí el error se dibuja dentro del
- * diálogo: quien está comprando ya tiene una pantalla abierta con contexto, y levantar el error
+ * **Sin `throwOnError`, a diferencia del catálogo de planes.** Aquí el error lo recoge el
+ * formulario de compra —con `mutateAsync` dentro de su `onSubmit`— y lo dibuja dentro del diálogo,
+ * junto al campo al que pertenece: quien está comprando ya tiene una pantalla abierta con contexto, y levantar el error
  * boundary del segmento se lo llevaría por delante junto con el resto del estado de su
  * suscripción. Un fallo al abrir la sesión no ha cobrado nada y se puede reintentar en el sitio.
  *

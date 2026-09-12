@@ -49,6 +49,35 @@ export const SIN_PERFIL: BillingAccess = {
 };
 
 /**
+ * Lo que responde el backend a una organización sin plan: sin perfil, sin saldo y sin NINGUNA
+ * acción. No es Free: las organizaciones nacen sin plan y tienen que contratarlo para operar.
+ */
+export const ORGANIZATION_WITHOUT_PLAN: BillingAccess = {
+  ...SIN_PERFIL,
+  actions: {
+    signSimpleAndAdvanced: false,
+    signInOrder: false,
+    unlimitedSigners: false,
+    requestWitnesses: false,
+    intelligentSearch: false,
+    graphSignatureBiometrics: false,
+    bulkSigning: false,
+    organizationAccount: false,
+    preApproval: false,
+    mixSignatureTypes: false,
+    prioritySupport: false,
+    customBranding: false,
+    apiIntegration: false,
+    caseFileGrouping: false,
+    buyDocumentCredits: false,
+  },
+  limits: {
+    documentsIncludedPerPeriod: null,
+    maxOrganizationMembers: null,
+  },
+};
+
+/**
  * `actions` y `limits` se aceptan a medias —y se fusionan sobre los del plan gratuito— porque una
  * prueba casi siempre habla de UN beneficio: escribir las quince banderas para decir "éste tiene
  * branding" enterraría lo que la prueba quiere afirmar.
