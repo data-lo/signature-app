@@ -32,8 +32,12 @@ const DOCUMENTS_PARENT_CRUMB: Crumb = {
   href: DOCUMENTS_SECTIONS.list.href,
 };
 
-/** Breadcrumbs del módulo, derivados de la misma configuración que alimenta el sidebar para que
- * los nombres coincidan exactamente en ambos componentes. */
+/** Breadcrumbs del módulo, derivados de la misma configuración que alimenta el sidebar y el
+ * botón de alta del listado, para que los nombres coincidan exactamente en los tres lugares.
+ *
+ * El alta ya no es una entrada del sidebar, así que el breadcrumb es lo único que ubica la
+ * pantalla dentro del módulo: "Documentos / Crear documento", con el padre enlazado al listado.
+ */
 const DOCUMENTS_CRUMBS: Record<string, Crumb[]> = {
   // El listado es el nivel padre: repetirlo como hijo diría "Documentos / Documentos".
   [DOCUMENTS_SECTIONS.list.href]: [{ label: DOCUMENTS_SECTIONS.list.label }],

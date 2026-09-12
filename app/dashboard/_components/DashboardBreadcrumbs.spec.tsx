@@ -112,7 +112,7 @@ describe('DashboardBreadcrumbs', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('en el alta muestra "Documentos / Nuevo documento", con el padre enlazado al listado', () => {
+  it('en el alta muestra "Documentos / Crear documento", con el padre enlazado al listado', () => {
     mockUsePathname.mockReturnValue('/dashboard/documents/create');
 
     renderWithProviders(<DashboardBreadcrumbs />);
@@ -121,7 +121,7 @@ describe('DashboardBreadcrumbs', () => {
       'href',
       '/dashboard/documents',
     );
-    expect(screen.getByText('Nuevo documento')).toHaveAttribute(
+    expect(screen.getByText('Crear documento')).toHaveAttribute(
       'aria-current',
       'page',
     );
