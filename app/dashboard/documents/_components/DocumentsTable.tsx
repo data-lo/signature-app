@@ -332,6 +332,7 @@ export default function DocumentsTable({
           <Button
             variant="ghost"
             size="icon-sm"
+            aria-label="Primera página"
             disabled={!onPageChange || !hasPrevPage}
             onClick={() => onPageChange?.(1)}
           >
@@ -340,6 +341,7 @@ export default function DocumentsTable({
           <Button
             variant="ghost"
             size="icon-sm"
+            aria-label="Página anterior"
             disabled={!onPageChange || !hasPrevPage}
             onClick={() => onPageChange?.(page - 1)}
           >
@@ -351,6 +353,7 @@ export default function DocumentsTable({
           <Button
             variant="ghost"
             size="icon-sm"
+            aria-label="Página siguiente"
             disabled={!onPageChange || !hasNextPage}
             onClick={() => onPageChange?.(page + 1)}
           >
@@ -359,6 +362,7 @@ export default function DocumentsTable({
           <Button
             variant="ghost"
             size="icon-sm"
+            aria-label="Última página"
             disabled={!onPageChange || !hasNextPage}
             onClick={() => onPageChange?.(totalPages)}
           >

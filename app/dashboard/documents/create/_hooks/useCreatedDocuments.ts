@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { getErrorMessage } from '@/lib/error-handler';
 import { DocumentView } from '@/lib/enums/document';
 import { useDocuments } from '../../_hooks/useDocuments';
@@ -37,6 +38,21 @@ export function useCreatedDocuments({
    * la URL — vive dentro del formulario de creación, donde ese parámetro no significa nada.
    */
   const [page, setPage] = useState(1);
+
+  /**
+   * Cambiar de cuenta vuelve a la primera página, igual que en la pantalla de documentos: quedarse
+   * en la 3 con una cuenta que sólo tiene una deja la tabla vacía, y vacía es justo lo que NO
+   * significa. El ajuste va durante el render y no en un efecto, por lo mismo que allá (ver
+   * `useDocumentsListState`): con un efecto llega tarde y se escapa una petición de la página
+   * vieja contra la cuenta nueva.
+   */
+  const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
+  const [renderedAccountId, setRenderedAccountId] = useState(activeAccountId);
+  if (activeAccountId !== renderedAccountId) {
+    setRenderedAccountId(activeAccountId);
+    setPage(1);
+  }
+
   /**
    * Filtros fijos: esta tabla no ofrece filtrado propio —para eso está la pantalla de
    * documentos— y dejarlos constantes evita que la queryKey cambie en cada render y vuelva a

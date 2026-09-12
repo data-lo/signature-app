@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { DocumentView } from '@/lib/enums/document';
 import {
   DEFAULT_DOCUMENTS_FILTERS,
@@ -47,6 +48,29 @@ export function useDocumentsListState() {
   const [filters, setFilters] = useState<DocumentsFilters>(() =>
     initialFilters(searchParams.get('view')),
   );
+
+  /**
+   * Cambiar de cuenta vuelve a la primera página, por lo mismo que cambiar un filtro: la lista de
+   * la cuenta nueva no tiene por qué llegar a la página en la que estaba la anterior, y pedir la
+   * 3 de una bandeja que sólo tiene una devuelve vacío —que en pantalla se lee como "esta cuenta
+   * no tiene documentos", no como "te pasaste de página"—.
+   *
+   * **El ajuste va DURANTE el render y no en un `useEffect`**, que es el patrón de React para
+   * corregir estado cuando cambia algo de fuera. Con un efecto el reinicio llega tarde: el render
+   * en el que la cuenta ya cambió todavía lleva la página vieja, y `useDocuments` alcanza a pedir
+   * esa página de la cuenta nueva antes de que el efecto la corrija —una petición de más, y una
+   * entrada de caché que nadie va a mirar—. Así, React descarta el render a medias y vuelve a
+   * empezar con la página ya en 1, sin que ningún hijo llegue a verla en 2.
+   *
+   * Los filtros NO se reinician: son cómo quiere mirar quien está mirando, y esa preferencia no
+   * cambia porque cambie el contexto.
+   */
+  const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
+  const [renderedAccountId, setRenderedAccountId] = useState(activeAccountId);
+  if (activeAccountId !== renderedAccountId) {
+    setRenderedAccountId(activeAccountId);
+    setPage(1);
+  }
 
   function handleFiltersChange(nextFilters: DocumentsFilters) {
     setFilters(nextFilters);
