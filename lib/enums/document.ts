@@ -16,11 +16,16 @@ export enum DocumentStatus {
   Cancelled = 'cancelled',
 }
 
-/** Espejo de SIGNEE_STATUS_ENUM (signature-server/src/document/enum/signee-status.enum.ts). */
+/**
+ * Espejo de SIGNEE_STATUS_ENUM (signature-server/src/document/enum/signee-status.enum.ts).
+ * `Notified` es exclusivo de un colaborador WATCHER: se le asigna cuando se le envía con éxito el
+ * correo de aviso (ver `SendPendingSignatureNotificationUseCase` en el backend).
+ */
 export enum ParticipantStatus {
-  Pending = 'pending',
-  Signed = 'signed',
-  Rejected = 'rejected',
+  Pending = 'PENDING',
+  Signed = 'SIGNED',
+  Rejected = 'REJECTED',
+  Notified = 'NOTIFIED',
 }
 
 /**
