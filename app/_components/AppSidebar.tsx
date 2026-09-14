@@ -69,7 +69,10 @@ export interface NavGroup {
   items: NavItem[];
   /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
   orgOnly?: boolean;
-  /** Visible también para una organización sin plan: son las pantallas donde lo contrata. */
+  /**
+   * Visible también para una organización sin plan: las pantallas donde lo contrata (Pagos) y
+   * las de administración de la organización, que no dependen del plan.
+   */
   availableWithoutPlan?: boolean;
 }
 
@@ -77,14 +80,18 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     key: 'documents',
     // Nombres y rutas salen de la configuración compartida del módulo, la misma que usa
-    // DashboardBreadcrumbs. Son dos entradas —la lista y el alta— desde que las tres secciones
-    // segmentadas se unificaron en una sola pantalla; el estado activo sigue siendo la
-    // coincidencia exacta del pathname.
+    // DashboardBreadcrumbs. Una sola entrada: el módulo entero se representa con "Documentos".
+    // El alta dejó de ser una entrada hermana —se entra por el botón de la propia pantalla— y
+    // por eso no está en DOCUMENTS_NAV_SECTIONS.
     items: DOCUMENTS_NAV_SECTIONS.map((section) => ({
       label: section.label,
       href: section.href,
       icon: section.icon,
-      isActive: (pathname: string) => pathname === section.href,
+      // La entrada marca todo su sub-árbol, no sólo su propia ruta: el alta y el detalle de un
+      // documento son pantallas del módulo, y dejar "Documentos" apagado mientras se está
+      // dentro de él haría parecer que se salió de la sección.
+      isActive: (pathname: string) =>
+        pathname === section.href || pathname.startsWith(`${section.href}/`),
     })),
   },
   {
@@ -129,6 +136,14 @@ export const NAV_GROUPS: NavGroup[] = [
     key: 'organization',
     label: NAV_GROUP_LABELS.organization,
     orgOnly: true,
+    /**
+     * Visible también sin plan: quien crea una organización queda como su administrador en el
+     * acto, y esconderle la administración hasta que pague lo dejaba con un menú de una sola
+     * opción —Planes— en la organización que acaba de crear. Lo que el plan habilita es operar
+     * (documentos y firmas); repartir accesos es administrarla, y el backend nunca lo condicionó
+     * al plan.
+     */
+    availableWithoutPlan: true,
     items: [
       {
         label: 'Administrar miembros',
@@ -156,10 +171,11 @@ export const NAV_GROUPS: NavGroup[] = [
  * Filtra los grupos del menú que se muestran para la cuenta activa.
  *
  * Los grupos de organización sólo aparecen con una organización activa. Si esa organización todavía
- * no tiene plan, sólo quedan los grupos marcados `availableWithoutPlan` (Pagos): las rutas
- * operativas no se ofrecen porque la guarda las mandaría de vuelta a Planes. Mientras se consulta
- * el plan (`lockedWithoutPlan` en `false`) se muestra el menú completo, para que no se reacomode
- * con cada cambio de cuenta.
+ * no tiene plan, sólo quedan los grupos marcados `availableWithoutPlan` —Pagos, donde lo contrata,
+ * y Organización, que su administrador puede usar desde el alta—: las rutas operativas no se
+ * ofrecen porque la guarda las mandaría de vuelta a Planes. Mientras se consulta el plan
+ * (`lockedWithoutPlan` en `false`) se muestra el menú completo, para que no se reacomode con cada
+ * cambio de cuenta.
  *
  * @param groups - Todos los grupos del menú.
  * @param options.accountType - Tipo de la cuenta activa; `undefined` mientras se rehidrata.
@@ -168,7 +184,7 @@ export const NAV_GROUPS: NavGroup[] = [
  *
  * @example
  * ```ts
- * visibleNavGroups(NAV_GROUPS, { accountType: 'ORGANIZATION', lockedWithoutPlan: true }); // sólo Pagos
+ * visibleNavGroups(NAV_GROUPS, { accountType: 'ORGANIZATION', lockedWithoutPlan: true }); // Pagos y Organización
  * ```
  */
 export function visibleNavGroups(
@@ -213,12 +229,14 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
+              // La marca lleva al inicio del producto: el listado de documentos. Antes apuntaba
+              // al alta, cuando crear era una entrada de menú por derecho propio.
               render={
                 <Link
                   href={
                     lockedWithoutPlan
                       ? PLANS_ROUTE
-                      : DOCUMENTS_SECTIONS.create.href
+                      : DOCUMENTS_SECTIONS.list.href
                   }
                 />
               }

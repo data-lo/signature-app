@@ -113,7 +113,7 @@ describe('DashboardBreadcrumbs', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('en el alta muestra "Documentos / Nuevo documento", con el padre enlazado al listado', () => {
+  it('en el alta muestra "Documentos / Crear documento", con el padre enlazado al listado', () => {
     mockUsePathname.mockReturnValue('/dashboard/documents/create');
 
     renderWithProviders(<DashboardBreadcrumbs />);
@@ -122,7 +122,7 @@ describe('DashboardBreadcrumbs', () => {
       'href',
       '/dashboard/documents',
     );
-    expect(screen.getByText('Nuevo documento')).toHaveAttribute(
+    expect(screen.getByText('Crear documento')).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -189,6 +189,21 @@ describe('DashboardBreadcrumbs', () => {
 
       expect(screen.getByText(NAV_GROUP_LABELS.payments)).toBeInTheDocument();
     });
+  });
+
+  /**
+   * La barra dejó de ser sólo el breadcrumb: comparte la fila con el saldo de documentos y el
+   * acceso a comprar más (ver `DocumentsAvailability`). El botón no depende del saldo, así que
+   * está desde el primer render; el número lo cubren las pruebas de ese componente.
+   */
+  it('acompaña al breadcrumb con el acceso para agregar documentos', () => {
+    mockUsePathname.mockReturnValue('/dashboard/documents');
+
+    renderWithProviders(<DashboardBreadcrumbs />);
+
+    expect(
+      screen.getByRole('link', { name: 'Agregar Documentos' }),
+    ).toHaveAttribute('href', '/dashboard/subscriptions');
   });
 
   it('no renderiza nada para una ruta sin breadcrumbs configurados', () => {
