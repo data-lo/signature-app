@@ -14,10 +14,12 @@ const emailField = z
   .trim()
   .min(1, { message: 'Ingresa el correo electrónico del participante.' })
   .email({ message: 'Ingresa un correo electrónico válido.' });
-const rfcField = z
-  .string()
-  .trim()
-  .min(1, { message: 'Ingresa el RFC del espectador.' });
+/**
+ * Opcional desde la historia "Eliminar campo RFC de la sección de Espectadores": un espectador
+ * puede guardarse sin RFC. `.trim()` sigue aplicando por si acaso llega solo espacios; un string
+ * vacío es válido y así viaja al backend, donde `CollaboratorPayloadDto.rfc` también lo acepta.
+ */
+const rfcField = z.string().trim();
 
 /**
  * Un firmante NO declara su propio tipo de firma ni su RFC (ver historia "Selección de tipo de

@@ -70,12 +70,12 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
-  it('rechaza un espectador sin rfc', () => {
+  it('acepta un espectador sin rfc', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([{ ...viewer(), rfc: '' }]),
+      formValues([signer(), { ...viewer(), rfc: '' }]),
     );
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rechaza un correo con formato inválido', () => {
