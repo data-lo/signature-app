@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { useDocumentDetail } from '../documents/[documentId]/_hooks/useDocumentDetail';
 import { DOCUMENTS_SECTIONS } from '../documents/_config/sections';
+import { NAV_GROUP_LABELS } from '../_config/nav-groups';
 import DocumentsAvailability from './DocumentsAvailability';
 
 interface Crumb {
@@ -48,27 +49,51 @@ const DOCUMENTS_CRUMBS: Record<string, Crumb[]> = {
   ],
 };
 
+/**
+ * El módulo como primer nivel, tal como se llama en el menú lateral.
+ *
+ * **Ninguno de estos tres lleva `href`, y no es un olvido.** Pagos, Configuración y Organización
+ * son agrupadores del menú: agrupan pantallas hermanas pero no tienen una pantalla propia a la que
+ * llevar. Un enlace ahí tendría que apuntar a la primera de sus hijas, que es otra cosa distinta de
+ * "el módulo" —y volvería imposible distinguir, estando en Planes, si el breadcrumb ofrece subir un
+ * nivel o quedarse donde ya está—. Se pintan atenuados, que es lo que el componente hace con un
+ * `Crumb` sin `href` que no sea el último.
+ */
+const GROUP_CRUMB: Record<keyof typeof NAV_GROUP_LABELS, Crumb> = {
+  payments: { label: NAV_GROUP_LABELS.payments },
+  settings: { label: NAV_GROUP_LABELS.settings },
+  organization: { label: NAV_GROUP_LABELS.organization },
+};
+
 /** Mapa estático ruta -> jerarquía de breadcrumbs, alineado con las etiquetas usadas en
- * AppSidebar y en las tabs de configuración de organización para mantener nombres consistentes. */
+ * AppSidebar —de donde salen literalmente los nombres de los módulos— y en las tabs de
+ * configuración de organización, para mantener nombres consistentes. */
 const STATIC_CRUMBS: Record<string, Crumb[]> = {
   ...DOCUMENTS_CRUMBS,
+  // Crear organización cuelga del selector de cuentas, no de un módulo del menú: no hay grupo
+  // padre que anteponerle.
   '/dashboard/organization/create': [{ label: 'Crear organización' }],
-  // "Organización" quedó sin página propia al mudarse Administrar miembros a su ruta con
-  // `organizationId`: ya no hay una URL fija a la que llevar, así que es un agrupador sin enlace.
   '/dashboard/organization/settings/permissions': [
-    { label: 'Organización' },
+    GROUP_CRUMB.organization,
     { label: 'Permisos' },
   ],
-  '/dashboard/personal-documents': [{ label: 'Información personal' }],
+  '/dashboard/personal-documents': [
+    GROUP_CRUMB.settings,
+    { label: 'Información personal' },
+  ],
   '/dashboard/personal-documents/identity': [
+    GROUP_CRUMB.settings,
     {
       label: 'Información personal',
       href: '/dashboard/personal-documents',
     },
     { label: 'Identidad y firma' },
   ],
-  '/dashboard/plans': [{ label: 'Planes' }],
-  '/dashboard/subscriptions': [{ label: 'Suscripciones' }],
+  '/dashboard/plans': [GROUP_CRUMB.payments, { label: 'Planes' }],
+  '/dashboard/subscriptions': [
+    GROUP_CRUMB.payments,
+    { label: 'Suscripciones' },
+  ],
 };
 
 const DOCUMENT_DETAIL_PATTERN = /^\/dashboard\/documents\/([^/]+)$/;
@@ -104,7 +129,7 @@ function useCrumbs(pathname: string): Crumb[] {
   }
 
   if (ORGANIZATION_MEMBERS_PATTERN.test(pathname)) {
-    return [{ label: 'Organización' }, { label: 'Administrar miembros' }];
+    return [GROUP_CRUMB.organization, { label: 'Administrar miembros' }];
   }
 
   return staticCrumbs ?? [];
@@ -136,6 +161,10 @@ export default function DashboardBreadcrumbs() {
 
   if (crumbs.length === 0) return null;
 
+  // `min-h-10` y no `h-10`: con el módulo como primer nivel, "Configuración / Información
+  // personal / Identidad y firma" no cabe en una línea de teléfono. `BreadcrumbList` ya sabe
+  // envolver (`flex-wrap`), pero con la altura fija la segunda línea se salía del recuadro y se
+  // montaba sobre el contenido. El alto no cambia mientras quepa en una sola línea.
   return (
     /* La fila se envuelve en móvil en vez de recortarse: con `flex-wrap` el saldo y el botón
        bajan a una segunda línea y nada desborda. En pantallas `sm` y mayores se fuerza una sola
