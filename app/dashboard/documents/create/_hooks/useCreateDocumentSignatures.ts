@@ -3,6 +3,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
+import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { createDocumentSignaturesRequest } from '../_requests';
 import {
   toRequiresDifferentSignatures,
@@ -29,6 +31,7 @@ export const CREATE_DOCUMENT_ERROR_MESSAGE =
  */
 export function useCreateDocumentSignatures() {
   const queryClient = useQueryClient();
+  const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
 
   return useMutation({
     mutationFn: async ({
@@ -60,6 +63,20 @@ export function useCreateDocumentSignatures() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
+      /**
+       * Crear un documento GASTA un crédito en el servidor (ver `ConsumeDocumentCreditUseCase`),
+       * así que el saldo que anuncia la barra superior (`DocumentsAvailability`) queda viejo en
+       * cuanto el envío sale bien: sin esto seguiría diciendo el número anterior hasta la
+       * siguiente recarga o cambio de cuenta.
+       *
+       * Se invalida la llave de ESA cuenta —la cuenta forma parte de la llave— para no tirar lo
+       * consultado en la otra: quien tiene cuenta personal y organización no debe perder el
+       * estado de una por trabajar en la otra.
+       */
+      queryClient.invalidateQueries({
+        queryKey: billingAccessQueryKey(activeAccountId),
+        exact: true,
+      });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error, CREATE_DOCUMENT_ERROR_MESSAGE));

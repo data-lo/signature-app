@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { useDocumentDetail } from '../documents/[documentId]/_hooks/useDocumentDetail';
 import { DOCUMENTS_SECTIONS } from '../documents/_config/sections';
+import DocumentsAvailability from './DocumentsAvailability';
 
 interface Crumb {
   label: string;
@@ -105,6 +106,26 @@ function useCrumbs(pathname: string): Crumb[] {
   return staticCrumbs ?? [];
 }
 
+/**
+ * Barra superior del dashboard: breadcrumbs a la izquierda, saldo de documentos y el acceso para
+ * comprar más a la derecha.
+ *
+ * Los breadcrumbs no cambian —las mismas rutas, los mismos enlaces y el mismo último nivel no
+ * interactivo—; lo único nuevo es que ahora comparten la fila con `DocumentsAvailability`, que
+ * resuelve su propio dato y no recibe nada de acá.
+ *
+ * Sigue sin dibujarse nada cuando la ruta no tiene breadcrumbs configurados, y con ella se va
+ * también el saldo. No es un descuido: toda ruta real del dashboard tiene su jerarquía en
+ * `STATIC_CRUMBS` o resuelta por patrón, así que el caso vacío es una ruta que no existe.
+ *
+ * @returns La barra, o `null` en una ruta sin breadcrumbs configurados.
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * <DashboardBreadcrumbs />
+ * ```
+ */
 export default function DashboardBreadcrumbs() {
   const pathname = usePathname();
   const crumbs = useCrumbs(pathname);
@@ -112,34 +133,42 @@ export default function DashboardBreadcrumbs() {
   if (crumbs.length === 0) return null;
 
   return (
-    <Breadcrumb className="flex h-10 items-center border-b border-border px-4">
-      <BreadcrumbList>
-        {crumbs.map((crumb, index) => {
-          const isLast = index === crumbs.length - 1;
-          return (
-            <Fragment key={`${crumb.label}-${index}`}>
-              {index > 0 && <BreadcrumbSeparator />}
-              <BreadcrumbItem
-                className={isLast ? 'min-w-0 max-w-[55vw] sm:max-w-xs' : ''}
-              >
-                {isLast ? (
-                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                ) : crumb.href ? (
-                  <BreadcrumbLink href={crumb.href}>
-                    {crumb.label}
-                  </BreadcrumbLink>
-                ) : (
-                  // Agrupador sin página propia: se muestra deshabilitado, no como enlace ni
-                  // como página actual (esa siempre es el último nivel).
-                  <span aria-disabled="true" className="truncate opacity-70">
-                    {crumb.label}
-                  </span>
-                )}
-              </BreadcrumbItem>
-            </Fragment>
-          );
-        })}
-      </BreadcrumbList>
-    </Breadcrumb>
+    /* La fila se envuelve en móvil en vez de recortarse: con `flex-wrap` el saldo y el botón
+       bajan a una segunda línea y nada desborda. En pantallas `sm` y mayores se fuerza una sola
+       línea (`sm:flex-nowrap`) y quien cede espacio es el breadcrumb, que ya trunca su último
+       nivel. */
+    <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-border px-4 py-1.5 sm:flex-nowrap sm:py-0">
+      <Breadcrumb className="flex items-center">
+        <BreadcrumbList>
+          {crumbs.map((crumb, index) => {
+            const isLast = index === crumbs.length - 1;
+            return (
+              <Fragment key={`${crumb.label}-${index}`}>
+                {index > 0 && <BreadcrumbSeparator />}
+                <BreadcrumbItem
+                  className={isLast ? 'min-w-0 max-w-[55vw] sm:max-w-xs' : ''}
+                >
+                  {isLast ? (
+                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  ) : crumb.href ? (
+                    <BreadcrumbLink href={crumb.href}>
+                      {crumb.label}
+                    </BreadcrumbLink>
+                  ) : (
+                    // Agrupador sin página propia: se muestra deshabilitado, no como enlace ni
+                    // como página actual (esa siempre es el último nivel).
+                    <span aria-disabled="true" className="truncate opacity-70">
+                      {crumb.label}
+                    </span>
+                  )}
+                </BreadcrumbItem>
+              </Fragment>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
+
+      <DocumentsAvailability />
+    </div>
   );
 }
