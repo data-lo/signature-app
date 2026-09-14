@@ -17,16 +17,36 @@ describe('isRouteAvailableWithoutPlan', () => {
     expect(isRouteAvailableWithoutPlan(pathname)).toBe(true);
   });
 
+  /**
+   * Administrar la organización no es usarla: quien la crea queda como su administrador en el
+   * acto y tiene que poder invitar al equipo y repartir permisos antes de contratar nada. El
+   * backend tampoco condiciona esos endpoints al plan.
+   */
+  it.each([
+    '/dashboard/organizations/org-1/members',
+    '/dashboard/organization/settings/permissions',
+  ])('deja administrar la organización en %s sin plan', (pathname) => {
+    expect(isRouteAvailableWithoutPlan(pathname)).toBe(true);
+  });
+
   it.each([
     '/dashboard',
     '/dashboard/documents',
     '/dashboard/documents/create',
     '/dashboard/documents/doc-1',
     '/dashboard/organization/settings/members',
-    '/dashboard/organization/settings/permissions',
     '/dashboard/personal-documents',
     '/dashboard/personal-documents/identity',
   ])('bloquea la ruta operativa %s', (pathname) => {
+    expect(isRouteAvailableWithoutPlan(pathname)).toBe(false);
+  });
+
+  /** El patrón de miembros pide el id y el segmento final exactos, no cualquier subruta. */
+  it.each([
+    '/dashboard/organizations',
+    '/dashboard/organizations/org-1',
+    '/dashboard/organizations/org-1/members/member-1',
+  ])('no confunde %s con la pantalla de miembros', (pathname) => {
     expect(isRouteAvailableWithoutPlan(pathname)).toBe(false);
   });
 
