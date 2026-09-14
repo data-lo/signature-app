@@ -111,6 +111,18 @@ describe('toCollaboratorPayload', () => {
     expect(payload.rfc).toBe('AURU800101ABC');
   });
 
+  it('historia "Eliminar campo RFC de la sección de Espectadores": un viewer sin rfc lo manda vacío, no lo omite', () => {
+    // `emptyViewer()` (no `viewer()`) porque tipa como ViewerFormValues y no como el union
+    // CollaboratorFormValues: spreadear un union en un literal dispara el excess-property-check
+    // de TypeScript contra la rama SIGNER, que no tiene `rfc`.
+    const payload = toCollaboratorPayload(
+      { ...emptyViewer(), rfc: '' },
+      'ADVANCED',
+    );
+
+    expect(payload.rfc).toBe('');
+  });
+
   it('historia "Habilitar ordenamiento Drag and Drop": sin orderIndex explícito, cae a 0 por defecto', () => {
     const payload = toCollaboratorPayload(signer(), 'SIMPLE');
 
