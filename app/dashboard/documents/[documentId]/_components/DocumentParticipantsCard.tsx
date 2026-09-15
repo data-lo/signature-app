@@ -6,6 +6,7 @@ const STATUS_LABELS: Record<ParticipantStatus, string> = {
   [ParticipantStatus.Pending]: 'Pendiente',
   [ParticipantStatus.Signed]: 'Firmado',
   [ParticipantStatus.Rejected]: 'Rechazado',
+  [ParticipantStatus.Notified]: 'Notificado',
 };
 
 const ROLE_LABELS: Record<ParticipantRole, string> = {
@@ -19,6 +20,7 @@ const STATUS_CLASSES: Record<ParticipantStatus, string> = {
   [ParticipantStatus.Signed]: 'text-emerald-600',
   [ParticipantStatus.Rejected]: 'text-red-600',
   [ParticipantStatus.Pending]: 'text-amber-600',
+  [ParticipantStatus.Notified]: 'text-sky-600',
 };
 
 interface DocumentParticipantsCardProps {

@@ -46,14 +46,15 @@ export const COLLABORATOR_EMAIL_FIELD: CollaboratorFieldConfig = {
 };
 
 /**
- * El RFC solo se pide a los espectadores, y ahí es obligatorio (de ahí `required: true`; la
- * decisión de mostrarlo o no es del componente, ver `CollaboratorFormItem`). A los firmantes ya no
- * se les pide en ningún flujo — ver historia "Selección de tipo de firma al crear documentos".
+ * El RFC solo se pide a los espectadores, y ahí es opcional (historia "Eliminar campo RFC de la
+ * sección de Espectadores"; la decisión de mostrarlo o no es del componente, ver
+ * `CollaboratorFormItem`). A los firmantes ya no se les pide en ningún flujo — ver historia
+ * "Selección de tipo de firma al crear documentos".
  */
 export const COLLABORATOR_RFC_FIELD: CollaboratorFieldConfig = {
   name: 'rfc',
   label: 'RFC',
   type: 'text',
   placeholder: 'PEAJ800101ABC',
-  required: true,
+  required: false,
 };

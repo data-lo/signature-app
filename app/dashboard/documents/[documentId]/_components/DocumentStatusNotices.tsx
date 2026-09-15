@@ -4,6 +4,7 @@ const MY_STATUS_MESSAGES: Record<ParticipantStatus, string> = {
   [ParticipantStatus.Signed]: 'Ya firmaste este documento.',
   [ParticipantStatus.Rejected]: 'Ya rechazaste este documento.',
   [ParticipantStatus.Pending]: 'Aún no es tu turno para firmar este documento.',
+  [ParticipantStatus.Notified]: 'Te notificamos sobre este documento.',
 };
 
 interface DocumentStatusNoticesProps {
