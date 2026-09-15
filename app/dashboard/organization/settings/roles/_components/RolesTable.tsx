@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { OrganizationRole } from '@/lib/api/organization-roles';
+import { formatRoleName } from '@/lib/format-role-name';
 
 interface RolesTableProps {
   roles: OrganizationRole[];
@@ -63,7 +64,7 @@ export default function RolesTable({ roles, canManage, onEdit }: RolesTableProps
 
             return (
               <TableRow key={role.id}>
-                <TableCell>{role.name}</TableCell>
+                <TableCell>{formatRoleName(role.name)}</TableCell>
                 <TableCell>
                   <Badge variant={role.isSystemRole ? 'secondary' : 'outline'}>
                     {role.isSystemRole ? 'Predeterminado' : 'Personalizado'}
@@ -80,7 +81,7 @@ export default function RolesTable({ roles, canManage, onEdit }: RolesTableProps
                       </PopoverTrigger>
                       <PopoverContent align="start" className="w-80">
                         <p className="mb-2 text-sm font-medium">
-                          Permisos de {role.name}
+                          Permisos de {formatRoleName(role.name)}
                         </p>
                         <ul className="flex flex-col gap-1.5">
                           {permissions.map((permission) => (
@@ -106,7 +107,7 @@ export default function RolesTable({ roles, canManage, onEdit }: RolesTableProps
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={`Acciones de ${role.name}`}
+                              aria-label={`Acciones de ${formatRoleName(role.name)}`}
                             />
                           }
                         >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,6 +22,10 @@ import { FormSelect } from '@/components/form/form-select';
 import { Form } from '@/components/form/form';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import {
+  DEFAULT_MEMBER_ROLE_NAME,
+  formatRoleName,
+} from '@/lib/format-role-name';
 import { addOrganizationMemberAction } from '@/app/server-actions/organizations/add-organization-member.server-action';
 import { addMemberSchema, type AddMemberFormValues } from '../_schemas';
 import RolePermissionsPreview from './RolePermissionsPreview';
@@ -64,6 +68,7 @@ export default function AddMemberModal({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { isValid },
   } = useForm<AddMemberFormValues>({
     resolver: zodResolver(addMemberSchema),
@@ -76,6 +81,21 @@ export default function AddMemberModal({
   const selectedRole = systemRolesQuery.data?.find(
     (role) => role.id === selectedRoleId,
   );
+
+  const defaultRoleId = systemRolesQuery.data?.find(
+    (role) => role.name === DEFAULT_MEMBER_ROLE_NAME,
+  )?.id;
+
+  /**
+   * Quien se agrega nace MIEMBRO salvo que se elija otra cosa: es el rol mínimo del catálogo y
+   * el que no regala capacidades por descuido. El id no se conoce hasta que responde
+   * `GET /api/v1/roles`, así que se aplica al llegar el catálogo y otra vez en cada apertura
+   * —el cierre hace `reset()` y devuelve el campo a vacío—.
+   */
+  useEffect(() => {
+    if (!open || !defaultRoleId) return;
+    setValue('roleId', defaultRoleId, { shouldValidate: true });
+  }, [open, defaultRoleId, setValue]);
 
   if (activeAccount?.accountType !== 'ORGANIZATION') {
     return null;
@@ -154,7 +174,7 @@ export default function AddMemberModal({
               }
               options={(systemRolesQuery.data ?? []).map((role) => ({
                 value: role.id,
-                label: role.name,
+                label: formatRoleName(role.name),
               }))}
             />
 
