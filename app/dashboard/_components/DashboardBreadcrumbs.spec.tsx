@@ -44,6 +44,18 @@ describe('DashboardBreadcrumbs', () => {
   });
 
   /**
+   * La ruta vieja de arriba se conserva sin enlazar en el sidebar (historia "Reemplazar
+   * 'Permisos' por 'Roles y permisos'"); esta es la que sí está enlazada ahora.
+   */
+  it('en la ruta de roles muestra "Roles y permisos" como nivel actual', () => {
+    mockUsePathname.mockReturnValue('/dashboard/organization/settings/roles');
+    renderWithProviders(<DashboardBreadcrumbs />);
+
+    const current = screen.getByText('Roles y permisos');
+    expect(current).toHaveAttribute('aria-current', 'page');
+  });
+
+  /**
    * La ruta de Administrar miembros lleva el id de la organización, así que no puede entrar en el
    * mapa estático de breadcrumbs y se resuelve por patrón. Sin esta prueba, la sección quedaría
    * sin ningún breadcrumb y nadie lo notaría hasta verlo en pantalla.

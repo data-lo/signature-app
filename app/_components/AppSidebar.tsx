@@ -157,11 +157,11 @@ export const NAV_GROUPS: NavGroup[] = [
           /^\/dashboard\/organizations\/[^/]+\/members$/.test(pathname),
       },
       {
-        label: 'Permisos',
-        href: '/dashboard/organization/settings/permissions',
+        label: 'Roles y permisos',
+        href: '/dashboard/organization/settings/roles',
         icon: KeyRound,
         isActive: (pathname) =>
-          pathname === '/dashboard/organization/settings/permissions',
+          pathname === '/dashboard/organization/settings/roles',
       },
     ],
   },

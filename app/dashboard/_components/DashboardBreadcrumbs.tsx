@@ -73,9 +73,16 @@ const STATIC_CRUMBS: Record<string, Crumb[]> = {
   // Crear organización cuelga del selector de cuentas, no de un módulo del menú: no hay grupo
   // padre que anteponerle.
   '/dashboard/organization/create': [{ label: 'Crear organización' }],
+  // Se conserva sin tocar: la sección vieja de etiquetas libres sigue funcionando si se visita
+  // la URL directamente, sólo se desligó del sidebar (ver historia "Reemplazar 'Permisos' por
+  // 'Roles y permisos'").
   '/dashboard/organization/settings/permissions': [
     GROUP_CRUMB.organization,
     { label: 'Permisos' },
+  ],
+  '/dashboard/organization/settings/roles': [
+    GROUP_CRUMB.organization,
+    { label: 'Roles y permisos' },
   ],
   '/dashboard/personal-documents': [
     GROUP_CRUMB.settings,
