@@ -18,14 +18,14 @@ import { Form } from '@/components/form/form';
 import type { OrganizationRole } from '@/lib/api/organization-roles';
 import {
   saveOrganizationRoleSchema,
-  isStaticPermissionKey,
+  staticPermissionKeysOf,
   type SaveOrganizationRoleFormValues,
 } from '../_schemas';
 import PermissionCheckboxList from './PermissionCheckboxList';
 
 interface EditOrganizationRoleModalProps {
   role: OrganizationRole | null;
-  /** Catálogo estático completo, para ofrecer los siete aunque este rol no tenga todos. */
+  /** Catálogo estático completo, para ofrecerlo entero aunque este rol no tenga todos. */
   availablePermissions: OrganizationRole['permissions'];
   onOpenChange: (open: boolean) => void;
   onConfirm: (roleId: string, values: SaveOrganizationRoleFormValues) => void;
@@ -58,9 +58,7 @@ export default function EditOrganizationRoleModal({
     if (role) {
       reset({
         name: role.name,
-        permissionKeys: role.permissions
-          .map((permission) => permission.key)
-          .filter(isStaticPermissionKey),
+        permissionKeys: staticPermissionKeysOf(role.permissions),
       });
     }
   }, [role, reset]);

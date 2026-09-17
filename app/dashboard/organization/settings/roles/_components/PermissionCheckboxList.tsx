@@ -7,8 +7,8 @@ import type { RolePermission } from '@/lib/api/organization-roles';
 interface PermissionCheckboxListProps {
   /**
    * Catálogo estático a ofrecer, con su descripción real. Se recibe de afuera —normalmente los
-   * permisos del rol ADMIN, que ya trae los siete— en vez de duplicar aquí las siete
-   * descripciones que ya vive del lado del servidor.
+   * permisos del rol ADMIN, que trae el catálogo casi completo— en vez de duplicar aquí unas
+   * descripciones que ya viven del lado del servidor.
    */
   availablePermissions: RolePermission[];
   selectedKeys: string[];
@@ -55,11 +55,16 @@ export default function PermissionCheckboxList({
   return (
     <div className="flex flex-col gap-3">
       {staticPermissions.map((permission) => (
-        <div key={permission.key} className="group/field flex items-start gap-2">
+        <div
+          key={permission.key}
+          className="group/field flex items-start gap-2"
+        >
           <Checkbox
             id={`permission-${permission.key}`}
             checked={selectedKeys.includes(permission.key)}
-            onCheckedChange={(checked) => toggle(permission.key, checked === true)}
+            onCheckedChange={(checked) =>
+              toggle(permission.key, checked === true)
+            }
             disabled={disabled}
           />
           <Label

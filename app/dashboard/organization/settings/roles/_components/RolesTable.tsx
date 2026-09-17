@@ -38,12 +38,16 @@ function formatDate(isoDate: string): string {
   return `${day}/${month}/${date.getFullYear()}`;
 }
 
-/** Sólo los siete del catálogo estático — nada de la rejilla CRUD heredada del seed anterior. */
+/** Sólo los del catálogo estático — nada de la rejilla CRUD heredada del seed anterior. */
 function catalogPermissionsOf(role: OrganizationRole) {
   return role.permissions.filter((permission) => permission.isStaticCatalog);
 }
 
-export default function RolesTable({ roles, canManage, onEdit }: RolesTableProps) {
+export default function RolesTable({
+  roles,
+  canManage,
+  onEdit,
+}: RolesTableProps) {
   const hasCustomRoles = roles.some((role) => !role.isSystemRole);
 
   return (
@@ -75,7 +79,9 @@ export default function RolesTable({ roles, canManage, onEdit }: RolesTableProps
                     <span className="text-muted-foreground">—</span>
                   ) : (
                     <Popover>
-                      <PopoverTrigger render={<Button variant="ghost" size="sm" />}>
+                      <PopoverTrigger
+                        render={<Button variant="ghost" size="sm" />}
+                      >
                         {permissions.length}{' '}
                         {permissions.length === 1 ? 'permiso' : 'permisos'}
                       </PopoverTrigger>
