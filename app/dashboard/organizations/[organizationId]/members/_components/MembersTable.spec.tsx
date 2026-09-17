@@ -68,7 +68,9 @@ describe('MembersTable', () => {
 
     expect(screen.getByText('admin@empresa.com')).toBeInTheDocument();
     expect(screen.getByText('XAXX010101000')).toBeInTheDocument();
-    expect(screen.getByText('ADMIN')).toBeInTheDocument();
+    // El rol viaja como ADMIN y se muestra traducido (ver `formatRoleName`).
+    expect(screen.getByText('ADMINISTRADOR')).toBeInTheDocument();
+    expect(screen.queryByText('ADMIN')).not.toBeInTheDocument();
     expect(screen.getByText('25/10/2023')).toBeInTheDocument();
   });
 

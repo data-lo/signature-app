@@ -3,6 +3,7 @@
 import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { RolePermission } from '@/lib/api/roles';
+import { formatRoleName } from '@/lib/format-role-name';
 
 interface RolePermissionsPreviewProps {
   roleName?: string;
@@ -50,7 +51,7 @@ export default function RolePermissionsPreview({
     <div className="flex flex-col gap-2 rounded-md border border-border p-3">
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">Permisos de</span>
-        <Badge variant="secondary">{roleName}</Badge>
+        <Badge variant="secondary">{formatRoleName(roleName)}</Badge>
       </div>
 
       {catalogPermissions.length === 0 ? (

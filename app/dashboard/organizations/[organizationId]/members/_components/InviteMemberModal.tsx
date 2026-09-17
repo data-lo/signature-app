@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,6 +22,10 @@ import { FormSelect } from '@/components/form/form-select';
 import { Form } from '@/components/form/form';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import {
+  DEFAULT_MEMBER_ROLE_NAME,
+  formatRoleName,
+} from '@/lib/format-role-name';
 import { inviteOrganizationMemberAction } from '@/app/server-actions/organizations/invite-organization-member.server-action';
 import { inviteMemberSchema, type InviteMemberFormValues } from '../_schemas';
 
@@ -62,12 +66,27 @@ export default function InviteMemberModal({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { isValid },
   } = useForm<InviteMemberFormValues>({
     resolver: zodResolver(inviteMemberSchema),
     mode: 'onChange',
     defaultValues: { email: '', roleId: '' },
   });
+
+  const defaultRoleId = systemRolesQuery.data?.find(
+    (role) => role.name === DEFAULT_MEMBER_ROLE_NAME,
+  )?.id;
+
+  /**
+   * A quien se invita se le propone MIEMBRO, el rol mínimo del catálogo: subirlo es una decisión
+   * consciente de quien administra, no el descuido de no tocar el selector. Se aplica al llegar
+   * el catálogo y en cada apertura, porque al cerrar el modal `reset()` vacía el campo.
+   */
+  useEffect(() => {
+    if (!open || !defaultRoleId) return;
+    setValue('roleId', defaultRoleId, { shouldValidate: true });
+  }, [open, defaultRoleId, setValue]);
 
   if (activeAccount?.accountType !== 'ORGANIZATION') {
     return null;
@@ -140,7 +159,7 @@ export default function InviteMemberModal({
               }
               options={(systemRolesQuery.data ?? []).map((role) => ({
                 value: role.id,
-                label: role.name,
+                label: formatRoleName(role.name),
               }))}
             />
           </FieldGroup>
