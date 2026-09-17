@@ -57,7 +57,7 @@ describe('RolesTable', () => {
   it('muestra nombre, tipo y fecha de creación de cada rol', () => {
     render(<RolesTable roles={ROLES} canManage={false} onEdit={jest.fn()} />);
 
-    expect(screen.getByText('ADMIN')).toBeInTheDocument();
+    expect(screen.getByText('ADMINISTRADOR')).toBeInTheDocument();
     expect(screen.getByText('Predeterminado')).toBeInTheDocument();
     expect(screen.getByText('Aprobador')).toBeInTheDocument();
     expect(screen.getByText('Personalizado')).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('RolesTable', () => {
     render(<RolesTable roles={ROLES} canManage onEdit={jest.fn()} />);
 
     expect(
-      screen.queryByRole('button', { name: 'Acciones de ADMIN' }),
+      screen.queryByRole('button', { name: 'Acciones de ADMINISTRADOR' }),
     ).not.toBeInTheDocument();
 
     await user.click(

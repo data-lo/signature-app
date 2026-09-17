@@ -10,7 +10,7 @@ import type {
  * Normaliza una Account cruda del backend (GET /api/v1/accounts/me,
  * POST /api/v1/organizations) al shape que consume el store. `roleId` es el
  * UUID real de la membresía en el catálogo RBAC (ver GET /api/v1/roles en
- * signature-server); hoy el backend siempre asigna el rol ADMIN de inmediato
+ * signature-server); hoy el backend siempre asigna el rol OWNER de inmediato
  * al crear una cuenta, así que `null` solo ocurriría ante una membresía sin
  * rol vigente (revocada).
  *

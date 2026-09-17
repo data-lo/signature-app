@@ -146,7 +146,7 @@ describe('MembersManager', () => {
     const roleSelect = await screen.findByRole('combobox', { name: /rol/i });
     roleSelect.focus();
     await user.keyboard('{Enter}');
-    await user.click(screen.getByRole('option', { name: 'ADMIN' }));
+    await user.click(screen.getByRole('option', { name: 'ADMINISTRADOR' }));
     await user.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() => {
@@ -293,4 +293,33 @@ describe('MembersManager', () => {
       }),
     ).not.toBeInTheDocument();
   });
+
+  /**
+   * Quien se suma a la organización nace MIEMBRO mientras nadie diga otra cosa: es el rol mínimo
+   * del catálogo, y dejar el selector vacío obligaba a elegir a mano en cada alta —con el riesgo
+   * de que el clic cayera en un rol que administra—. El tag que se ve es `MIEMBRO`; lo que viaja
+   * al backend sigue siendo el id del rol `MEMBER`.
+   */
+  describe('rol predeterminado', () => {
+    it('propone MIEMBRO al agregar a alguien que ya tiene cuenta', async () => {
+      const user = userEvent.setup();
+      renderManager();
+
+      await user.click(screen.getByRole('button', { name: /agregar miembro/i }));
+
+      const roleSelect = await screen.findByRole('combobox', { name: /rol/i });
+      await waitFor(() => expect(roleSelect).toHaveTextContent('MIEMBRO'));
+    });
+
+    it('propone MIEMBRO al invitar a alguien que todavía no se registró', async () => {
+      const user = userEvent.setup();
+      renderManager();
+
+      await user.click(screen.getByRole('button', { name: /invitar miembro/i }));
+
+      const roleSelect = await screen.findByRole('combobox', { name: /rol/i });
+      await waitFor(() => expect(roleSelect).toHaveTextContent('MIEMBRO'));
+    });
+  });
+
 });

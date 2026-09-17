@@ -38,7 +38,9 @@ describe('RolePermissionsPreview', () => {
       />,
     );
 
-    expect(screen.getByText('MEMBER')).toBeInTheDocument();
+    // El tag del rol sale traducido; el identificador MEMBER no se muestra nunca.
+    expect(screen.getByText('MIEMBRO')).toBeInTheDocument();
+    expect(screen.queryByText('MEMBER')).not.toBeInTheDocument();
     expect(
       screen.getByText(
         'Crear documentos o borradores dentro de la organización activa.',

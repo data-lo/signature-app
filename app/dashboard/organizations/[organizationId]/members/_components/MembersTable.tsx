@@ -27,6 +27,7 @@ import type {
   OrganizationMemberStatus,
 } from '@/lib/api/organization-members';
 import type { RolePermission } from '@/lib/api/roles';
+import { formatRoleName } from '@/lib/format-role-name';
 
 interface MembersTableProps {
   members: OrganizationMember[];
@@ -95,7 +96,7 @@ export default function MembersTable({
             <TableRow key={member.accountId}>
               <TableCell>{member.email}</TableCell>
               <TableCell>{member.rfc ?? '—'}</TableCell>
-              <TableCell>{member.role?.name ?? '—'}</TableCell>
+              <TableCell>{formatRoleName(member.role?.name)}</TableCell>
               <TableCell>
                 <Badge variant={status.variant}>{status.label}</Badge>
               </TableCell>
@@ -117,7 +118,7 @@ export default function MembersTable({
                     </PopoverTrigger>
                     <PopoverContent align="start" className="w-80">
                       <p className="mb-2 text-sm font-medium">
-                        Permisos por el rol {member.role?.name ?? '—'}
+                        Permisos por el rol {formatRoleName(member.role?.name)}
                       </p>
                       <ul className="flex flex-col gap-1.5">
                         {permissions.map((permission) => (

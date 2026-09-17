@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import type { OrganizationMember } from '@/lib/api/organization-members';
+import { formatRoleName } from '@/lib/format-role-name';
 import RolePermissionsPreview from './RolePermissionsPreview';
 
 /**
@@ -52,7 +53,7 @@ export default function EditRoleModal({
 
   const roleOptions = (roles ?? []).map((role) => ({
     value: role.id,
-    label: role.name,
+    label: formatRoleName(role.name),
   }));
 
   const selectedRole = roles?.find((role) => role.id === roleId);
@@ -94,7 +95,7 @@ export default function EditRoleModal({
             <SelectContent>
               {roles?.map((role) => (
                 <SelectItem key={role.id} value={role.id}>
-                  {role.name}
+                  {formatRoleName(role.name)}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -20,6 +20,11 @@ interface PermissionCheckboxListProps {
  * Selector múltiple de los permisos del catálogo estático para un rol personalizado. Distinto de
  * `RolePermissionsPreview` (de solo lectura, para previsualizar un rol ya fijo antes de
  * asignarlo): aquí se eligen los permisos que el rol va a otorgar.
+ *
+ * Cada opción se rotula SÓLO con la descripción de negocio del permiso. La clave técnica
+ * (`DOCUMENT.READ_OWN`, `MEMBER.INVITE`...) es un identificador interno del catálogo: sigue
+ * siendo lo que se envía al backend y lo que liga el checkbox con su etiqueta, pero no se
+ * muestra, para que quien crea un rol lea capacidades y no nomenclatura del sistema.
  */
 export default function PermissionCheckboxList({
   availablePermissions,
@@ -59,12 +64,9 @@ export default function PermissionCheckboxList({
           />
           <Label
             htmlFor={`permission-${permission.key}`}
-            className="flex flex-col gap-0.5 font-normal"
+            className="font-normal leading-snug"
           >
-            <span className="text-sm">{permission.key}</span>
-            <span className="text-xs text-muted-foreground">
-              {permission.description}
-            </span>
+            {permission.description}
           </Label>
         </div>
       ))}
