@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { Pencil } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
@@ -21,14 +19,12 @@ interface UserInfoCardProps {
 }
 
 export default function UserInfoCard({ user }: UserInfoCardProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const updateMutation = useUpdatePersonalInformation();
 
   const {
     register,
     handleSubmit,
-    reset,
-    formState: { errors, isValid },
+    formState: { errors, isValid, isDirty },
   } = useForm<UpdatePersonalInfoFormValues>({
     resolver: zodResolver(updatePersonalInfoSchema),
     mode: 'onChange',
@@ -38,30 +34,14 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
     },
   });
 
-  function handleCancel() {
-    reset();
-    setIsEditing(false);
-  }
-
   function onSubmit(values: UpdatePersonalInfoFormValues) {
-    updateMutation.mutate(values, { onSuccess: () => setIsEditing(false) });
+    updateMutation.mutate(values);
   }
 
   return (
-    <Card id="personal-info" className="max-w-xl w-full scroll-mt-6">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card id="personal-info" className="w-full max-w-3xl scroll-mt-6">
+      <CardHeader>
         <CardTitle>Mi información</CardTitle>
-        {!isEditing && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsEditing(true)}
-          >
-            <Pencil className="size-3.5" />
-            Editar
-          </Button>
-        )}
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
@@ -76,20 +56,11 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
           <dt className="text-muted-foreground">CURP</dt>
           <dd className="font-medium">{user.nationalId}</dd>
 
-          {!isEditing && (
-            <>
-              <dt className="text-muted-foreground">Teléfono</dt>
-              <dd className="font-medium">{user.phoneNumber ?? '—'}</dd>
-
-              <dt className="text-muted-foreground">Correo secundario</dt>
-              <dd className="font-medium">{user.secondaryEmail ?? '—'}</dd>
-            </>
-          )}
         </dl>
 
-        {isEditing && (
-          <Form onSubmit={handleSubmit(onSubmit)} className="mt-4">
-            <FieldGroup>
+        <Form onSubmit={handleSubmit(onSubmit)} className="mt-4">
+          <FieldGroup>
+            <div className="grid gap-5 md:grid-cols-2">
               <TextField
                 id="phoneNumber"
                 label="Teléfono"
@@ -107,28 +78,19 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
                 error={errors.secondaryEmail}
                 {...register('secondaryEmail')}
               />
+            </div>
 
-              <div className="flex gap-2">
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={!isValid || updateMutation.isPending}
-                >
-                  {updateMutation.isPending ? 'Guardando...' : 'Guardar'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCancel}
-                  disabled={updateMutation.isPending}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </FieldGroup>
-          </Form>
-        )}
+            <div>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!isDirty || !isValid || updateMutation.isPending}
+              >
+                {updateMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+              </Button>
+            </div>
+          </FieldGroup>
+        </Form>
       </CardContent>
     </Card>
   );

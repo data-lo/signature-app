@@ -48,7 +48,7 @@ describe('DocumentsAvailability', () => {
     render(<DocumentsAvailability />, { wrapper });
 
     expect(
-      await screen.findByText('12 Documentos Disponibles'),
+      await screen.findByText('12 documentos'),
     ).toBeInTheDocument();
   });
 
@@ -66,7 +66,7 @@ describe('DocumentsAvailability', () => {
 
     render(<DocumentsAvailability />, { wrapper });
 
-    await screen.findByText('12 Documentos Disponibles');
+    await screen.findByText('12 documentos');
     expect(screen.queryByText(/50/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\bde\b/)).not.toBeInTheDocument();
   });
@@ -79,7 +79,7 @@ describe('DocumentsAvailability', () => {
     render(<DocumentsAvailability />, { wrapper });
 
     expect(
-      await screen.findByText('1 Documento Disponible'),
+      await screen.findByText('1 documento'),
     ).toBeInTheDocument();
   });
 
@@ -92,7 +92,7 @@ describe('DocumentsAvailability', () => {
     render(<DocumentsAvailability />, { wrapper });
 
     expect(
-      await screen.findByText('0 Documentos Disponibles'),
+      await screen.findByText('Sin documentos disponibles'),
     ).toBeInTheDocument();
   });
 
@@ -106,7 +106,7 @@ describe('DocumentsAvailability', () => {
     render(<DocumentsAvailability />, { wrapper });
 
     expect(
-      screen.queryByText(/Documentos? Disponibles?/),
+      screen.queryByText(/documentos?/),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: ADD_DOCUMENTS_LABEL }),
@@ -135,7 +135,7 @@ describe('DocumentsAvailability', () => {
     );
 
     render(<DocumentsAvailability />, { wrapper });
-    await screen.findByText('12 Documentos Disponibles');
+    await screen.findByText('12 documentos');
 
     mockedRequest.mockResolvedValueOnce(
       buildBillingAccess({ creditsAvailable: 3 }),
@@ -143,7 +143,7 @@ describe('DocumentsAvailability', () => {
     givenActiveAccount('cuenta-org-1');
 
     expect(
-      await screen.findByText('3 Documentos Disponibles'),
+      await screen.findByText('3 documentos'),
     ).toBeInTheDocument();
   });
 });

@@ -60,7 +60,7 @@ export default function PasswordCard() {
   }
 
   return (
-    <Card id="password" className="w-full max-w-xl scroll-mt-6">
+    <Card id="password" className="w-full max-w-3xl scroll-mt-6">
       <CardHeader>
         <CardTitle>Contraseña</CardTitle>
         <CardDescription>

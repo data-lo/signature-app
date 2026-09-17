@@ -177,7 +177,7 @@ export default function DashboardBreadcrumbs() {
        bajan a una segunda línea y nada desborda. En pantallas `sm` y mayores se fuerza una sola
        línea (`sm:flex-nowrap`) y quien cede espacio es el breadcrumb, que ya trunca su último
        nivel. */
-    <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-border px-4 py-1.5 sm:flex-nowrap sm:py-0">
+    <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-6 py-3 sm:flex-nowrap">
       <Breadcrumb className="flex items-center">
         <BreadcrumbList>
           {crumbs.map((crumb, index) => {
