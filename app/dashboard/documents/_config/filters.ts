@@ -26,14 +26,19 @@ export interface DocumentsFilters {
 }
 
 /**
- * Con qué filtros abre la pantalla: lo que espera una acción del usuario.
+ * Con qué filtros abre la pantalla: TODO lo visible, sin ningún recorte.
  *
- * Es la misma decisión que antes tomaba el sidebar al mandar a "Por firmar" — la bandeja abre por
- * lo que hay que hacer, no por todo lo que existe — sólo que ahora se puede cambiar sin salir de
- * la pantalla.
+ * `view` en `All` y `statuses` vacío: la lista inicial trae los documentos de todos los estados
+ * que la cuenta activa puede ver, sin que el usuario tenga que tocar nada. Antes abría en
+ * "Requieren mi firma o revisión", heredando la decisión del sidebar de mandar a "Por firmar";
+ * con eso, quien entraba sin firmas pendientes veía una lista vacía y creía no tener documentos.
+ * Los recortes siguen a un clic en el panel de filtros.
+ *
+ * Todo lo que "limpia" o "quita" un filtro vuelve aquí, así que cambiar este valor cambia también
+ * a dónde regresa el botón de restablecer y el chip de la vista.
  */
 export const DEFAULT_DOCUMENTS_FILTERS: DocumentsFilters = {
-  view: DocumentView.RequiresMySignature,
+  view: DocumentView.All,
   search: '',
   statuses: [],
   participant: '',
@@ -96,8 +101,8 @@ function formatDateRange(from: string, to: string): string {
  * Los filtros activos, listos para pintarse como chips.
  *
  * La `view` sólo produce chip cuando NO es la de por omisión: el encabezado de la lista ya dice
- * cuál está aplicada, y un chip "Requieren mi firma o revisión" que reaparece en cuanto se quita
- * —porque quitarlo significa volver al valor por omisión— sería un botón que no hace nada.
+ * cuál está aplicada, y un chip "Todos" que reaparece en cuanto se quita —porque quitarlo
+ * significa volver al valor por omisión— sería un botón que no hace nada.
  */
 export function activeFilterChips(
   filters: DocumentsFilters,
