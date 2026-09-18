@@ -65,30 +65,15 @@ describe('AuthProvider', () => {
     jest.restoreAllMocks();
   });
 
-  it('cae a la cuenta PERSONAL cuando no hay activeAccount (primera sesión)', async () => {
-    renderWithProviders(<AuthProvider>hijos</AuthProvider>);
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().activeAccount?.id).toBe('personal-1');
-    });
-  });
-
-  it('revalida y cae a PERSONAL si el activeAccount persistido ya no existe en el catálogo fresco', async () => {
-    useAuthStore.setState({
-      activeAccount: buildActiveAccount({
-        id: 'org-revocada',
-        organizationId: 'org-revocada',
-      }),
-    });
-
-    renderWithProviders(<AuthProvider>hijos</AuthProvider>);
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().activeAccount?.id).toBe('personal-1');
-    });
-  });
-
-  it('no toca activeAccount si sigue siendo válido en el catálogo (p. ej. justo tras crear una organización)', async () => {
+  /**
+   * Resolver la cuenta activa dejó de ser de este componente. Antes rehidrataba `activeAccount`
+   * desde `localStorage` y caía a la PERSONAL cuando faltaba o cuando el catálogo fresco ya no la
+   * traía; las dos cosas se mudaron al servidor —`resolveDefaultAccountId` en
+   * `get-authorization-context.server.ts`, con sus propias pruebas— para que el primer HTML salga
+   * ya con la cuenta correcta en vez de corregirse después de hidratar. Lo que sigue siendo suyo,
+   * y es lo único que se comprueba aquí, es llenar el catálogo y el perfil.
+   */
+  it('no toca activeAccount: de eso se encarga el servidor', async () => {
     useAuthStore.setState({ activeAccount: buildActiveAccount({}) });
 
     renderWithProviders(<AuthProvider>hijos</AuthProvider>);

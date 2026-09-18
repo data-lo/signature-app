@@ -1,7 +1,7 @@
 'use client';
 
 import { Users } from 'lucide-react';
-import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import InviteMemberModal from './InviteMemberModal';
 import AddMemberModal from './AddMemberModal';
 
@@ -35,8 +35,8 @@ interface MembersEmptyStateProps {
 export default function MembersEmptyState({
   organizationId,
 }: MembersEmptyStateProps) {
-  const { isAdmin, isLoading } = useIsOrganizationAdmin();
-  const canManage = isAdmin && !isLoading;
+  const { can } = usePermissions();
+  const canManage = can('MEMBER.INVITE');
 
   return (
     <div className="flex flex-col gap-6">
