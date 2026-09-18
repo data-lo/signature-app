@@ -22,6 +22,7 @@ import { FormSelect } from '@/components/form/form-select';
 import { Form } from '@/components/form/form';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import { assignableMemberRoles } from '@/lib/assignable-member-roles';
 import {
   DEFAULT_MEMBER_ROLE_NAME,
   formatRoleName,
@@ -157,7 +158,9 @@ export default function InviteMemberModal({
                   ? 'Cargando roles...'
                   : 'Selecciona un rol'
               }
-              options={(systemRolesQuery.data ?? []).map((role) => ({
+              // Sin OWNER: el rol del propietario no se reparte en el alta. Ver
+              // `assignableMemberRoles`.
+              options={assignableMemberRoles(systemRolesQuery.data).map((role) => ({
                 value: role.id,
                 label: formatRoleName(role.name),
               }))}
