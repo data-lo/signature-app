@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Building2, ChevronDown, Plus } from 'lucide-react';
+import { Building2, ChevronDown, Loader2, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,10 +24,14 @@ function labelFor(account: AccountListEntry): string {
 /**
  * Selector de cuenta activa y acceso a "Crear organización".
  *
- * Cambiar de cuenta pasa por `useSwitchActiveAccount`, que vuelve a consultar el estado comercial
- * de la cuenta elegida: la guarda de rutas espera esa respuesta antes de habilitar nada, así que
- * pasar a una organización sin plan la manda a Planes y volver a la cuenta personal restaura sus
- * accesos.
+ * Cambiar de cuenta pasa por `useSwitchActiveAccount`, que vacía los permisos, tira el caché de
+ * las dos cuentas implicadas, escribe la cookie desde el servidor y vuelve a pedir el layout. El
+ * estado comercial se recarga con él, así que pasar a una organización sin plan sigue mandando a
+ * Planes y volver a la cuenta personal restaura sus accesos.
+ *
+ * **Mientras el cambio está en curso el selector se deshabilita y lo dice.** No es un adorno: en
+ * ese rato el menú ya está vacío —los permisos viejos se descartaron y los nuevos no han
+ * llegado—, y sin señal alguna parecería que la aplicación se rompió.
  *
  * **"Crear organización" está disponible siempre**, sin depender del plan de la cuenta activa: crear
  * organizaciones ya no se cobra —lo que se paga es usarlas—, y el backend tampoco lo rechaza por
@@ -37,7 +41,7 @@ export default function AccountSwitcher() {
   const router = useRouter();
   const accountsList = useAuthStore((state) => state.accountsList);
   const activeAccount = useAuthStore((state) => state.activeAccount);
-  const switchActiveAccount = useSwitchActiveAccount();
+  const { switchActiveAccount, isSwitching } = useSwitchActiveAccount();
 
   const activeEntry = accountsList.find(
     (account) => account.id === activeAccount?.id,
@@ -45,9 +49,20 @@ export default function AccountSwitcher() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 outline-none hover:text-foreground">
-        <Building2 className="size-3.5" />
-        {activeEntry ? labelFor(activeEntry) : 'Cuenta'}
+      <DropdownMenuTrigger
+        disabled={isSwitching}
+        className="flex items-center gap-1 outline-none hover:text-foreground disabled:opacity-60"
+      >
+        {isSwitching ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Building2 className="size-3.5" />
+        )}
+        {isSwitching
+          ? 'Cambiando…'
+          : activeEntry
+            ? labelFor(activeEntry)
+            : 'Cuenta'}
         <ChevronDown className="size-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -56,7 +71,8 @@ export default function AccountSwitcher() {
           {accountsList.map((account) => (
             <DropdownMenuItem
               key={account.id}
-              onClick={() => switchActiveAccount(account)}
+              disabled={isSwitching}
+              onClick={() => void switchActiveAccount(account)}
             >
               {labelFor(account)}
               {account.id === activeAccount?.id && (

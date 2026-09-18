@@ -51,13 +51,19 @@ describe('DocumentsView', () => {
    * firmar", "Enviados para firma" y "Completados"— es una sola pantalla, y la sección pasó a ser
    * el filtro `view`.
    */
-  it('abre por lo que espera una acción del usuario', () => {
+  /**
+   * Historia "Configuración predeterminada del filtro de documentos": la pantalla abre en
+   * "Todos", sin recorte de participación y sin filtro de estado, para que la lista inicial traiga
+   * los documentos de todos los estados sin que el usuario toque nada.
+   */
+  it('abre en "Todos", sin recorte ni filtro de estado', () => {
     renderWithProviders(<DocumentsView />);
 
     expect(screen.getByText(/vista predeterminada/i)).toHaveTextContent(
-      'Vista predeterminada: Requieren mi firma o revisión',
+      'Vista predeterminada: Todos',
     );
-    expect(lastFilters().view).toBe(DocumentView.RequiresMySignature);
+    expect(lastFilters().view).toBe(DocumentView.All);
+    expect(lastFilters().statuses).toEqual([]);
   });
 
   /**
@@ -80,7 +86,7 @@ describe('DocumentsView', () => {
 
     renderWithProviders(<DocumentsView />);
 
-    expect(lastFilters().view).toBe(DocumentView.RequiresMySignature);
+    expect(lastFilters().view).toBe(DocumentView.All);
   });
 
   it('busca por nombre del documento o participante con una sola caja', async () => {
@@ -114,6 +120,37 @@ describe('DocumentsView', () => {
     await user.click(within(panel).getByRole('button', { name: 'Creados por mí' }));
 
     await waitFor(() => expect(lastFilters().view).toBe(DocumentView.CreatedByMe));
+  });
+
+  /**
+   * Lo que el usuario ve al abrir el panel: "Todos" ya marcado y ningún estado elegido. Y "Todos"
+   * no lo encierra: puede pasar a otro recorte y, volviendo a pulsarlo, regresar.
+   */
+  it('muestra "Todos" seleccionado al abrir el panel y deja cambiarlo', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.click(screen.getByRole('button', { name: /filtros/i }));
+    const panel = await screen.findByRole('dialog');
+
+    expect(within(panel).getByRole('button', { name: 'Todos' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(
+      within(panel).getByRole('button', { name: 'En progreso' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+
+    const requiresMySignature = within(panel).getByRole('button', {
+      name: 'Requieren mi firma o revisión',
+    });
+    await user.click(requiresMySignature);
+    await waitFor(() =>
+      expect(lastFilters().view).toBe(DocumentView.RequiresMySignature),
+    );
+
+    await user.click(requiresMySignature);
+    await waitFor(() => expect(lastFilters().view).toBe(DocumentView.All));
   });
 
   it('acumula varios estados a la vez', async () => {

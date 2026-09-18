@@ -11,6 +11,7 @@ import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
 import { getBillingAccessRequest, type BillingAccess } from '@/lib/api/billing';
 import { buildBillingAccess } from '@/lib/api/billing.fixtures';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { PermissionProvider } from '@/components/authorization/PermissionProvider';
 import type { AccountKind } from '@/lib/store/types/auth-store.types';
 
 jest.mock('../_requests');
@@ -25,9 +26,45 @@ const ORGANIZATION_ACCOUNT_ID = 'cuenta-org-1';
 
 let queryClient: QueryClient;
 
+/**
+ * Monta la tarjeta con `BILLING.READ` y `BILLING.MANAGE`: es el rol que ve todos sus controles,
+ * que es lo que casi todas estas pruebas miran. El caso contrario —quien consulta pero no
+ * administra— tiene su propia prueba al final del archivo.
+ */
 function wrapper({ children }: { children: ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <PermissionProvider
+        initialContext={{
+          accountId: 'account-1',
+          accountType: 'PERSONAL',
+          organizationId: null,
+          roleId: 'role-1',
+          permissions: ['BILLING.READ', 'BILLING.MANAGE'],
+        }}
+      >
+        {children}
+      </PermissionProvider>
+    </QueryClientProvider>
+  );
+}
+
+/** El mismo árbol, pero con un rol que sólo puede consultar la facturación. */
+function readOnlyWrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <PermissionProvider
+        initialContext={{
+          accountId: 'account-1',
+          accountType: 'PERSONAL',
+          organizationId: null,
+          roleId: 'role-member',
+          permissions: ['BILLING.READ'],
+        }}
+      >
+        {children}
+      </PermissionProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -601,5 +638,33 @@ describe('SubscriptionStateCard', () => {
         ).toBeInTheDocument(),
       );
     });
+  });
+});
+
+/**
+ * El criterio de la historia: `BILLING.READ` sin `BILLING.MANAGE` deja consultar la pantalla pero
+ * no administrar el plan. Que el botón no esté no es lo que protege nada —el endpoint vuelve a
+ * exigir el permiso—; lo que evita es ofrecer una acción que va a responder 403.
+ */
+describe('sin BILLING.MANAGE', () => {
+  it('muestra el estado del plan pero no ofrece administrarlo', async () => {
+    givenActiveAccount('account-1');
+    mockedRequest.mockResolvedValue(
+      buildBillingAccess({
+        currentPlanType: 'plus',
+        hasActiveSubscription: true,
+        status: 'ACTIVE',
+      }),
+    );
+
+    render(<SubscriptionStateCard />, { wrapper: readOnlyWrapper });
+
+    expect(await screen.findByText(/plan plus/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /cancelar suscripción/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /agregar más documentos/i }),
+    ).not.toBeInTheDocument();
   });
 });

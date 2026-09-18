@@ -2,6 +2,8 @@ import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AccountSwitcher from './AccountSwitcher';
+import { switchActiveAccountAction } from '@/app/server-actions/accounts/switch-active-account.server-action';
+import { PermissionProvider } from '@/components/authorization/PermissionProvider';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { buildBillingAccess } from '@/lib/api/billing.fixtures';
 import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
@@ -11,9 +13,21 @@ import type {
 } from '@/lib/store/types/auth-store.types';
 
 const mockPush = jest.fn();
+const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
 }));
+/**
+ * Cambiar de cuenta ya no lo resuelve el cliente: escribe una cookie `HttpOnly` desde el
+ * servidor, así que la Server Action se dobla y lo que se comprueba aquí es que se llame con la
+ * cuenta correcta.
+ */
+jest.mock(
+  '@/app/server-actions/accounts/switch-active-account.server-action',
+  () => ({ switchActiveAccountAction: jest.fn() }),
+);
+
+const mockedSwitchAction = switchActiveAccountAction as jest.Mock;
 
 const PERSONAL: AccountListEntry = {
   id: 'personal-1',
@@ -64,10 +78,20 @@ function setActiveAccount(entry: AccountListEntry | null) {
  * @example
  * renderSwitcher();
  */
-function renderSwitcher() {
+function renderSwitcher(activeAccountId = PERSONAL.id) {
   return render(
     <QueryClientProvider client={queryClient}>
-      <AccountSwitcher />
+      <PermissionProvider
+        initialContext={{
+          accountId: activeAccountId,
+          accountType: 'PERSONAL',
+          organizationId: null,
+          roleId: 'role-owner',
+          permissions: [],
+        }}
+      >
+        <AccountSwitcher />
+      </PermissionProvider>
     </QueryClientProvider>,
   );
 }
@@ -89,6 +113,9 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>) {
 describe('AccountSwitcher', () => {
   beforeEach(() => {
     mockPush.mockReset();
+    mockRefresh.mockReset();
+    mockedSwitchAction.mockReset();
+    mockedSwitchAction.mockResolvedValue({ ok: true });
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -142,7 +169,12 @@ describe('AccountSwitcher', () => {
     expect(activePersonalItem?.textContent).toContain('Actual');
   });
 
-  it('al elegir otra cuenta, la vuelve la activa en el store', async () => {
+  /**
+   * El store ya no se escribe desde aquí: la cuenta activa vive en una cookie `HttpOnly`, la
+   * cambia la Server Action y el layout la baja de vuelta en el siguiente render. Lo que esta
+   * prueba fija es el disparo correcto, no el efecto —que ya no es del cliente.
+   */
+  it('al elegir otra cuenta, se lo pide al servidor y refresca el layout', async () => {
     const user = userEvent.setup();
     setActiveAccount(PERSONAL);
     renderSwitcher();
@@ -154,7 +186,10 @@ describe('AccountSwitcher', () => {
       }),
     );
 
-    expect(useAuthStore.getState().activeAccount?.id).toBe('org-1');
+    await waitFor(() =>
+      expect(mockedSwitchAction).toHaveBeenCalledWith('org-1'),
+    );
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalled());
   });
 
   /**

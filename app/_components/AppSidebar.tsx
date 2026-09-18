@@ -35,6 +35,10 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useOrganizationPlanAccess } from '@/lib/hooks/useOrganizationPlanAccess';
 import { PLANS_ROUTE } from '@/lib/billing/organization-plan-access';
 import type { AccountKind } from '@/lib/store/types/auth-store.types';
+import type { PermissionKey } from '@/lib/authorization/authorization.types';
+import { DASHBOARD_NAVIGATION } from '@/lib/authorization/navigation-permissions';
+import { hasAnyPermission } from '@/lib/authorization/permissions';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import {
   DOCUMENTS_NAV_SECTIONS,
   DOCUMENTS_SECTIONS,
@@ -54,6 +58,16 @@ interface NavItem {
    * existe por definición.
    */
   buildHref?: (organizationId: string) => string;
+  /**
+   * Capacidades que dan derecho a ver la entrada; basta con UNA. Las declara
+   * `navigation-permissions.ts`, que es donde vive el mapa de sección → permiso; aquí sólo se
+   * referencian, para que icono y permiso no acaben en dos verdades distintas.
+   *
+   * Omitirlo significa "visible para cualquiera con sesión", y sólo lo omiten las entradas del
+   * perfil: son datos del propio usuario, no de la cuenta, y no hay permiso del catálogo que las
+   * gobierne.
+   */
+  anyPermissions?: readonly PermissionKey[];
 }
 
 export interface NavGroup {
@@ -92,6 +106,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // dentro de él haría parecer que se salió de la sección.
       isActive: (pathname: string) =>
         pathname === section.href || pathname.startsWith(`${section.href}/`),
+      anyPermissions: DASHBOARD_NAVIGATION.documents.anyPermissions,
     })),
   },
   {
@@ -104,12 +119,14 @@ export const NAV_GROUPS: NavGroup[] = [
         href: '/dashboard/plans',
         icon: CreditCard,
         isActive: (pathname) => pathname.startsWith('/dashboard/plans'),
+        anyPermissions: DASHBOARD_NAVIGATION.plans.anyPermissions,
       },
       {
         label: 'Suscripciones',
         href: '/dashboard/subscriptions',
         icon: ReceiptText,
         isActive: (pathname) => pathname.startsWith('/dashboard/subscriptions'),
+        anyPermissions: DASHBOARD_NAVIGATION.subscriptions.anyPermissions,
       },
     ],
   },
@@ -155,6 +172,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Users,
         isActive: (pathname) =>
           /^\/dashboard\/organizations\/[^/]+\/members$/.test(pathname),
+        anyPermissions: DASHBOARD_NAVIGATION.members.anyPermissions,
       },
       {
         label: 'Roles y permisos',
@@ -162,29 +180,44 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: KeyRound,
         isActive: (pathname) =>
           pathname === '/dashboard/organization/settings/roles',
+        anyPermissions: DASHBOARD_NAVIGATION.roles.anyPermissions,
       },
     ],
   },
 ];
 
 /**
- * Filtra los grupos del menú que se muestran para la cuenta activa.
+ * Filtra el menú para la cuenta activa: primero por permisos, después por contexto.
  *
- * Los grupos de organización sólo aparecen con una organización activa. Si esa organización todavía
- * no tiene plan, sólo quedan los grupos marcados `availableWithoutPlan` —Pagos, donde lo contrata,
- * y Organización, que su administrador puede usar desde el alta—: las rutas operativas no se
- * ofrecen porque la guarda las mandaría de vuelta a Planes. Mientras se consulta el plan
- * (`lockedWithoutPlan` en `false`) se muestra el menú completo, para que no se reacomode con cada
- * cambio de cuenta.
+ * **Los permisos mandan sobre todo lo demás.** Una entrada cuyo permiso no se tiene desaparece,
+ * venga de donde venga el grupo y esté el plan contratado o no: es lo único que responde "¿esto
+ * es tuyo?". Un grupo que se queda sin entradas visibles no se pinta — un encabezado solo, sin
+ * nada debajo, sólo informa de que existe algo a lo que no se llega.
+ *
+ * Después siguen los dos filtros que ya había, que no hablan de permisos sino de contexto: los
+ * grupos de organización sólo aparecen con una organización activa, y si esa organización todavía
+ * no tiene plan quedan sólo los marcados `availableWithoutPlan` —Pagos, donde lo contrata, y
+ * Organización, que su administrador puede usar desde el alta—, porque las rutas operativas
+ * mandarían de vuelta a Planes. Mientras se consulta el plan (`lockedWithoutPlan` en `false`) se
+ * muestra todo, para que el menú no se reacomode con cada cambio de cuenta.
+ *
+ * Una lista de permisos VACÍA esconde todo lo que exija alguno. Es el estado del cambio de cuenta
+ * a medio hacer, y fallar cerrado es justo lo que evita enseñar por un instante el menú de la
+ * cuenta anterior.
  *
  * @param groups - Todos los grupos del menú.
- * @param options.accountType - Tipo de la cuenta activa; `undefined` mientras se rehidrata.
+ * @param options.accountType - Tipo de la cuenta activa; `undefined` mientras se resuelve.
  * @param options.lockedWithoutPlan - Si la cuenta activa es una organización sin plan.
- * @returns Los grupos visibles, en su orden original.
+ * @param options.permissions - Permisos efectivos de la cuenta activa.
+ * @returns Los grupos visibles, con sus entradas ya filtradas y en su orden original.
  *
  * @example
  * ```ts
- * visibleNavGroups(NAV_GROUPS, { accountType: 'ORGANIZATION', lockedWithoutPlan: true }); // Pagos y Organización
+ * visibleNavGroups(NAV_GROUPS, {
+ *   accountType: 'ORGANIZATION',
+ *   lockedWithoutPlan: false,
+ *   permissions: ['DOCUMENT.READ_OWN'],
+ * }); // sólo Documentos
  * ```
  */
 export function visibleNavGroups(
@@ -192,11 +225,25 @@ export function visibleNavGroups(
   {
     accountType,
     lockedWithoutPlan,
-  }: { accountType: AccountKind | undefined; lockedWithoutPlan: boolean },
+    permissions,
+  }: {
+    accountType: AccountKind | undefined;
+    lockedWithoutPlan: boolean;
+    permissions: readonly PermissionKey[];
+  },
 ): NavGroup[] {
   return groups
     .filter((group) => !group.orgOnly || accountType === 'ORGANIZATION')
-    .filter((group) => !lockedWithoutPlan || group.availableWithoutPlan);
+    .filter((group) => !lockedWithoutPlan || group.availableWithoutPlan)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) =>
+          !item.anyPermissions ||
+          hasAnyPermission(permissions, item.anyPermissions),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 export default function AppSidebar() {
@@ -205,6 +252,7 @@ export default function AppSidebar() {
   const { data: currentUser } = useCurrentUser();
   const activeAccount = useAuthStore((state) => state.activeAccount);
   const lockedWithoutPlan = useOrganizationPlanAccess() === 'locked';
+  const { authorization } = usePermissions();
 
   /**
    * Bug corregido: este componente vive dentro de `<Suspense fallback={null}>` (ver
@@ -252,6 +300,7 @@ export default function AppSidebar() {
         {visibleNavGroups(NAV_GROUPS, {
           accountType: activeAccount?.accountType,
           lockedWithoutPlan,
+          permissions: authorization?.permissions ?? [],
         }).map((group) => (
           <SidebarGroup key={group.key}>
             {group.label && (
