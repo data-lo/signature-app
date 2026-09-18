@@ -37,10 +37,6 @@ jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
-jest.mock(
-  '@/app/server-actions/organizations/add-organization-member.server-action',
-  () => ({ addOrganizationMemberAction: jest.fn() }),
-);
 
 const mockedUseIsOrganizationAdmin = useIsOrganizationAdmin as jest.Mock;
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
@@ -263,15 +259,19 @@ describe('MembersManager', () => {
     });
   });
 
-  it('ofrece invitar y agregar miembros junto a la tabla', () => {
+  /**
+   * Historia "Unificar invitaciones de miembros": invitar es el único camino de alta, también
+   * cuando ya hay miembros en la tabla.
+   */
+  it('ofrece sólo invitar miembros junto a la tabla, sin alta directa', () => {
     renderManager();
 
     expect(
       screen.getByRole('button', { name: /invitar miembro/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /agregar miembro/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: /agregar miembro/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('a quien no administra la organización no le ofrece ninguna acción', () => {
@@ -301,16 +301,6 @@ describe('MembersManager', () => {
    * al backend sigue siendo el id del rol `MEMBER`.
    */
   describe('rol predeterminado', () => {
-    it('propone MIEMBRO al agregar a alguien que ya tiene cuenta', async () => {
-      const user = userEvent.setup();
-      renderManager();
-
-      await user.click(screen.getByRole('button', { name: /agregar miembro/i }));
-
-      const roleSelect = await screen.findByRole('combobox', { name: /rol/i });
-      await waitFor(() => expect(roleSelect).toHaveTextContent('MIEMBRO'));
-    });
-
     it('propone MIEMBRO al invitar a alguien que todavía no se registró', async () => {
       const user = userEvent.setup();
       renderManager();
