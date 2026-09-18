@@ -42,9 +42,12 @@ export default function RolesView() {
     );
   }
 
-  // El catálogo estático completo siempre está en ADMIN (lo trae de fábrica) — se usa para
-  // ofrecer los siete permisos al crear/editar, sin duplicar el catálogo en el frontend.
-  const adminRole = roles?.find((role) => role.isSystemRole && role.name === 'ADMIN');
+  // ADMIN trae de fábrica todo el catálogo estático salvo MEMBER.REMOVE (ver
+  // STATIC_ROLE_PERMISSION_MATRIX en signature-server) — se usa para ofrecer los permisos al
+  // crear/editar, sin duplicar el catálogo en el frontend.
+  const adminRole = roles?.find(
+    (role) => role.isSystemRole && role.name === 'ADMIN',
+  );
   const availablePermissions = adminRole?.permissions ?? [];
 
   function handleConfirmEdit(
@@ -78,11 +81,7 @@ export default function RolesView() {
       {rolesLoading ? (
         <p className="text-sm text-muted-foreground">Cargando roles...</p>
       ) : (
-        <RolesTable
-          roles={roles ?? []}
-          canManage
-          onEdit={setEditingRole}
-        />
+        <RolesTable roles={roles ?? []} canManage onEdit={setEditingRole} />
       )}
 
       <EditOrganizationRoleModal

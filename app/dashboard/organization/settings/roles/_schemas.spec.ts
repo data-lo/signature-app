@@ -1,14 +1,37 @@
-import {
-  saveOrganizationRoleSchema,
-  isStaticPermissionKey,
-  STATIC_PERMISSION_KEYS,
-} from './_schemas';
+import type { RolePermission } from '@/lib/api/organization-roles';
+import { saveOrganizationRoleSchema, staticPermissionKeysOf } from './_schemas';
+
+function permission(key: string, isStaticCatalog: boolean): RolePermission {
+  return {
+    id: `permission-${key}`,
+    key,
+    resource: key.split('.')[0],
+    action: key.split('.')[1],
+    scope: 'ANY',
+    description: key,
+    isStaticCatalog,
+  } as RolePermission;
+}
 
 describe('saveOrganizationRoleSchema', () => {
   it('acepta un nombre válido con permisos del catálogo estático', () => {
     const result = saveOrganizationRoleSchema.safeParse({
       name: 'Aprobador',
       permissionKeys: ['DOCUMENT.READ_ORGANIZATION', 'DOCUMENT.APPROVE'],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  /**
+   * El catálogo del backend crece (BILLING, ROLE, MEMBER...), y el formulario tiene que poder
+   * guardar esas claves el mismo día, sin que nadie las copie en el frontend. Cuáles son válidas
+   * de verdad lo decide el backend contra su enum.
+   */
+  it('acepta claves del catálogo que el frontend no conoce de antemano', () => {
+    const result = saveOrganizationRoleSchema.safeParse({
+      name: 'Tesorería',
+      permissionKeys: ['BILLING.READ', 'BILLING.MANAGE', 'ROLE.READ'],
     });
 
     expect(result.success).toBe(true);
@@ -31,23 +54,23 @@ describe('saveOrganizationRoleSchema', () => {
 
     expect(result.success).toBe(false);
   });
-
-  it('rechaza una clave que no pertenece al catálogo estático', () => {
-    const result = saveOrganizationRoleSchema.safeParse({
-      name: 'Aprobador',
-      permissionKeys: ['ORGANIZATION.UPDATE'],
-    });
-
-    expect(result.success).toBe(false);
-  });
 });
 
-describe('isStaticPermissionKey', () => {
-  it.each(STATIC_PERMISSION_KEYS)('reconoce %s como clave del catálogo', (key) => {
-    expect(isStaticPermissionKey(key)).toBe(true);
+describe('staticPermissionKeysOf', () => {
+  it('se queda con las claves del catálogo estático', () => {
+    const keys = staticPermissionKeysOf([
+      permission('DOCUMENT.CREATE', true),
+      permission('BILLING.MANAGE', true),
+      permission('USER.DELETE', false),
+    ]);
+
+    expect(keys).toEqual(['DOCUMENT.CREATE', 'BILLING.MANAGE']);
   });
 
-  it('rechaza una clave de la rejilla CRUD heredada', () => {
-    expect(isStaticPermissionKey('ORGANIZATION.READ')).toBe(false);
+  /** La rejilla CRUD heredada del seed anterior no se ofrece al armar un rol. */
+  it('descarta lo que no es del catálogo', () => {
+    expect(staticPermissionKeysOf([permission('USER.READ', false)])).toEqual(
+      [],
+    );
   });
 });
