@@ -14,7 +14,6 @@ import type { OrganizationMember } from '@/lib/api/organization-members';
 import type { OrganizationPermission } from '@/lib/api/organization-permissions';
 import MembersTable from './MembersTable';
 import InviteMemberModal from './InviteMemberModal';
-import AddMemberModal from './AddMemberModal';
 import EditRoleModal from './EditRoleModal';
 import RemoveMemberDialog from './RemoveMemberDialog';
 import ConfigureMemberPermissionsModal from './ConfigureMemberPermissionsModal';
@@ -132,8 +131,10 @@ export default function MembersManager({
   return (
     <div className="flex flex-col gap-4">
       {/*
-        Dos caminos de alta, a propósito: "Agregar miembro" da de alta de una vez a quien ya tiene
-        cuenta, e "Invitar miembro" manda el correo a quien todavía no está registrado.
+        Un solo camino de alta: "Invitar miembro". Tenga o no cuenta la persona, recibe un enlace
+        y se une identificándose con su RFC en `/join`. El alta directa ("Agregar miembro") se
+        retiró: resolvía a la persona por correo, y quien tiene su cuenta con el correo personal
+        quedaba fuera.
       */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -146,7 +147,6 @@ export default function MembersManager({
         {canManage && (
           <div className="flex items-center gap-2">
             <InviteMemberModal organizationId={organizationId} />
-            <AddMemberModal organizationId={organizationId} />
           </div>
         )}
       </div>
