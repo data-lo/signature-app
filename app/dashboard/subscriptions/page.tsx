@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
+import { assertPagePermission } from '@/lib/authorization/assert-page-permission.server';
 import PaymentReturnNotice from './_components/PaymentReturnNotice';
 import SubscriptionStateCard from './_components/SubscriptionStateCard';
 
@@ -9,8 +10,13 @@ import SubscriptionStateCard from './_components/SubscriptionStateCard';
  * `PaymentReturnNotice` va dentro de un `Suspense` porque lee la query string con
  * `useSearchParams`, y sin ese límite Next obliga a renderizar toda la ruta del lado del
  * cliente. El aviso es lo único que depende de la URL; el estado de la suscripción no.
+ *
+ * Exige `BILLING.READ`. Administrar el plan —cancelar, reanudar, comprar documentos— pide además
+ * `BILLING.MANAGE`, que se decide dentro de la pantalla y lo vuelve a validar cada endpoint.
  */
-export default function SubscriptionsPage() {
+export default async function SubscriptionsPage() {
+  await assertPagePermission('BILLING.READ');
+
   return (
     <PageContainer>
       <div className="flex flex-col gap-6">

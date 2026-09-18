@@ -2,7 +2,6 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen } from '@/test-utils';
 import PermissionsView from './PermissionsView';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
 import { useOrganizationPermissions } from '@/lib/hooks/useOrganizationPermissions';
 import { useCreateOrganizationPermission } from '../_hooks/useCreateOrganizationPermission';
 import { useUpdateOrganizationPermission } from '../_hooks/useUpdateOrganizationPermission';
@@ -10,13 +9,11 @@ import { useDeleteOrganizationPermission } from '../_hooks/useDeleteOrganization
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import type { OrganizationPermission } from '@/lib/api/organization-permissions';
 
-jest.mock('@/lib/hooks/useIsOrganizationAdmin');
 jest.mock('@/lib/hooks/useOrganizationPermissions');
 jest.mock('../_hooks/useCreateOrganizationPermission');
 jest.mock('../_hooks/useUpdateOrganizationPermission');
 jest.mock('../_hooks/useDeleteOrganizationPermission');
 
-const mockedUseIsOrganizationAdmin = useIsOrganizationAdmin as jest.Mock;
 const mockedUseOrganizationPermissions = useOrganizationPermissions as jest.Mock;
 const mockedUseCreateOrganizationPermission =
   useCreateOrganizationPermission as jest.Mock;
@@ -59,10 +56,6 @@ describe('PermissionsView', () => {
     updatePermissionMutate.mockReset();
     deletePermissionMutate.mockReset();
     useAuthStore.setState({ activeAccount: ORG_ACCOUNT });
-    mockedUseIsOrganizationAdmin.mockReturnValue({
-      isAdmin: true,
-      isLoading: false,
-    });
     mockedUseOrganizationPermissions.mockReturnValue({
       data: PERMISSIONS,
       isLoading: false,
@@ -83,7 +76,9 @@ describe('PermissionsView', () => {
 
   it('muestra un mensaje y no consulta el catálogo si la cuenta activa no es una organización', () => {
     useAuthStore.setState({ activeAccount: PERSONAL_ACCOUNT });
-    renderWithProviders(<PermissionsView />);
+    renderWithProviders(<PermissionsView />, {
+      permissions: ['ORGANIZATION.READ'],
+    });
 
     expect(
       screen.getByText(/selecciona una organización/i),
@@ -91,12 +86,8 @@ describe('PermissionsView', () => {
     expect(screen.queryByText('Aprobar documentos')).not.toBeInTheDocument();
   });
 
-  it('muestra un mensaje de acceso restringido si el usuario no es ADMIN de la organización activa', () => {
-    mockedUseIsOrganizationAdmin.mockReturnValue({
-      isAdmin: false,
-      isLoading: false,
-    });
-    renderWithProviders(<PermissionsView />);
+  it('muestra un mensaje de acceso restringido sin ORGANIZATION.READ', () => {
+    renderWithProviders(<PermissionsView />, { permissions: [] });
 
     expect(
       screen.getByText(/no tienes permisos para gestionar los permisos/i),
@@ -108,7 +99,9 @@ describe('PermissionsView', () => {
   });
 
   it('renderiza la tabla de permisos cuando el usuario es ADMIN de una organización', () => {
-    renderWithProviders(<PermissionsView />);
+    renderWithProviders(<PermissionsView />, {
+      permissions: ['ORGANIZATION.READ'],
+    });
 
     expect(screen.getByText('Aprobar documentos')).toBeInTheDocument();
     expect(mockedUseOrganizationPermissions).toHaveBeenCalledWith(
@@ -119,7 +112,9 @@ describe('PermissionsView', () => {
 
   it('crear permiso: abre el modal, escribe un nombre y llama a la mutación', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<PermissionsView />);
+    renderWithProviders(<PermissionsView />, {
+      permissions: ['ORGANIZATION.READ'],
+    });
 
     await user.click(screen.getByRole('button', { name: /crear permiso/i }));
     await user.type(screen.getByLabelText(/nombre/i), 'Nuevo permiso');
@@ -133,7 +128,9 @@ describe('PermissionsView', () => {
 
   it('modificar: abre el modal, cambia el estatus y llama a la mutación con permissionId+changes', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<PermissionsView />);
+    renderWithProviders(<PermissionsView />, {
+      permissions: ['ORGANIZATION.READ'],
+    });
 
     const [rowActionsTrigger] = screen.getAllByRole('button', { name: '' });
     await user.click(rowActionsTrigger);
@@ -157,7 +154,9 @@ describe('PermissionsView', () => {
 
   it('eliminar: abre el diálogo de confirmación y llama a la mutación con el permissionId', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<PermissionsView />);
+    renderWithProviders(<PermissionsView />, {
+      permissions: ['ORGANIZATION.READ'],
+    });
 
     const [rowActionsTrigger] = screen.getAllByRole('button', { name: '' });
     await user.click(rowActionsTrigger);
