@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useOrganizationPermissions } from '@/lib/hooks/useOrganizationPermissions';
 import { useUpdateOrganizationPermission } from '../_hooks/useUpdateOrganizationPermission';
 import { useDeleteOrganizationPermission } from '../_hooks/useDeleteOrganizationPermission';
@@ -14,7 +14,8 @@ import type { OrganizationPermission } from '@/lib/api/organization-permissions'
 
 export default function PermissionsView() {
   const activeAccount = useAuthStore((state) => state.activeAccount);
-  const { isAdmin, isLoading: roleLoading } = useIsOrganizationAdmin();
+  const { can } = usePermissions();
+  const canReadOrganization = can('ORGANIZATION.READ');
   const [editingPermission, setEditingPermission] =
     useState<OrganizationPermission | null>(null);
   const [deletingPermission, setDeletingPermission] =
@@ -22,7 +23,7 @@ export default function PermissionsView() {
 
   const organizationId = activeAccount?.organizationId ?? null;
   const { data: permissions, isLoading: permissionsLoading } =
-    useOrganizationPermissions(organizationId, isAdmin);
+    useOrganizationPermissions(organizationId, canReadOrganization);
   const updatePermissionMutation = useUpdateOrganizationPermission(organizationId);
   const deletePermissionMutation = useDeleteOrganizationPermission(organizationId);
 
@@ -34,11 +35,7 @@ export default function PermissionsView() {
     );
   }
 
-  if (roleLoading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
-  }
-
-  if (!isAdmin) {
+  if (!canReadOrganization) {
     return (
       <p className="text-sm text-muted-foreground">
         No tienes permisos para gestionar los permisos de esta organización.

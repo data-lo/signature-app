@@ -45,15 +45,26 @@ interface BackendRequestOptions {
    * endpoints la toman del path y validan contra el `sub` del JWT.
    */
   accountId?: string;
+  /**
+   * Header `X-Active-Account-Id`: la cuenta desde la que se está trabajando. Sólo lo pide
+   * `authorization/context`, que resuelve los permisos efectivos de ESA cuenta.
+   *
+   * Es un header distinto de `accountId` aunque el valor sea el mismo, y no por simetría: aquél
+   * nombra la membresía sobre la que se OPERA en un alta concreta, y éste el contexto de la
+   * sesión. El backend acepta los dos en ese endpoint; mandar el propio deja claro qué se está
+   * preguntando.
+   */
+  activeAccountId?: string;
   searchParams?: Record<string, string | undefined>;
 }
 
 /**
  * Llama al backend desde el servidor con la sesión del usuario actual.
  *
- * La sesión sale de la cookie `token`, que es lo único de la sesión que el servidor puede leer:
- * `activeAccount` vive en `localStorage` y por eso la organización viaja siempre en la URL o como
- * argumento explícito, nunca inferida aquí.
+ * La sesión sale de la cookie `token`. La cuenta activa vive en su propia cookie `HttpOnly` y no
+ * se lee aquí a propósito: este módulo no decide contexto, lo transporta — quien llama pasa la
+ * cuenta explícitamente (`accountId`/`activeAccountId`) o la lleva en la URL. Así una petición
+ * nunca hereda en silencio una cuenta que quien la escribió no eligió.
  *
  * Ni el token ni la URL interna aparecen en el error que se propaga: sólo el código HTTP y el
  * mensaje del backend, que es lo que sirve en el log del servidor.
@@ -96,6 +107,10 @@ export async function backendRequest<T>(
 
   if (options.accountId) {
     headers['X-Account-Id'] = options.accountId;
+  }
+
+  if (options.activeAccountId) {
+    headers['X-Active-Account-Id'] = options.activeAccountId;
   }
 
   if (options.body !== undefined) {

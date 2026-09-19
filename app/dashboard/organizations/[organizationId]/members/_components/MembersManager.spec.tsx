@@ -1,6 +1,6 @@
 import userEvent from '@testing-library/user-event';
+import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
-import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -19,7 +19,6 @@ const mockReplace = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mockRefresh, replace: mockReplace }),
 }));
-jest.mock('@/lib/hooks/useIsOrganizationAdmin');
 jest.mock('@/lib/hooks/useSystemRoles');
 // El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
 jest.mock('@/lib/hooks/useOrganizationRoles');
@@ -45,7 +44,6 @@ jest.mock(
   () => ({ addOrganizationMemberAction: jest.fn() }),
 );
 
-const mockedUseIsOrganizationAdmin = useIsOrganizationAdmin as jest.Mock;
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
 const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 const mockedUseMemberPermissions = useMemberPermissions as jest.Mock;
@@ -85,7 +83,15 @@ const PERMISSIONS: OrganizationPermission[] = [
   },
 ];
 
-function renderManager(includeInactive = false) {
+/**
+ * Por defecto se monta con `MEMBER.READ` y `MEMBER.INVITE`: es el rol que llega a esta pantalla
+ * pudiendo dar de alta, que es el caso que ejercitan casi todas las pruebas. Las que miran el
+ * otro lado pasan sólo `MEMBER.READ`.
+ */
+function renderManager(
+  includeInactive = false,
+  memberPermissions: readonly PermissionKey[] = ['MEMBER.READ', 'MEMBER.INVITE'],
+) {
   return renderWithProviders(
     <MembersManager
       organizationId="org-1"
@@ -93,6 +99,7 @@ function renderManager(includeInactive = false) {
       permissions={PERMISSIONS}
       includeInactive={includeInactive}
     />,
+    { permissions: memberPermissions },
   );
 }
 
@@ -103,10 +110,6 @@ const rowActions = () =>
 describe('MembersManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedUseIsOrganizationAdmin.mockReturnValue({
-      isAdmin: true,
-      isLoading: false,
-    });
     mockedUseOrganizationRoles.mockImplementation(() => ({
       data: mockedUseSystemRoles().data,
       isPending: false,
@@ -284,13 +287,8 @@ describe('MembersManager', () => {
     ).toBeInTheDocument();
   });
 
-  it('a quien no administra la organización no le ofrece ninguna acción', () => {
-    mockedUseIsOrganizationAdmin.mockReturnValue({
-      isAdmin: false,
-      isLoading: false,
-    });
-
-    renderManager();
+  it('a quien sólo puede leer no le ofrece ninguna acción', () => {
+    renderManager(false, ['MEMBER.READ']);
 
     // La lista se sigue viendo: tiene permiso de lectura, que es como llegó hasta acá.
     expect(screen.getByText('miembro@empresa.com')).toBeInTheDocument();

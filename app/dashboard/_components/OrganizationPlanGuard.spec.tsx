@@ -1,7 +1,5 @@
-import userEvent from '@testing-library/user-event';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '@/test-utils';
-import AccountSwitcher from '@/app/_components/AccountSwitcher';
 import { getBillingAccessRequest } from '@/lib/api/billing';
 import {
   ORGANIZATION_WITHOUT_PLAN,
@@ -98,12 +96,9 @@ function respondBilling(byAccountId: Record<string, BillingAccess>): void {
  */
 function renderGuard() {
   return renderWithProviders(
-    <>
-      <AccountSwitcher />
-      <OrganizationPlanGuard>
-        <p>{PROTECTED_CONTENT}</p>
-      </OrganizationPlanGuard>
-    </>,
+    <OrganizationPlanGuard>
+      <p>{PROTECTED_CONTENT}</p>
+    </OrganizationPlanGuard>,
   );
 }
 
@@ -218,26 +213,29 @@ describe('OrganizationPlanGuard', () => {
    * El ejemplo de la historia: cuenta personal con plan → organización sin plan → de vuelta a la
    * cuenta personal. Cada cambio vuelve a pedir el estado comercial de la cuenta elegida.
    */
+  /**
+   * El ejemplo de la historia: cuenta personal con plan → organización sin plan → de vuelta a la
+   * cuenta personal. Cada cambio vuelve a pedir el estado comercial de la cuenta elegida.
+   *
+   * El cambio se hace sobre el store y NO pulsando el selector. Desde que la cuenta activa vive
+   * en una cookie `HttpOnly`, elegir otra en el selector escribe esa cookie desde el servidor y
+   * el layout la baja de vuelta en el render siguiente —un viaje que jsdom no puede recorrer—.
+   * Lo que esta prueba mira es cómo reacciona la guarda a que la cuenta activa cambie, que es
+   * exactamente lo que se simula aquí; el disparo del selector lo cubre su propia prueba.
+   */
   it('bloquea al cambiar a una organización sin plan y restaura los accesos al volver', async () => {
-    const user = userEvent.setup();
     renderGuard();
 
     expect(await screen.findByText(PROTECTED_CONTENT)).toBeInTheDocument();
 
-    await user.click(screen.getByText('Mi cuenta personal'));
-    await user.click(
-      await screen.findByRole('menuitem', { name: /acme corp/i }),
-    );
+    act(() => activate(ORG));
 
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('/dashboard/plans'),
     );
     expect(screen.queryByText(PROTECTED_CONTENT)).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('Acme Corp S.A. de C.V.'));
-    await user.click(
-      await screen.findByRole('menuitem', { name: /mi cuenta personal/i }),
-    );
+    act(() => activate(PERSONAL));
 
     expect(await screen.findByText(PROTECTED_CONTENT)).toBeInTheDocument();
     expect(requestedFor).toEqual([PERSONAL.id, ORG.id, PERSONAL.id]);

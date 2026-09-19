@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useUpdateOrganizationRole } from '../_hooks/useUpdateOrganizationRole';
 import type { OrganizationRole } from '@/lib/api/organization-roles';
@@ -12,13 +12,21 @@ import EditOrganizationRoleModal from './EditOrganizationRoleModal';
 
 export default function RolesView() {
   const activeAccount = useAuthStore((state) => state.activeAccount);
-  const { isAdmin, isLoading: roleLoading } = useIsOrganizationAdmin();
+  /**
+   * Antes esto preguntaba si el rol se llamaba OWNER o ADMIN, lo que obligaba a resolver el
+   * `roleId` contra el catálogo de roles —una consulta más— y dejaba fuera a cualquier rol
+   * personalizado con `ROLE.READ`. Ahora se pregunta por la capacidad, que es lo que el backend
+   * comprueba de verdad.
+   */
+  const { can } = usePermissions();
+  const canReadRoles = can('ROLE.READ');
+  const canManageRoles = can('ROLE.MANAGE');
   const [editingRole, setEditingRole] = useState<OrganizationRole | null>(null);
 
   const organizationId = activeAccount?.organizationId ?? null;
   const { data: roles, isLoading: rolesLoading } = useOrganizationRoles(
     organizationId,
-    isAdmin,
+    canReadRoles,
   );
   const updateRoleMutation = useUpdateOrganizationRole(organizationId);
 
@@ -30,11 +38,7 @@ export default function RolesView() {
     );
   }
 
-  if (roleLoading) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>;
-  }
-
-  if (!isAdmin) {
+  if (!canReadRoles) {
     return (
       <p className="text-sm text-muted-foreground">
         No tienes permisos para gestionar los roles de esta organización.
@@ -70,7 +74,7 @@ export default function RolesView() {
             sólo usan los permisos técnicos del catálogo.
           </p>
         </div>
-        {organizationId && (
+        {organizationId && canManageRoles && (
           <CreateOrganizationRoleModal
             organizationId={organizationId}
             availablePermissions={availablePermissions}
@@ -81,9 +85,17 @@ export default function RolesView() {
       {rolesLoading ? (
         <p className="text-sm text-muted-foreground">Cargando roles...</p>
       ) : (
-        <RolesTable roles={roles ?? []} canManage onEdit={setEditingRole} />
+        <RolesTable
+          roles={roles ?? []}
+          canManage={canManageRoles}
+          onEdit={setEditingRole}
+        />
       )}
 
+      {/*
+        Editar es `ROLE.MANAGE`, no `ROLE.READ`: quien sólo puede consultar ve la tabla y no la
+        modal. El endpoint lo vuelve a exigir de todas formas.
+      */}
       <EditOrganizationRoleModal
         role={editingRole}
         availablePermissions={availablePermissions}
