@@ -20,10 +20,19 @@ const noopStorage = {
   removeItem: () => {},
 };
 
-// authToken y user se recargan en cada sesión desde la cookie + GET /users/me
-// (fuentes de verdad); solo activeAccount se persiste en localStorage para
-// recordar el tenant operativo elegido entre refrescos de página, sin
-// duplicar el JWT en un almacenamiento más expuesto a XSS.
+// Nada de este store se persiste ya. `authToken` y `user` se recargan en cada
+// sesión desde la cookie + GET /users/me, y `activeAccount` —lo único que
+// llegó a guardarse en localStorage— se mudó a una cookie HttpOnly que sólo el
+// servidor lee y escribe: es lo que permite resolver los permisos durante el
+// render inicial del dashboard, y de paso deja de existir una copia del tenant
+// activo que cualquiera pudiera editar desde el navegador. Aquí `activeAccount`
+// queda como espejo en memoria de lo que dijo el servidor (ver
+// ActiveAccountBridge), para no reescribir los cuarenta y tantos consumidores
+// que lo leen.
+//
+// El middleware `persist` se conserva con una lista de campos VACÍA en vez de
+// quitarse: `AuthProvider` y las pruebas siguen llamando a `useAuthStore.persist.*`,
+// y sin el middleware esa API no existe.
 export const useAuthStore = create<AuthState>()(
   persist(
     (...a) => ({
@@ -37,7 +46,7 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() =>
         typeof window !== 'undefined' ? localStorage : noopStorage,
       ),
-      partialize: (state) => ({ activeAccount: state.activeAccount }),
+      partialize: () => ({}),
       // Next.js renderiza este store en el servidor, donde no existe
       // localStorage; se rehidrata manualmente en el cliente (AuthProvider)
       // para evitar errores de SSR y mismatches de hidratación de React.

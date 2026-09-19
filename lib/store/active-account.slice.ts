@@ -23,4 +23,6 @@ export const createActiveAccountSlice: StateCreator<
         roleId: account.roleId,
       },
     }),
+
+  clearActiveAccount: () => set({ activeAccount: null }),
 });

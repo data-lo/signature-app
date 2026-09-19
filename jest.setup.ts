@@ -1,5 +1,21 @@
 import '@testing-library/jest-dom';
 
+/**
+ * `next/cache` no se puede cargar en jsdom: arrastra los internos del servidor de Next y revienta
+ * al importarse. Llega hasta aquí por las Server Actions, que en producción son un stub de RPC en
+ * el cliente pero en jest se resuelven como módulos normales — así que cualquier componente que
+ * importe un hook que importe una Server Action tumbaría su suite entera, sin que la prueba tenga
+ * nada que ver con la revalidación.
+ *
+ * Se dobla globalmente, junto al resto de los huecos de jsdom, en vez de repetirlo en cada
+ * archivo: quien necesite comprobar que se revalidó algo lo espía sobre este doble.
+ */
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+  revalidateTag: jest.fn(),
+  unstable_cache: (fn: unknown) => fn,
+}));
+
 // jsdom no implementa ResizeObserver; los popups de @base-ui/react (Select,
 // Popover, dropdown-menu) lo usan para calcular su posición y sin este stub
 // se quedan montados con `hidden`/`data-closed` aunque se hayan "abierto".

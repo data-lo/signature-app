@@ -248,7 +248,13 @@ describe('useAuthStore', () => {
       });
     });
 
-    it('persiste activeAccount en localStorage', () => {
+    /**
+     * La cuenta activa dejó de persistirse: vive en una cookie `HttpOnly` que sólo el servidor lee
+     * y escribe, y aquí queda como espejo en memoria de lo que resolvió el layout (ver
+     * `ActiveAccountBridge`). Persistirla de nuevo crearía una segunda verdad, editable desde el
+     * navegador, que sobreviviría al cambio de cuenta y al cierre de sesión.
+     */
+    it('NO persiste activeAccount en localStorage', () => {
       useAuthStore.getState().setActiveAccount({
         id: 'personal-1',
         accountType: 'PERSONAL',
@@ -257,12 +263,21 @@ describe('useAuthStore', () => {
       });
 
       const persisted = JSON.parse(localStorage.getItem('auth-storage')!);
-      expect(persisted.state.activeAccount).toEqual({
+      expect(persisted.state).toEqual({});
+      expect(useAuthStore.getState().activeAccount?.id).toBe('personal-1');
+    });
+
+    it('clearActiveAccount deja el contexto sin cuenta', () => {
+      useAuthStore.getState().setActiveAccount({
         id: 'personal-1',
         accountType: 'PERSONAL',
         organizationId: null,
         roleId: null,
       });
+
+      useAuthStore.getState().clearActiveAccount();
+
+      expect(useAuthStore.getState().activeAccount).toBeNull();
     });
   });
 
