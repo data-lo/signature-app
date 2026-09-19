@@ -1,7 +1,18 @@
 import PageContainer from '@/app/dashboard/_components/PageContainer';
+import { assertPagePermission } from '@/lib/authorization/assert-page-permission.server';
 import PaymentServicesView from './_components/PaymentServicesView';
 
-export default function PlansPage() {
+/**
+ * Catálogo de planes contratables.
+ *
+ * Exige `BILLING.READ` para entrar, el mismo permiso que la pantalla de suscripciones: quien no
+ * puede ver el plan de la cuenta tampoco tiene por qué ver lo que cuesta cambiarlo. Contratar es
+ * otra cosa y pide `BILLING.MANAGE`, que se comprueba en el botón y, de verdad, en el endpoint de
+ * checkout.
+ */
+export default async function PlansPage() {
+  await assertPagePermission('BILLING.READ');
+
   return (
     <PageContainer>
       <div className="mb-8">

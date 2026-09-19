@@ -63,6 +63,12 @@ export interface AccountsListSlice {
 export interface ActiveAccountSlice {
   activeAccount: ActiveAccount | null;
   setActiveAccount: (account: AccountListEntry | ActiveAccount) => void;
+  /**
+   * Deja el contexto sin cuenta activa. Lo usa el puente con el servidor cuando éste no pudo
+   * resolver ninguna —acceso revocado, catálogo vacío—: conservar la anterior haría que las
+   * pantallas siguieran consultando una cuenta que ya no es suya.
+   */
+  clearActiveAccount: () => void;
 }
 
 // Slice 4: estado comercial por cuenta (cargado desde /payments/billing-state)

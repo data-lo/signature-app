@@ -1,19 +1,17 @@
 import { renderWithProviders, screen } from '@/test-utils';
-import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
+import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import MembersEmptyState from './MembersEmptyState';
 
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: jest.fn() }) }));
-jest.mock('@/lib/hooks/useIsOrganizationAdmin');
 jest.mock('@/lib/hooks/useSystemRoles');
 jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
 
-const mockedUseIsOrganizationAdmin = useIsOrganizationAdmin as jest.Mock;
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
 
 const ORG_ACCOUNT: ActiveAccount = {
@@ -23,18 +21,26 @@ const ORG_ACCOUNT: ActiveAccount = {
   roleId: 'admin-role-1',
 };
 
+/**
+ * Por defecto se monta con `MEMBER.READ` y `MEMBER.INVITE`: es el rol que ve esta pantalla y
+ * puede dar de alta. Las pruebas que miran el otro lado pasan los suyos.
+ */
+function renderEmptyState(
+  permissions: readonly PermissionKey[] = ['MEMBER.READ', 'MEMBER.INVITE'],
+) {
+  return renderWithProviders(<MembersEmptyState organizationId="org-1" />, {
+    permissions,
+  });
+}
+
 describe('MembersEmptyState', () => {
   beforeEach(() => {
-    mockedUseIsOrganizationAdmin.mockReturnValue({
-      isAdmin: true,
-      isLoading: false,
-    });
     mockedUseSystemRoles.mockReturnValue({ data: [], isLoading: false });
     useAuthStore.setState({ activeAccount: ORG_ACCOUNT });
   });
 
   it('explica que todavía no hay miembros invitados', () => {
-    renderWithProviders(<MembersEmptyState organizationId="org-1" />);
+    renderEmptyState();
 
     expect(screen.getByText('Aún no has invitado miembros')).toBeInTheDocument();
     expect(
@@ -49,7 +55,7 @@ describe('MembersEmptyState', () => {
    * que hay que hacer, y esconderlo detrás de una tabla vacía dejaba al administrador buscando.
    */
   it('ofrece "Invitar miembro" aunque no exista ningún miembro', () => {
-    renderWithProviders(<MembersEmptyState organizationId="org-1" />);
+    renderEmptyState();
 
     expect(
       screen.getByRole('button', { name: /invitar miembro/i }),
@@ -58,7 +64,7 @@ describe('MembersEmptyState', () => {
 
   /** No se dibuja tabla: ni encabezados, ni columnas, ni filas vacías. */
   it('no renderiza la tabla ni sus encabezados', () => {
-    renderWithProviders(<MembersEmptyState organizationId="org-1" />);
+    renderEmptyState();
 
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(
@@ -72,7 +78,7 @@ describe('MembersEmptyState', () => {
    * directa por correo se retiró, porque dejaba fuera a quien tiene su cuenta con otro correo.
    */
   it('ya no ofrece el alta directa: sólo invitar', () => {
-    renderWithProviders(<MembersEmptyState organizationId="org-1" />);
+    renderEmptyState();
 
     expect(
       screen.getByRole('button', { name: /invitar miembro/i }),
@@ -86,13 +92,8 @@ describe('MembersEmptyState', () => {
    * Mismo gate que rige la tabla: a quien sólo puede leer no se le ofrecen acciones que el
    * backend va a rechazar.
    */
-  it('no ofrece acciones de alta a quien no administra la organización', () => {
-    mockedUseIsOrganizationAdmin.mockReturnValue({
-      isAdmin: false,
-      isLoading: false,
-    });
-
-    renderWithProviders(<MembersEmptyState organizationId="org-1" />);
+  it('no ofrece acciones de alta a quien no puede invitar', () => {
+    renderEmptyState(['MEMBER.READ']);
 
     expect(screen.getByText('Aún no has invitado miembros')).toBeInTheDocument();
     expect(
@@ -103,13 +104,13 @@ describe('MembersEmptyState', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('mantiene las acciones ocultas mientras el rol no se ha resuelto', () => {
-    mockedUseIsOrganizationAdmin.mockReturnValue({
-      isAdmin: false,
-      isLoading: true,
-    });
-
-    renderWithProviders(<MembersEmptyState organizationId="org-1" />);
+  /**
+   * El instante del cambio de cuenta, cuando los permisos viejos ya se descartaron: sin contexto
+   * no se ofrece nada. Antes esto se llamaba "mientras el rol no se ha resuelto" y dependía de un
+   * `isLoading`; ahora es la misma garantía sin estado intermedio que mantener.
+   */
+  it('mantiene las acciones ocultas cuando no hay permisos', () => {
+    renderEmptyState([]);
 
     expect(
       screen.queryByRole('button', { name: /invitar miembro/i }),

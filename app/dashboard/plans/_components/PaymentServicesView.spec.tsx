@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test-utils';
+import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import {
   getPaymentServicesRequest,
   createCheckoutSessionRequest,
@@ -10,6 +11,17 @@ import { buildBillingAccess } from '@/lib/api/billing.fixtures';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { PaymentService } from '../_interfaces/payment-service.interface';
 import PaymentServicesView from './PaymentServicesView';
+
+/**
+ * Monta el catálogo con `BILLING.READ` y `BILLING.MANAGE`: entrar a la pantalla pide la primera y
+ * el botón "Comprar" la segunda, y casi todas estas pruebas miran el botón. La que comprueba el
+ * caso contrario pasa los suyos.
+ */
+function renderCatalog(
+  permissions: readonly PermissionKey[] = ['BILLING.READ', 'BILLING.MANAGE'],
+) {
+  return renderWithProviders(<PaymentServicesView />, { permissions });
+}
 
 jest.mock('../_requests');
 jest.mock('@/lib/api/billing');
@@ -87,7 +99,7 @@ describe('PaymentServicesView', () => {
   });
 
   it('pinta una tarjeta por servicio con su importe y periodicidad', async () => {
-    renderWithProviders(<PaymentServicesView />);
+    renderCatalog();
 
     expect(await screen.findByText('Plan Pro')).toBeInTheDocument();
     expect(screen.getByText('al mes')).toBeInTheDocument();
@@ -100,7 +112,7 @@ describe('PaymentServicesView', () => {
 
   /** La regla central del ticket. */
   it('no pide ninguna sesión de Checkout al cargar el catálogo', async () => {
-    renderWithProviders(<PaymentServicesView />);
+    renderCatalog();
 
     await screen.findByText('Plan Pro');
 
@@ -114,7 +126,7 @@ describe('PaymentServicesView', () => {
    * contrato que la precede — que la sesión se pida, y con el precio de la tarjeta pulsada.
    */
   it('crea la sesión sólo al pulsar Comprar, con el precio de esa tarjeta', async () => {
-    renderWithProviders(<PaymentServicesView />);
+    renderCatalog();
 
     const botones = await screen.findAllByRole('button', { name: /comprar/i });
     await userEvent.click(botones[0]);
@@ -128,7 +140,7 @@ describe('PaymentServicesView', () => {
     // La promesa se deja pendiente para observar el estado intermedio.
     mockedCreateSession.mockReturnValue(new Promise(() => {}));
 
-    renderWithProviders(<PaymentServicesView />);
+    renderCatalog();
 
     const botones = await screen.findAllByRole('button', { name: /comprar/i });
     await userEvent.click(botones[0]);
@@ -154,14 +166,14 @@ describe('PaymentServicesView', () => {
     });
 
     it('marca con el badge "Plan actual" la tarjeta del plan contratado', async () => {
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       expect(await screen.findByText('Plan actual')).toBeInTheDocument();
     });
 
     /** Uno y sólo uno: el badge en dos tarjetas no diría nada. */
     it('no marca ninguna otra tarjeta como plan actual', async () => {
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       await screen.findByText('Plan actual');
 
@@ -169,7 +181,7 @@ describe('PaymentServicesView', () => {
     });
 
     it('deshabilita la contratación de los demás planes', async () => {
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       await screen.findByText('Plan actual');
 
@@ -186,7 +198,7 @@ describe('PaymentServicesView', () => {
      * "Comprar" en la tarjeta que ya lleva el badge invitaría a pagar dos veces por lo mismo.
      */
     it('tampoco deja volver a contratar el plan que ya se tiene', async () => {
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       await screen.findByText('Plan actual');
 
@@ -198,7 +210,7 @@ describe('PaymentServicesView', () => {
     });
 
     it('un clic en un plan bloqueado no abre ninguna sesión de Checkout', async () => {
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       await screen.findByText('Plan actual');
 
@@ -213,7 +225,7 @@ describe('PaymentServicesView', () => {
     });
 
     it('explica por qué no se puede contratar al interactuar con el botón', async () => {
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       await screen.findByText('Plan actual');
 
@@ -234,7 +246,7 @@ describe('PaymentServicesView', () => {
      * justamente lo contrario, y bloquearlo cortaría una venta que el backend sí acepta.
      */
     it('NO bloquea la compra de créditos de documentos', async () => {
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       await screen.findByText('Plan actual');
 
@@ -263,7 +275,7 @@ describe('PaymentServicesView', () => {
     it('deja contratar cualquier plan y no marca ninguno como actual', async () => {
       givenBilling({ hasActiveSubscription: false, currentPlanType: 'free' });
 
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       const botones = await screen.findAllByRole('button', {
         name: /comprar/i,
@@ -287,7 +299,7 @@ describe('PaymentServicesView', () => {
         currentPlanType: 'pro',
       });
 
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       await screen.findByText('Plan actual');
 
@@ -305,7 +317,7 @@ describe('PaymentServicesView', () => {
     it('no bloquea nada si el estado de facturación falla', async () => {
       mockedGetBilling.mockRejectedValue(new Error('billing caído'));
 
-      renderWithProviders(<PaymentServicesView />);
+      renderCatalog();
 
       const botones = await screen.findAllByRole('button', {
         name: /comprar/i,
@@ -319,7 +331,7 @@ describe('PaymentServicesView', () => {
   it('un catálogo vacío se explica, no se deja en blanco', async () => {
     mockedGetServices.mockResolvedValue([]);
 
-    renderWithProviders(<PaymentServicesView />);
+    renderCatalog();
 
     expect(
       await screen.findByText(/todavía no hay servicios disponibles/i),
@@ -329,9 +341,31 @@ describe('PaymentServicesView', () => {
   it('muestra el esqueleto mientras carga, sin tarjetas parciales', () => {
     mockedGetServices.mockReturnValue(new Promise(() => {}));
 
-    renderWithProviders(<PaymentServicesView />);
+    renderCatalog();
 
     expect(screen.getByLabelText(/cargando servicios/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /comprar/i }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * `BILLING.READ` abre la pantalla; contratar es `BILLING.MANAGE`. A quien sólo consulta se le
+ * enseña el plan y su precio, y se le quita el botón: el checkout lo rechazaría igual.
+ */
+describe('sin BILLING.MANAGE', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuthStore.setState({ activeAccount: null });
+    mockedGetServices.mockResolvedValue([MENSUAL, UNICO]);
+    mockedGetBilling.mockResolvedValue(buildBillingAccess({}));
+  });
+
+  it('muestra los planes pero no ofrece comprarlos', async () => {
+    renderCatalog(['BILLING.READ']);
+
+    expect(await screen.findByText('Plan Pro')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /comprar/i }),
     ).not.toBeInTheDocument();

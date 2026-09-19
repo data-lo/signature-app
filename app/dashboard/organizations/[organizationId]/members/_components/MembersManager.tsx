@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
 import { removeOrganizationMemberAction } from '@/app/server-actions/organizations/remove-organization-member.server-action';
 import { updateOrganizationMemberPermissionsAction } from '@/app/server-actions/organizations/update-organization-member-permissions.server-action';
@@ -68,8 +68,15 @@ export default function MembersManager({
     se ofrecen las acciones de cada fila. Sin él, quien sólo puede leer vería botones que el
     backend va a rechazar.
   */
-  const { isAdmin, isLoading: roleLoading } = useIsOrganizationAdmin();
-  const canManage = isAdmin && !roleLoading;
+  /**
+   * Administrar miembros es invitar, cambiar de rol y dar de baja: tres capacidades distintas del
+   * catálogo que hoy se ofrecen juntas en esta pantalla. Se exige la de invitar, que es la que
+   * abre el alta; cada acción concreta la vuelve a validar su endpoint, y las dos que sobran
+   * (`MEMBER.UPDATE` y `MEMBER.REMOVE`) separarán aquí los controles cuando la pantalla las
+   * distinga.
+   */
+  const { can } = usePermissions();
+  const canManage = can('MEMBER.INVITE');
 
   const [editingMember, setEditingMember] = useState<OrganizationMember | null>(
     null,
