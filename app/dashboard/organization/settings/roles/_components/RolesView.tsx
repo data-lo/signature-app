@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
-import { useOrganizationRoles } from '../_hooks/useOrganizationRoles';
+import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useUpdateOrganizationRole } from '../_hooks/useUpdateOrganizationRole';
 import type { OrganizationRole } from '@/lib/api/organization-roles';
 import RolesTable from './RolesTable';
