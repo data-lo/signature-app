@@ -1,6 +1,7 @@
 import { renderWithProviders, screen } from '@/test-utils';
 import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import MembersEmptyState from './MembersEmptyState';
@@ -8,6 +9,8 @@ import MembersEmptyState from './MembersEmptyState';
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: jest.fn() }) }));
 jest.mock('@/lib/hooks/useIsOrganizationAdmin');
 jest.mock('@/lib/hooks/useSystemRoles');
+// El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
+jest.mock('@/lib/hooks/useOrganizationRoles');
 jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
@@ -19,6 +22,7 @@ jest.mock(
 
 const mockedUseIsOrganizationAdmin = useIsOrganizationAdmin as jest.Mock;
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
+const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 
 const ORG_ACCOUNT: ActiveAccount = {
   id: 'org-account-1',
@@ -33,6 +37,12 @@ describe('MembersEmptyState', () => {
       isAdmin: true,
       isLoading: false,
     });
+    mockedUseOrganizationRoles.mockImplementation(() => ({
+      data: mockedUseSystemRoles().data,
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+    }));
     mockedUseSystemRoles.mockReturnValue({ data: [], isLoading: false });
     useAuthStore.setState({ activeAccount: ORG_ACCOUNT });
   });

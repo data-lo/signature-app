@@ -2,6 +2,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import { useIsOrganizationAdmin } from '@/lib/hooks/useIsOrganizationAdmin';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useMemberPermissions } from '../_hooks/useMemberPermissions';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
@@ -20,6 +21,8 @@ jest.mock('next/navigation', () => ({
 }));
 jest.mock('@/lib/hooks/useIsOrganizationAdmin');
 jest.mock('@/lib/hooks/useSystemRoles');
+// El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
+jest.mock('@/lib/hooks/useOrganizationRoles');
 jest.mock('../_hooks/useMemberPermissions');
 jest.mock(
   '@/app/server-actions/organizations/update-organization-member-role.server-action',
@@ -44,6 +47,7 @@ jest.mock(
 
 const mockedUseIsOrganizationAdmin = useIsOrganizationAdmin as jest.Mock;
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
+const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 const mockedUseMemberPermissions = useMemberPermissions as jest.Mock;
 const mockedUpdateRole = updateOrganizationMemberRoleAction as jest.Mock;
 const mockedRemoveMember = removeOrganizationMemberAction as jest.Mock;
@@ -103,6 +107,12 @@ describe('MembersManager', () => {
       isAdmin: true,
       isLoading: false,
     });
+    mockedUseOrganizationRoles.mockImplementation(() => ({
+      data: mockedUseSystemRoles().data,
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+    }));
     mockedUseSystemRoles.mockReturnValue({
       data: [
         {
