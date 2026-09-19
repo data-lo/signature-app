@@ -636,6 +636,45 @@ describe('CreateDocumentView', () => {
 
       expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
     });
+
+    /**
+     * Historia "Estandarizar campos de colaboradores": la etiqueta sigue diciendo RFC —es lo que
+     * el usuario mexicano captura— pero el dato viaja al backend como `taxId`. Se comprueba de
+     * punta a punta, desde el campo que se llena hasta el payload de la mutación, porque el
+     * renombre atraviesa esquema, configuración de campos y mapper: cualquiera de los tres
+     * podría quedarse con el nombre viejo sin que las pruebas de unidad de los otros dos lo
+     * noten.
+     */
+    it('lo que el espectador escribe en RFC viaja al backend como taxId', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await user.click(screen.getByRole('button', { name: /espectador/i }));
+      const viewerInputs = screen.getAllByLabelText(/nombre\(s\)/i);
+      await user.type(viewerInputs[viewerInputs.length - 1], 'Ana');
+      const lastNames = screen.getAllByLabelText(/apellido/i);
+      await user.type(lastNames[lastNames.length - 1], 'Ruiz');
+      const emails = screen.getAllByLabelText(/^email/i);
+      await user.type(emails[emails.length - 1], 'ana.ruiz@mail.com');
+      await user.type(screen.getByLabelText(/^rfc/i), 'AURU800101ABC');
+      await selectSignatureType(user, /firma simple/i);
+
+      await submitRequest(user);
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          collaborators: expect.arrayContaining([
+            expect.objectContaining({
+              collaboratorType: 'VIEWER',
+              taxId: 'AURU800101ABC',
+            }),
+          ]),
+        }),
+        expect.anything(),
+      );
+    });
   });
 
   describe('Búsqueda Inteligente', () => {

@@ -24,7 +24,7 @@ function viewer(): ViewerFormValues {
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
-    rfc: 'AURU800101ABC',
+    taxId: 'AURU800101ABC',
   };
 }
 
@@ -52,7 +52,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('historia "Selección de tipo de firma": acepta firma avanzada sin pedirle rfc al firmante', () => {
+  it('historia "Selección de tipo de firma": acepta firma avanzada sin pedirle taxId al firmante', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([signer()], false, 'ADVANCED'),
     );
@@ -70,9 +70,9 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
-  it('acepta un espectador sin rfc', () => {
+  it('acepta un espectador sin taxId', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer(), { ...viewer(), rfc: '' }]),
+      formValues([signer(), { ...viewer(), taxId: '' }]),
     );
 
     expect(result.success).toBe(true);

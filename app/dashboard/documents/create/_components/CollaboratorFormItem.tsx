@@ -8,7 +8,7 @@ import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
   COLLABORATOR_NAME_FIELDS,
-  COLLABORATOR_RFC_FIELD,
+  COLLABORATOR_TAX_ID_FIELD,
 } from '../_config/collaborator-fields.config';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 import type { DragHandleProps } from './SortableCollaboratorItem';
@@ -60,7 +60,7 @@ export default function CollaboratorFormItem({
     name: `collaborators.${index}.collaboratorType`,
   });
   const isSigner = collaboratorType === 'SIGNER';
-  const showRfc = collaboratorType === 'VIEWER';
+  const showTaxId = collaboratorType === 'VIEWER';
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -131,13 +131,13 @@ export default function CollaboratorFormItem({
         disabled={isSelf}
       />
 
-      {showRfc && (
+      {showTaxId && (
         <FormInput
           control={control}
-          name={`collaborators.${index}.${COLLABORATOR_RFC_FIELD.name}`}
-          label={COLLABORATOR_RFC_FIELD.label}
-          type={COLLABORATOR_RFC_FIELD.type}
-          placeholder={COLLABORATOR_RFC_FIELD.placeholder}
+          name={`collaborators.${index}.${COLLABORATOR_TAX_ID_FIELD.name}`}
+          label={COLLABORATOR_TAX_ID_FIELD.label}
+          type={COLLABORATOR_TAX_ID_FIELD.type}
+          placeholder={COLLABORATOR_TAX_ID_FIELD.placeholder}
         />
       )}
 

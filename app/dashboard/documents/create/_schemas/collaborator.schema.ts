@@ -15,18 +15,23 @@ const emailField = z
   .min(1, { message: 'Ingresa el correo electrónico del participante.' })
   .email({ message: 'Ingresa un correo electrónico válido.' });
 /**
+ * Identificador fiscal del espectador —en México, su RFC, que es lo que sigue diciendo la
+ * etiqueta en pantalla—. Se llamaba `rfc` hasta la historia "Estandarizar campos de
+ * colaboradores": el nombre del campo deja de dar por hecho el régimen fiscal, el dato que se
+ * captura es el mismo.
+ *
  * Opcional desde la historia "Eliminar campo RFC de la sección de Espectadores": un espectador
- * puede guardarse sin RFC. `.trim()` sigue aplicando por si acaso llega solo espacios; un string
- * vacío es válido y así viaja al backend, donde `CollaboratorPayloadDto.rfc` también lo acepta.
+ * puede guardarse sin él. `.trim()` sigue aplicando por si acaso llega solo espacios; un string
+ * vacío es válido y así viaja al backend, donde `CollaboratorPayloadDto.taxId` también lo acepta.
  */
-const rfcField = z.string().trim();
+const taxIdField = z.string().trim();
 
 /**
- * Un firmante NO declara su propio tipo de firma ni su RFC (ver historia "Selección de tipo de
- * firma al crear documentos"): el tipo lo define el documento completo (`signatureType` en
- * `documentConfigurationSchema`) y el RFC del flujo avanzado se extrae del certificado de e.firma
- * en el momento de firmar (ver `EfirmaService.extaerRfcDeSubject` en el backend), así que pedirlo
- * al crear el documento era capturar un dato que nadie valida ni usa.
+ * Un firmante NO declara su propio tipo de firma ni su identificador fiscal (ver historia
+ * "Selección de tipo de firma al crear documentos"): el tipo lo define el documento completo
+ * (`signatureType` en `documentConfigurationSchema`) y el RFC del flujo avanzado se extrae del
+ * certificado de e.firma en el momento de firmar (ver `EfirmaService.extaerRfcDeSubject` en el
+ * backend), así que pedirlo al crear el documento era capturar un dato que nadie valida ni usa.
  */
 export const signerSchema = z.object({
   collaboratorType: z.literal('SIGNER'),
@@ -48,13 +53,16 @@ export const signerSchema = z.object({
   isSelf: z.boolean(),
 });
 
-/** El RFC sobrevive solo acá: un espectador no firma, así que no hay certificado del que leerlo. */
+/**
+ * El identificador fiscal sobrevive solo acá: un espectador no firma, así que no hay certificado
+ * del que leerlo.
+ */
 export const viewerSchema = z.object({
   collaboratorType: z.literal('VIEWER'),
   firstName: firstNameField,
   lastName: lastNameField,
   email: emailField,
-  rfc: rfcField,
+  taxId: taxIdField,
 });
 
 /** Firmantes y espectadores viven en un solo arreglo, diferenciados por `collaboratorType`. */
@@ -84,7 +92,7 @@ export function emptyViewer(): ViewerFormValues {
     firstName: '',
     lastName: '',
     email: '',
-    rfc: '',
+    taxId: '',
   };
 }
 
