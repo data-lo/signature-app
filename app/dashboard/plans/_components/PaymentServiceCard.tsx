@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Can } from '@/components/authorization/Can';
 import {
   Tooltip,
   TooltipContent,
@@ -123,23 +124,30 @@ export default function PaymentServiceCard({
         </p>
       </CardContent>
 
+      {/**
+       * Contratar es `BILLING.MANAGE`; entrar a esta pantalla sólo pide `BILLING.READ`. A quien
+       * puede consultar el catálogo pero no comprar se le enseña el plan y su precio, y se le
+       * quita el botón: `CreateSubscriptionCheckoutUseCase` lo rechazaría de todas formas.
+       */}
       <CardFooter>
-        {isBlockedByActiveSubscription ? (
-          <Tooltip>
-            <TooltipTrigger
-              /**
-               * El envoltorio ocupa el ancho de la tarjeta porque el botón es `w-full`: sin esto
-               * el área que dispara el tooltip sería más angosta que el botón que explica, y
-               * habría una franja donde pulsar no hace nada y tampoco dice por qué.
-               */
-              className="w-full"
-              render={boton}
-            />
-            <TooltipContent>{ACTIVE_SUBSCRIPTION_TOOLTIP}</TooltipContent>
-          </Tooltip>
-        ) : (
-          boton
-        )}
+        <Can permission="BILLING.MANAGE">
+          {isBlockedByActiveSubscription ? (
+            <Tooltip>
+              <TooltipTrigger
+                /**
+                 * El envoltorio ocupa el ancho de la tarjeta porque el botón es `w-full`: sin esto
+                 * el área que dispara el tooltip sería más angosta que el botón que explica, y
+                 * habría una franja donde pulsar no hace nada y tampoco dice por qué.
+                 */
+                className="w-full"
+                render={boton}
+              />
+              <TooltipContent>{ACTIVE_SUBSCRIPTION_TOOLTIP}</TooltipContent>
+            </Tooltip>
+          ) : (
+            boton
+          )}
+        </Can>
       </CardFooter>
     </Card>
   );

@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Can } from '@/components/authorization/Can';
 import { getErrorMessage } from '@/lib/error-handler';
 import { useBillingAccess } from '@/lib/hooks/useBillingAccess';
 import { useCancelSubscription } from '../_hooks/useCancelSubscription';
@@ -165,7 +166,9 @@ export default function SubscriptionStateCard() {
             <Button render={<Link href="/dashboard/plans" />} variant="brand">
               Ver planes
             </Button>
-            <AddDocumentsDialog />
+            <Can permission="BILLING.MANAGE">
+              <AddDocumentsDialog />
+            </Can>
           </div>
         </CardContent>
       </Card>
@@ -240,14 +243,26 @@ export default function SubscriptionStateCard() {
            * disponibles con la baja programada, porque el plan sigue activo hasta el fin del
            * periodo y su tarifa sigue siendo la suya.
            */}
-          <AddDocumentsDialog />
+          {/**
+           * Comprar, cancelar y reanudar son la misma capacidad —`BILLING.MANAGE`—, así que van
+           * bajo un solo `Can`. "Ver planes" queda fuera: es navegación, y a la pantalla de
+           * planes se entra con `BILLING.READ`.
+           *
+           * Esconderlas no protege nada: cada endpoint vuelve a exigir el permiso. Lo que evita
+           * es ofrecerle a un miembro raso un botón que va a responder 403.
+           */}
+          <Can permission="BILLING.MANAGE">
+            <AddDocumentsDialog />
+          </Can>
 
           {puedeCancelar ? (
-            <CancelSubscriptionDialog
-              currentPeriodEnd={subscription.currentPeriodEnd}
-              onConfirm={() => cancelar.mutate()}
-              disabled={operacionEnCurso}
-            />
+            <Can permission="BILLING.MANAGE">
+              <CancelSubscriptionDialog
+                currentPeriodEnd={subscription.currentPeriodEnd}
+                onConfirm={() => cancelar.mutate()}
+                disabled={operacionEnCurso}
+              />
+            </Can>
           ) : null}
 
           {/**
@@ -256,13 +271,15 @@ export default function SubscriptionStateCard() {
            * lo rechaza con 409), y deshacerlo exigiría entrar al Dashboard de Stripe.
            */}
           {subscription.cancelAtPeriodEnd ? (
-            <Button
-              variant="brand"
-              onClick={() => reanudar.mutate()}
-              disabled={operacionEnCurso}
-            >
-              Reanudar suscripción
-            </Button>
+            <Can permission="BILLING.MANAGE">
+              <Button
+                variant="brand"
+                onClick={() => reanudar.mutate()}
+                disabled={operacionEnCurso}
+              >
+                Reanudar suscripción
+              </Button>
+            </Can>
           ) : null}
 
           {puedeContratar ? (

@@ -16,9 +16,14 @@ describe('filtros del listado unificado', () => {
      * `view` viaja siempre, incluso con su valor por omisión: el backend también tiene un valor
      * por defecto, y dejar que cada extremo elija el suyo es cómo terminan discrepando.
      */
+    /**
+     * `view=all` viaja explícito aunque sea el valor por omisión: si se omitiera, el backend
+     * aplicaría SU propio valor por omisión (`requires_my_signature`) y la pantalla abriría
+     * recortada sin que nada en ella lo dijera.
+     */
     it('manda siempre el recorte, y nada más si no hay filtros', () => {
       expect(buildDocumentsQueryParams(filters())).toEqual({
-        view: DocumentView.RequiresMySignature,
+        view: DocumentView.All,
       });
     });
 
@@ -81,9 +86,24 @@ describe('filtros del listado unificado', () => {
      * aplicado, y un chip cuyo botón de quitar devuelve al mismo valor sería un botón inerte.
      */
     it('no produce chip para el recorte por omisión', () => {
+      expect(activeFilterChips(filters({ view: DocumentView.All }))).toEqual(
+        [],
+      );
+    });
+
+    /**
+     * Con "Todos" como valor por omisión, "Requieren mi firma o revisión" pasa a ser un recorte
+     * como cualquier otro: se anuncia con su chip, y quitarlo vuelve a "Todos".
+     */
+    it('el recorte "Requieren mi firma" produce chip, y quitarlo vuelve a Todos', () => {
+      const [chip] = activeFilterChips(
+        filters({ view: DocumentView.RequiresMySignature }),
+      );
+
+      expect(chip.label).toBe('Requieren mi firma o revisión');
       expect(
-        activeFilterChips(filters({ view: DocumentView.RequiresMySignature })),
-      ).toEqual([]);
+        chip.remove(filters({ view: DocumentView.RequiresMySignature })).view,
+      ).toBe(DocumentView.All);
     });
 
     it('produce un chip por cada filtro puesto', () => {
