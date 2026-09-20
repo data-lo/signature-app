@@ -44,11 +44,11 @@ describe('filtros del listado unificado', () => {
     it('manda varios estatus separados por comas', () => {
       const params = buildDocumentsQueryParams(
         filters({
-          statuses: [DocumentStatus.Pending, DocumentStatus.Signed],
+          statuses: [DocumentStatus.PendingSignature, DocumentStatus.Signed],
         }),
       );
 
-      expect(params.statuses).toBe('pending,signed');
+      expect(params.statuses).toBe('PENDING_SIGNATURE,SIGNED');
     });
 
     it('traduce cada filtro a su parámetro del endpoint', () => {
@@ -110,7 +110,7 @@ describe('filtros del listado unificado', () => {
       const chips = activeFilterChips(
         filters({
           view: DocumentView.Completed,
-          statuses: [DocumentStatus.Pending, DocumentStatus.Rejected],
+          statuses: [DocumentStatus.PendingSignature, DocumentStatus.Rejected],
           participant: 'isaay',
           createdFrom: '2026-01-01',
           createdTo: '2026-12-31',
@@ -119,7 +119,7 @@ describe('filtros del listado unificado', () => {
 
       expect(chips.map((chip) => chip.label)).toEqual([
         'Completados',
-        'En progreso',
+        'En espera de firma',
         'Rechazado',
         'Participante: isaay',
         'Creación 2026-01-01 → 2026-12-31',
@@ -136,10 +136,10 @@ describe('filtros del listado unificado', () => {
     /** Cada estado se quita por separado; los demás siguen puestos. */
     it('quitar el chip de un estado conserva los otros', () => {
       const current = filters({
-        statuses: [DocumentStatus.Pending, DocumentStatus.Rejected],
+        statuses: [DocumentStatus.PendingSignature, DocumentStatus.Rejected],
       });
       const chip = activeFilterChips(current).find(
-        (item) => item.id === 'status:pending',
+        (item) => item.id === 'status:PENDING_SIGNATURE',
       )!;
 
       expect(chip.remove(current).statuses).toEqual([DocumentStatus.Rejected]);

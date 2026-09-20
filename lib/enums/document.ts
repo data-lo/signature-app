@@ -5,24 +5,38 @@
  * serializa, así que se pueden usar directamente contra la respuesta del backend sin mapear nada.
  */
 
-/** Espejo de DOCUMENT_STATUS_ENUM (signature-server/src/document/enum/document-status.enum.ts). */
+/**
+ * Espejo de DOCUMENT_STATUS_ENUM (signature-server/src/document/enum/document-status.enum.ts), en
+ * MAYÚSCULAS y con la espera partida en dos desde la historia "Implementar flujo de aprobación
+ * previo al proceso de firma".
+ *
+ * `Pending` ya no existe. Era el único estado de espera cuando la única espera era la de los
+ * firmantes; con la aprobación previa hay dos, y de distinguirlas depende si el documento se puede
+ * firmar. Los documentos que estaban en `pending` son `PendingSignature`.
+ */
 export enum DocumentStatus {
-  Created = 'created',
-  Pending = 'pending',
-  Signed = 'signed',
-  Rejected = 'rejected',
-  Expired = 'expired',
-  CancellationPending = 'cancellation_pending',
-  Cancelled = 'cancelled',
+  Created = 'CREATED',
+  /** Esperando la decisión del aprobador: nadie puede firmar todavía. */
+  PendingApproval = 'PENDING_APPROVAL',
+  /** El flujo de firma está abierto. */
+  PendingSignature = 'PENDING_SIGNATURE',
+  Signed = 'SIGNED',
+  Rejected = 'REJECTED',
+  Expired = 'EXPIRED',
+  CancellationPending = 'CANCELLATION_PENDING',
+  Cancelled = 'CANCELLED',
 }
 
 /**
- * Espejo de SIGNEE_STATUS_ENUM (signature-server/src/document/enum/signee-status.enum.ts).
+ * Espejo de COLLABORATOR_STATUS_ENUM
+ * (signature-server/src/document/enum/collaborator-status.enum.ts).
  * `Notified` es exclusivo de un colaborador WATCHER: se le asigna cuando se le envía con éxito el
  * correo de aviso (ver `SendPendingSignatureNotificationUseCase` en el backend).
  */
 export enum ParticipantStatus {
   Pending = 'PENDING',
+  /** Sólo un REVIEWER: autorizó que el documento salga a firma. */
+  Approved = 'APPROVED',
   Signed = 'SIGNED',
   Rejected = 'REJECTED',
   Notified = 'NOTIFIED',

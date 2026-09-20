@@ -31,6 +31,7 @@ export {
 
 export {
   documentConfigurationSchema,
+  REVIEWER_REQUIRED_MESSAGE,
   DOCUMENT_SIGNATURE_TYPES,
   type DocumentSignatureType,
   type DocumentConfigurationFormValues,

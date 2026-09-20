@@ -54,6 +54,15 @@ export interface CollaboratorPayload {
 export interface DocumentDataPayload {
   fileName: string;
   requiresApproval: boolean;
+  /**
+   * Usuario que aprobará el documento (historia "Implementar flujo de aprobación previo al proceso
+   * de firma"). Es el `users.id` del aprobador, no el id de su membresía.
+   *
+   * El backend lo exige cuando `requiresApproval` es `true` y **lo rechaza** cuando es `false`, así
+   * que se omite en vez de mandarlo en `null`: mandar aprobador diciendo que no hace falta
+   * aprobación es la contradicción que ese contrato rechaza a propósito.
+   */
+  reviewerUserId?: string;
   /** Espejo de `requiresOrder` del formulario, con el nombre que usa el backend. */
   isSequential: boolean;
   /** Tipo de firma exigido a TODOS los firmantes del documento — única fuente de verdad del flujo. */
@@ -87,6 +96,8 @@ export interface CreateDocumentSignaturesInput {
   file: File;
   fileName: string;
   requiresApproval: boolean;
+  /** Aprobador elegido, o `null` cuando el documento no requiere aprobación. */
+  reviewerUserId: string | null;
   requiresOrder: boolean;
   signatureType: DocumentSignatureType;
   requiresTwoFactorAuth: boolean;

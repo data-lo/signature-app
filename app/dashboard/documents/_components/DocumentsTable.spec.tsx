@@ -189,7 +189,7 @@ describe('DocumentsTable', () => {
       renderWithProviders(
         <DocumentsTable
           documents={[
-            buildDoc({ status: DocumentStatus.Pending, signedAt: null }),
+            buildDoc({ status: DocumentStatus.PendingSignature, signedAt: null }),
           ]}
         />,
       );
@@ -287,7 +287,7 @@ describe('DocumentsTable', () => {
         const user = userEvent.setup();
         renderWithProviders(
           <DocumentsTable
-            documents={[buildDoc({ status: DocumentStatus.Pending })]}
+            documents={[buildDoc({ status: DocumentStatus.PendingSignature })]}
             onRowSelect={jest.fn()}
           />,
         );
@@ -303,7 +303,7 @@ describe('DocumentsTable', () => {
     it('tampoco ofrece firmar como botón de texto en la fila', () => {
       renderWithProviders(
         <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Pending })]}
+          documents={[buildDoc({ status: DocumentStatus.PendingSignature })]}
           onRowSelect={jest.fn()}
         />,
       );
@@ -364,7 +364,7 @@ describe('DocumentsTable', () => {
      * un documento cancelado sólo produciría un error que el usuario no puede evitar.
      */
     it.each([
-      DocumentStatus.Pending,
+      DocumentStatus.PendingSignature,
       DocumentStatus.Cancelled,
       DocumentStatus.CancellationPending,
       DocumentStatus.Rejected,

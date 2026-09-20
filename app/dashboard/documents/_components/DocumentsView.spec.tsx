@@ -138,7 +138,7 @@ describe('DocumentsView', () => {
       'true',
     );
     expect(
-      within(panel).getByRole('button', { name: 'En progreso' }),
+      within(panel).getByRole('button', { name: 'En espera de firma' }),
     ).toHaveAttribute('aria-pressed', 'false');
 
     const requiresMySignature = within(panel).getByRole('button', {
@@ -159,12 +159,12 @@ describe('DocumentsView', () => {
 
     await user.click(screen.getByRole('button', { name: /filtros/i }));
     const panel = await screen.findByRole('dialog');
-    await user.click(within(panel).getByRole('button', { name: 'En progreso' }));
+    await user.click(within(panel).getByRole('button', { name: 'En espera de firma' }));
     await user.click(within(panel).getByRole('button', { name: 'Rechazado' }));
 
     await waitFor(() =>
       expect(lastFilters().statuses).toEqual([
-        DocumentStatus.Pending,
+        DocumentStatus.PendingSignature,
         DocumentStatus.Rejected,
       ]),
     );
@@ -181,11 +181,11 @@ describe('DocumentsView', () => {
 
     await user.click(screen.getByRole('button', { name: /filtros/i }));
     const panel = await screen.findByRole('dialog');
-    await user.click(within(panel).getByRole('button', { name: 'En progreso' }));
+    await user.click(within(panel).getByRole('button', { name: 'En espera de firma' }));
     await user.keyboard('{Escape}');
 
     const chip = await screen.findByRole('button', {
-      name: /quitar filtro: en progreso/i,
+      name: /quitar filtro: en espera de firma/i,
     });
     await user.click(chip);
 
@@ -204,7 +204,7 @@ describe('DocumentsView', () => {
             spectators: [],
             creator: 'Sara Ramírez',
             totalPages: 1,
-            status: DocumentStatus.Pending,
+            status: DocumentStatus.PendingSignature,
             createdAt: new Date(2026, 2, 15).toISOString(),
             signedAt: null,
           },

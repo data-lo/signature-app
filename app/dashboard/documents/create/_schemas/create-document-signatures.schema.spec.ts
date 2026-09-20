@@ -1,4 +1,5 @@
 import {
+  REVIEWER_REQUIRED_MESSAGE,
   createDocumentSignaturesSchema,
   emptySigner,
   emptyViewer,
@@ -37,6 +38,7 @@ function formValues(
     signatureType,
     requiresTwoFactorAuth: true,
     requiresApproval: false,
+    reviewerUserId: null,
     requiresOrder: false,
     includeMeAsSigner,
     collaborators,
@@ -121,6 +123,43 @@ describe('createDocumentSignaturesSchema', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([signer({ isSelf: true })], true),
     );
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('aprobador', () => {
+  /**
+   * Historia "Implementar flujo de aprobación previo al proceso de firma": la aprobación no viaja
+   * sola. La regla vive en el esquema y no en el selector porque el selector puede no estar en
+   * pantalla y el envío tiene que rechazarse igual.
+   */
+  it('con aprobación activa y sin aprobador, el error apunta al selector', () => {
+    const result = createDocumentSignaturesSchema.safeParse({
+      ...formValues([signer()]),
+      requiresApproval: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path).toEqual(['reviewerUserId']);
+    expect(result.error?.issues[0].message).toBe(REVIEWER_REQUIRED_MESSAGE);
+  });
+
+  it('con aprobación activa y un aprobador elegido, acepta', () => {
+    const result = createDocumentSignaturesSchema.safeParse({
+      ...formValues([signer()]),
+      requiresApproval: true,
+      reviewerUserId: 'user-aprobador',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('sin aprobación, no se exige aprobador', () => {
+    const result = createDocumentSignaturesSchema.safeParse({
+      ...formValues([signer()]),
+      requiresApproval: false,
+    });
 
     expect(result.success).toBe(true);
   });

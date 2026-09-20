@@ -93,7 +93,7 @@ function buildPending(
   return {
     id: 'doc-1',
     fileName: 'contrato.pdf',
-    status: DocumentStatus.Pending,
+    status: DocumentStatus.PendingSignature,
     isCompleted: false,
     sealingPending: false,
     secureUrl: null,

@@ -38,6 +38,7 @@ export function useCreateDocumentSignatures() {
       file,
       fileName,
       requiresApproval,
+      reviewerUserId,
       requiresOrder,
       signatureType,
       requiresTwoFactorAuth,
@@ -49,6 +50,11 @@ export function useCreateDocumentSignatures() {
         documentData: {
           fileName,
           requiresApproval,
+          /**
+           * Se omite cuando no hay aprobación, en vez de mandarlo en `null`: el backend rechaza el
+           * payload que trae aprobador diciendo a la vez que no requiere aprobación.
+           */
+          ...(requiresApproval && reviewerUserId ? { reviewerUserId } : {}),
           isSequential: requiresOrder,
           signatureType,
           isIndexable,

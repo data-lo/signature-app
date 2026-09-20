@@ -70,6 +70,19 @@ export function useCreateDocumentForm({
     control: form.control,
     name: 'signatureType',
   });
+  /**
+   * La aprobación y su aprobador se observan acá por el mismo motivo que el tipo de firma: la
+   * sección "Configurar firma" no está completa si el documento requiere aprobación y todavía no
+   * se eligió quién la da (ver `_section-progress.ts`), y esa cuenta la hace la pantalla.
+   */
+  const requiresApproval = useWatch({
+    control: form.control,
+    name: 'requiresApproval',
+  });
+  const reviewerUserId = useWatch({
+    control: form.control,
+    name: 'reviewerUserId',
+  });
 
   function onValidSubmit(
     values: CreateDocumentSignaturesFormValues,
@@ -85,6 +98,7 @@ export function useCreateDocumentForm({
         file,
         fileName: file.name,
         requiresApproval: values.requiresApproval,
+        reviewerUserId: values.reviewerUserId,
         requiresOrder: values.requiresOrder,
         signatureType: values.signatureType,
         requiresTwoFactorAuth: values.requiresTwoFactorAuth,
@@ -133,6 +147,10 @@ export function useCreateDocumentForm({
     viewerCount: countViewers(collaborators),
     /** Tipo de firma elegido para todo el documento (ver `SignatureTypeField`). */
     signatureType: signatureType ?? undefined,
+    /** Si el documento necesita que alguien lo apruebe antes de salir a firma. */
+    requiresApproval,
+    /** Aprobador elegido, o `null` mientras no se haya elegido ninguno. */
+    reviewerUserId,
     /** Error general de la sección de participantes (no pertenece a ningún campo). */
     participantsErrorMessage: getParticipantsErrorMessage(
       form.formState.errors,
