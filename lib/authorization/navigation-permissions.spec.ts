@@ -1,3 +1,4 @@
+import type { PermissionKey } from './authorization.types';
 import {
   DASHBOARD_NAVIGATION,
   dashboardNavigation,
@@ -67,6 +68,33 @@ describe('visibleNavigation', () => {
     expect(
       visibleNavigation(dashboardNavigation, ['BILLING.MANAGE']),
     ).toEqual([]);
+  });
+
+  /**
+   * Los permisos exactos con los que el backend responde para una cuenta PERSONAL (ver
+   * `personal-account-permissions.ts` en signature-server). No es una regla nueva del frontend
+   * —aquí no hay ninguna excepción por tipo de cuenta— sino la comprobación de que ese contrato
+   * pinta el menú que pide la historia: Documentos, Planes y Suscripciones, y nada de
+   * administración.
+   */
+  it('los permisos de una cuenta PERSONAL abren Documentos, Planes y Suscripciones, y nada más', () => {
+    const permisosDeCuentaPersonal: PermissionKey[] = [
+      'BILLING.READ',
+      'BILLING.MANAGE',
+      'DOCUMENT.CREATE',
+      'DOCUMENT.READ_OWN',
+      'DOCUMENT.SEND_SIGNATURE_REQUEST',
+      'DOCUMENT.SIGN_SELF',
+      'DOCUMENT.CANCEL',
+    ];
+
+    expect(
+      visibleNavigation(dashboardNavigation, permisosDeCuentaPersonal),
+    ).toEqual([
+      DASHBOARD_NAVIGATION.documents,
+      DASHBOARD_NAVIGATION.plans,
+      DASHBOARD_NAVIGATION.subscriptions,
+    ]);
   });
 
   it('sin permisos no queda ninguna sección', () => {
