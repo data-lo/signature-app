@@ -60,19 +60,19 @@ describe('JoinView', () => {
     mockedGetAccountsCatalogRequest.mockResolvedValue([]);
   });
 
-  it('muestra "Enlace inválido" sin consultar la invitación si falta token u orgId', () => {
+  it('muestra "Enlace inválido" si falta el token', () => {
     mockedUseInvitationPreview.mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<JoinView token={null} orgId="org-1" />);
+    renderWithProviders(<JoinView token={null} />);
 
     expect(screen.getByText(/enlace inválido/i)).toBeInTheDocument();
   });
 
   it('muestra el nombre de la organización y el formulario de RFC cuando la invitación está PENDING', () => {
-    renderWithProviders(<JoinView token="token-1" orgId="org-1" />);
+    renderWithProviders(<JoinView token="token-1" />);
 
     expect(
       screen.getByText(/has sido invitado a acme corp/i),
@@ -86,7 +86,7 @@ describe('JoinView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<JoinView token="token-1" orgId="org-1" />);
+    renderWithProviders(<JoinView token="token-1" />);
 
     expect(screen.getByText(/invitación expirada/i)).toBeInTheDocument();
   });
@@ -97,32 +97,89 @@ describe('JoinView', () => {
       isLoading: false,
       isError: false,
     });
-    renderWithProviders(<JoinView token="token-1" orgId="org-1" />);
+    renderWithProviders(<JoinView token="token-1" />);
 
     expect(screen.getByText(/invitación ya utilizada/i)).toBeInTheDocument();
   });
 
-  it('RFC nuevo (no existe): redirige a /signup con rfc, token y orgId', async () => {
-    const user = userEvent.setup();
-    checkRfcMutate.mockImplementation((rfc, { onSuccess }) => onSuccess(false));
-    renderWithProviders(<JoinView token="token-1" orgId="org-1" />);
+  /**
+   * Historia "Unificar invitaciones de miembros": un RFC sin cuenta ya no manda solo al registro.
+   * Se muestra el RFC consultado y se ofrece crear la cuenta o corregirlo, porque un RFC mal
+   * tecleado llevaba directo a crear una cuenta duplicada.
+   */
+  describe('RFC sin cuenta', () => {
+    async function submitUnknownRfc() {
+      const user = userEvent.setup();
+      checkRfcMutate.mockImplementation((rfc, { onSuccess }) =>
+        onSuccess(false),
+      );
+      renderWithProviders(<JoinView token="token-1" />);
 
-    await user.type(screen.getByLabelText(/rfc/i), 'XAXX010101000');
-    await user.click(screen.getByRole('button', { name: /continuar/i }));
+      await user.type(screen.getByLabelText(/rfc/i), 'XAXX010101000');
+      await user.click(screen.getByRole('button', { name: /continuar/i }));
 
-    expect(checkRfcMutate).toHaveBeenCalledWith(
-      'XAXX010101000',
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
-    expect(push).toHaveBeenCalledWith(
-      '/signup?rfc=XAXX010101000&token=token-1&orgId=org-1',
-    );
+      return user;
+    }
+
+    it('no redirige: muestra el aviso con "Crear cuenta" y "Usar otro RFC"', async () => {
+      await submitUnknownRfc();
+
+      expect(
+        screen.getByText('No encontramos una cuenta con este RFC.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('XAXX010101000')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Crear cuenta' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Usar otro RFC' }),
+      ).toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    /** Sólo RFC y token: la organización la resuelve el registro a partir de la invitación. */
+    it('"Crear cuenta" lleva a /signup conservando RFC y token', async () => {
+      const user = await submitUnknownRfc();
+
+      await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+
+      expect(push).toHaveBeenCalledWith(
+        '/signup?rfc=XAXX010101000&token=token-1',
+      );
+    });
+
+    it('codifica RFC y token en la URL del registro', async () => {
+      const user = userEvent.setup();
+      checkRfcMutate.mockImplementation((rfc, { onSuccess }) =>
+        onSuccess(false),
+      );
+      renderWithProviders(<JoinView token="tok en&x" />);
+
+      await user.type(screen.getByLabelText(/rfc/i), 'XAXX010101000');
+      await user.click(screen.getByRole('button', { name: /continuar/i }));
+      await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+
+      expect(push).toHaveBeenCalledWith(
+        '/signup?rfc=XAXX010101000&token=tok%20en%26x',
+      );
+    });
+
+    it('"Usar otro RFC" vuelve al formulario de RFC', async () => {
+      const user = await submitUnknownRfc();
+
+      await user.click(screen.getByRole('button', { name: 'Usar otro RFC' }));
+
+      expect(screen.getByLabelText(/rfc/i)).toBeInTheDocument();
+      expect(
+        screen.queryByText('No encontramos una cuenta con este RFC.'),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('RFC existente: muestra la confirmación de unirse con el aviso de privacidad', async () => {
     const user = userEvent.setup();
     checkRfcMutate.mockImplementation((rfc, { onSuccess }) => onSuccess(true));
-    renderWithProviders(<JoinView token="token-1" orgId="org-1" />);
+    renderWithProviders(<JoinView token="token-1" />);
 
     await user.type(screen.getByLabelText(/rfc/i), 'XAXX010101000');
     await user.click(screen.getByRole('button', { name: /continuar/i }));
@@ -143,7 +200,7 @@ describe('JoinView', () => {
       onSuccess(undefined),
     );
     mockedGetAuthToken.mockReturnValue(undefined);
-    renderWithProviders(<JoinView token="token-1" orgId="org-1" />);
+    renderWithProviders(<JoinView token="token-1" />);
 
     await user.type(screen.getByLabelText(/rfc/i), 'XAXX010101000');
     await user.click(screen.getByRole('button', { name: /continuar/i }));
@@ -174,7 +231,7 @@ describe('JoinView', () => {
         isActive: true,
       },
     ]);
-    renderWithProviders(<JoinView token="token-1" orgId="org-1" />);
+    renderWithProviders(<JoinView token="token-1" />);
 
     await user.type(screen.getByLabelText(/rfc/i), 'XAXX010101000');
     await user.click(screen.getByRole('button', { name: /continuar/i }));

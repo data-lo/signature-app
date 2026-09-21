@@ -21,18 +21,40 @@ export interface RegisterRequestValues extends RegisterFormValues {
    * nada (ver signature-server TurnstileService).
    */
   turnstileToken: string;
-  /** Presente cuando el registro viene de /join (RFC nuevo) — une automáticamente al usuario recién creado a esa organización (ver signature-server AuthService.register). */
+  /**
+   * Token de la invitación cuando el registro viene de `/join` (RFC sin cuenta). NO viaja al
+   * backend: el registro sólo crea la cuenta. Se conserva en las variables de la mutación para
+   * que `useRegister` acepte la invitación en cuanto el registro responda bien.
+   */
   invitationToken?: string;
 }
 
+/**
+ * Crea la cuenta por el flujo normal de registro.
+ *
+ * El `invitationToken` se separa antes de enviar: el backend ya no une a nadie a una
+ * organización durante el registro, y mandarlo sólo daría la impresión de que lo hace.
+ *
+ * @param values - Datos del formulario, token del CAPTCHA y, opcionalmente, el de la invitación.
+ * @returns Los datos para continuar a la verificación OTP.
+ * @throws {AxiosError} Si el backend rechaza el registro.
+ *
+ * @example
+ * ```ts
+ * const data = await registerRequest({ ...values, turnstileToken });
+ * ```
+ */
 export async function registerRequest(
   values: RegisterRequestValues,
 ): Promise<RegisterResponseData> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { invitationToken, ...body } = values;
+
   const { data } = await apiClient.post<{
     success: boolean;
     message: string;
     data: RegisterResponseData;
-  }>('/api/v1/auth/register', values);
+  }>('/api/v1/auth/register', body);
   return data.data;
 }
 

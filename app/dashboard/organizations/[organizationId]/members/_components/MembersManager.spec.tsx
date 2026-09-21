@@ -2,6 +2,7 @@ import userEvent from '@testing-library/user-event';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useMemberPermissions } from '../_hooks/useMemberPermissions';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
@@ -19,6 +20,8 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mockRefresh, replace: mockReplace }),
 }));
 jest.mock('@/lib/hooks/useSystemRoles');
+// El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
+jest.mock('@/lib/hooks/useOrganizationRoles');
 jest.mock('../_hooks/useMemberPermissions');
 jest.mock(
   '@/app/server-actions/organizations/update-organization-member-role.server-action',
@@ -36,12 +39,9 @@ jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
-jest.mock(
-  '@/app/server-actions/organizations/add-organization-member.server-action',
-  () => ({ addOrganizationMemberAction: jest.fn() }),
-);
 
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
+const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 const mockedUseMemberPermissions = useMemberPermissions as jest.Mock;
 const mockedUpdateRole = updateOrganizationMemberRoleAction as jest.Mock;
 const mockedRemoveMember = removeOrganizationMemberAction as jest.Mock;
@@ -106,6 +106,12 @@ const rowActions = () =>
 describe('MembersManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedUseOrganizationRoles.mockImplementation(() => ({
+      data: mockedUseSystemRoles().data,
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+    }));
     mockedUseSystemRoles.mockReturnValue({
       data: [
         {
@@ -266,15 +272,19 @@ describe('MembersManager', () => {
     });
   });
 
-  it('ofrece invitar y agregar miembros junto a la tabla', () => {
+  /**
+   * Historia "Unificar invitaciones de miembros": invitar es el único camino de alta, también
+   * cuando ya hay miembros en la tabla.
+   */
+  it('ofrece sólo invitar miembros junto a la tabla, sin alta directa', () => {
     renderManager();
 
     expect(
       screen.getByRole('button', { name: /invitar miembro/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /agregar miembro/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: /agregar miembro/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('a quien sólo puede leer no le ofrece ninguna acción', () => {
@@ -299,16 +309,6 @@ describe('MembersManager', () => {
    * al backend sigue siendo el id del rol `MEMBER`.
    */
   describe('rol predeterminado', () => {
-    it('propone MIEMBRO al agregar a alguien que ya tiene cuenta', async () => {
-      const user = userEvent.setup();
-      renderManager();
-
-      await user.click(screen.getByRole('button', { name: /agregar miembro/i }));
-
-      const roleSelect = await screen.findByRole('combobox', { name: /rol/i });
-      await waitFor(() => expect(roleSelect).toHaveTextContent('MIEMBRO'));
-    });
-
     it('propone MIEMBRO al invitar a alguien que todavía no se registró', async () => {
       const user = userEvent.setup();
       renderManager();

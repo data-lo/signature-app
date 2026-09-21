@@ -3,7 +3,6 @@
 import { Users } from 'lucide-react';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import InviteMemberModal from './InviteMemberModal';
-import AddMemberModal from './AddMemberModal';
 
 interface MembersEmptyStateProps {
   organizationId: string;
@@ -16,15 +15,15 @@ interface MembersEmptyStateProps {
  * seis títulos y ningún renglón no dice "todavía no invitaste a nadie", dice "algo no cargó" —y
  * deja al administrador esperando en lugar de actuar.
  *
- * Los dos botones de alta viven aquí, y no en una cabecera común, para que no aparezcan
- * duplicados: cuando hay miembros los ofrece `MembersManager`, y cuando no los hay, este estado.
+ * El botón de invitar vive aquí, y no en una cabecera común, para que no aparezca duplicado:
+ * cuando hay miembros lo ofrece `MembersManager`, y cuando no los hay, este estado.
  * Es además el único momento en que el llamado a la acción es lo principal de la pantalla.
  *
  * El gate de administrador es el mismo que rige la tabla: quien sólo puede leer no ve acciones
  * que el backend va a rechazar.
  *
- * @param props - Organización activa, que necesita el alta directa.
- * @returns El estado vacío con sus dos acciones de alta.
+ * @param props - Organización activa, a la que se invita.
+ * @returns El estado vacío con la acción de invitar.
  * @throws Nada.
  *
  * @example
@@ -63,7 +62,6 @@ export default function MembersEmptyState({
         {canManage && (
           <div className="flex flex-wrap items-center justify-center gap-2">
             <InviteMemberModal organizationId={organizationId} />
-            <AddMemberModal organizationId={organizationId} />
           </div>
         )}
       </div>
