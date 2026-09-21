@@ -25,6 +25,15 @@ export function toAccountListEntry(raw: AccountData): AccountListEntry {
     accountType: raw.type,
     organizationId: raw.organizationId,
     organizationName: raw.organizationDetail?.name ?? null,
+    /**
+     * Cae a la razón social cuando el nombre de visualización no viene. Pasa con las entradas
+     * que quedaron cacheadas en Redis antes de que la columna existiera, y es exactamente lo que
+     * el selector mostraba hasta ahora: preferible a un hueco.
+     */
+    organizationDisplayName:
+      raw.organizationDetail?.displayName ??
+      raw.organizationDetail?.name ??
+      null,
     roleId: raw.roleId,
     status: raw.isActive ? 'ACTIVE' : 'INACTIVE',
   };

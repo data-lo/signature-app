@@ -31,7 +31,10 @@ function buildAccount(overrides: Partial<AccountData> = {}): AccountData {
     type: 'ORGANIZATION',
     createdAt: '2026-01-01T00:00:00.000Z',
     organizationId: 'org-1',
-    organizationDetail: { name: 'Acme Corp S.A. de C.V.' },
+    organizationDetail: {
+      name: 'Acme Corp S.A. de C.V.',
+      displayName: 'Acme',
+    },
     roleId: 'admin-role-1',
     isActive: true,
     ...overrides,
@@ -188,6 +191,7 @@ describe('useAuthStore', () => {
           accountType: 'ORGANIZATION',
           organizationId: 'org-1',
           organizationName: 'Acme Corp S.A. de C.V.',
+          organizationDisplayName: 'Acme',
           roleId: 'admin-role-1',
           status: 'ACTIVE',
         },
@@ -196,10 +200,30 @@ describe('useAuthStore', () => {
           accountType: 'PERSONAL',
           organizationId: null,
           organizationName: null,
+          organizationDisplayName: null,
           roleId: 'admin-role-1',
           status: 'ACTIVE',
         },
       ]);
+    });
+
+    /**
+     * El catálogo viaja cacheado en Redis, así que una entrada escrita antes de que existiera la
+     * columna llega sin `displayName`. Cae a la razón social —lo que el selector rotulaba hasta
+     * ahora— en vez de quedarse en `null` y dejar la organización sin nombre.
+     */
+    it('cae a la razón social cuando el backend no manda el nombre de visualización', () => {
+      useAuthStore.getState().setAccountsList([
+        buildAccount({
+          id: 'org-1',
+          organizationDetail: { name: 'Acme Corp S.A. de C.V.' },
+        }),
+      ]);
+
+      const [organization] = useAuthStore.getState().accountsList;
+      expect(organization.organizationDisplayName).toBe(
+        'Acme Corp S.A. de C.V.',
+      );
     });
 
     it('mapea roleId=null y status=INACTIVE cuando el backend los manda así', () => {

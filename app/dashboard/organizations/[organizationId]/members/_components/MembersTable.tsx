@@ -172,7 +172,7 @@ export default function MembersTable({
                         disabled={!member.isActive}
                       >
                         <Trash2 className="size-4" />
-                        Eliminar
+                        Desactivar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

@@ -34,15 +34,18 @@ const PERSONAL: AccountListEntry = {
   accountType: 'PERSONAL',
   organizationId: null,
   organizationName: null,
+  organizationDisplayName: null,
   roleId: 'OWNER',
   status: 'ACTIVE',
 };
 
+/** Los dos nombres distintos a propósito: es lo único que distingue cuál de ellos se rotula. */
 const ORG: AccountListEntry = {
   id: 'org-1',
   accountType: 'ORGANIZATION',
   organizationId: 'org-1',
   organizationName: 'Acme Corp S.A. de C.V.',
+  organizationDisplayName: 'Acme',
   roleId: 'OWNER',
   status: 'ACTIVE',
 };
@@ -151,8 +154,29 @@ describe('AccountSwitcher', () => {
     expect(screen.getByText('Mi cuenta personal')).toBeInTheDocument();
   });
 
-  it('muestra el nombre de la organización cuando la cuenta activa es ORGANIZATION', () => {
+  /**
+   * El nombre de visualización, no la razón social: "Acme" es lo que el alta pide bajo ese
+   * rótulo, y el nombre legal completo no cabe ni describe nada en un selector.
+   */
+  it('rotula una organización con su nombre de visualización', () => {
     setActiveAccount(ORG);
+    renderSwitcher();
+
+    expect(screen.getByText('Acme')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Acme Corp S.A. de C.V.'),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * Las entradas que quedaron cacheadas en Redis antes de que existiera la columna llegan sin
+   * nombre de visualización. Ahí se rotula con la razón social —lo que el selector mostraba hasta
+   * ahora— en vez de dejar el hueco.
+   */
+  it('cae a la razón social cuando no hay nombre de visualización', () => {
+    const sinNombreCorto = { ...ORG, organizationDisplayName: null };
+    useAuthStore.setState({ accountsList: [PERSONAL, sinNombreCorto] });
+    setActiveAccount(sinNombreCorto);
     renderSwitcher();
 
     expect(screen.getByText('Acme Corp S.A. de C.V.')).toBeInTheDocument();
@@ -170,9 +194,7 @@ describe('AccountSwitcher', () => {
     expect(labels.some((label) => label?.includes('Mi cuenta personal'))).toBe(
       true,
     );
-    expect(
-      labels.some((label) => label?.includes('Acme Corp S.A. de C.V.')),
-    ).toBe(true);
+    expect(labels.some((label) => label?.includes('Acme'))).toBe(true);
 
     const activePersonalItem = items.find((item) =>
       item.textContent?.includes('Mi cuenta personal'),
@@ -193,7 +215,7 @@ describe('AccountSwitcher', () => {
     await user.click(screen.getByText('Mi cuenta personal'));
     await user.click(
       await screen.findByRole('menuitem', {
-        name: /acme corp s\.a\. de c\.v\./i,
+        name: /acme/i,
       }),
     );
 
@@ -218,7 +240,7 @@ describe('AccountSwitcher', () => {
 
     await user.click(screen.getByText('Mi cuenta personal'));
     await user.click(
-      await screen.findByRole('menuitem', { name: /acme corp/i }),
+      await screen.findByRole('menuitem', { name: /acme/i }),
     );
 
     await waitFor(() =>

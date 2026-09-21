@@ -102,7 +102,7 @@ export default function MembersManager({
    * ```ts
    * runMutation(
    *   () => removeOrganizationMemberAction(accountId, organizationId),
-   *   'Miembro eliminado correctamente',
+   *   'Miembro desactivado correctamente',
    *   () => setRemovingMember(null),
    * );
    * ```
@@ -223,7 +223,7 @@ export default function MembersManager({
         onConfirm={(accountId) =>
           runMutation(
             () => removeOrganizationMemberAction(accountId, organizationId),
-            'Miembro eliminado correctamente',
+            'Miembro desactivado correctamente',
             () => setRemovingMember(null),
           )
         }

@@ -9,7 +9,13 @@ export interface AccountData {
   createdAt: string;
   /** UUID de la organización (tabla organizations); null para cuentas PERSONAL. Varias filas de Account (una por miembro) comparten el mismo organizationId. */
   organizationId: string | null;
-  organizationDetail?: { name: string } | null;
+  /**
+   * `name` es la razón social y `displayName` el nombre corto con el que la organización se
+   * presenta en la interfaz. `displayName` es opcional acá y no en el backend a propósito: el
+   * catálogo viaja cacheado en Redis, así que una entrada escrita antes de que la columna
+   * existiera puede llegar sin él hasta que su key se reconstruya.
+   */
+  organizationDetail?: { name: string; displayName?: string } | null;
   /** UUID del rol (ver GET /api/v1/roles) del usuario autenticado en esta cuenta; null solo si la membresía no tiene rol vigente. */
   roleId: string | null;
   /** Vigencia de la membresía del usuario autenticado en esta cuenta. */

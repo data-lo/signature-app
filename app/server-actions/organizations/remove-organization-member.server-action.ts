@@ -34,7 +34,7 @@ export async function removeOrganizationMemberAction(
   } catch (error) {
     return toFailedResult(
       error,
-      'Ocurrió un error al eliminar al miembro. Intenta de nuevo.',
+      'Ocurrió un error al desactivar al miembro. Intenta de nuevo.',
     );
   }
 

@@ -15,10 +15,25 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useSwitchActiveAccount } from '@/lib/hooks/useSwitchActiveAccount';
 import type { AccountListEntry } from '@/lib/store/types/auth-store.types';
 
+/**
+ * Cómo se llama cada cuenta en el selector.
+ *
+ * Una organización se rotula con su **nombre de visualización**, que es para lo que se pide en el
+ * alta: "Acme", no "Acme Corp S.A. de C.V.". La razón social queda de respaldo —es lo que este
+ * selector mostró hasta ahora, y lo que el store rellena cuando el backend no manda el nombre
+ * corto—, y 'Organización' para el caso en que no llegue ninguno de los dos.
+ *
+ * Una cuenta personal no tiene nombre que elegir: es una sola por usuario y se llama igual para
+ * todos.
+ */
 function labelFor(account: AccountListEntry): string {
-  return account.accountType === 'ORGANIZATION'
-    ? (account.organizationName ?? 'Organización')
-    : 'Mi cuenta personal';
+  if (account.accountType !== 'ORGANIZATION') return 'Mi cuenta personal';
+
+  return (
+    account.organizationDisplayName ??
+    account.organizationName ??
+    'Organización'
+  );
 }
 
 /**
