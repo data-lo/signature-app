@@ -6,12 +6,12 @@ import type { SignerFormValues, ViewerFormValues } from '../_schemas';
  * está acotado a las llaves reales del colaborador, así que renombrar un campo del esquema
  * rompe la compilación aquí en vez de fallar en silencio en tiempo de ejecución. Se arma sobre la
  * UNIÓN de llaves de firmante y espectador (no sobre `keyof CollaboratorFormValues`, que al ser
- * unión discriminada solo expone las llaves comunes): `rfc` ya solo existe en el espectador.
+ * unión discriminada solo expone las llaves comunes): `taxId` ya solo existe en el espectador.
  */
 export interface CollaboratorFieldConfig {
   name: Extract<
     keyof SignerFormValues | keyof ViewerFormValues,
-    'firstName' | 'lastName' | 'email' | 'rfc'
+    'firstName' | 'lastName' | 'email' | 'taxId'
   >;
   label: string;
   type: 'text' | 'email';
@@ -46,13 +46,16 @@ export const COLLABORATOR_EMAIL_FIELD: CollaboratorFieldConfig = {
 };
 
 /**
- * El RFC solo se pide a los espectadores, y ahí es opcional (historia "Eliminar campo RFC de la
- * sección de Espectadores"; la decisión de mostrarlo o no es del componente, ver
+ * El identificador fiscal solo se pide a los espectadores, y ahí es opcional (historia "Eliminar
+ * campo RFC de la sección de Espectadores"; la decisión de mostrarlo o no es del componente, ver
  * `CollaboratorFormItem`). A los firmantes ya no se les pide en ningún flujo — ver historia
  * "Selección de tipo de firma al crear documentos".
+ *
+ * El campo se llama `taxId` y la etiqueta sigue diciendo "RFC": lo que se estandarizó es el
+ * nombre del dato en el contrato, no lo que el usuario mexicano tiene que escribir ahí.
  */
-export const COLLABORATOR_RFC_FIELD: CollaboratorFieldConfig = {
-  name: 'rfc',
+export const COLLABORATOR_TAX_ID_FIELD: CollaboratorFieldConfig = {
+  name: 'taxId',
   label: 'RFC',
   type: 'text',
   placeholder: 'PEAJ800101ABC',

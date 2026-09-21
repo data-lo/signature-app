@@ -5,7 +5,10 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useDocuments } from '../../_hooks/useDocuments';
 import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatures';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
+import { getOrganizationMembersRequest } from '@/lib/api/organization-members';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { MISSING_FILE_MESSAGE } from '../_section-rules';
+import { NO_APPROVERS_MESSAGE } from './ApproverUserField';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -17,6 +20,7 @@ jest.mock('../_hooks/useCreateDocumentSignatures', () => ({
   useCreateDocumentSignatures: jest.fn(),
 }));
 jest.mock('@/app/_components/DocumentsCountContext');
+jest.mock('@/lib/api/organization-members');
 // El selector real monta FilePond (que necesita APIs de archivos del navegador): se reemplaza por
 // dos botones que disparan los mismos callbacks — archivo listo y archivo procesándose.
 jest.mock('./DocumentFilePicker', () => ({
@@ -57,6 +61,7 @@ const mockedUseDocuments = useDocuments as jest.Mock;
 const mockedUseCreateDocumentSignatures =
   useCreateDocumentSignatures as jest.Mock;
 const mockedUseDocumentsCount = useDocumentsCount as jest.Mock;
+const mockedGetOrganizationMembers = getOrganizationMembersRequest as jest.Mock;
 
 function selectFile(user: ReturnType<typeof userEvent.setup>) {
   return user.click(
@@ -137,6 +142,13 @@ describe('CreateDocumentView', () => {
       error: null,
     });
     mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount: jest.fn() });
+    mockedGetOrganizationMembers.mockReset();
+    /**
+     * Sin cuenta activa, que es el punto de partida de casi toda esta suite: "Requiere
+     * aprobación" sólo se muestra en cuentas ORGANIZATION, así que el bloque que la prueba es el
+     * único que declara una.
+     */
+    useAuthStore.setState({ activeAccount: null });
   });
 
   describe('activación de secciones', () => {
@@ -636,6 +648,45 @@ describe('CreateDocumentView', () => {
 
       expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
     });
+
+    /**
+     * Historia "Estandarizar campos de colaboradores": la etiqueta sigue diciendo RFC —es lo que
+     * el usuario mexicano captura— pero el dato viaja al backend como `taxId`. Se comprueba de
+     * punta a punta, desde el campo que se llena hasta el payload de la mutación, porque el
+     * renombre atraviesa esquema, configuración de campos y mapper: cualquiera de los tres
+     * podría quedarse con el nombre viejo sin que las pruebas de unidad de los otros dos lo
+     * noten.
+     */
+    it('lo que el espectador escribe en RFC viaja al backend como taxId', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await user.click(screen.getByRole('button', { name: /espectador/i }));
+      const viewerInputs = screen.getAllByLabelText(/nombre\(s\)/i);
+      await user.type(viewerInputs[viewerInputs.length - 1], 'Ana');
+      const lastNames = screen.getAllByLabelText(/apellido/i);
+      await user.type(lastNames[lastNames.length - 1], 'Ruiz');
+      const emails = screen.getAllByLabelText(/^email/i);
+      await user.type(emails[emails.length - 1], 'ana.ruiz@mail.com');
+      await user.type(screen.getByLabelText(/^rfc/i), 'AURU800101ABC');
+      await selectSignatureType(user, /firma simple/i);
+
+      await submitRequest(user);
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          collaborators: expect.arrayContaining([
+            expect.objectContaining({
+              collaboratorType: 'VIEWER',
+              taxId: 'AURU800101ABC',
+            }),
+          ]),
+        }),
+        expect.anything(),
+      );
+    });
   });
 
   describe('Búsqueda Inteligente', () => {
@@ -809,6 +860,125 @@ describe('CreateDocumentView', () => {
 
       expect(screen.getByText(/servicio no disponible/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Selección de aprobador al requerir aprobación en nuevo documento": la opción sólo
+   * existe en cuentas ORGANIZATION, consulta a los miembros con permiso para aprobar en cuanto se
+   * marca, y deja el envío preparado con el usuario elegido.
+   */
+  describe('aprobación', () => {
+    function approverMember() {
+      return {
+        accountId: 'account-9',
+        userId: 'user-9',
+        email: 'ana@empresa.com',
+        rfc: null,
+        role: { id: 'role-9', name: 'Aprobador' },
+        joinedAt: '2026-01-01T00:00:00Z',
+        status: 'active',
+        isActive: true,
+        permissions: [
+          {
+            id: 'permission-approve',
+            key: 'DOCUMENT.APPROVE',
+            resource: 'DOCUMENT',
+            action: 'APPROVE',
+            scope: 'ORGANIZATION',
+            description: 'APROBAR DOCUMENTOS',
+            isStaticCatalog: true,
+          },
+        ],
+      };
+    }
+
+    async function requireApproval(user: ReturnType<typeof userEvent.setup>) {
+      await openSection(user, /configurar firma/i);
+      await user.click(
+        screen.getByRole('checkbox', { name: /requiere aprobación/i }),
+      );
+    }
+
+    beforeEach(() => {
+      useAuthStore.setState({
+        activeAccount: {
+          id: 'account-1',
+          accountType: 'ORGANIZATION',
+          organizationId: 'org-1',
+          roleId: 'role-1',
+        },
+      });
+    });
+
+    it('sin marcar la opción no consulta a los aprobadores', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await openSection(user, /configurar firma/i);
+
+      expect(
+        screen.getByRole('checkbox', { name: /requiere aprobación/i }),
+      ).toBeInTheDocument();
+      expect(mockedGetOrganizationMembers).not.toHaveBeenCalled();
+    });
+
+    it('al marcarla, consulta y prepara el envío con el aprobador elegido', async () => {
+      const user = userEvent.setup();
+      mockedGetOrganizationMembers.mockResolvedValue([approverMember()]);
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
+      await requireApproval(user);
+
+      await waitFor(() =>
+        expect(mockedGetOrganizationMembers).toHaveBeenCalledWith('org-1'),
+      );
+
+      // Con la aprobación marcada y sin aprobador, la configuración está a medias.
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeDisabled();
+
+      screen.getByRole('combobox', { name: /usuario aprobador/i }).focus();
+      await user.keyboard('{Enter}');
+      await user.click(
+        await screen.findByRole('option', { name: /ana@empresa\.com/i }),
+      );
+
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeEnabled();
+
+      await submitRequest(user);
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requiresApproval: true,
+          approverUserId: 'user-9',
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('sin usuarios aprobadores lo dice y no deja enviar', async () => {
+      const user = userEvent.setup();
+      mockedGetOrganizationMembers.mockResolvedValue([]);
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
+      await requireApproval(user);
+
+      expect(
+        await screen.findByText(NO_APPROVERS_MESSAGE),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeDisabled();
     });
   });
 });

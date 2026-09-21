@@ -94,6 +94,8 @@ export default function CreateDocumentView({
     fileName: fileSelection.file?.name,
     pageCount: fileSelection.pageCount,
     signatureType: createDocumentForm.signatureType,
+    requiresApproval: createDocumentForm.requiresApproval,
+    approverUserId: createDocumentForm.approverUserId,
     signerCount: createDocumentForm.signerCount,
     viewerCount: createDocumentForm.viewerCount,
   });

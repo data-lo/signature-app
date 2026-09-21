@@ -30,10 +30,10 @@ export type ActionResult = { ok: true } | { ok: false; message: string };
  * @example
  * ```ts
  * try {
- *   await backendRequest('organizations/members', { method: 'POST', body, accountId });
+ *   await backendRequest('organizations/invite', { method: 'POST', body, accountId });
  *   return { ok: true };
  * } catch (error) {
- *   return toFailedResult(error, 'No se pudo agregar al miembro.');
+ *   return toFailedResult(error, 'No se pudo enviar la invitación.');
  * }
  * ```
  */

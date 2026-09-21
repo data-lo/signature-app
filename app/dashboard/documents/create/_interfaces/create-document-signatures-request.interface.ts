@@ -31,15 +31,15 @@ export interface SignaturePositionPayload {
 
 /**
  * Forma exacta que espera el backend por cada colaborador (campo `collaborators`). Sin
- * `signatureType`: lo define el documento entero (`DocumentDataPayload.signatureType`). `rfc` solo
- * viaja para VIEWER — a los firmantes ya no se les pide en ningún flujo.
+ * `signatureType`: lo define el documento entero (`DocumentDataPayload.signatureType`). `taxId`
+ * solo viaja para VIEWER — a los firmantes ya no se les pide en ningún flujo.
  */
 export interface CollaboratorPayload {
   collaboratorType: 'SIGNER' | 'VIEWER';
   firstName: string;
   lastName: string;
   email: string;
-  rfc?: string | null;
+  taxId?: string | null;
   signatures?: SignaturePositionPayload[];
   requiresTwoFactorAuth?: boolean;
   /**
@@ -87,6 +87,16 @@ export interface CreateDocumentSignaturesInput {
   file: File;
   fileName: string;
   requiresApproval: boolean;
+  /**
+   * Usuario elegido para aprobar el documento, o `null` cuando no requiere aprobación (ver
+   * historia "Selección de aprobador al requerir aprobación en nuevo documento").
+   *
+   * Entra por acá aunque el payload todavía no lo incluya: el backend no recibe este campo por
+   * ahora, así que la historia pide dejar la decisión capturada y lista para enviarla. Ponerlo en
+   * la entrada de la mutación —y no en el payload— es lo que hace explícito dónde falta el último
+   * cable: en `DocumentDataPayload`, en cuanto el endpoint lo acepte.
+   */
+  approverUserId: string | null;
   requiresOrder: boolean;
   signatureType: DocumentSignatureType;
   requiresTwoFactorAuth: boolean;

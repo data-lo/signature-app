@@ -26,7 +26,7 @@ function viewer(): CollaboratorFormValues {
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
-    rfc: 'AURU800101ABC',
+    taxId: 'AURU800101ABC',
   };
 }
 
@@ -38,19 +38,19 @@ describe('toRequiresDifferentSignatures', () => {
 });
 
 describe('toCollaboratorPayload', () => {
-  it('sin firmas colocadas, manda un arreglo vacío y ningún rfc para el firmante', () => {
+  it('sin firmas colocadas, manda un arreglo vacío y ningún taxId para el firmante', () => {
     const payload = toCollaboratorPayload(signer(), 'SIMPLE');
 
     expect(payload.signatures).toEqual([]);
-    expect(payload.rfc).toBeUndefined();
+    expect(payload.taxId).toBeUndefined();
     // SIMPLE: requiresTwoFactorAuth forzado a true "oculto", sin importar el valor del form.
     expect(payload.requiresTwoFactorAuth).toBe(true);
   });
 
-  it('historia "Selección de tipo de firma": un firmante con firma avanzada tampoco manda rfc', () => {
+  it('historia "Selección de tipo de firma": un firmante con firma avanzada tampoco manda taxId', () => {
     const payload = toCollaboratorPayload(signer(), 'ADVANCED');
 
-    expect(payload.rfc).toBeUndefined();
+    expect(payload.taxId).toBeUndefined();
   });
 
   it('historia "Ubicación de firmas por usuario": traduce cada posición colocada al shape del backend', () => {
@@ -102,25 +102,25 @@ describe('toCollaboratorPayload', () => {
     expect(payload.requiresTwoFactorAuth).toBe(false);
   });
 
-  it('un viewer no manda signatures ni requiresTwoFactorAuth, pero sí su rfc', () => {
+  it('un viewer no manda signatures ni requiresTwoFactorAuth, pero sí su taxId', () => {
     const payload = toCollaboratorPayload(viewer(), 'ADVANCED');
 
     expect(payload.collaboratorType).toBe('VIEWER');
     expect(payload.signatures).toBeUndefined();
     expect(payload.requiresTwoFactorAuth).toBeUndefined();
-    expect(payload.rfc).toBe('AURU800101ABC');
+    expect(payload.taxId).toBe('AURU800101ABC');
   });
 
-  it('historia "Eliminar campo RFC de la sección de Espectadores": un viewer sin rfc lo manda vacío, no lo omite', () => {
+  it('historia "Eliminar campo RFC de la sección de Espectadores": un viewer sin taxId lo manda vacío, no lo omite', () => {
     // `emptyViewer()` (no `viewer()`) porque tipa como ViewerFormValues y no como el union
     // CollaboratorFormValues: spreadear un union en un literal dispara el excess-property-check
-    // de TypeScript contra la rama SIGNER, que no tiene `rfc`.
+    // de TypeScript contra la rama SIGNER, que no tiene `taxId`.
     const payload = toCollaboratorPayload(
-      { ...emptyViewer(), rfc: '' },
+      { ...emptyViewer(), taxId: '' },
       'ADVANCED',
     );
 
-    expect(payload.rfc).toBe('');
+    expect(payload.taxId).toBe('');
   });
 
   it('historia "Habilitar ordenamiento Drag and Drop": sin orderIndex explícito, cae a 0 por defecto', () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { organizationRolesQueryKey } from '@/lib/hooks/useOrganizationRoles';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import {
@@ -23,7 +24,7 @@ export function useUpdateOrganizationRole(organizationId: string | null) {
     onSuccess: () => {
       toast.success('Rol actualizado correctamente');
       queryClient.invalidateQueries({
-        queryKey: ['organizationRoles', organizationId],
+        queryKey: organizationRolesQueryKey(organizationId),
       });
     },
     onError: (error) => {

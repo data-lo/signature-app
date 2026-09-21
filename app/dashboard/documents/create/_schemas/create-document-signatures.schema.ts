@@ -48,6 +48,9 @@ export const CREATE_DOCUMENT_DEFAULT_VALUES: CreateDocumentSignaturesFormValues 
     signatureType: null,
     requiresTwoFactorAuth: true,
     requiresApproval: false,
+    // Sin aprobación no hay aprobador: el campo sólo toma valor cuando el usuario marca la
+    // opción y elige a alguien (ver `ApproverUserField`).
+    approverUserId: null,
     includeMeAsSigner: false,
     requiresOrder: false,
     collaborators: [],
