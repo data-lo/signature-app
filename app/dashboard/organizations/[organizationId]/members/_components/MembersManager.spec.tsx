@@ -2,6 +2,7 @@ import userEvent from '@testing-library/user-event';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useMemberPermissions } from '../_hooks/useMemberPermissions';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
@@ -19,6 +20,8 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mockRefresh, replace: mockReplace }),
 }));
 jest.mock('@/lib/hooks/useSystemRoles');
+// El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
+jest.mock('@/lib/hooks/useOrganizationRoles');
 jest.mock('../_hooks/useMemberPermissions');
 jest.mock(
   '@/app/server-actions/organizations/update-organization-member-role.server-action',
@@ -38,6 +41,7 @@ jest.mock(
 );
 
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
+const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 const mockedUseMemberPermissions = useMemberPermissions as jest.Mock;
 const mockedUpdateRole = updateOrganizationMemberRoleAction as jest.Mock;
 const mockedRemoveMember = removeOrganizationMemberAction as jest.Mock;
@@ -102,6 +106,12 @@ const rowActions = () =>
 describe('MembersManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedUseOrganizationRoles.mockImplementation(() => ({
+      data: mockedUseSystemRoles().data,
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+    }));
     mockedUseSystemRoles.mockReturnValue({
       data: [
         {
