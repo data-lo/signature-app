@@ -1,22 +1,22 @@
 import { renderWithProviders, screen } from '@/test-utils';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
+import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import MembersEmptyState from './MembersEmptyState';
 
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: jest.fn() }) }));
 jest.mock('@/lib/hooks/useSystemRoles');
+// El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
+jest.mock('@/lib/hooks/useOrganizationRoles');
 jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
-jest.mock(
-  '@/app/server-actions/organizations/add-organization-member.server-action',
-  () => ({ addOrganizationMemberAction: jest.fn() }),
-);
 
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
+const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 
 const ORG_ACCOUNT: ActiveAccount = {
   id: 'org-account-1',
@@ -39,6 +39,12 @@ function renderEmptyState(
 
 describe('MembersEmptyState', () => {
   beforeEach(() => {
+    mockedUseOrganizationRoles.mockImplementation(() => ({
+      data: mockedUseSystemRoles().data,
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+    }));
     mockedUseSystemRoles.mockReturnValue({ data: [], isLoading: false });
     useAuthStore.setState({ activeAccount: ORG_ACCOUNT });
   });
@@ -77,12 +83,19 @@ describe('MembersEmptyState', () => {
     expect(screen.queryByText('Fecha de ingreso')).not.toBeInTheDocument();
   });
 
-  it('también ofrece el alta directa de quien ya tiene cuenta', () => {
+  /**
+   * Historia "Unificar invitaciones de miembros": invitar es el único camino de alta. El alta
+   * directa por correo se retiró, porque dejaba fuera a quien tiene su cuenta con otro correo.
+   */
+  it('ya no ofrece el alta directa: sólo invitar', () => {
     renderEmptyState();
 
     expect(
-      screen.getByRole('button', { name: /agregar miembro/i }),
+      screen.getByRole('button', { name: /invitar miembro/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /agregar miembro/i }),
+    ).not.toBeInTheDocument();
   });
 
   /**

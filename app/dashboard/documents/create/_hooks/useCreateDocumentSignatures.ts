@@ -49,6 +49,13 @@ export function useCreateDocumentSignatures() {
         documentData: {
           fileName,
           requiresApproval,
+          /*
+            Falta `approverUserId`, que sí llega en la entrada de la mutación: el endpoint de
+            creación todavía no lo recibe (ver la historia del aprobador), y mandarlo hoy sería
+            un campo que el `ValidationPipe` del backend descarta en silencio — la peor forma de
+            "ya está integrado". Cuando el DTO lo acepte, va aquí y no hay nada más que cambiar
+            en el camino: el valor ya viaja desde el formulario.
+          */
           isSequential: requiresOrder,
           signatureType,
           isIndexable,

@@ -87,6 +87,16 @@ export interface CreateDocumentSignaturesInput {
   file: File;
   fileName: string;
   requiresApproval: boolean;
+  /**
+   * Usuario elegido para aprobar el documento, o `null` cuando no requiere aprobación (ver
+   * historia "Selección de aprobador al requerir aprobación en nuevo documento").
+   *
+   * Entra por acá aunque el payload todavía no lo incluya: el backend no recibe este campo por
+   * ahora, así que la historia pide dejar la decisión capturada y lista para enviarla. Ponerlo en
+   * la entrada de la mutación —y no en el payload— es lo que hace explícito dónde falta el último
+   * cable: en `DocumentDataPayload`, en cuanto el endpoint lo acepte.
+   */
+  approverUserId: string | null;
   requiresOrder: boolean;
   signatureType: DocumentSignatureType;
   requiresTwoFactorAuth: boolean;
