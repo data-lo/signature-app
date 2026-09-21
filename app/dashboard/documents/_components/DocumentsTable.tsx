@@ -71,7 +71,8 @@ export interface DocumentListItem {
 
 const STATUS_LABELS: Record<DocumentStatus, string> = {
   [DocumentStatus.Created]: 'Creado',
-  [DocumentStatus.Pending]: 'En progreso',
+  [DocumentStatus.PendingApproval]: 'En espera de aprobación',
+  [DocumentStatus.PendingSignature]: 'En espera de firma',
   [DocumentStatus.Signed]: 'Firmado por todos',
   [DocumentStatus.Rejected]: 'Rechazado',
   [DocumentStatus.Expired]: 'Expirado',
@@ -104,7 +105,8 @@ const UNSIGNED_DATE_LABEL = 'No disponible';
 
 const STATUS_DOT: Record<DocumentStatus, string> = {
   [DocumentStatus.Created]: 'bg-amber-400',
-  [DocumentStatus.Pending]: 'bg-amber-400',
+  [DocumentStatus.PendingApproval]: 'bg-amber-400',
+  [DocumentStatus.PendingSignature]: 'bg-amber-400',
   [DocumentStatus.Signed]: 'bg-emerald-500',
   [DocumentStatus.Rejected]: 'bg-red-400',
   [DocumentStatus.Expired]: 'bg-gray-400',

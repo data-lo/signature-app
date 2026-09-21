@@ -12,6 +12,7 @@ import AdvancedSignatureDialog, {
 } from './AdvancedSignatureDialog';
 import CancellationConfirmDialog from './CancellationConfirmDialog';
 import DocumentParticipantsCard from './DocumentParticipantsCard';
+import DocumentApprovalActions from './DocumentApprovalActions';
 import DocumentPreviewPanel from './DocumentPreviewPanel';
 import DocumentSignaturePanel, {
   type DocumentSigningProps,
@@ -141,6 +142,18 @@ export default function DocumentView({
         />
 
         <DocumentParticipantsCard participants={document.participants} />
+
+        {/*
+          Va antes del panel de firma y no después porque, cuando aparece, es LO ÚNICO que se
+          puede hacer con el documento: mientras espera aprobación `canSign` viene en false desde
+          el backend, así que los dos bloques nunca compiten por la atención.
+        */}
+        <DocumentApprovalActions
+          documentId={document.id}
+          documentStatus={document.status}
+          myRole={document.myRole}
+          myStatus={document.myStatus}
+        />
 
         {document.canSign && !reject.isFormOpen && (
           <DocumentSignaturePanel

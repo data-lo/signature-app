@@ -102,7 +102,7 @@ describe('buildCreateDocumentProgress', () => {
      */
     it('con aprobación activa y sin aprobador, no está completa', () => {
       const progress = buildCreateDocumentProgress(
-        completeParams({ requiresApproval: true, approverUserId: null }),
+        completeParams({ requiresApproval: true, reviewerUserId: null }),
       );
 
       expect(progress.configuration.isComplete).toBe(false);
@@ -111,7 +111,7 @@ describe('buildCreateDocumentProgress', () => {
 
     it('con aprobación activa y aprobador elegido, está completa', () => {
       const progress = buildCreateDocumentProgress(
-        completeParams({ requiresApproval: true, approverUserId: 'user-1' }),
+        completeParams({ requiresApproval: true, reviewerUserId: 'user-1' }),
       );
 
       expect(progress.configuration.isComplete).toBe(true);
@@ -120,7 +120,7 @@ describe('buildCreateDocumentProgress', () => {
 
     it('sin aprobación, el aprobador no se exige', () => {
       const progress = buildCreateDocumentProgress(
-        completeParams({ requiresApproval: false, approverUserId: null }),
+        completeParams({ requiresApproval: false, reviewerUserId: null }),
       );
 
       expect(progress.configuration.isComplete).toBe(true);

@@ -957,7 +957,7 @@ describe('CreateDocumentView', () => {
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({
           requiresApproval: true,
-          approverUserId: 'user-9',
+          reviewerUserId: 'user-9',
         }),
         expect.anything(),
       );

@@ -79,9 +79,9 @@ export function useCreateDocumentForm({
     control: form.control,
     name: 'requiresApproval',
   });
-  const approverUserId = useWatch({
+  const reviewerUserId = useWatch({
     control: form.control,
-    name: 'approverUserId',
+    name: 'reviewerUserId',
   });
 
   function onValidSubmit(
@@ -98,7 +98,7 @@ export function useCreateDocumentForm({
         file,
         fileName: file.name,
         requiresApproval: values.requiresApproval,
-        approverUserId: values.approverUserId,
+        reviewerUserId: values.reviewerUserId,
         requiresOrder: values.requiresOrder,
         signatureType: values.signatureType,
         requiresTwoFactorAuth: values.requiresTwoFactorAuth,
@@ -150,7 +150,7 @@ export function useCreateDocumentForm({
     /** Si el documento necesita que alguien lo apruebe antes de salir a firma. */
     requiresApproval,
     /** Aprobador elegido, o `null` mientras no se haya elegido ninguno. */
-    approverUserId,
+    reviewerUserId,
     /** Error general de la sección de participantes (no pertenece a ningún campo). */
     participantsErrorMessage: getParticipantsErrorMessage(
       form.formState.errors,

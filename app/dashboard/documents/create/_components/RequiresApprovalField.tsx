@@ -37,12 +37,12 @@ export default function RequiresApprovalField({
     useAuthStore((state) => state.activeAccount?.accountType) ===
     'ORGANIZATION';
   const { field } = useController({ control, name: 'requiresApproval' });
-  const { field: approverField } = useController({
+  const { field: reviewerField } = useController({
     control,
-    name: 'approverUserId',
+    name: 'reviewerUserId',
   });
   const requiresApproval = field.value;
-  const approverUserId = approverField.value;
+  const reviewerUserId = reviewerField.value;
 
   useEffect(() => {
     if (!isOrganization && field.value) {
@@ -52,15 +52,15 @@ export default function RequiresApprovalField({
   }, [isOrganization]);
 
   /**
-   * El aprobador elegido se descarta en cuanto la aprobación deja de estar activa, la desmarque
-   * el usuario o la fuerce el efecto de arriba al cambiar a una cuenta personal. Sin esto, un
-   * `approverUserId` viejo seguiría en los valores del formulario y viajaría con un documento
-   * que ya no requiere aprobación — invisible en pantalla, porque el selector desaparece con el
-   * checkbox.
+   * El aprobador elegido se descarta en cuanto la aprobación deja de estar activa, la desmarque el
+   * usuario o la fuerce el efecto de arriba al cambiar a una cuenta personal. Sin esto, un
+   * `reviewerUserId` viejo seguiría en los valores del formulario y viajaría con un documento que
+   * ya no requiere aprobación — invisible en pantalla, porque el selector desaparece con el
+   * checkbox, y rechazado por el backend, que no admite las dos cosas a la vez.
    */
   useEffect(() => {
-    if (!requiresApproval && approverUserId !== null) {
-      approverField.onChange(null);
+    if (!requiresApproval && reviewerUserId !== null) {
+      reviewerField.onChange(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requiresApproval]);

@@ -8,9 +8,9 @@ import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 
 /**
- * El selector de aprobador se monta dentro de este campo, así que su consulta llegaría hasta
- * React Query. Se dobla el hook —y no la petición— porque lo que esta suite comprueba es el
- * checkbox y lo que arrastra consigo; los estados de la consulta son de `ApproverUserField.spec`.
+ * El selector de aprobador se monta dentro de este campo, así que su consulta llegaría hasta React
+ * Query. Se dobla el hook —y no la petición— porque lo que esta suite comprueba es el checkbox y
+ * lo que arrastra consigo; los estados de la consulta son de `ApproverUserField.spec`.
  */
 jest.mock('../_hooks/useDocumentApprovers', () => ({
   ...jest.requireActual('../_hooks/useDocumentApprovers'),
@@ -32,27 +32,27 @@ function buildActiveAccount(
 }
 
 /** El valor que el formulario prepara para el envío, visible para poder afirmar sobre él. */
-function ApproverUserIdOutput({
+function ReviewerUserIdOutput({
   control,
 }: {
   control: Control<CreateDocumentSignaturesFormValues>;
 }) {
-  const approverUserId = useWatch({ control, name: 'approverUserId' });
+  const reviewerUserId = useWatch({ control, name: 'reviewerUserId' });
 
-  return <output>{approverUserId ?? 'sin aprobador'}</output>;
+  return <output>{reviewerUserId ?? 'sin aprobador'}</output>;
 }
 
 function Harness({
   defaultValue = false,
-  approverUserId = null,
+  reviewerUserId = null,
 }: {
   defaultValue?: boolean;
-  approverUserId?: string | null;
+  reviewerUserId?: string | null;
 }) {
   const { control } = useForm<CreateDocumentSignaturesFormValues>({
     defaultValues: {
       requiresApproval: defaultValue,
-      approverUserId,
+      reviewerUserId,
       includeMeAsSigner: false,
       requiresOrder: false,
       collaborators: [],
@@ -62,7 +62,7 @@ function Harness({
   return (
     <>
       <RequiresApprovalField control={control} />
-      <ApproverUserIdOutput control={control} />
+      <ReviewerUserIdOutput control={control} />
     </>
   );
 }
@@ -72,13 +72,16 @@ describe('RequiresApprovalField', () => {
     mockedUseDocumentApprovers.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [{ value: 'user-1', label: 'ana@empresa.com' }],
+      data: [{ value: 'user-aprobador', label: 'ana@empresa.com' }],
     });
   });
 
   it('bug corregido: en una cuenta PERSONAL, la opción no se muestra', () => {
     useAuthStore.setState({
-      activeAccount: buildActiveAccount({ accountType: 'PERSONAL', organizationId: null }),
+      activeAccount: buildActiveAccount({
+        accountType: 'PERSONAL',
+        organizationId: null,
+      }),
     });
 
     renderWithProviders(<Harness />);
@@ -133,9 +136,10 @@ describe('RequiresApprovalField', () => {
   });
 
   /**
-   * Historia "Selección de aprobador al requerir aprobación en nuevo documento": marcar la opción
-   * obliga a decir a quién se le pide la aprobación, y desmarcarla no puede dejar esa elección
-   * escondida en los valores del formulario.
+   * Historia "Implementar flujo de aprobación previo al proceso de firma": marcar la opción obliga
+   * a decir a quién se le pide la aprobación, y desmarcarla no puede dejar esa elección escondida
+   * en los valores del formulario — el backend rechaza el payload que trae aprobador diciendo a la
+   * vez que no requiere aprobación.
    */
   describe('aprobador', () => {
     it('sin la opción marcada no hay selector', () => {
@@ -166,8 +170,10 @@ describe('RequiresApprovalField', () => {
       const user = userEvent.setup();
       useAuthStore.setState({ activeAccount: buildActiveAccount() });
 
-      renderWithProviders(<Harness defaultValue approverUserId="user-1" />);
-      expect(screen.getByText('user-1')).toBeInTheDocument();
+      renderWithProviders(
+        <Harness defaultValue reviewerUserId="user-aprobador" />,
+      );
+      expect(screen.getByText('user-aprobador')).toBeInTheDocument();
 
       await user.click(
         screen.getByRole('checkbox', { name: /requiere aprobación/i }),

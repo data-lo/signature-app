@@ -1,6 +1,7 @@
 import { DocumentStatus, ParticipantStatus } from '@/lib/enums/document';
 
 const MY_STATUS_MESSAGES: Record<ParticipantStatus, string> = {
+  [ParticipantStatus.Approved]: 'Ya aprobaste este documento.',
   [ParticipantStatus.Signed]: 'Ya firmaste este documento.',
   [ParticipantStatus.Rejected]: 'Ya rechazaste este documento.',
   [ParticipantStatus.Pending]: 'Aún no es tu turno para firmar este documento.',

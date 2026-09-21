@@ -1,5 +1,5 @@
 import {
-  APPROVER_REQUIRED_MESSAGE,
+  REVIEWER_REQUIRED_MESSAGE,
   createDocumentSignaturesSchema,
   emptySigner,
   emptyViewer,
@@ -38,7 +38,7 @@ function formValues(
     signatureType,
     requiresTwoFactorAuth: true,
     requiresApproval: false,
-    approverUserId: null,
+    reviewerUserId: null,
     requiresOrder: false,
     includeMeAsSigner,
     collaborators,
@@ -140,15 +140,15 @@ describe('createDocumentSignaturesSchema', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error?.issues[0].path).toEqual(['approverUserId']);
-      expect(result.error?.issues[0].message).toBe(APPROVER_REQUIRED_MESSAGE);
+      expect(result.error?.issues[0].path).toEqual(['reviewerUserId']);
+      expect(result.error?.issues[0].message).toBe(REVIEWER_REQUIRED_MESSAGE);
     });
 
     it('con aprobación activa y un aprobador elegido, acepta', () => {
       const result = createDocumentSignaturesSchema.safeParse({
         ...formValues([signer()]),
         requiresApproval: true,
-        approverUserId: 'user-1',
+        reviewerUserId: 'user-1',
       });
 
       expect(result.success).toBe(true);

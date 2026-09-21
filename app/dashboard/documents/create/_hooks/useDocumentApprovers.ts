@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+
 import {
   getOrganizationMembersRequest,
   type OrganizationMember,
@@ -10,24 +11,27 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 
 /**
  * Capacidad del catálogo estático que distingue a un aprobador: no es un rol ni un puesto, así
- * que la lista no se arma por nombre de rol ("Aprobador") sino por el permiso que ese rol
- * otorgue. Una organización que reparte `DOCUMENT.APPROVE` desde un rol propio aparece igual.
+ * que la lista no se arma por nombre de rol ("Aprobador") sino por el permiso que ese rol otorgue.
+ * Una organización que lo reparte desde un rol propio aparece igual.
+ *
+ * Es el mismo permiso que el backend vuelve a exigir al crear el documento (ver
+ * `DocumentReviewerService`): esta lista es una comodidad para elegir, no la autorización.
  */
 const APPROVE_DOCUMENT_PERMISSION: PermissionKey = 'DOCUMENT.APPROVE';
 
-/** Un aprobador ya listo para alimentar el `FormSelect` (`value`/`label`). */
+/** Un aprobador listo para alimentar el `FormSelect`. */
 export interface ApproverOption {
   /**
-   * `userId` y no `accountId`: lo que el formulario prepara es `approverUserId`, el usuario que
-   * aprobará el documento. La membresía es el vehículo por el que se sabe que puede hacerlo, no
-   * lo que se envía.
+   * `userId` y no `accountId`: lo que el contrato pide es `reviewerUserId`, el usuario que
+   * aprobará. La membresía es el vehículo por el que se sabe que puede hacerlo, no lo que se
+   * envía.
    */
   value: string;
   /**
    * El correo del miembro, que es la única identidad que publica hoy
-   * `GET /organizations/:id/members` (ver `OrganizationMemberData` en el backend: trae email,
-   * RFC y rol, pero no nombre). En cuanto ese endpoint publique nombre y apellido, esto pasa a
-   * ser "Nombre Apellido" y no cambia nada más.
+   * `GET /organizations/:id/members` (ver `OrganizationMemberData` en el backend: trae email, RFC
+   * y rol, pero no nombre). En cuanto ese endpoint publique nombre y apellido, esto pasa a ser
+   * "Nombre Apellido" y no cambia nada más.
    */
   label: string;
 }
@@ -50,14 +54,14 @@ export function documentApproversQueryKey(organizationId: string | null) {
 }
 
 /**
- * Traduce los miembros de la organización a la lista de aprobadores que se puede elegir.
+ * Traduce los miembros de la organización a la lista de aprobadores elegibles.
  *
  * Deja fuera a quien no ha entrado todavía (`pending_invite`) o ya no está (`suspended`,
  * `removed`): el permiso lo tendrán por su rol, pero un miembro que no puede iniciar sesión no
  * puede aprobar nada, y ofrecerlo dejaría el documento esperando a alguien que nunca lo verá.
  *
  * @param members - Miembros tal como los devuelve el backend.
- * @returns Los aprobadores, en el mismo orden en que llegan (por antigüedad en la organización).
+ * @returns Los aprobadores, en el orden en que llegan (por antigüedad en la organización).
  * @throws Nada: es una función pura.
  *
  * @example
@@ -84,20 +88,20 @@ export function toApproverOptions(
  * Usuarios de la organización activa que pueden aprobar documentos, para el selector que aparece
  * al marcar "Requiere aprobación" (ver `ApproverUserField`).
  *
- * `enabled` es el corazón de la historia: mientras la opción esté desmarcada no se consulta nada
- * —ni una petición de más por abrir la pantalla— y la lista sólo se pide cuando el usuario
- * declara que el documento necesita aprobación. Al desmarcar, React Query conserva lo ya traído
- * en caché, así que volver a marcarla no dispara una segunda petición.
+ * `enabled` es la regla de la historia: mientras la opción esté desmarcada no se consulta nada —ni
+ * una petición de más por abrir la pantalla— y la lista sólo se pide cuando el usuario declara que
+ * el documento necesita aprobación. Al desmarcarla, React Query conserva lo traído en caché, así
+ * que volver a marcarla no dispara una segunda petición.
  *
- * Vive en los `_hooks` de esta ruta y no en `lib/hooks` porque "aprobadores" no es un catálogo de
- * la organización sino la lectura que hace ESTA pantalla del listado de miembros: el mismo
+ * Vive en los `_hooks` de esta ruta y no en `lib/hooks` porque "aprobadores" no es un catálogo
+ * de la organización sino la lectura que hace ESTA pantalla del listado de miembros: el mismo
  * criterio por el que `useMemberPermissions` vive junto a su sección.
  *
  * @param enabled - Si la opción "Requiere aprobación" está activa.
- * @returns La consulta de React Query, con `data` ya reducida a opciones del selector.
+ * @returns La consulta, con `data` ya reducida a opciones del selector.
  *
- * @throws Nada por sí mismo: el fallo de la petición llega como `query.isError` (un 403 cuando
- * el usuario no tiene `MEMBER.READ` en su organización).
+ * @throws Nada por sí mismo: el fallo llega como `query.isError` (un 403 cuando el usuario no
+ * tiene `MEMBER.READ` en su organización).
  *
  * @example
  * ```tsx

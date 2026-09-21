@@ -97,7 +97,7 @@ function baseDocument(overrides: Partial<DocumentDetail> = {}): DocumentDetail {
     fileName: 'contrato.pdf',
     fileType: 'application/pdf',
     totalPages: 1,
-    status: DocumentStatus.Pending,
+    status: DocumentStatus.PendingSignature,
     creator: 'Creador Uno',
     // Distinto del secureUrl que devuelve el mock de useDocumentFileUrl a propósito: algunas
     // pruebas verifican que el visor use el del endpoint dedicado, no este (ver bug corregido).
@@ -1260,7 +1260,7 @@ describe('DocumentViewSection', () => {
 
     it('la acción está disponible aunque el documento siga pendiente de firma', () => {
       mockedUseDocumentDetail.mockReturnValue({
-        data: baseDocument({ status: DocumentStatus.Pending, canSign: true }),
+        data: baseDocument({ status: DocumentStatus.PendingSignature, canSign: true }),
         isLoading: false,
         isError: false,
       });

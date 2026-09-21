@@ -165,6 +165,51 @@ export async function rejectDocumentRequest(
   await apiClient.patch(`/api/v1/document/${documentId}/reject`, { reason });
 }
 
+/**
+ * El reviewer autoriza que el documento salga a firma (historia "Implementar flujo de aprobación
+ * previo al proceso de firma"). El backend comprueba que quien llama sea el aprobador asignado y
+ * que el documento siga en PENDING_APPROVAL — la UI oculta el botón, pero la decisión es suya.
+ *
+ * @param documentId - Documento a aprobar.
+ * @returns Nada: el detalle se vuelve a consultar tras la mutación.
+ *
+ * @throws {AxiosError} 403 si no es el aprobador asignado, 400 si el documento ya salió de
+ * PENDING_APPROVAL o la decisión ya estaba registrada.
+ *
+ * @example
+ * ```ts
+ * await approveDocumentRequest('doc-1');
+ * ```
+ */
+export async function approveDocumentRequest(
+  documentId: string,
+): Promise<void> {
+  await apiClient.post(`/api/v1/document/${documentId}/approval/approve`);
+}
+
+/**
+ * El reviewer niega la autorización. El documento queda rechazado y el flujo de firma no empieza.
+ *
+ * @param documentId - Documento sobre el que se decide.
+ * @param resolutionNote - Motivo opcional; es lo que el creador va a leer en su correo.
+ * @returns Nada.
+ *
+ * @throws {AxiosError} Los mismos casos que `approveDocumentRequest`.
+ *
+ * @example
+ * ```ts
+ * await rejectDocumentApprovalRequest('doc-1', 'Falta el anexo B');
+ * ```
+ */
+export async function rejectDocumentApprovalRequest(
+  documentId: string,
+  resolutionNote?: string,
+): Promise<void> {
+  await apiClient.post(`/api/v1/document/${documentId}/approval/reject`, {
+    resolutionNote: resolutionNote?.trim() ? resolutionNote.trim() : undefined,
+  });
+}
+
 export async function requestCancellationRequest(
   documentId: string,
 ): Promise<void> {

@@ -65,7 +65,8 @@ export const DOCUMENT_VIEW_OPTIONS: DocumentView[] = [
 
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
   [DocumentStatus.Created]: 'Creado',
-  [DocumentStatus.Pending]: 'En progreso',
+  [DocumentStatus.PendingApproval]: 'En espera de aprobación',
+  [DocumentStatus.PendingSignature]: 'En espera de firma',
   [DocumentStatus.Signed]: 'Firmado por todos',
   [DocumentStatus.Rejected]: 'Rechazado',
   [DocumentStatus.Expired]: 'Expirado',
@@ -75,7 +76,10 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
 
 export const DOCUMENT_STATUS_OPTIONS: DocumentStatus[] = [
   DocumentStatus.Created,
-  DocumentStatus.Pending,
+  // Las dos esperas se filtran por separado: para quien administra documentos no es lo mismo uno
+  // atascado esperando a su aprobador que uno que ya está circulando entre los firmantes.
+  DocumentStatus.PendingApproval,
+  DocumentStatus.PendingSignature,
   DocumentStatus.Signed,
   DocumentStatus.Rejected,
   DocumentStatus.Expired,

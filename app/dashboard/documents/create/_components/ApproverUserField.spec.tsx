@@ -29,7 +29,9 @@ function permission(key: string): RolePermission {
   };
 }
 
-function member(overrides: Partial<OrganizationMember> = {}): OrganizationMember {
+function member(
+  overrides: Partial<OrganizationMember> = {},
+): OrganizationMember {
   return {
     accountId: 'account-1',
     userId: 'user-1',
@@ -45,21 +47,21 @@ function member(overrides: Partial<OrganizationMember> = {}): OrganizationMember
 }
 
 /** El valor que el formulario prepara para el envío, visible para poder afirmar sobre él. */
-function ApproverUserIdOutput({
+function ReviewerUserIdOutput({
   control,
 }: {
   control: Control<CreateDocumentSignaturesFormValues>;
 }) {
-  const approverUserId = useWatch({ control, name: 'approverUserId' });
+  const reviewerUserId = useWatch({ control, name: 'reviewerUserId' });
 
-  return <output>{approverUserId ?? 'sin aprobador'}</output>;
+  return <output>{reviewerUserId ?? 'sin aprobador'}</output>;
 }
 
 function Harness({ requiresApproval = true }: { requiresApproval?: boolean }) {
   const { control } = useForm<CreateDocumentSignaturesFormValues>({
     defaultValues: {
       requiresApproval,
-      approverUserId: null,
+      reviewerUserId: null,
       includeMeAsSigner: false,
       requiresOrder: false,
       collaborators: [],
@@ -69,22 +71,9 @@ function Harness({ requiresApproval = true }: { requiresApproval?: boolean }) {
   return (
     <>
       <ApproverUserField control={control} />
-      <ApproverUserIdOutput control={control} />
+      <ReviewerUserIdOutput control={control} />
     </>
   );
-}
-
-/**
- * jsdom no dispara los PointerEvent con los que @base-ui/react abre el Select al hacer click; el
- * teclado recorre los mismos handlers (mismo camino que `CreateDocumentView.spec.tsx`).
- */
-async function selectApprover(
-  user: ReturnType<typeof userEvent.setup>,
-  optionName: RegExp,
-) {
-  screen.getByRole('combobox', { name: /usuario aprobador/i }).focus();
-  await user.keyboard('{Enter}');
-  await user.click(await screen.findByRole('option', { name: optionName }));
 }
 
 describe('ApproverUserField', () => {
@@ -134,12 +123,11 @@ describe('ApproverUserField', () => {
     ]);
 
     renderWithProviders(<Harness />);
+    const combobox = await screen.findByRole('combobox', {
+      name: /usuario aprobador/i,
+    });
 
-    expect(
-      await screen.findByRole('combobox', { name: /usuario aprobador/i }),
-    ).toBeInTheDocument();
-
-    screen.getByRole('combobox', { name: /usuario aprobador/i }).focus();
+    combobox.focus();
     await user.keyboard('{Enter}');
 
     expect(
@@ -181,10 +169,16 @@ describe('ApproverUserField', () => {
     mockedGetOrganizationMembers.mockResolvedValue([member()]);
 
     renderWithProviders(<Harness />);
-    await screen.findByRole('combobox', { name: /usuario aprobador/i });
+    const combobox = await screen.findByRole('combobox', {
+      name: /usuario aprobador/i,
+    });
 
     expect(screen.getByText('sin aprobador')).toBeInTheDocument();
-    await selectApprover(user, /ana@empresa\.com/i);
+    combobox.focus();
+    await user.keyboard('{Enter}');
+    await user.click(
+      await screen.findByRole('option', { name: /ana@empresa\.com/i }),
+    );
 
     // `userId`, no `accountId`: es el usuario quien aprueba, la membresía sólo prueba que puede.
     expect(await screen.findByText('user-1')).toBeInTheDocument();
@@ -195,7 +189,9 @@ describe('ApproverUserField', () => {
 
     renderWithProviders(<Harness />);
 
-    expect(await screen.findByText(APPROVERS_ERROR_MESSAGE)).toBeInTheDocument();
+    expect(
+      await screen.findByText(APPROVERS_ERROR_MESSAGE),
+    ).toBeInTheDocument();
     expect(screen.queryByText(NO_APPROVERS_MESSAGE)).not.toBeInTheDocument();
   });
 });

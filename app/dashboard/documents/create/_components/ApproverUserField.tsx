@@ -2,8 +2,10 @@
 
 import { Loader2 } from 'lucide-react';
 import { useWatch, type Control } from 'react-hook-form';
+
 import { FormSelect } from '@/components/form/form-select';
 import { FieldError } from '@/components/ui/field';
+
 import { useDocumentApprovers } from '../_hooks/useDocumentApprovers';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 
@@ -13,23 +15,23 @@ export const NO_APPROVERS_MESSAGE = 'No hay usuarios aprobadores disponibles';
 export const APPROVERS_LOADING_MESSAGE = 'Cargando usuarios aprobadores...';
 
 /**
- * El fallo de la consulta no se confunde con el vacío: "no hay aprobadores" es una respuesta
- * sobre la organización —y la salida es desmarcar la opción o repartir el permiso—, mientras que
- * esto es un problema de la petición y la salida es reintentar.
+ * El fallo de la consulta no se confunde con el vacío: "no hay aprobadores" es una respuesta sobre
+ * la organización —y la salida es desmarcar la opción o repartir el permiso—, mientras que esto es
+ * un problema de la petición y la salida es reintentar.
  */
 export const APPROVERS_ERROR_MESSAGE =
   'No se pudieron cargar los usuarios aprobadores. Intenta de nuevo.';
 
 /**
- * Selector del usuario que aprobará el documento, dependiente de "Requiere aprobación" (ver
- * historia "Selección de aprobador al requerir aprobación en nuevo documento").
+ * Selector del usuario que aprobará el documento, dependiente de "Requiere aprobación" (historia
+ * "Implementar flujo de aprobación previo al proceso de firma").
  *
  * Vive montado siempre junto al checkbox y es él quien decide no pintarse: así la regla "la
  * consulta sólo corre con la opción activa" es una sola —el `enabled` de la consulta y lo que se
  * renderiza salen del mismo valor observado— en vez de quedar repartida entre este componente y
  * quien lo monta, donde una de las dos podría cambiar sin la otra.
  *
- * Los cuatro estados se muestran, ninguno se omite: cargando, error, sin aprobadores y la lista.
+ * Los cuatro estados se muestran y ninguno se omite: cargando, error, sin aprobadores y la lista.
  * El vacío es la respuesta más informativa de las cuatro —dice que la organización todavía no le
  * ha dado a nadie el permiso de aprobar documentos— y por eso no se disfraza de selector vacío.
  */
@@ -74,8 +76,8 @@ export default function ApproverUserField({
   return (
     <FormSelect
       control={control}
-      name="approverUserId"
-      id="approverUserId"
+      name="reviewerUserId"
+      id="reviewerUserId"
       label="Usuario aprobador"
       required
       options={approvers}

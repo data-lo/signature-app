@@ -15,7 +15,7 @@ export type DocumentSignatureType = (typeof DOCUMENT_SIGNATURE_TYPES)[number];
  * Lo que se muestra cuando el documento requiere aprobación pero todavía no se ha elegido a
  * quién se le pide.
  */
-export const APPROVER_REQUIRED_MESSAGE =
+export const REVIEWER_REQUIRED_MESSAGE =
   'Selecciona el usuario que aprobará el documento';
 
 /**
@@ -27,7 +27,7 @@ export const APPROVER_REQUIRED_MESSAGE =
  *  - `requiresOrder` solo se puede ordenar visualmente con dos o más firmantes.
  *  - `includeMeAsSigner` participa de la regla cruzada del esquema compuesto.
  *
- * La única excepción es `approverUserId`, cuya restricción sí es expresable aquí porque depende
+ * La única excepción es `reviewerUserId`, cuya restricción sí es expresable aquí porque depende
  * de otro campo de esta misma sección y de nada más: exigir un aprobador cuando —y sólo
  * cuando— el documento requiere aprobación (ver el `superRefine` de abajo).
  *
@@ -44,26 +44,27 @@ export const documentConfigurationSchema = z
     requiresTwoFactorAuth: z.boolean(),
     requiresApproval: z.boolean(),
     /**
-     * Usuario de la organización que aprobará el documento antes de que salga a firma (ver
-     * historia "Selección de aprobador al requerir aprobación en nuevo documento"). `null`
-     * mientras no se haya elegido, que es el único valor válido con la aprobación desactivada.
+     * Usuario que aprobará el documento antes de que salga a firma (historia "Implementar flujo de
+     * aprobación previo al proceso de firma"). `null` mientras no se haya elegido, que es el único
+     * valor válido con la aprobación desactivada.
      */
-    approverUserId: z.string().nullable(),
+    reviewerUserId: z.string().nullable(),
     includeMeAsSigner: z.boolean(),
     requiresOrder: z.boolean(),
   })
   .superRefine((values, ctx) => {
     /**
-     * Sin aprobador no hay a quién mandarle el documento: la aprobación quedaría marcada y el
-     * documento parado. La regla es del formulario y no del selector porque el selector puede
-     * no estar en pantalla —la sección está contraída, o la consulta no devolvió a nadie— y aun
-     * así el envío tiene que rechazarse.
+     * Sin aprobador no hay a quién pedirle la aprobación: el documento quedaría esperando a nadie.
+     * La regla es del formulario y no del selector porque el selector puede no estar en pantalla
+     * —la sección contraída, o la consulta sin resultados— y aun así el envío debe rechazarse. El
+     * backend la vuelve a aplicar (`reviewerUserId` es obligatorio en su DTO); ésta sólo evita el
+     * viaje.
      */
-    if (values.requiresApproval && !values.approverUserId) {
+    if (values.requiresApproval && !values.reviewerUserId) {
       ctx.addIssue({
         code: 'custom',
-        message: APPROVER_REQUIRED_MESSAGE,
-        path: ['approverUserId'],
+        message: REVIEWER_REQUIRED_MESSAGE,
+        path: ['reviewerUserId'],
       });
     }
   });

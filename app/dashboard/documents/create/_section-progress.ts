@@ -26,7 +26,7 @@ export interface CreateDocumentProgressParams {
   /** "Requiere aprobación" está activo (sólo posible en cuentas ORGANIZATION). */
   requiresApproval?: boolean;
   /** Usuario elegido para aprobar, cuando la aprobación está activa. */
-  approverUserId?: string | null;
+  reviewerUserId?: string | null;
   signerCount: number;
   viewerCount: number;
 }
@@ -67,7 +67,7 @@ export function buildCreateDocumentProgress({
   pageCount,
   signatureType,
   requiresApproval = false,
-  approverUserId = null,
+  reviewerUserId = null,
   signerCount,
   viewerCount,
 }: CreateDocumentProgressParams): CreateDocumentProgress {
@@ -77,12 +77,12 @@ export function buildCreateDocumentProgress({
   const hasSignatureType = signatureType !== undefined;
   /**
    * Marcar "Requiere aprobación" sin elegir aprobador deja la configuración a medias, así que la
-   * sección no se da por completa y el botón "Firmar" sigue deshabilitado. Es deliberado que el
+   * sección no se da por completa y el botón de envío sigue deshabilitado. Es deliberado que el
    * usuario lo note aquí —en la palomita de la sección— y no al pulsar el botón: el envío abre
    * antes el modal de Búsqueda Inteligente, y descubrir el error después de contestarlo sería
    * pedirle una decisión sobre un documento que no se iba a mandar.
    */
-  const hasApprover = !requiresApproval || !!approverUserId;
+  const hasReviewer = !requiresApproval || !!reviewerUserId;
   const hasSigners = signerCount > 0;
 
   const pageCountLabel =
@@ -100,7 +100,7 @@ export function buildCreateDocumentProgress({
   };
 
   const configuration: SectionProgress = {
-    isComplete: hasSignatureType && hasApprover,
+    isComplete: hasSignatureType && hasReviewer,
     collapsedSummary:
       signatureType === undefined
         ? PENDING_LABEL
