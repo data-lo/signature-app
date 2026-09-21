@@ -11,10 +11,6 @@ jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
-jest.mock(
-  '@/app/server-actions/organizations/add-organization-member.server-action',
-  () => ({ addOrganizationMemberAction: jest.fn() }),
-);
 
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
 
@@ -77,12 +73,19 @@ describe('MembersEmptyState', () => {
     expect(screen.queryByText('Fecha de ingreso')).not.toBeInTheDocument();
   });
 
-  it('también ofrece el alta directa de quien ya tiene cuenta', () => {
+  /**
+   * Historia "Unificar invitaciones de miembros": invitar es el único camino de alta. El alta
+   * directa por correo se retiró, porque dejaba fuera a quien tiene su cuenta con otro correo.
+   */
+  it('ya no ofrece el alta directa: sólo invitar', () => {
     renderEmptyState();
 
     expect(
-      screen.getByRole('button', { name: /agregar miembro/i }),
+      screen.getByRole('button', { name: /invitar miembro/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /agregar miembro/i }),
+    ).not.toBeInTheDocument();
   });
 
   /**

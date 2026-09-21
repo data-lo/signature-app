@@ -25,12 +25,6 @@ export interface OrganizationMember {
   permissions: RolePermission[];
 }
 
-export interface AddOrganizationMemberValues {
-  email: string;
-  roleId: string;
-  position?: string;
-}
-
 /*
   Este módulo quedó siendo sólo los tipos.
 

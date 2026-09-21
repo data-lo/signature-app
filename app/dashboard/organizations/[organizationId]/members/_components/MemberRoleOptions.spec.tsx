@@ -3,7 +3,6 @@ import { renderWithProviders, screen, within } from '@/test-utils';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { RoleData } from '@/lib/api/roles';
-import AddMemberModal from './AddMemberModal';
 import InviteMemberModal from './InviteMemberModal';
 
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: jest.fn() }) }));
@@ -11,10 +10,6 @@ jest.mock('@/lib/hooks/useSystemRoles');
 jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
-);
-jest.mock(
-  '@/app/server-actions/organizations/add-organization-member.server-action',
-  () => ({ addOrganizationMemberAction: jest.fn() }),
 );
 
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
@@ -27,13 +22,14 @@ const ROLES: RoleData[] = [
 ];
 
 /**
- * Historia "Ocultar rol OWNER en la gestión de miembros": ninguna de las dos ventanas de alta
- * ofrece PROPIETARIO, y el resto de los roles se sigue pudiendo elegir.
+ * Historia "Ocultar rol OWNER en la gestión de miembros": la ventana de alta no ofrece
+ * PROPIETARIO, y el resto de los roles se sigue pudiendo elegir.
+ *
+ * Antes cubría dos ventanas. El alta directa ("Agregar miembro") se retiró al dejar la
+ * invitación por RFC como único camino, así que sólo queda "Invitar miembro"; el filtro vive en
+ * `assignableMemberRoles` y tiene su propia prueba en `lib/assignable-member-roles.spec.ts`.
  */
-describe.each([
-  ['Invitar miembro', InviteMemberModal],
-  ['Agregar miembro', AddMemberModal],
-])('ventana "%s"', (triggerName, Modal) => {
+describe('ventana "Invitar miembro"', () => {
   beforeEach(() => {
     mockedUseSystemRoles.mockReturnValue({ data: ROLES, isLoading: false });
     useAuthStore.setState({
@@ -48,9 +44,9 @@ describe.each([
 
   async function openRoleOptions() {
     const user = userEvent.setup();
-    renderWithProviders(<Modal organizationId="org-1" />);
+    renderWithProviders(<InviteMemberModal organizationId="org-1" />);
 
-    await user.click(screen.getByRole('button', { name: new RegExp(triggerName, 'i') }));
+    await user.click(screen.getByRole('button', { name: /Invitar miembro/i }));
     const dialog = await screen.findByRole('dialog');
     const roleSelect = within(dialog).getByRole('combobox', { name: /rol/i });
     roleSelect.focus();
