@@ -28,9 +28,9 @@ export default function RemoveMemberDialog({
     <Dialog open={member !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>¿Eliminar a este miembro?</DialogTitle>
+          <DialogTitle>¿Desactivar a este miembro?</DialogTitle>
           <DialogDescription>
-            ¿Estás seguro de que deseas eliminar a {member?.email} de la
+            ¿Estás seguro de que deseas desactivar a {member?.email} en la
             organización? Perderá el acceso inmediatamente.
           </DialogDescription>
         </DialogHeader>
@@ -49,7 +49,7 @@ export default function RemoveMemberDialog({
             onClick={() => member && onConfirm(member.accountId)}
             disabled={confirming}
           >
-            {confirming ? 'Eliminando...' : 'Eliminar'}
+            {confirming ? 'Desactivando...' : 'Desactivar'}
           </Button>
         </DialogFooter>
       </DialogContent>

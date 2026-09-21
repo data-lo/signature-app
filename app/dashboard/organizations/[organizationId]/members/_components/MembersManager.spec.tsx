@@ -178,13 +178,13 @@ describe('MembersManager', () => {
 
     await user.click(rowActions());
     await user.click(
-      await screen.findByRole('menuitem', { name: /eliminar/i }),
+      await screen.findByRole('menuitem', { name: /desactivar/i }),
     );
     expect(
       await screen.findByText(/perderá el acceso inmediatamente/i),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^eliminar$/i }));
+    await user.click(screen.getByRole('button', { name: /^desactivar$/i }));
 
     await waitFor(() => {
       expect(mockedRemoveMember).toHaveBeenCalledWith('account-1', 'org-1');
@@ -196,17 +196,17 @@ describe('MembersManager', () => {
   it('ante un rechazo del backend no refresca la ruta', async () => {
     mockedRemoveMember.mockResolvedValue({
       ok: false,
-      message: 'No puedes eliminar al último administrador',
+      message: 'No puedes desactivar al último administrador',
     });
     const user = userEvent.setup();
     renderManager();
 
     await user.click(rowActions());
     await user.click(
-      await screen.findByRole('menuitem', { name: /eliminar/i }),
+      await screen.findByRole('menuitem', { name: /desactivar/i }),
     );
     await user.click(
-      await screen.findByRole('button', { name: /^eliminar$/i }),
+      await screen.findByRole('button', { name: /^desactivar$/i }),
     );
 
     await waitFor(() => expect(mockedRemoveMember).toHaveBeenCalled());

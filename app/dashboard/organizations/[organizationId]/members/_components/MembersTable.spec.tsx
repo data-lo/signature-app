@@ -168,7 +168,7 @@ describe('MembersTable', () => {
     expect(onConfigurePermissions).toHaveBeenCalledWith(MEMBERS[0]);
   });
 
-  it('al elegir "Eliminar" llama a onRemove con el miembro de esa fila', async () => {
+  it('al elegir "Desactivar" llama a onRemove con el miembro de esa fila', async () => {
     const user = userEvent.setup();
     const onRemove = jest.fn();
     render(<MembersTable members={MEMBERS} canManage onRemove={onRemove} />);
@@ -177,14 +177,14 @@ describe('MembersTable', () => {
       screen.getByRole('button', { name: 'Acciones de admin@empresa.com' }),
     );
     await user.click(
-      await screen.findByRole('menuitem', { name: /eliminar/i }),
+      await screen.findByRole('menuitem', { name: /desactivar/i }),
     );
 
     expect(onRemove).toHaveBeenCalledWith(MEMBERS[0]);
   });
 
-  /** Dar de baja a quien ya está dado de baja no tiene efecto; la opción se deshabilita. */
-  it('deshabilita "Eliminar" en una membresía ya dada de baja', async () => {
+  /** Desactivar a quien ya está dado de baja no tiene efecto; la opción se deshabilita. */
+  it('deshabilita "Desactivar" en una membresía ya dada de baja', async () => {
     const user = userEvent.setup();
     render(<MembersTable members={MEMBERS} canManage onRemove={jest.fn()} />);
 
@@ -193,7 +193,7 @@ describe('MembersTable', () => {
     );
 
     expect(
-      await screen.findByRole('menuitem', { name: /eliminar/i }),
+      await screen.findByRole('menuitem', { name: /desactivar/i }),
     ).toHaveAttribute('data-disabled');
   });
 });
