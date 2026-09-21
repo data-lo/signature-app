@@ -9,7 +9,7 @@ import type { DocumentSignatureType } from '../_schemas';
  * el tipo ya elegido (ver `_section-progress.ts`).
  */
 export const SIGNATURE_TYPE_LABELS: Record<DocumentSignatureType, string> = {
-  SIMPLE: 'Firma Simple',
+  SIMPLE: 'Firma Grafo',
   ADVANCED: 'Firma Electrónica Avanzada (e.firma)',
 };
 
