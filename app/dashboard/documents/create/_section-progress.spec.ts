@@ -94,6 +94,37 @@ describe('buildCreateDocumentProgress', () => {
         'Firma Electrónica Avanzada (e.firma)',
       );
     });
+
+    /**
+     * Historia "Selección de aprobador al requerir aprobación en nuevo documento": marcar la
+     * aprobación sin elegir aprobador deja la sección a medias, así que el botón "Firmar" no se
+     * habilita — el usuario lo ve en la palomita de la sección y no al pulsar el botón.
+     */
+    it('con aprobación activa y sin aprobador, no está completa', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({ requiresApproval: true, reviewerUserId: null }),
+      );
+
+      expect(progress.configuration.isComplete).toBe(false);
+      expect(progress.isReadyToSubmit).toBe(false);
+    });
+
+    it('con aprobación activa y aprobador elegido, está completa', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({ requiresApproval: true, reviewerUserId: 'user-1' }),
+      );
+
+      expect(progress.configuration.isComplete).toBe(true);
+      expect(progress.isReadyToSubmit).toBe(true);
+    });
+
+    it('sin aprobación, el aprobador no se exige', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({ requiresApproval: false, reviewerUserId: null }),
+      );
+
+      expect(progress.configuration.isComplete).toBe(true);
+    });
   });
 
   describe('añadir participantes', () => {

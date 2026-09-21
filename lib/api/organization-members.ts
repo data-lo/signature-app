@@ -34,12 +34,14 @@ export interface AddOrganizationMemberValues {
 
 /**
  * Miembros de una organización, tal como los publica
- * `GET /api/v1/organizations/:organizationId/members`, pedidos desde el navegador.
+ * `GET /api/v1/organizations/:organizationId/members`.
  *
- * Convive con `getOrganizationMembersAction` sin sustituirlo: aquél sirve la carga inicial de la
- * sección de miembros, que se renderiza en el servidor; éste existe para la consulta perezosa que
- * dispara marcar "Requiere aprobación" al crear un documento, que se resuelve con TanStack Query
- * (ver `useDocumentApprovers`).
+ * Es la MISMA consulta que hace `getOrganizationMembersAction` desde el servidor, pero llamada
+ * desde el navegador. No la sustituye ni la duplica por descuido: aquella sirve la carga inicial
+ * de la sección de miembros, que se renderiza en el servidor; ésta existe para las consultas
+ * perezosas que dispara una interacción del usuario y que la historia pide resolver con TanStack
+ * Query (ver `useDocumentApprovers`), donde pasar por un Server Action significaría un POST RPC
+ * sin caché ni reintentos, justo lo que React Query aporta.
  *
  * @param organizationId - Organización cuyos miembros se listan.
  * @returns Los miembros activos con su rol, su estado y los permisos que heredan de ese rol.
@@ -50,6 +52,7 @@ export interface AddOrganizationMemberValues {
  * @example
  * ```ts
  * const members = await getOrganizationMembersRequest('org-1');
+ * members.filter((member) => member.permissions.some((p) => p.key === 'DOCUMENT.APPROVE'));
  * ```
  */
 export async function getOrganizationMembersRequest(
@@ -66,7 +69,7 @@ export async function getOrganizationMembersRequest(
 
 /*
   Las demás funciones que pedían y modificaban miembros desde el navegador
-  `addOrganizationMember`, `updateMemberRole`, `removeMember`) se fueron con la migración de la
+  (`addOrganizationMember`, `updateMemberRole`, `removeMember`) se fueron con la migración de la
   pantalla a renderizado en el servidor: ahora esas llamadas salen del servidor de Next, con la
   cookie de sesión, desde `app/server-actions/organizations/`. Los tipos se quedan porque los usan
   tanto los Server Actions como los componentes cliente que reciben los datos ya resueltos.

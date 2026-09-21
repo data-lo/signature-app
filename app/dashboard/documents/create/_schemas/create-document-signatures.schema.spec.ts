@@ -25,7 +25,7 @@ function viewer(): ViewerFormValues {
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
-    rfc: 'AURU800101ABC',
+    taxId: 'AURU800101ABC',
   };
 }
 
@@ -54,7 +54,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('historia "Selección de tipo de firma": acepta firma avanzada sin pedirle rfc al firmante', () => {
+  it('historia "Selección de tipo de firma": acepta firma avanzada sin pedirle taxId al firmante', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([signer()], false, 'ADVANCED'),
     );
@@ -72,9 +72,9 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
-  it('acepta un espectador sin rfc', () => {
+  it('acepta un espectador sin taxId', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer(), { ...viewer(), rfc: '' }]),
+      formValues([signer(), { ...viewer(), taxId: '' }]),
     );
 
     expect(result.success).toBe(true);
@@ -126,42 +126,42 @@ describe('createDocumentSignaturesSchema', () => {
 
     expect(result.success).toBe(true);
   });
-});
 
-describe('aprobador', () => {
   /**
-   * Historia "Implementar flujo de aprobación previo al proceso de firma": la aprobación no viaja
-   * sola. La regla vive en el esquema y no en el selector porque el selector puede no estar en
-   * pantalla y el envío tiene que rechazarse igual.
+   * Historia "Selección de aprobador al requerir aprobación en nuevo documento": la aprobación no
+   * viaja sola, y la regla vive en el esquema (no en el selector) porque el selector puede no
+   * estar en pantalla y el envío tiene que rechazarse igual.
    */
-  it('con aprobación activa y sin aprobador, el error apunta al selector', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      ...formValues([signer()]),
-      requiresApproval: true,
+  describe('aprobador', () => {
+    it('con aprobación activa y sin aprobador, el error apunta al selector', () => {
+      const result = createDocumentSignaturesSchema.safeParse({
+        ...formValues([signer()]),
+        requiresApproval: true,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0].path).toEqual(['reviewerUserId']);
+      expect(result.error?.issues[0].message).toBe(REVIEWER_REQUIRED_MESSAGE);
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].path).toEqual(['reviewerUserId']);
-    expect(result.error?.issues[0].message).toBe(REVIEWER_REQUIRED_MESSAGE);
-  });
+    it('con aprobación activa y un aprobador elegido, acepta', () => {
+      const result = createDocumentSignaturesSchema.safeParse({
+        ...formValues([signer()]),
+        requiresApproval: true,
+        reviewerUserId: 'user-1',
+      });
 
-  it('con aprobación activa y un aprobador elegido, acepta', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      ...formValues([signer()]),
-      requiresApproval: true,
-      reviewerUserId: 'user-aprobador',
+      expect(result.success).toBe(true);
     });
 
-    expect(result.success).toBe(true);
-  });
+    it('sin aprobación, no se exige aprobador', () => {
+      const result = createDocumentSignaturesSchema.safeParse({
+        ...formValues([signer()]),
+        requiresApproval: false,
+      });
 
-  it('sin aprobación, no se exige aprobador', () => {
-    const result = createDocumentSignaturesSchema.safeParse({
-      ...formValues([signer()]),
-      requiresApproval: false,
+      expect(result.success).toBe(true);
     });
-
-    expect(result.success).toBe(true);
   });
 });
 

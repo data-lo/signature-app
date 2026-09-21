@@ -25,7 +25,7 @@ function sync(
 }
 
 describe('buildSelfSigner', () => {
-  it('autocompleta al usuario en sesión como firmante, sin firmas colocadas ni rfc', () => {
+  it('autocompleta al usuario en sesión como firmante, sin firmas colocadas ni identificador fiscal', () => {
     expect(buildSelfSigner(CURRENT_USER)).toEqual({
       collaboratorType: 'SIGNER',
       firstName: 'Creador',

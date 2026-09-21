@@ -44,13 +44,20 @@ export enum ParticipantStatus {
 
 /**
  * Espejo de COLABORATOR_TYPE_ENUM (signature-server/src/document/enum/colaborator-type.enum.ts)
- * más `Creator`, sintetizado solo en el frontend para el creador del documento (ver
- * `myRole` en DocumentService.findDetailForUser — el creador no es un CollaboratorEntity).
+ * más `Creator`, que no es un valor de ese enum: lo sintetiza el backend en el campo `myRole`
+ * cuando quien mira el documento es su creador y no figura como colaborador (ver
+ * `GetDocumentUseCase` — el creador no es un CollaboratorEntity).
+ *
+ * Los tres primeros van en MAYÚSCULAS desde la historia "Estandarizar enums signature_type y
+ * collaborator_type", igual que los persiste y los publica el backend. `Creator` se queda en
+ * minúsculas porque su valor lo decide ese `??` del backend y esa historia no lo alcanza:
+ * cambiarlo aquí y no allá haría que el creador dejara de reconocerse, que es justo el error que
+ * este espejo existe para evitar.
  */
 export enum ParticipantRole {
-  Signer = 'signer',
-  Reviewer = 'reviewer',
-  Watcher = 'watcher',
+  Signer = 'SIGNER',
+  Reviewer = 'REVIEWER',
+  Watcher = 'WATCHER',
   Creator = 'creator',
 }
 
@@ -82,8 +89,16 @@ export enum DocumentParticipation {
   Participant = 'participant',
 }
 
-/** Espejo de SIGNATURE_TYPE_ENUM (signature-server/src/document/enum/signature-type.enum.ts). */
+/**
+ * Espejo de SIGNATURE_TYPE_ENUM (signature-server/src/document/enum/signature-type.enum.ts), en
+ * MAYÚSCULAS desde la historia "Estandarizar enums signature_type y collaborator_type".
+ *
+ * Es el tipo de firma que la API **devuelve** al consultar un documento. No es el mismo
+ * vocabulario que el `DocumentSignatureType` del formulario de creación (`SIMPLE`/`ADVANCED`):
+ * ahí `ADVANCED` es lo que aquí se llama `FIEL`, y la traducción entre ambos vive en
+ * `toRequiresDifferentSignatures`.
+ */
 export enum SignatureType {
-  Simple = 'simple',
-  Fiel = 'fiel',
+  Simple = 'SIMPLE',
+  Fiel = 'FIEL',
 }

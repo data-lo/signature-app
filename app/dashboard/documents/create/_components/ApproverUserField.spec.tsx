@@ -97,6 +97,7 @@ describe('ApproverUserField', () => {
     );
     expect(mockedGetOrganizationMembers).not.toHaveBeenCalled();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByText(NO_APPROVERS_MESSAGE)).not.toBeInTheDocument();
   });
 
   it('con la opción activa consulta a los miembros de la organización activa', async () => {
@@ -143,6 +144,7 @@ describe('ApproverUserField', () => {
       member({
         accountId: 'account-2',
         userId: 'user-2',
+        email: 'beto@empresa.com',
         status: 'removed',
         isActive: false,
       }),

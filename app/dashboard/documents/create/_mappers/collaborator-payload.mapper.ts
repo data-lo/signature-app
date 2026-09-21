@@ -31,8 +31,9 @@ export function toRequiresDifferentSignatures(
  * manda requiresTwoFactorAuth=true "oculto". En firma avanzada, la configuración única del
  * documento se aplica a todos los firmantes.
  *
- * Un firmante nunca lleva `rfc`: el flujo avanzado lo obtiene del certificado de e.firma al firmar
- * (ver historia "Selección de tipo de firma al crear documentos"), y el simple nunca lo pidió.
+ * Un firmante nunca lleva `taxId`: el flujo avanzado obtiene ese dato del certificado de e.firma
+ * al firmar (ver historia "Selección de tipo de firma al crear documentos"), y el simple nunca lo
+ * pidió.
  */
 export function toCollaboratorPayload(
   collaborator: CollaboratorFormValues,
@@ -46,7 +47,7 @@ export function toCollaboratorPayload(
       firstName: collaborator.firstName,
       lastName: collaborator.lastName,
       email: collaborator.email,
-      rfc: collaborator.rfc,
+      taxId: collaborator.taxId,
       orderIndex,
     };
   }

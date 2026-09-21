@@ -22,6 +22,11 @@ const HELP_TEXT =
  * miembros ni permisos, así que la opción no debe ni mostrarse ahí. No solo se oculta: si el
  * usuario ya la había activado y cambia a su cuenta personal sin recargar (AccountSwitcher no
  * desmonta este formulario), se fuerza el valor a false para que el submit nunca la arrastre.
+ *
+ * Desde la historia "Selección de aprobador al requerir aprobación en nuevo documento" la opción
+ * ya no viaja sola: marcarla obliga a elegir a QUIÉN se le pide la aprobación, y ese selector
+ * (`ApproverUserField`) se monta aquí porque su existencia depende por completo de este
+ * checkbox.
  */
 export default function RequiresApprovalField({
   control,
