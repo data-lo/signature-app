@@ -3,11 +3,11 @@ import { FileSignature } from 'lucide-react';
 import JoinView from './_components/JoinView';
 
 interface JoinPageProps {
-  searchParams: Promise<{ token?: string; orgId?: string }>;
+  searchParams: Promise<{ token?: string }>;
 }
 
 export default async function JoinPage({ searchParams }: JoinPageProps) {
-  const { token, orgId } = await searchParams;
+  const { token } = await searchParams;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
@@ -18,7 +18,7 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
             Signature
           </span>
         </Link>
-        <JoinView token={token ?? null} orgId={orgId ?? null} />
+        <JoinView token={token ?? null} />
       </div>
     </div>
   );
