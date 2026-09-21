@@ -33,7 +33,13 @@ export interface AccountListEntry {
   id: string;
   accountType: AccountKind;
   organizationId: string | null;
+  /** Razón social de la organización. `null` en una cuenta personal. */
   organizationName: string | null;
+  /**
+   * Nombre de visualización de la organización: el corto, el que rotula el selector de cuentas.
+   * `null` en una cuenta personal, y cae a la razón social si el backend no lo trae.
+   */
+  organizationDisplayName: string | null;
   roleId: string | null;
   status: AccountStatus;
 }
