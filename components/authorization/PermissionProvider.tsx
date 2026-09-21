@@ -28,6 +28,11 @@ export interface PermissionContextValue {
   canAll: (permissions: readonly PermissionKey[]) => boolean;
   /** Vacía los permisos ANTES de cambiar de cuenta. Ver `useSwitchActiveAccount`. */
   clearAuthorization: () => void;
+  /**
+   * Adopta un contexto que el SERVIDOR ya resolvió, sin esperar a que el layout se vuelva a
+   * renderizar. Ver `useSwitchActiveAccount`.
+   */
+  applyAuthorization: (context: AuthorizationContext) => void;
 }
 
 export const PermissionContext = createContext<PermissionContextValue | null>(
@@ -55,14 +60,16 @@ interface PermissionProviderProps {
  * El contexto se re-sincroniza cuando cambia `initialContext`, es decir cuando el servidor vuelve
  * a renderizar el layout tras un `router.refresh()`. Ese efecto es lo que cierra el cambio de
  * cuenta: el cliente vacía los permisos, el servidor manda los nuevos, y aquí se adoptan.
+ *
+ * `applyAuthorization` es el atajo para cuando el contexto nuevo ya está en la mano antes de ese
+ * render —lo devuelve la propia Server Action de cambio de cuenta— y hay que actuar sin esperarlo.
  */
 export function PermissionProvider({
   initialContext,
   children,
 }: PermissionProviderProps) {
-  const [authorization, setAuthorization] = useState<AuthorizationContext | null>(
-    initialContext,
-  );
+  const [authorization, setAuthorization] =
+    useState<AuthorizationContext | null>(initialContext);
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
 
   useEffect(() => {
@@ -73,6 +80,24 @@ export function PermissionProvider({
   const clearAuthorization = useCallback(() => {
     setAuthorization(null);
     setIsSwitchingAccount(true);
+  }, []);
+
+  /**
+   * Cierra el cambio de cuenta con el contexto que devolvió el servidor, sin esperar al render
+   * del layout.
+   *
+   * Existe porque hay un flujo que no puede esperarlo: al crear una organización hay que navegar
+   * a Planes en cuanto la cuenta activa es suya, y si los permisos llegaran con el render
+   * siguiente, Planes se pintaría con el hueco de "cambiando de cuenta" —`can()` respondiendo
+   * `false` a todo— justo cuando necesita `BILLING.READ` para dibujarse.
+   *
+   * **Sólo se le pasa un contexto que venga del servidor.** No es un atajo para fabricar
+   * permisos en el cliente: lo que entra aquí es lo que respondió `authorization/context`, y el
+   * render siguiente del layout lo confirma o lo corrige.
+   */
+  const applyAuthorization = useCallback((context: AuthorizationContext) => {
+    setAuthorization(context);
+    setIsSwitchingAccount(false);
   }, []);
 
   const permissions = useMemo(
@@ -110,8 +135,17 @@ export function PermissionProvider({
       canAny,
       canAll,
       clearAuthorization,
+      applyAuthorization,
     }),
-    [authorization, isSwitchingAccount, can, canAny, canAll, clearAuthorization],
+    [
+      authorization,
+      isSwitchingAccount,
+      can,
+      canAny,
+      canAll,
+      clearAuthorization,
+      applyAuthorization,
+    ],
   );
 
   return (

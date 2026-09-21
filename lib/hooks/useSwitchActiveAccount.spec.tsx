@@ -7,6 +7,7 @@ import { PermissionProvider } from '@/components/authorization/PermissionProvide
 import type { AuthorizationContext } from '@/lib/authorization/authorization.types';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useSwitchActiveAccount } from '@/lib/hooks/useSwitchActiveAccount';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 
 const refresh = jest.fn();
 
@@ -23,6 +24,7 @@ const CURRENT_CONTEXT: AuthorizationContext = {
   accountType: 'ORGANIZATION',
   organizationId: 'org-1',
   roleId: 'role-admin',
+  roleName: 'ADMIN',
   permissions: ['BILLING.READ', 'BILLING.MANAGE', 'MEMBER.READ'],
 };
 
@@ -32,6 +34,19 @@ const TARGET_ACCOUNT = {
   organizationId: null,
   roleId: 'role-owner',
 };
+
+/** Lo que el servidor resuelve para la cuenta destino y devuelve la Server Action. */
+const TARGET_CONTEXT: AuthorizationContext = {
+  accountId: 'account-personal',
+  accountType: 'PERSONAL',
+  organizationId: null,
+  roleId: 'role-owner',
+  roleName: 'OWNER',
+  permissions: ['DOCUMENT.CREATE', 'DOCUMENT.READ_OWN'],
+};
+
+/** Lo último que devolvió `switchActiveAccount`, para poder afirmar qué recibe quien la llama. */
+let lastResult: unknown;
 
 /**
  * Enseña los permisos vigentes y ofrece el botón de cambio. Es lo mínimo para poder afirmar QUÉ
@@ -47,7 +62,11 @@ function Harness() {
         {(authorization?.permissions ?? []).join(',') || 'ninguno'}
       </p>
       <p data-testid="cambiando">{isSwitching ? 'sí' : 'no'}</p>
-      <button onClick={() => void switchActiveAccount(TARGET_ACCOUNT)}>
+      <button
+        onClick={async () => {
+          lastResult = await switchActiveAccount(TARGET_ACCOUNT);
+        }}
+      >
         Cambiar de cuenta
       </button>
     </div>
@@ -82,7 +101,9 @@ function renderHarness() {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockedSwitchAction.mockResolvedValue({ ok: true });
+  lastResult = undefined;
+  useAuthStore.setState({ activeAccount: null });
+  mockedSwitchAction.mockResolvedValue({ ok: true, context: TARGET_CONTEXT });
 });
 
 describe('useSwitchActiveAccount', () => {
@@ -100,6 +121,18 @@ describe('useSwitchActiveAccount', () => {
    * cuenta anterior permitía.
    */
   it('vacía los permisos antes de pedir los nuevos', async () => {
+    /**
+     * La Server Action se deja a medias a propósito: lo que se comprueba es qué se ve MIENTRAS
+     * dura el viaje al servidor. Con una acción que resuelve al instante, los permisos nuevos ya
+     * estarían puestos al mirar y la prueba pasaría sin comprobar nada.
+     */
+    let resolveAction: (result: unknown) => void = () => {};
+    mockedSwitchAction.mockReturnValue(
+      new Promise((resolve) => {
+        resolveAction = resolve;
+      }),
+    );
+
     renderHarness();
 
     expect(screen.getByTestId('permisos')).toHaveTextContent('BILLING.READ');
@@ -107,6 +140,14 @@ describe('useSwitchActiveAccount', () => {
     await userEvent.click(screen.getByRole('button'));
 
     expect(screen.getByTestId('permisos')).toHaveTextContent('ninguno');
+
+    await act(async () => {
+      resolveAction({ ok: true, context: TARGET_CONTEXT });
+    });
+
+    expect(screen.getByTestId('permisos')).toHaveTextContent(
+      'DOCUMENT.CREATE,DOCUMENT.READ_OWN',
+    );
   });
 
   it('tira el caché de la cuenta anterior y el de la nueva, y respeta el de las demás', async () => {
@@ -136,6 +177,76 @@ describe('useSwitchActiveAccount', () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
+  /**
+   * El hueco por el que se colaba el error de la historia: entre escribir la cookie y el render
+   * siguiente del layout, el cliente se quedaba sin permisos. Adoptar el contexto que devuelve la
+   * Server Action lo cierra, y es lo que permite navegar a otra pantalla justo después.
+   */
+  it('adopta los permisos que devolvió el servidor sin esperar al render del layout', async () => {
+    renderHarness();
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button'));
+    });
+
+    expect(screen.getByTestId('permisos')).toHaveTextContent(
+      'DOCUMENT.CREATE,DOCUMENT.READ_OWN',
+    );
+  });
+
+  /**
+   * La cuenta activa del store sale del CONTEXTO del servidor y no de lo que se le pasó a la
+   * función: es la que el interceptor manda como `X-Account-Id`, así que tiene que decir lo mismo
+   * que la cookie.
+   */
+  it('pone como cuenta activa la que resolvió el servidor', async () => {
+    renderHarness();
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button'));
+    });
+
+    expect(useAuthStore.getState().activeAccount).toEqual({
+      id: 'account-personal',
+      accountType: 'PERSONAL',
+      organizationId: null,
+      roleId: 'role-owner',
+    });
+  });
+
+  it('devuelve el resultado a quien la llamó, con el contexto de la cuenta nueva', async () => {
+    renderHarness();
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button'));
+    });
+
+    expect(lastResult).toEqual({ ok: true, context: TARGET_CONTEXT });
+  });
+
+  /**
+   * Cuando el cambio falla, la cuenta activa del cliente NO se mueve: es lo que impide que
+   * frontend y servidor queden apuntando a cuentas distintas.
+   */
+  it('no toca la cuenta activa ni los permisos cuando el cambio falla', async () => {
+    mockedSwitchAction.mockResolvedValue({
+      ok: false,
+      message: 'No se pudo cambiar de cuenta. Intenta de nuevo.',
+    });
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    renderHarness();
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button'));
+    });
+
+    expect(useAuthStore.getState().activeAccount).toBeNull();
+    expect(lastResult).toEqual({
+      ok: false,
+      message: 'No se pudo cambiar de cuenta. Intenta de nuevo.',
+    });
+  });
+
   /** Cambiar a la cuenta en la que ya se está no hace nada: ni descarta permisos ni recarga. */
   it('ignora el cambio a la cuenta que ya está activa', async () => {
     render(
@@ -152,6 +263,28 @@ describe('useSwitchActiveAccount', () => {
 
     expect(mockedSwitchAction).not.toHaveBeenCalled();
     expect(screen.getByTestId('permisos')).toHaveTextContent('BILLING.READ');
+  });
+
+  /**
+   * Aun sin hacer nada tiene que responder como un cambio logrado: para quien llama la cuenta
+   * activa ya es la que pedía, y un fallo le haría tratar como error una situación correcta.
+   */
+  it('responde ok con el contexto vigente cuando ya se estaba en esa cuenta', async () => {
+    const context = { ...CURRENT_CONTEXT, accountId: 'account-personal' };
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PermissionProvider initialContext={context}>
+          <Harness />
+        </PermissionProvider>
+      </QueryClientProvider>,
+    );
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button'));
+    });
+
+    expect(lastResult).toEqual({ ok: true, context });
   });
 
   /**

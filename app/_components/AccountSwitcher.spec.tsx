@@ -87,6 +87,7 @@ function renderSwitcher(activeAccountId = PERSONAL.id) {
           accountType: 'PERSONAL',
           organizationId: null,
           roleId: 'role-owner',
+          roleName: 'OWNER',
           permissions: [],
         }}
       >
@@ -115,7 +116,17 @@ describe('AccountSwitcher', () => {
     mockPush.mockReset();
     mockRefresh.mockReset();
     mockedSwitchAction.mockReset();
-    mockedSwitchAction.mockResolvedValue({ ok: true });
+    mockedSwitchAction.mockResolvedValue({
+      ok: true,
+      context: {
+        accountId: ORG.id,
+        accountType: 'ORGANIZATION',
+        organizationId: 'org-1',
+        roleId: 'role-owner',
+        roleName: 'OWNER',
+        permissions: [],
+      },
+    });
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });

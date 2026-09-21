@@ -36,16 +36,44 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+/** Lo que responde `authorization/context` para una cuenta que sí es del usuario. */
+const CONTEXT = {
+  accountId: 'account-2',
+  accountType: 'ORGANIZATION',
+  organizationId: 'org-2',
+  roleId: 'role-owner',
+  roleName: 'OWNER',
+  permissions: ['BILLING.READ', 'BILLING.MANAGE'],
+};
+
 describe('switchActiveAccountAction', () => {
   it('escribe la cookie y revalida el layout cuando la cuenta es del usuario', async () => {
-    mockedBackendRequest.mockResolvedValue({ accountId: 'account-2' });
+    mockedBackendRequest.mockResolvedValue(CONTEXT);
 
     await expect(switchActiveAccountAction('account-2')).resolves.toEqual({
       ok: true,
+      context: CONTEXT,
     });
 
     expect(mockedSetCookie).toHaveBeenCalledWith('account-2');
     expect(mockedRevalidate).toHaveBeenCalledWith('/dashboard', 'layout');
+  });
+
+  /**
+   * El contexto vuelve tal cual lo resolvió el backend. Quien llama decide con él —al crear una
+   * organización se comprueba que quedó como propietario antes de mandarlo a Planes—, así que
+   * recortarlo aquí le quitaría justo lo que necesita mirar.
+   */
+  it('devuelve el contexto que resolvió el backend, sin recortarlo', async () => {
+    mockedBackendRequest.mockResolvedValue(CONTEXT);
+
+    const result = await switchActiveAccountAction('account-2');
+
+    expect(result.ok && result.context.roleName).toBe('OWNER');
+    expect(result.ok && result.context.permissions).toEqual([
+      'BILLING.READ',
+      'BILLING.MANAGE',
+    ]);
   });
 
   /**
@@ -54,7 +82,7 @@ describe('switchActiveAccountAction', () => {
    * esa cuenta recibe el 403 del backend y la cookie se queda como estaba.
    */
   it('comprueba la pertenencia ANTES de escribir la cookie', async () => {
-    mockedBackendRequest.mockResolvedValue({ accountId: 'account-2' });
+    mockedBackendRequest.mockResolvedValue(CONTEXT);
 
     await switchActiveAccountAction('account-2');
 
