@@ -40,6 +40,7 @@ function wrapper({ children }: { children: ReactNode }) {
           accountType: 'PERSONAL',
           organizationId: null,
           roleId: 'role-1',
+          roleName: 'OWNER',
           permissions: ['BILLING.READ', 'BILLING.MANAGE'],
         }}
       >
@@ -59,6 +60,7 @@ function readOnlyWrapper({ children }: { children: ReactNode }) {
           accountType: 'PERSONAL',
           organizationId: null,
           roleId: 'role-member',
+          roleName: 'MEMBER',
           permissions: ['BILLING.READ'],
         }}
       >

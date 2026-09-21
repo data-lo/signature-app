@@ -11,6 +11,7 @@ const ADMIN_CONTEXT: AuthorizationContext = {
   accountType: 'ORGANIZATION',
   organizationId: 'org-1',
   roleId: 'role-admin',
+  roleName: 'ADMIN',
   permissions: ['BILLING.READ', 'BILLING.MANAGE', 'MEMBER.READ'],
 };
 
@@ -19,12 +20,20 @@ const MEMBER_CONTEXT: AuthorizationContext = {
   accountType: 'PERSONAL',
   organizationId: null,
   roleId: 'role-member',
+  roleName: 'MEMBER',
   permissions: ['DOCUMENT.READ_OWN'],
 };
 
 function Probe() {
-  const { authorization, can, canAny, canAll, isSwitchingAccount, clearAuthorization } =
-    usePermissions();
+  const {
+    authorization,
+    can,
+    canAny,
+    canAll,
+    isSwitchingAccount,
+    clearAuthorization,
+    applyAuthorization,
+  } = usePermissions();
 
   return (
     <div>
@@ -38,6 +47,9 @@ function Probe() {
       </p>
       <p data-testid="cambiando">{String(isSwitchingAccount)}</p>
       <button onClick={clearAuthorization}>Vaciar</button>
+      <button onClick={() => applyAuthorization(MEMBER_CONTEXT)}>
+        Adoptar
+      </button>
     </div>
   );
 }
@@ -102,6 +114,28 @@ describe('PermissionProvider', () => {
     expect(screen.getByTestId('canAny')).toHaveTextContent('false');
     expect(screen.getByTestId('canAll')).toHaveTextContent('false');
     expect(screen.getByTestId('cambiando')).toHaveTextContent('true');
+  });
+
+  /**
+   * Cerrar el cambio de cuenta con el contexto que ya devolvió el servidor, sin esperar al render
+   * del layout. Es lo que permite que crear una organización navegue a Planes en cuanto la cuenta
+   * activa es suya, en vez de pintarla con el hueco de "cambiando de cuenta".
+   */
+  it('adopta un contexto ya resuelto y da el cambio por cerrado', async () => {
+    render(
+      <PermissionProvider initialContext={ADMIN_CONTEXT}>
+        <Probe />
+      </PermissionProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vaciar' }));
+    expect(screen.getByTestId('cambiando')).toHaveTextContent('true');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Adoptar' }));
+
+    expect(screen.getByTestId('cuenta')).toHaveTextContent('account-personal');
+    expect(screen.getByTestId('canAny')).toHaveTextContent('true');
+    expect(screen.getByTestId('cambiando')).toHaveTextContent('false');
   });
 });
 
