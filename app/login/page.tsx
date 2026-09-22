@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import LoginForm from './_components/LoginForm';
+import LoginForm from './_components/login-form';
+
 
 interface LoginPageProps {
   searchParams: Promise<{ registered?: string; reset?: string }>;
