@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { FileSignature } from 'lucide-react';
-import LoginForm from './_components/LoginForm';
+import LoginForm from './_components/login-form';
 
 interface LoginPageProps {
   searchParams: Promise<{ registered?: string; reset?: string }>;
