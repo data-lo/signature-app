@@ -113,6 +113,49 @@ describe('grupo de documentos', () => {
   });
 });
 
+describe('grupo de organización', () => {
+  /** Las entradas del grupo, en el orden en que se pintan. */
+  function organizationLabels(permissions?: readonly PermissionKey[]) {
+    return visibleNavGroups(NAV_GROUPS, {
+      accountType: 'ORGANIZATION',
+      lockedWithoutPlan: false,
+      permissions: permissions ?? ALL_PERMISSIONS,
+    })
+      .find((group) => group.key === 'organization')!
+      .items.map((item) => item.label);
+  }
+
+  /**
+   * "Información de la organización" va primero: es la ficha de la organización, y las otras dos
+   * son operaciones sobre ella.
+   */
+  it('abre con la información de la organización', () => {
+    expect(organizationLabels()).toEqual([
+      'Información de la organización',
+      'Administrar miembros',
+      'Roles y permisos',
+    ]);
+  });
+
+  /** Pide el mismo permiso que el endpoint que la surte, ni más ni menos. */
+  it('la información sólo aparece con ORGANIZATION.READ', () => {
+    expect(organizationLabels(['ORGANIZATION.READ'])).toEqual([
+      'Información de la organización',
+    ]);
+    expect(organizationLabels(['MEMBER.READ'])).not.toContain(
+      'Información de la organización',
+    );
+  });
+
+  it('marca la entrada como activa sólo en su propia ruta', () => {
+    const isActive = NAV_GROUPS.find((group) => group.key === 'organization')!
+      .items[0].isActive;
+
+    expect(isActive('/dashboard/organization/settings/information')).toBe(true);
+    expect(isActive('/dashboard/organization/settings/roles')).toBe(false);
+  });
+});
+
 describe('filtrado por permisos', () => {
   /**
    * El criterio de aceptación: sin `BILLING.READ`, Pagos no aparece en el menú. El grupo entero
