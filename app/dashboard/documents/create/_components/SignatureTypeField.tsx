@@ -73,7 +73,7 @@ export default function SignatureTypeField({
         <FormCheckbox
           control={control}
           name="requiresTwoFactorAuth"
-          label="Código de verificación (2FA)"
+          label="Código de seguridad"
         />
       )}
     </>

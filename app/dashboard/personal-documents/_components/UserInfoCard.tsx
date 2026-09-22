@@ -56,6 +56,9 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
           <dt className="text-muted-foreground">CURP</dt>
           <dd className="font-medium">{user.nationalId}</dd>
 
+          <dt className="text-muted-foreground">RFC</dt>
+          <dd className="font-medium">{user.rfc ?? '—'}</dd>
+
         </dl>
 
         <Form onSubmit={handleSubmit(onSubmit)} className="mt-4">

@@ -1,6 +1,6 @@
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen } from '@/test-utils';
-import LoginForm from './LoginForm';
+import LoginForm from './login-form';
 import { useLogin } from '../_hooks/useLogin';
 
 jest.mock('../_hooks/useLogin');
