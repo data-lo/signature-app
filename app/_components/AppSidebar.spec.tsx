@@ -61,15 +61,27 @@ describe('visibleNavGroups', () => {
   });
 
   /**
-   * Pagos y Organización. Lo operativo —documentos y firmas— sí queda fuera: la guarda lo
-   * mandaría de vuelta a Planes. La administración se queda porque quien crea la organización es
-   * su administrador desde el alta, y un menú con una sola opción en la organización que acaba de
-   * crear no le deja hacer nada de lo que su rol le permite.
+   * Sólo Pagos, que es donde contrata. Ni lo operativo —documentos y firmas— ni la
+   * administración de la organización: la guarda mandaría las dos de vuelta a Planes, y una
+   * entrada de menú que rebota es peor que no estar.
+   *
+   * Organización estuvo visible sin plan; esta prueba fija la regla nueva para que reponer
+   * `availableWithoutPlan` en ese grupo no pase inadvertido.
    */
-  it('a una organización sin plan le muestra Pagos y su administración', () => {
+  it('a una organización sin plan sólo le muestra Pagos', () => {
     expect(
       visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: true }),
-    ).toEqual(['payments', 'organization']);
+    ).toEqual(['payments']);
+  });
+
+  /** Al activar el plan la sección vuelve: es el mismo menú, sin el recorte. */
+  it('al contratar un plan, la organización recupera su sección', () => {
+    expect(
+      visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: true }),
+    ).not.toContain('organization');
+    expect(
+      visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: false }),
+    ).toContain('organization');
   });
 });
 

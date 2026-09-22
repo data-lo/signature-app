@@ -7,33 +7,23 @@ export const PLANS_ROUTE = '/dashboard/plans';
 /**
  * Pantallas que una organización sin plan SÍ puede abrir.
  *
- * **Planes y Suscripciones** son las que le permiten contratar y ver en qué quedó el pago. **Crear
- * organización** también, aunque no sea una pantalla de pagos: crear organizaciones está disponible
- * para cualquier usuario, y sin esta excepción quien está parado en una organización sin plan
- * pulsaría "Crear organización" en el selector de cuentas y rebotaría a Planes.
+ * **Planes y Suscripciones** son las que le permiten contratar y ver en qué quedó el pago: son la
+ * única sección disponible hasta que haya plan.
  *
- * **Permisos** entra por lo mismo que miembros (ver `ROUTE_PATTERNS_AVAILABLE_WITHOUT_PLAN`):
- * administrar la organización no es usarla.
+ * **Crear organización** también, aunque su ruta caiga bajo `/dashboard/organization`. No es la
+ * sección Organización —esa es administrar la organización ACTIVA: miembros y roles— sino el alta
+ * de una nueva, que se entra desde el selector de cuentas y no depende del plan de ninguna. Sin
+ * esta excepción, quien está parado en una organización sin plan pulsaría "Crear organización" y
+ * rebotaría a Planes, sin forma de salir de la cuenta en la que quedó atrapado.
+ *
+ * **La administración de la organización ya no entra.** Se permitía —miembros y permisos— con el
+ * argumento de que administrar no es usar, pero la regla de producto es que una organización sin
+ * plan no tenga más sección que Pagos: hasta contratar, no hay organización que administrar.
  */
 export const ROUTES_AVAILABLE_WITHOUT_PLAN = [
   PLANS_ROUTE,
   '/dashboard/subscriptions',
   '/dashboard/organization/create',
-  '/dashboard/organization/settings/permissions',
-] as const;
-
-/**
- * Lo mismo, para las rutas que llevan un identificador y no se pueden escribir como texto fijo.
- *
- * Por ahora sólo Administrar miembros, cuya ruta lleva el `organizationId`. Quien acaba de crear
- * una organización queda como su administrador en el mismo momento del alta, así que la pantalla
- * donde ejerce ese rol —invitar al equipo, repartir permisos— tiene que estar disponible desde el
- * primer segundo, antes de contratar nada. Lo que el plan habilita es OPERAR la organización
- * (documentos y firmas), no administrarla; el backend nunca puso el plan de por medio para
- * gestionar miembros ni permisos, sólo `assertHasOrganizationPermission`.
- */
-export const ROUTE_PATTERNS_AVAILABLE_WITHOUT_PLAN = [
-  /^\/dashboard\/organizations\/[^/]+\/members$/,
 ] as const;
 
 /**
@@ -43,24 +33,18 @@ export const ROUTE_PATTERNS_AVAILABLE_WITHOUT_PLAN = [
  * no cuente como `/dashboard/plans`.
  *
  * @param pathname - Ruta actual, tal como la devuelve `usePathname()`.
- * @returns `true` si es Planes, Suscripciones, Crear organización, la administración de la
- *   organización (miembros y permisos) o una subruta de ellas.
+ * @returns `true` si es Planes, Suscripciones, Crear organización o una subruta de ellas.
  *
  * @example
  * ```ts
  * isRouteAvailableWithoutPlan('/dashboard/plans'); // true
- * isRouteAvailableWithoutPlan('/dashboard/organizations/org-1/members'); // true
+ * isRouteAvailableWithoutPlan('/dashboard/organizations/org-1/members'); // false
  * isRouteAvailableWithoutPlan('/dashboard/documents/create'); // false
  * ```
  */
 export function isRouteAvailableWithoutPlan(pathname: string): boolean {
-  return (
-    ROUTES_AVAILABLE_WITHOUT_PLAN.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`),
-    ) ||
-    ROUTE_PATTERNS_AVAILABLE_WITHOUT_PLAN.some((pattern) =>
-      pattern.test(pathname),
-    )
+  return ROUTES_AVAILABLE_WITHOUT_PLAN.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 }
 
