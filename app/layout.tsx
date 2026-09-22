@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Visualizador de documentos',
-  description: 'Visualizador de documentos con validación de acceso',
-  icons: { icon: [] },
+  title: 'Firmalo',
+  description: 'Firmalo: Firma digital en México con Válidez Legal NOM-151',
+  icons: { icon: '/isotipo-firmalo.svg' },
 };
 
 export default function RootLayout({
