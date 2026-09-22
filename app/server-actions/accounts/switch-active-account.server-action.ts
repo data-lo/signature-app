@@ -12,9 +12,15 @@ import {
   BackendRequestError,
 } from '@/lib/server/backend-request';
 
+/**
+ * Resultado del cambio de cuenta.
+ *
+ * El contexto viaja de vuelta porque esta acción ya tuvo que pedirlo para comprobar la
+ * pertenencia: devolverlo evita que quien llama haga una segunda consulta para saber con qué rol
+ * y con qué permisos quedó la cuenta a la que acaba de cambiar. Quien no lo necesite lo ignora.
+ */
 export type SwitchAccountResult =
-  | { ok: true }
-  | { ok: false; message: string };
+  { ok: true; context: AuthorizationContext } | { ok: false; message: string };
 
 /**
  * Cambia la cuenta activa del usuario.
@@ -32,7 +38,8 @@ export type SwitchAccountResult =
  * nueva. Sin eso la cookie cambiaría y la pantalla seguiría enseñando lo de antes.
  *
  * @param accountId - Membresía que pasa a ser la activa.
- * @returns `{ ok: true }`, o el motivo por el que no se pudo cambiar.
+ * @returns El contexto de autorización de la cuenta nueva, o el motivo por el que no se pudo
+ *   cambiar.
  * @throws Nada: los fallos vuelven como resultado para poder mostrarlos.
  *
  * @example
@@ -44,12 +51,18 @@ export type SwitchAccountResult =
 export async function switchActiveAccountAction(
   accountId: string,
 ): Promise<SwitchAccountResult> {
+  let context: AuthorizationContext;
+
   try {
-    await backendRequest<AuthorizationContext>('authorization/context', {
-      activeAccountId: accountId,
-    });
+    context = await backendRequest<AuthorizationContext>(
+      'authorization/context',
+      { activeAccountId: accountId },
+    );
   } catch (error) {
-    console.error('[switch-active-account] no se pudo cambiar de cuenta:', error);
+    console.error(
+      '[switch-active-account] no se pudo cambiar de cuenta:',
+      error,
+    );
 
     if (error instanceof BackendRequestError && error.status === 403) {
       /**
@@ -75,5 +88,5 @@ export async function switchActiveAccountAction(
   await setActiveAccountCookie(accountId);
   revalidatePath('/dashboard', 'layout');
 
-  return { ok: true };
+  return { ok: true, context };
 }

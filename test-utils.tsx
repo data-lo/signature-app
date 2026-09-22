@@ -3,9 +3,10 @@ import { render, type RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { PermissionProvider } from '@/components/authorization/PermissionProvider';
-import type {
-  AuthorizationContext,
-  PermissionKey,
+import {
+  SYSTEM_ROLE_NAME,
+  type AuthorizationContext,
+  type PermissionKey,
 } from '@/lib/authorization/authorization.types';
 
 function createTestQueryClient() {
@@ -55,6 +56,7 @@ export function renderWithProviders(
     accountType: 'ORGANIZATION',
     organizationId: 'org-1',
     roleId: 'role-1',
+    roleName: SYSTEM_ROLE_NAME.OWNER,
     permissions: [...permissions],
     ...authorization,
   };

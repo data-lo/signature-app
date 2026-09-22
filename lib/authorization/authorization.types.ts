@@ -48,8 +48,24 @@ export interface AuthorizationContext {
   accountType: 'PERSONAL' | 'ORGANIZATION';
   organizationId: string | null;
   roleId: string | null;
+  /**
+   * Nombre del rol de la membresía (`OWNER`, `ADMIN`, `MEMBER` o uno propio de la organización);
+   * `null` mientras no se le haya asignado ninguno.
+   *
+   * Es `string` y no una unión cerrada de los tres roles de sistema a propósito: una organización
+   * puede definir roles propios, y tipar sólo los de sistema obligaría a tratar como imposible un
+   * valor que el backend manda a diario.
+   */
+  roleName: string | null;
   permissions: PermissionKey[];
 }
+
+/** Los tres roles que el backend siembra de fábrica. Ver `SYSTEM_ROLE_NAME_ENUM` en el servidor. */
+export const SYSTEM_ROLE_NAME = {
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  MEMBER: 'MEMBER',
+} as const;
 
 /**
  * Una entrada del menú y los permisos con los que se gana su sitio.
