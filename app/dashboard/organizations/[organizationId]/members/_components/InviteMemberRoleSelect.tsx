@@ -2,13 +2,14 @@
 
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { Control } from 'react-hook-form';
-import { AlertCircle } from 'lucide-react';
 
 import { FormSelect } from '@/components/form/form-select';
 import { FormSelectSkeleton } from '@/components/ui/form-select-skeleton';
 import type { OrganizationRole } from '@/lib/api/organization-roles';
 import { assignableMemberRoles } from '@/lib/assignable-member-roles';
 import { formatRoleName } from '@/lib/format-role-name';
+
+import MemberRolesLoadError from './MemberRolesLoadError';
 
 import type { InviteMemberFormValues } from '../_schemas';
 
@@ -18,9 +19,12 @@ interface InviteMemberRoleSelectProps {
   rolesQuery: UseQueryResult<OrganizationRole[]>;
 }
 
-/** Texto del error. Dice qué hacer, no qué falló por dentro. */
-export const ROLES_LOAD_ERROR_MESSAGE =
-  'No pudimos cargar los roles de la organización. Cierra la ventana y vuelve a abrirla para reintentar.';
+/*
+  El texto del error se re-exporta desde aquí porque es donde nació y desde donde ya lo importan
+  las pruebas; su definición se mudó a `MemberRolesLoadError`, que lo comparte con el modal de
+  editar rol.
+*/
+export { ROLES_LOAD_ERROR_MESSAGE } from './MemberRolesLoadError';
 
 /**
  * El selector de rol del modal "Invitar miembro", con sus tres estados: cargando, error y listo.
@@ -48,15 +52,7 @@ export default function InviteMemberRoleSelect({
   }
 
   if (rolesQuery.isError) {
-    return (
-      <div
-        role="alert"
-        className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-      >
-        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-        <span>{ROLES_LOAD_ERROR_MESSAGE}</span>
-      </div>
-    );
+    return <MemberRolesLoadError />;
   }
 
   return (
