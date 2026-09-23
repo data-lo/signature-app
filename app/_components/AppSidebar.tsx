@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  Building2,
   FileSignature,
   CreditCard,
   ReceiptText,
@@ -160,6 +161,15 @@ export const NAV_GROUPS: NavGroup[] = [
      * organización administra su equipo en cuanto la activa, no antes.
      */
     items: [
+      {
+        label: 'Información de la organización',
+        href: '/dashboard/organization/settings/information',
+        icon: Building2,
+        isActive: (pathname) =>
+          pathname === '/dashboard/organization/settings/information',
+        anyPermissions:
+          DASHBOARD_NAVIGATION.organizationInformation.anyPermissions,
+      },
       {
         label: 'Administrar miembros',
         // Respaldo inerte: este grupo es `orgOnly`, así que `buildHref` siempre tiene con qué
