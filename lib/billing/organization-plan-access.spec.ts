@@ -18,15 +18,16 @@ describe('isRouteAvailableWithoutPlan', () => {
   });
 
   /**
-   * Administrar la organización no es usarla: quien la crea queda como su administrador en el
-   * acto y tiene que poder invitar al equipo y repartir permisos antes de contratar nada. El
-   * backend tampoco condiciona esos endpoints al plan.
+   * La sección Organización queda fuera: una organización sin plan no tiene más sección que
+   * Pagos, ni en el menú ni escribiendo la URL. Estas rutas estuvieron permitidas —con el
+   * argumento de que administrar no es usar—; la prueba fija la regla nueva.
    */
   it.each([
     '/dashboard/organizations/org-1/members',
+    '/dashboard/organization/settings/roles',
     '/dashboard/organization/settings/permissions',
-  ])('deja administrar la organización en %s sin plan', (pathname) => {
-    expect(isRouteAvailableWithoutPlan(pathname)).toBe(true);
+  ])('bloquea la administración de la organización en %s', (pathname) => {
+    expect(isRouteAvailableWithoutPlan(pathname)).toBe(false);
   });
 
   it.each([
@@ -34,20 +35,26 @@ describe('isRouteAvailableWithoutPlan', () => {
     '/dashboard/documents',
     '/dashboard/documents/create',
     '/dashboard/documents/doc-1',
-    '/dashboard/organization/settings/members',
+    '/dashboard/organizations',
+    '/dashboard/organizations/org-1',
     '/dashboard/personal-documents',
     '/dashboard/personal-documents/identity',
   ])('bloquea la ruta operativa %s', (pathname) => {
     expect(isRouteAvailableWithoutPlan(pathname)).toBe(false);
   });
 
-  /** El patrón de miembros pide el id y el segmento final exactos, no cualquier subruta. */
-  it.each([
-    '/dashboard/organizations',
-    '/dashboard/organizations/org-1',
-    '/dashboard/organizations/org-1/members/member-1',
-  ])('no confunde %s con la pantalla de miembros', (pathname) => {
-    expect(isRouteAvailableWithoutPlan(pathname)).toBe(false);
+  /**
+   * `/dashboard/organization/create` sí pasa, y sus vecinas de `/dashboard/organization` no: la
+   * comparación es por segmentos, así que permitir el alta no abre la configuración entera.
+   */
+  it('permitir Crear organización no abre el resto de /dashboard/organization', () => {
+    expect(isRouteAvailableWithoutPlan('/dashboard/organization/create')).toBe(
+      true,
+    );
+    expect(isRouteAvailableWithoutPlan('/dashboard/organization')).toBe(false);
+    expect(
+      isRouteAvailableWithoutPlan('/dashboard/organization/settings'),
+    ).toBe(false);
   });
 
   /** Compara por segmentos: un prefijo parecido no es la misma ruta. */

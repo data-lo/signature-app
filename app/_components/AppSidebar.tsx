@@ -84,8 +84,8 @@ export interface NavGroup {
   /** Solo visible con una cuenta activa de tipo ORGANIZATION (mismo gate que InviteMemberModal). */
   orgOnly?: boolean;
   /**
-   * Visible también para una organización sin plan: las pantallas donde lo contrata (Pagos) y
-   * las de administración de la organización, que no dependen del plan.
+   * Visible también para una organización sin plan. Sólo lo lleva Pagos, que es donde se
+   * contrata: hasta que haya plan, no hay ninguna otra sección que ofrecer.
    */
   availableWithoutPlan?: boolean;
 }
@@ -154,13 +154,11 @@ export const NAV_GROUPS: NavGroup[] = [
     label: NAV_GROUP_LABELS.organization,
     orgOnly: true,
     /**
-     * Visible también sin plan: quien crea una organización queda como su administrador en el
-     * acto, y esconderle la administración hasta que pague lo dejaba con un menú de una sola
-     * opción —Planes— en la organización que acaba de crear. Lo que el plan habilita es operar
-     * (documentos y firmas); repartir accesos es administrarla, y el backend nunca lo condicionó
-     * al plan.
+     * Sin `availableWithoutPlan`: una organización sin plan no ve esta sección. Estuvo visible
+     * —administrar no es usar, y el backend nunca condicionó esos endpoints al plan—, pero la
+     * regla de producto es que hasta contratar no haya más sección que Pagos. Quien crea una
+     * organización administra su equipo en cuanto la activa, no antes.
      */
-    availableWithoutPlan: true,
     items: [
       {
         label: 'Administrar miembros',
@@ -196,10 +194,10 @@ export const NAV_GROUPS: NavGroup[] = [
  *
  * Después siguen los dos filtros que ya había, que no hablan de permisos sino de contexto: los
  * grupos de organización sólo aparecen con una organización activa, y si esa organización todavía
- * no tiene plan quedan sólo los marcados `availableWithoutPlan` —Pagos, donde lo contrata, y
- * Organización, que su administrador puede usar desde el alta—, porque las rutas operativas
- * mandarían de vuelta a Planes. Mientras se consulta el plan (`lockedWithoutPlan` en `false`) se
- * muestra todo, para que el menú no se reacomode con cada cambio de cuenta.
+ * no tiene plan queda sólo el marcado `availableWithoutPlan` —Pagos, donde lo contrata—, porque
+ * el resto de rutas mandaría de vuelta a Planes. Mientras se consulta el plan
+ * (`lockedWithoutPlan` en `false`) se muestra todo, para que el menú no se reacomode con cada
+ * cambio de cuenta.
  *
  * Una lista de permisos VACÍA esconde todo lo que exija alguno. Es el estado del cambio de cuenta
  * a medio hacer, y fallar cerrado es justo lo que evita enseñar por un instante el menú de la
