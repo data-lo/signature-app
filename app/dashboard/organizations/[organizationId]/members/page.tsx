@@ -3,7 +3,6 @@ import MembersSection from './_components/MembersSection';
 
 interface OrganizationMembersPageProps {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{ includeInactive?: string }>;
 }
 
 /**
@@ -22,31 +21,22 @@ interface OrganizationMembersPageProps {
  * impide que alguien sin nada que hacer aquí reciba la pantalla, pero quien manipule la URL para
  * pedir los miembros de otra organización se topa con el 403 del backend, que es el que decide.
  *
- * @param props - Parámetros de ruta y de consulta que entrega Next.
+ * @param props - Parámetros de ruta que entrega Next.
  * @returns La sección de miembros, renderizada en el servidor.
  * @throws Propaga lo que lance la sección; Next lo entrega a `error.tsx`.
  *
  * @example
  * ```tsx
- * // GET /dashboard/organizations/org-1/members?includeInactive=true
- * <OrganizationMembersPage params={params} searchParams={searchParams} />
+ * // GET /dashboard/organizations/org-1/members
+ * <OrganizationMembersPage params={params} />
  * ```
  */
 export default async function OrganizationMembersPage({
   params,
-  searchParams,
 }: OrganizationMembersPageProps) {
   await assertPagePermission('MEMBER.READ');
 
-  const [{ organizationId }, { includeInactive }] = await Promise.all([
-    params,
-    searchParams,
-  ]);
+  const { organizationId } = await params;
 
-  return (
-    <MembersSection
-      organizationId={organizationId}
-      includeInactive={includeInactive === 'true'}
-    />
-  );
+  return <MembersSection organizationId={organizationId} />;
 }

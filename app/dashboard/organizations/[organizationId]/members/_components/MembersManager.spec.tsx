@@ -14,10 +14,9 @@ import type { OrganizationPermission } from '@/lib/api/organization-permissions'
 import MembersManager from './MembersManager';
 
 const mockRefresh = jest.fn();
-const mockReplace = jest.fn();
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: mockRefresh, replace: mockReplace }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }));
 jest.mock('@/lib/hooks/useSystemRoles');
 // El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
@@ -85,7 +84,6 @@ const PERMISSIONS: OrganizationPermission[] = [
  * otro lado pasan sólo `MEMBER.READ`.
  */
 function renderManager(
-  includeInactive = false,
   memberPermissions: readonly PermissionKey[] = ['MEMBER.READ', 'MEMBER.INVITE'],
 ) {
   return renderWithProviders(
@@ -93,7 +91,6 @@ function renderManager(
       organizationId="org-1"
       members={MEMBERS}
       permissions={PERMISSIONS}
-      includeInactive={includeInactive}
     />,
     { permissions: memberPermissions },
   );
@@ -238,38 +235,18 @@ describe('MembersManager', () => {
   });
 
   /**
-   * El filtro vive en la URL y no en un estado de React: así lo resuelve el mismo render del
-   * servidor que trae la lista, en vez de que el navegador vuelva a pedir los miembros — que es
-   * justo lo que esta migración vino a quitar.
+   * La vista de miembros dados de baja se retiró de la interfaz. No basta con que el conmutador
+   * no se dibuje: no debe quedar ningún control ni texto que la ofrezca, porque el parámetro de
+   * URL que la sostenía ya no existe y el servidor tampoco devuelve esas membresías.
    */
-  it('el filtro de dados de baja navega, no dispara una consulta desde el cliente', async () => {
-    const user = userEvent.setup();
+  it('no ofrece ya mostrar a los miembros dados de baja', () => {
     renderManager();
 
-    await user.click(
-      screen.getByRole('switch', { name: /mostrar miembros dados de baja/i }),
-    );
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/dashboard/organizations/org-1/members?includeInactive=true',
-      );
-    });
-  });
-
-  it('al desmarcar el filtro quita el parámetro de la URL', async () => {
-    const user = userEvent.setup();
-    renderManager(true);
-
-    await user.click(
-      screen.getByRole('switch', { name: /mostrar miembros dados de baja/i }),
-    );
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/dashboard/organizations/org-1/members',
-      );
-    });
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: /dados de baja/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/dados de baja/i)).not.toBeInTheDocument();
   });
 
   /**
@@ -288,7 +265,7 @@ describe('MembersManager', () => {
   });
 
   it('a quien sólo puede leer no le ofrece ninguna acción', () => {
-    renderManager(false, ['MEMBER.READ']);
+    renderManager(['MEMBER.READ']);
 
     // La lista se sigue viendo: tiene permiso de lectura, que es como llegó hasta acá.
     expect(screen.getByText('miembro@empresa.com')).toBeInTheDocument();

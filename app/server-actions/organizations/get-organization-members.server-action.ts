@@ -4,7 +4,9 @@ import { backendRequest } from '@/lib/server/backend-request';
 import type { OrganizationMember } from '@/lib/api/organization-members';
 
 /**
- * Miembros de una organización, con su rol, su estado y los permisos que hereda de ese rol.
+ * Miembros ACTIVOS de una organización, con su rol, su estado y los permisos que hereda de ese
+ * rol. Quien fue dado de baja no vuelve: el backend ya no lo devuelve y la pantalla retiró el
+ * conmutador que los pedía.
  *
  * La organización va en la URL del backend y la sesión en la cookie: `GET
  * /organizations/:organizationId/members` valida con el `sub` del JWT que quien pregunta sea
@@ -14,7 +16,6 @@ import type { OrganizationMember } from '@/lib/api/organization-members';
  * que puede quedarse vieja.
  *
  * @param organizationId - Organización a consultar, tal como viene en la ruta de la sección.
- * @param includeInactive - `true` para incluir también las membresías dadas de baja.
  * @returns La lista de miembros, ya serializable para pasarla a componentes cliente.
  * @throws {BackendRequestError} Si no hay sesión (401), si el llamador no tiene acceso a esa
  * organización (403) o si el backend falla.
@@ -27,12 +28,8 @@ import type { OrganizationMember } from '@/lib/api/organization-members';
  */
 export async function getOrganizationMembersAction(
   organizationId: string,
-  includeInactive = false,
 ): Promise<OrganizationMember[]> {
   return backendRequest<OrganizationMember[]>(
     `organizations/${organizationId}/members`,
-    {
-      searchParams: includeInactive ? { includeInactive: 'true' } : undefined,
-    },
   );
 }

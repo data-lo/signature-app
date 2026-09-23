@@ -66,10 +66,10 @@ describe('MembersSection', () => {
     mockedGetMembers.mockResolvedValue([MEMBER]);
 
     render(
-      await MembersSection({ organizationId: 'org-1', includeInactive: false }),
+      await MembersSection({ organizationId: 'org-1' }),
     );
 
-    expect(mockedGetMembers).toHaveBeenCalledWith('org-1', false);
+    expect(mockedGetMembers).toHaveBeenCalledWith('org-1');
     expect(mockedGetPermissions).toHaveBeenCalledWith('org-1');
     expect(screen.getByTestId('members-manager')).toHaveTextContent(
       '1 miembros',
@@ -85,21 +85,11 @@ describe('MembersSection', () => {
     mockedGetMembers.mockResolvedValue([]);
 
     render(
-      await MembersSection({ organizationId: 'org-1', includeInactive: false }),
+      await MembersSection({ organizationId: 'org-1' }),
     );
 
     expect(screen.getByTestId('members-empty-state')).toBeInTheDocument();
     expect(screen.queryByTestId('members-manager')).not.toBeInTheDocument();
-  });
-
-  it('traslada el filtro de dados de baja a la consulta del servidor', async () => {
-    mockedGetMembers.mockResolvedValue([MEMBER]);
-
-    render(
-      await MembersSection({ organizationId: 'org-1', includeInactive: true }),
-    );
-
-    expect(mockedGetMembers).toHaveBeenCalledWith('org-1', true);
   });
 
   /**
@@ -110,7 +100,7 @@ describe('MembersSection', () => {
     mockedGetMembers.mockRejectedValue(new BackendRequestError(401, 'sin sesión'));
 
     await expect(
-      MembersSection({ organizationId: 'org-1', includeInactive: false }),
+      MembersSection({ organizationId: 'org-1' }),
     ).rejects.toThrow('NEXT_REDIRECT');
 
     expect(mockedRedirect).toHaveBeenCalledWith('/login');
@@ -126,7 +116,7 @@ describe('MembersSection', () => {
     );
 
     render(
-      await MembersSection({ organizationId: 'ajena', includeInactive: false }),
+      await MembersSection({ organizationId: 'ajena' }),
     );
 
     expect(
@@ -139,7 +129,7 @@ describe('MembersSection', () => {
     mockedGetMembers.mockRejectedValue(new BackendRequestError(500, 'interno'));
 
     await expect(
-      MembersSection({ organizationId: 'org-1', includeInactive: false }),
+      MembersSection({ organizationId: 'org-1' }),
     ).rejects.toMatchObject({ status: 500 });
 
     expect(console.error).toHaveBeenCalled();
