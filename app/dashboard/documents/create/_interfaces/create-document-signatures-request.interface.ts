@@ -68,12 +68,13 @@ export interface DocumentDataPayload {
   /** Tipo de firma exigido a TODOS los firmantes del documento — única fuente de verdad del flujo. */
   signatureType: DocumentSignatureType;
   /**
-   * Si el documento entra a Búsqueda Inteligente (ver `SmartSearchDialog`).
+   * Si el documento entra a Búsqueda Inteligente (ver `SmartSearchCard`).
    *
    * Se manda siempre, aunque el backend lo trate como opcional y asigne `true` cuando falta: acá
-   * SIEMPRE hay una decisión del usuario —el modal no deja pasar sin una— y omitirla haría que el
-   * valor enviado dependiera de cuál de las dos eligió, que es justo la ambigüedad que el default
-   * del backend existe para resolver en los clientes que no preguntan.
+   * SIEMPRE hay un valor —la casilla arranca marcada y el usuario puede dejarla como está— y
+   * omitirlo haría que el documento se indexara por el default del backend y no por lo que se vio
+   * en pantalla, que es justo la ambigüedad que ese default existe para resolver en los clientes
+   * que no ofrecen la opción.
    */
   isIndexable: boolean;
 }
@@ -103,9 +104,9 @@ export interface CreateDocumentSignaturesInput {
   requiresTwoFactorAuth: boolean;
   collaborators: CollaboratorFormValues[];
   /**
-   * No sale del formulario sino del modal que se muestra al enviar (ver `SmartSearchDialog`), y
-   * por eso entra por acá y no por `CreateDocumentSignaturesFormValues`: no es configuración que
-   * el usuario capture y revise en el resumen, es la última decisión antes de mandar.
+   * Sale del formulario como cualquier otro campo (ver `SmartSearchCard`), desde que la card con
+   * la casilla reemplazó al modal que se interponía al enviar. Se sigue listando aparte aquí
+   * porque esta entrada refleja el contrato de la mutación, no la forma del formulario.
    */
   isIndexable: boolean;
 }

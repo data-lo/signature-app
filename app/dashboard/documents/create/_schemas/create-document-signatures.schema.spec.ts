@@ -41,6 +41,7 @@ function formValues(
     reviewerUserId: null,
     requiresOrder: false,
     includeMeAsSigner,
+    isIndexable: true,
     collaborators,
   };
 }
