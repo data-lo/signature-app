@@ -4,13 +4,10 @@ import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { useMemberPermissions } from '../_hooks/useMemberPermissions';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
 import { removeOrganizationMemberAction } from '@/app/server-actions/organizations/remove-organization-member.server-action';
-import { updateOrganizationMemberPermissionsAction } from '@/app/server-actions/organizations/update-organization-member-permissions.server-action';
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import type { OrganizationMember } from '@/lib/api/organization-members';
-import type { OrganizationPermission } from '@/lib/api/organization-permissions';
 import MembersManager from './MembersManager';
 
 const mockRefresh = jest.fn();
@@ -22,7 +19,6 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/lib/hooks/useSystemRoles');
 // El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
 jest.mock('@/lib/hooks/useOrganizationRoles');
-jest.mock('../_hooks/useMemberPermissions');
 jest.mock(
   '@/app/server-actions/organizations/update-organization-member-role.server-action',
   () => ({ updateOrganizationMemberRoleAction: jest.fn() }),
@@ -32,21 +28,14 @@ jest.mock(
   () => ({ removeOrganizationMemberAction: jest.fn() }),
 );
 jest.mock(
-  '@/app/server-actions/organizations/update-organization-member-permissions.server-action',
-  () => ({ updateOrganizationMemberPermissionsAction: jest.fn() }),
-);
-jest.mock(
   '@/app/server-actions/organizations/invite-organization-member.server-action',
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
 
 const mockedUseSystemRoles = useSystemRoles as jest.Mock;
 const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
-const mockedUseMemberPermissions = useMemberPermissions as jest.Mock;
 const mockedUpdateRole = updateOrganizationMemberRoleAction as jest.Mock;
 const mockedRemoveMember = removeOrganizationMemberAction as jest.Mock;
-const mockedUpdatePermissions =
-  updateOrganizationMemberPermissionsAction as jest.Mock;
 
 const ORG_ACCOUNT: ActiveAccount = {
   id: 'org-account-1',
@@ -69,16 +58,6 @@ const MEMBERS: OrganizationMember[] = [
   },
 ];
 
-const PERMISSIONS: OrganizationPermission[] = [
-  {
-    id: 'permission-1',
-    organizationId: 'org-1',
-    name: 'Aprobar gastos',
-    isActive: true,
-    createdAt: '2023-10-25T10:00:00Z',
-  },
-];
-
 /**
  * Por defecto se monta con `MEMBER.READ` y `MEMBER.INVITE`: es el rol que llega a esta pantalla
  * pudiendo dar de alta, que es el caso que ejercitan casi todas las pruebas. Las que miran el
@@ -92,7 +71,6 @@ function renderManager(
     <MembersManager
       organizationId="org-1"
       members={MEMBERS}
-      permissions={PERMISSIONS}
       includeInactive={includeInactive}
     />,
     { permissions: memberPermissions },
@@ -129,10 +107,8 @@ describe('MembersManager', () => {
       ],
       isLoading: false,
     });
-    mockedUseMemberPermissions.mockReturnValue({ data: [], isLoading: false });
     mockedUpdateRole.mockResolvedValue({ ok: true });
     mockedRemoveMember.mockResolvedValue({ ok: true });
-    mockedUpdatePermissions.mockResolvedValue({ ok: true });
     useAuthStore.setState({ activeAccount: ORG_ACCOUNT });
   });
 
@@ -213,28 +189,23 @@ describe('MembersManager', () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
-  it('etiquetas del catálogo: marca una y la manda al Server Action', async () => {
+  /**
+   * Asignar etiquetas del catálogo a una membresía dejó de estar disponible desde aquí: no basta
+   * con que la entrada del menú no se dibuje, tampoco debe quedar el modal que abría.
+   */
+  it('no ofrece ya asignar etiquetas del catálogo', async () => {
     const user = userEvent.setup();
     renderManager();
 
     await user.click(rowActions());
-    await user.click(
-      await screen.findByRole('menuitem', { name: /etiquetas del catálogo/i }),
-    );
 
-    // El catálogo llega por props desde el servidor: no hay consulta que esperar para pintarlo.
-    expect(await screen.findByText(/no otorgan accesos/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole('checkbox', { name: /aprobar gastos/i }));
-    await user.click(screen.getByRole('button', { name: /guardar/i }));
-
-    await waitFor(() => {
-      expect(mockedUpdatePermissions).toHaveBeenCalledWith(
-        'account-1',
-        'org-1',
-        ['permission-1'],
-      );
-    });
+    expect(
+      await screen.findByRole('menuitem', { name: /editar rol/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: /etiquetas del catálogo/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/no otorgan accesos/i)).not.toBeInTheDocument();
   });
 
   /**

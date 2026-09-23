@@ -49,22 +49,10 @@ export async function deleteOrganizationPermissionRequest(
   );
 }
 
-export async function getMemberPermissionsRequest(
-  accountId: string,
-): Promise<string[]> {
-  const { data } = await apiClient.get<{
-    success: boolean;
-    message: string;
-    data: { accountId: string; permissionIds: string[] };
-  }>(`/api/v1/organizations/members/${accountId}/permissions`);
-
-  return data.data.permissionIds;
-}
-
 /*
-  `updateMemberPermissionsRequest` se fue con la migración de Administrar miembros a renderizado
-  en el servidor: esa escritura la hace ahora
-  `update-organization-member-permissions.server-action.ts`. `getMemberPermissionsRequest` sigue
-  aquí porque el modal de asignación lo consulta al abrirse, que es una consulta perezosa y no la
-  carga inicial de la sección.
+  Aquí vivían `getMemberPermissionsRequest` y `updateMemberPermissionsRequest`, las etiquetas del
+  catálogo asignadas a UNA membresía. Se fueron con la opción "Etiquetas del catálogo" del menú de
+  Administrar miembros, que era su único consumidor. Lo que queda es el catálogo de la
+  organización, que administra la pantalla "Roles y permisos"; los endpoints por membresía siguen
+  existiendo en el backend, sin cliente en esta aplicación.
 */

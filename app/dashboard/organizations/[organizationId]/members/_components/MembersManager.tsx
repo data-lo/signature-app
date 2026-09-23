@@ -8,22 +8,17 @@ import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
 import { removeOrganizationMemberAction } from '@/app/server-actions/organizations/remove-organization-member.server-action';
-import { updateOrganizationMemberPermissionsAction } from '@/app/server-actions/organizations/update-organization-member-permissions.server-action';
 import type { ActionResult } from '@/app/server-actions/organizations/_result';
 import type { OrganizationMember } from '@/lib/api/organization-members';
-import type { OrganizationPermission } from '@/lib/api/organization-permissions';
 import MembersTable from './MembersTable';
 import InviteMemberModal from './InviteMemberModal';
 import EditRoleModal from './EditRoleModal';
 import RemoveMemberDialog from './RemoveMemberDialog';
-import ConfigureMemberPermissionsModal from './ConfigureMemberPermissionsModal';
 
 interface MembersManagerProps {
   organizationId: string;
   /** Miembros ya resueltos en el servidor. Este componente NO los vuelve a pedir. */
   members: OrganizationMember[];
-  /** Catálogo de etiquetas de la organización, también resuelto en el servidor. */
-  permissions: OrganizationPermission[];
   includeInactive: boolean;
 }
 
@@ -49,7 +44,6 @@ interface MembersManagerProps {
  * <MembersManager
  *   organizationId="org-1"
  *   members={members}
- *   permissions={permissions}
  *   includeInactive={false}
  * />
  * ```
@@ -57,7 +51,6 @@ interface MembersManagerProps {
 export default function MembersManager({
   organizationId,
   members,
-  permissions,
   includeInactive,
 }: MembersManagerProps) {
   const router = useRouter();
@@ -83,13 +76,11 @@ export default function MembersManager({
   );
   const [removingMember, setRemovingMember] =
     useState<OrganizationMember | null>(null);
-  const [configuringPermissionsMember, setConfiguringPermissionsMember] =
-    useState<OrganizationMember | null>(null);
 
   /**
    * Ejecuta una mutación y deja la sección al día.
    *
-   * Centraliza lo que las tres acciones repiten —aviso, cierre del modal y refresco— para que
+   * Centraliza lo que las dos acciones repiten —aviso, cierre del modal y refresco— para que
    * ninguna pueda olvidarse del refresco y dejar la tabla mostrando el estado anterior.
    *
    * @param run - La llamada al Server Action.
@@ -176,7 +167,6 @@ export default function MembersManager({
         members={members}
         canManage={canManage}
         onEditRole={setEditingMember}
-        onConfigurePermissions={setConfiguringPermissionsMember}
         onRemove={setRemovingMember}
       />
 
@@ -193,25 +183,6 @@ export default function MembersManager({
               ),
             'Rol actualizado correctamente',
             () => setEditingMember(null),
-          )
-        }
-        confirming={isPending}
-      />
-
-      <ConfigureMemberPermissionsModal
-        member={configuringPermissionsMember}
-        permissions={permissions}
-        onOpenChange={(open) => !open && setConfiguringPermissionsMember(null)}
-        onConfirm={(accountId, permissionIds) =>
-          runMutation(
-            () =>
-              updateOrganizationMemberPermissionsAction(
-                accountId,
-                organizationId,
-                permissionIds,
-              ),
-            'Permisos actualizados correctamente',
-            () => setConfiguringPermissionsMember(null),
           )
         }
         confirming={isPending}

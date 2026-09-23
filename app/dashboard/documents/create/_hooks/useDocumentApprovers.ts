@@ -94,8 +94,7 @@ export function toApproverOptions(
  * que volver a marcarla no dispara una segunda petición.
  *
  * Vive en los `_hooks` de esta ruta y no en `lib/hooks` porque "aprobadores" no es un catálogo
- * de la organización sino la lectura que hace ESTA pantalla del listado de miembros: el mismo
- * criterio por el que `useMemberPermissions` vive junto a su sección.
+ * de la organización sino la lectura que hace ESTA pantalla del listado de miembros.
  *
  * @param enabled - Si la opción "Requiere aprobación" está activa.
  * @returns La consulta, con `data` ya reducida a opciones del selector.
