@@ -166,25 +166,44 @@ describe('OrganizationPlanGuard', () => {
   );
 
   /**
-   * Quien acaba de crear una organización es su administrador desde ese mismo momento, y la
-   * organización nace sin plan: si la guarda lo rebotara a Planes, el rol que el backend le
-   * asignó no serviría para nada hasta que pagara.
+   * La sección Organización desaparece del menú sin plan, así que tampoco puede alcanzarse
+   * escribiendo la URL: esta guarda es lo que cierra esa puerta. Se afirma además que el
+   * contenido protegido NO llega a pintarse, porque redirigir después de mostrarlo dejaría ver
+   * —y pulsar— lo que se está bloqueando.
    */
   it.each([
     '/dashboard/organizations/org-1/members',
+    '/dashboard/organization/settings/roles',
     '/dashboard/organization/settings/permissions',
   ])(
-    'deja administrar la organización en %s aunque no tenga plan',
+    'manda a Planes a una organización sin plan que abre %s por URL',
     async (pathname) => {
       mockPathname = pathname;
       activate(ORG);
 
       renderGuard();
 
-      expect(await screen.findByText(PROTECTED_CONTENT)).toBeInTheDocument();
-      expect(mockReplace).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith('/dashboard/plans'),
+      );
+      expect(screen.queryByText(PROTECTED_CONTENT)).not.toBeInTheDocument();
     },
   );
+
+  /**
+   * Crear una organización nueva no es la sección Organización: se entra desde el selector de
+   * cuentas y no depende del plan de ninguna. Bloquearla dejaría atrapado a quien está parado en
+   * una organización sin plan.
+   */
+  it('deja crear otra organización aunque la activa no tenga plan', async () => {
+    mockPathname = '/dashboard/organization/create';
+    activate(ORG);
+
+    renderGuard();
+
+    expect(await screen.findByText(PROTECTED_CONTENT)).toBeInTheDocument();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 
   /** Las organizaciones que ya existían nacieron en Free y no pierden su acceso. */
   it('no bloquea a una organización Free existente', async () => {

@@ -80,6 +80,10 @@ const STATIC_CRUMBS: Record<string, Crumb[]> = {
     GROUP_CRUMB.organization,
     { label: 'Permisos' },
   ],
+  '/dashboard/organization/settings/information': [
+    GROUP_CRUMB.organization,
+    { label: 'Información de la organización' },
+  ],
   '/dashboard/organization/settings/roles': [
     GROUP_CRUMB.organization,
     { label: 'Roles y permisos' },

@@ -61,15 +61,27 @@ describe('visibleNavGroups', () => {
   });
 
   /**
-   * Pagos y Organización. Lo operativo —documentos y firmas— sí queda fuera: la guarda lo
-   * mandaría de vuelta a Planes. La administración se queda porque quien crea la organización es
-   * su administrador desde el alta, y un menú con una sola opción en la organización que acaba de
-   * crear no le deja hacer nada de lo que su rol le permite.
+   * Sólo Pagos, que es donde contrata. Ni lo operativo —documentos y firmas— ni la
+   * administración de la organización: la guarda mandaría las dos de vuelta a Planes, y una
+   * entrada de menú que rebota es peor que no estar.
+   *
+   * Organización estuvo visible sin plan; esta prueba fija la regla nueva para que reponer
+   * `availableWithoutPlan` en ese grupo no pase inadvertido.
    */
-  it('a una organización sin plan le muestra Pagos y su administración', () => {
+  it('a una organización sin plan sólo le muestra Pagos', () => {
     expect(
       visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: true }),
-    ).toEqual(['payments', 'organization']);
+    ).toEqual(['payments']);
+  });
+
+  /** Al activar el plan la sección vuelve: es el mismo menú, sin el recorte. */
+  it('al contratar un plan, la organización recupera su sección', () => {
+    expect(
+      visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: true }),
+    ).not.toContain('organization');
+    expect(
+      visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: false }),
+    ).toContain('organization');
   });
 });
 
@@ -98,6 +110,49 @@ describe('grupo de documentos', () => {
     expect(isActive(DOCUMENTS_SECTIONS.create.href)).toBe(true);
     expect(isActive('/dashboard/documents/doc-1')).toBe(true);
     expect(isActive('/dashboard/plans')).toBe(false);
+  });
+});
+
+describe('grupo de organización', () => {
+  /** Las entradas del grupo, en el orden en que se pintan. */
+  function organizationLabels(permissions?: readonly PermissionKey[]) {
+    return visibleNavGroups(NAV_GROUPS, {
+      accountType: 'ORGANIZATION',
+      lockedWithoutPlan: false,
+      permissions: permissions ?? ALL_PERMISSIONS,
+    })
+      .find((group) => group.key === 'organization')!
+      .items.map((item) => item.label);
+  }
+
+  /**
+   * "Información de la organización" va primero: es la ficha de la organización, y las otras dos
+   * son operaciones sobre ella.
+   */
+  it('abre con la información de la organización', () => {
+    expect(organizationLabels()).toEqual([
+      'Información de la organización',
+      'Administrar miembros',
+      'Roles y permisos',
+    ]);
+  });
+
+  /** Pide el mismo permiso que el endpoint que la surte, ni más ni menos. */
+  it('la información sólo aparece con ORGANIZATION.READ', () => {
+    expect(organizationLabels(['ORGANIZATION.READ'])).toEqual([
+      'Información de la organización',
+    ]);
+    expect(organizationLabels(['MEMBER.READ'])).not.toContain(
+      'Información de la organización',
+    );
+  });
+
+  it('marca la entrada como activa sólo en su propia ruta', () => {
+    const isActive = NAV_GROUPS.find((group) => group.key === 'organization')!
+      .items[0].isActive;
+
+    expect(isActive('/dashboard/organization/settings/information')).toBe(true);
+    expect(isActive('/dashboard/organization/settings/roles')).toBe(false);
   });
 });
 

@@ -55,6 +55,18 @@ describe('DashboardBreadcrumbs', () => {
     expect(current).toHaveAttribute('aria-current', 'page');
   });
 
+  it('en la ruta de información muestra la sección dentro de Organización', () => {
+    mockUsePathname.mockReturnValue(
+      '/dashboard/organization/settings/information',
+    );
+    renderWithProviders(<DashboardBreadcrumbs />);
+
+    expect(screen.getByText('Organización')).toBeInTheDocument();
+    expect(
+      screen.getByText('Información de la organización'),
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
   /**
    * La ruta de Administrar miembros lleva el id de la organización, así que no puede entrar en el
    * mapa estático de breadcrumbs y se resuelve por patrón. Sin esta prueba, la sección quedaría

@@ -102,22 +102,27 @@ async function selectSignatureType(
   await user.click(screen.getByRole('option', { name: optionName }));
 }
 
+/** La casilla de la card de Búsqueda Inteligente, que acompaña al botón de enviar. */
+function smartSearchCheckbox() {
+  return screen.getByRole('checkbox', {
+    name: /agregar este documento a la búsqueda inteligente/i,
+  });
+}
+
 /**
- * Envía la solicitud completa: pulsa "Enviar solicitud de firma" y responde el modal de Búsqueda
- * Inteligente, que desde la historia "Renombrar isIndexable" se interpone entre el botón y el
- * envío real. Por omisión elige agregar, que es la opción por defecto del producto.
+ * Envía la solicitud completa. Pulsar el botón alcanza: ya no hay modal que responda entre él y
+ * la petición —la decisión de Búsqueda Inteligente se toma en la card, antes de enviar—.
  */
 async function submitRequest(
   user: ReturnType<typeof userEvent.setup>,
   { addToSmartSearch = true }: { addToSmartSearch?: boolean } = {},
 ) {
+  if (!addToSmartSearch) {
+    await user.click(smartSearchCheckbox());
+  }
+
   await user.click(
     screen.getByRole('button', { name: /enviar solicitud de firma/i }),
-  );
-  await user.click(
-    await screen.findByRole('button', {
-      name: addToSmartSearch ? /agregar a búsqueda inteligente/i : /^no agregar$/i,
-    }),
   );
 }
 
@@ -691,10 +696,10 @@ describe('CreateDocumentView', () => {
 
   describe('Búsqueda Inteligente', () => {
     /**
-     * El modal se interpone entre el botón y el envío: preguntar después de mandar el documento
-     * no serviría de nada, porque la decisión viaja en la misma petición que lo crea.
+     * El modal que antes se interponía al pulsar "Enviar" ya no existe: la decisión se ve y se
+     * toma mientras se arma la solicitud, no cuando el usuario ya la dio por terminada.
      */
-    it('pregunta antes de enviar, no después', async () => {
+    it('no interpone ningún modal entre el botón y el envío', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -705,18 +710,52 @@ describe('CreateDocumentView', () => {
         screen.getByRole('button', { name: /enviar solicitud de firma/i }),
       );
 
-      const dialog = await screen.findByRole('alertdialog');
-      expect(dialog).toHaveTextContent(
-        /¿deseas agregar este documento a la búsqueda inteligente\?/i,
-      );
-      expect(dialog).toHaveTextContent(
-        /podrás encontrarlo más rápido mediante búsquedas inteligentes y precisas/i,
-      );
-      // Todavía no se mandó nada: el envío espera a la decisión.
-      expect(mutate).not.toHaveBeenCalled();
+      expect(
+        screen.queryByText(
+          /¿deseas agregar este documento a la búsqueda inteligente\?/i,
+        ),
+      ).not.toBeInTheDocument();
+      expect(mutate).toHaveBeenCalledTimes(1);
     });
 
-    it('al agregarlo, envía isIndexable en true', async () => {
+    /**
+     * La card vive DEBAJO del botón: es una preferencia sobre qué hacemos con el documento
+     * después, no un requisito para mandarlo, y ponerla antes la pondría en el camino de quien
+     * sólo quiere enviar.
+     */
+    it('muestra la card debajo del botón de enviar, con la explicación y la casilla', () => {
+      renderWithProviders(<CreateDocumentView />);
+
+      const submitButton = screen.getByRole('button', {
+        name: /enviar solicitud de firma/i,
+      });
+      const card = screen.getByRole('group', {
+        name: /búsqueda inteligente/i,
+      });
+
+      expect(
+        submitButton.compareDocumentPosition(card) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        screen.getByText(
+          /analizamos el contenido del documento para que después puedas encontrarlo por lo que dice/i,
+        ),
+      ).toBeInTheDocument();
+      expect(smartSearchCheckbox()).toBeInTheDocument();
+    });
+
+    /**
+     * Arranca marcada, que es el valor con el que ya salían los documentos: en el modal era el
+     * botón primario. Cambiar el default habría cambiado en silencio qué se indexa.
+     */
+    it('la casilla arranca marcada', () => {
+      renderWithProviders(<CreateDocumentView />);
+
+      expect(smartSearchCheckbox()).toBeChecked();
+    });
+
+    it('sin tocar la casilla, envía isIndexable en true', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -732,10 +771,10 @@ describe('CreateDocumentView', () => {
     });
 
     /**
-     * "No agregar" NO cancela el envío: el documento se crea igual, sólo que fuera de la
+     * Desmarcarla NO cancela el envío: el documento se crea igual, sólo que fuera de la
      * indexación. Por eso se afirman las dos cosas —el valor y que la mutación corrió—.
      */
-    it('al no agregarlo, el documento se envía igual con isIndexable en false', async () => {
+    it('al desmarcarla, el documento se envía igual con isIndexable en false', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -744,6 +783,7 @@ describe('CreateDocumentView', () => {
       await selectSignatureType(user, /firma simple/i);
       await submitRequest(user, { addToSmartSearch: false });
 
+      expect(smartSearchCheckbox()).not.toBeChecked();
       expect(mutate).toHaveBeenCalledTimes(1);
       expect(mutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -757,11 +797,30 @@ describe('CreateDocumentView', () => {
     });
 
     /**
-     * El modal aparece ANTES del último modal del flujo (la confirmación de envío), y no a la
-     * vez: son dos pasos, y ver los dos superpuestos dejaría al usuario decidiendo sobre un
-     * documento que ya se anunció como enviado.
+     * Se puede cambiar de opinión sin volver a enviar, que es justo lo que el modal no permitía:
+     * ahí la decisión se tomaba una vez y ya viajaba con la petición.
      */
-    it('la confirmación de envío llega después de decidir, no antes', async () => {
+    it('se puede marcar y desmarcar antes de enviar; manda el último valor', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma simple/i);
+      await user.click(smartSearchCheckbox());
+      await user.click(smartSearchCheckbox());
+      await user.click(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      );
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({ isIndexable: true }),
+        expect.anything(),
+      );
+    });
+
+    /** Tras un envío exitoso el formulario vuelve a su estado inicial, la casilla incluida. */
+    it('tras enviar, la casilla vuelve a su valor inicial', async () => {
       const mutateWithSuccess = jest.fn((_vars, opts) => opts?.onSuccess?.());
       mockedUseCreateDocumentSignatures.mockReturnValue({
         mutate: mutateWithSuccess,
@@ -775,32 +834,23 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await selectSignatureType(user, /firma simple/i);
-      await user.click(
-        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
-      );
-
-      // Primero el de Búsqueda Inteligente, y sin rastro del de confirmación.
-      expect(await screen.findByRole('alertdialog')).toHaveTextContent(
-        /búsqueda inteligente/i,
-      );
-      expect(
-        screen.queryByText(/solicitud de firma enviada/i),
-      ).not.toBeInTheDocument();
-
-      await user.click(
-        screen.getByRole('button', { name: /agregar a búsqueda inteligente/i }),
-      );
+      await submitRequest(user, { addToSmartSearch: false });
 
       expect(await screen.findByRole('alertdialog')).toHaveTextContent(
         /solicitud de firma enviada/i,
       );
+      // El modal de confirmación deja inerte el resto de la pantalla: sin cerrarlo, la casilla
+      // no es alcanzable ni para el usuario ni para esta consulta.
+      await user.click(screen.getByRole('button', { name: /entendido/i }));
+
+      await waitFor(() => expect(smartSearchCheckbox()).toBeChecked());
     });
 
     /**
-     * Con el formulario incompleto no se pregunta nada: pedirle una decisión sobre la indexación
-     * a quien todavía tiene errores sería pedirla sobre un documento que no se va a mandar.
+     * Con el formulario incompleto no se manda nada, y la casilla sigue ahí para cuando se
+     * complete: no es ella la que bloquea el envío.
      */
-    it('no pregunta si el formulario todavía no es válido', async () => {
+    it('no envía si el formulario todavía no es válido', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -813,8 +863,8 @@ describe('CreateDocumentView', () => {
         screen.getByRole('button', { name: /enviar solicitud de firma/i }),
       );
 
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(mutate).not.toHaveBeenCalled();
+      expect(smartSearchCheckbox()).toBeInTheDocument();
     });
   });
 

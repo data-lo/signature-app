@@ -30,6 +30,11 @@ export const DASHBOARD_NAVIGATION = {
     href: '/dashboard/subscriptions',
     anyPermissions: ['BILLING.READ'],
   },
+  organizationInformation: {
+    label: 'Información de la organización',
+    href: '/dashboard/organization/settings/information',
+    anyPermissions: ['ORGANIZATION.READ'],
+  },
   members: {
     label: 'Administrar miembros',
     href: '/dashboard/organizations',

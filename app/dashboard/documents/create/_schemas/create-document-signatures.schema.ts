@@ -53,5 +53,11 @@ export const CREATE_DOCUMENT_DEFAULT_VALUES: CreateDocumentSignaturesFormValues 
     reviewerUserId: null,
     includeMeAsSigner: false,
     requiresOrder: false,
+    /**
+     * La regla de producto es que todo documento sea encontrable salvo que su autor decida lo
+     * contrario, así que la casilla arranca marcada. Es el mismo valor que ofrecía por omisión el
+     * modal que esta card reemplaza: ahí era el botón primario, el camino de menor resistencia.
+     */
+    isIndexable: true,
     collaborators: [],
   };

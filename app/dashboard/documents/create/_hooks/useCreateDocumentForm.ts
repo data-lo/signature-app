@@ -19,16 +19,6 @@ import {
 interface UseCreateDocumentFormParams {
   /** Archivo ya cargado; sin él no hay nada que enviar (ver `_section-rules.ts`). */
   file: File | null;
-  /**
-   * El formulario es válido y sólo falta la última decisión: si el documento entra a Búsqueda
-   * Inteligente. La pantalla abre aquí su modal (ver `SmartSearchDialog`) y después llama a
-   * `submitWith`.
-   *
-   * El envío se parte en dos justamente por esto: preguntar ANTES de validar mostraría el modal
-   * a quien todavía tiene errores en el formulario, y le pediría una decisión sobre un documento
-   * que no se va a mandar.
-   */
-  onValidated: () => void;
   /** Se ejecuta tras un envío exitoso, para limpiar la selección de archivo. */
   onSubmitted: () => void;
   /** Abre la sección que contiene los errores cuando la validación del formulario falla. */
@@ -47,7 +37,6 @@ interface UseCreateDocumentFormParams {
  */
 export function useCreateDocumentForm({
   file,
-  onValidated,
   onSubmitted,
   onInvalid,
 }: UseCreateDocumentFormParams) {
@@ -84,10 +73,7 @@ export function useCreateDocumentForm({
     name: 'reviewerUserId',
   });
 
-  function onValidSubmit(
-    values: CreateDocumentSignaturesFormValues,
-    isIndexable: boolean,
-  ) {
+  function onValidSubmit(values: CreateDocumentSignaturesFormValues) {
     // Guarda redundante con `sections.submission.isEnabled` (el botón está deshabilitado sin
     // archivo): la validación del esquema no cubre el archivo, así que el envío se protege
     // también acá y no depende de que la UI haya deshabilitado el botón.
@@ -102,7 +88,7 @@ export function useCreateDocumentForm({
         requiresOrder: values.requiresOrder,
         signatureType: values.signatureType,
         requiresTwoFactorAuth: values.requiresTwoFactorAuth,
-        isIndexable,
+        isIndexable: values.isIndexable,
         // Sin composición extra: desde la historia "Crear y eliminar automáticamente el
         // participante Usuario firmante", el creador que marcó "Incluirme como firmante" ya es
         // una tarjeta más dentro de `collaborators` (la agrega `CollaboratorsFieldArray`), así que
@@ -123,24 +109,14 @@ export function useCreateDocumentForm({
     currentUserQuery,
     createDocumentSignaturesMutation,
     /**
-     * Lo que corre al pulsar "Enviar solicitud de firma": valida y, si todo está bien, avisa a la
-     * pantalla para que pregunte por Búsqueda Inteligente. **No manda nada todavía** — el envío
-     * lo dispara `submitWith` con la decisión del usuario.
-     */
-    handleSubmit: form.handleSubmit(() => onValidated(), onInvalid),
-    /**
-     * Envía la solicitud con la decisión ya tomada.
+     * Lo que corre al pulsar "Enviar solicitud de firma": valida y manda la solicitud.
      *
-     * Se vuelve a validar en vez de guardarse los valores del paso anterior: el `handleSubmit` de
-     * react-hook-form es la única fuente de los valores ya transformados por el resolver, y
-     * fotografiarlos aparte abriría la puerta a mandar una copia vieja. Revalidar mientras un
-     * modal está abierto no puede fallar —nada del formulario es alcanzable— y cuesta nada.
+     * Antes esto sólo validaba, y el envío real quedaba en un `submitWith` que la pantalla
+     * llamaba con lo que el usuario respondiera en un modal (`SmartSearchDialog`). Esa decisión
+     * ahora es un campo más del formulario (`isIndexable`, ver `SmartSearchCard`), así que no
+     * queda nada que preguntar entre el botón y la petición.
      */
-    submitWith: (isIndexable: boolean) =>
-      form.handleSubmit(
-        (values) => onValidSubmit(values, isIndexable),
-        onInvalid,
-      )(),
+    handleSubmit: form.handleSubmit(onValidSubmit, onInvalid),
     /** Cuántos firmantes hay hoy en el formulario (gobierna el orden de firma). */
     signerCount: countSigners(collaborators),
     /** Cuántos espectadores hay hoy en el formulario (solo informativo: alimenta el resumen). */
