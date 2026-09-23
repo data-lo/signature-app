@@ -1,7 +1,6 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { SigningCredentialStatus } from '@/lib/enums/identity';
 import { useIdentityVerification } from '../_hooks/useIdentityVerification';
 import { useStartDiditVerification } from '../_hooks/useStartDiditVerification';
 import DiditVerificationCard from './DiditVerificationCard';
@@ -57,15 +56,18 @@ export default function IdentitySignatureView() {
   const { signingCredentialStatus: status } = data;
 
   return (
-    <div id="signature-documents" className="flex w-full flex-col gap-6">
-      <header>
+    <div
+      id="signature-documents"
+      className="flex w-full flex-col items-center gap-6"
+    >
+      <header className="w-full max-w-3xl">
         <p className="text-sm text-muted-foreground">
           Aquí puedes iniciar el proceso de verificación de identidad y
           registrar tu firma para firmar de manera simple.
         </p>
       </header>
 
-      <div className="flex w-full flex-col gap-6">
+      <div className="flex w-full max-w-3xl flex-col gap-6">
         <DiditVerificationCard
           data={data}
           onStart={() => startMutation.mutate()}

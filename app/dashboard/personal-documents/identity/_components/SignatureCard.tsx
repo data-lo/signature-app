@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BadgeCheck, LockKeyhole, PenLine, Smartphone } from 'lucide-react';
+import { BadgeCheck, LockKeyhole, PencilLine, Signature, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -117,36 +117,35 @@ function SignatureCapture() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <PenLine className="size-5 text-primary" />
+          <Signature className="size-5 text-primary" aria-hidden />
           Registra tu firma
         </CardTitle>
         <CardDescription>
-          Dibújala aquí mismo o continúa en tu celular, donde es más cómodo
-          trazarla con el dedo.
+          Dibuja tu firma aquí o usa tu celular para trazarla con el dedo.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         {mode === 'idle' && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               type="button"
-              className="flex-1"
+              className="w-full sm:w-auto"
               onClick={handleDraw}
               disabled={createSession.isPending}
             >
-              <PenLine className="size-4" aria-hidden />
-              Dibujar aquí
+              <PencilLine className="size-4" aria-hidden />
+              Dibujar mi firma
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="flex-1"
+              className="w-full sm:w-auto"
               onClick={handleMobile}
               disabled={createSession.isPending}
             >
               <Smartphone className="size-4" aria-hidden />
-              Firmar desde mi celular
+              Dibujar en mi celular
             </Button>
           </div>
         )}

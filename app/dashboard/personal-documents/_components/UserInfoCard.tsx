@@ -44,22 +44,26 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
         <CardTitle>Mi información</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">Nombre</dt>
-          <dd className="font-medium">
-            {user.firstName} {user.lastName}
-          </dd>
+        <div className="grid gap-5 md:grid-cols-2">
+          <TextField
+            id="fullName"
+            label="Nombre"
+            value={`${user.firstName} ${user.lastName}`}
+            disabled
+          />
 
-          <dt className="text-muted-foreground">Correo</dt>
-          <dd className="font-medium">{user.email}</dd>
+          <TextField id="email" label="Correo" type="email" value={user.email} disabled />
 
-          <dt className="text-muted-foreground">CURP</dt>
-          <dd className="font-medium">{user.nationalId}</dd>
+          <TextField id="nationalId" label="CURP" value={user.nationalId} disabled />
 
-          <dt className="text-muted-foreground">RFC</dt>
-          <dd className="font-medium">{user.rfc ?? '—'}</dd>
-
-        </dl>
+          <TextField
+            id="rfc"
+            label="RFC"
+            value={user.rfc ?? ''}
+            placeholder="No registrado"
+            disabled
+          />
+        </div>
 
         <Form onSubmit={handleSubmit(onSubmit)} className="mt-4">
           <FieldGroup>
