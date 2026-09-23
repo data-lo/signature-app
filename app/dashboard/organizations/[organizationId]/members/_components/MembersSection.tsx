@@ -2,9 +2,7 @@ import { redirect } from 'next/navigation';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
 import { BackendRequestError } from '@/lib/server/backend-request';
 import { getOrganizationMembersAction } from '@/app/server-actions/organizations/get-organization-members.server-action';
-import { getOrganizationPermissionsAction } from '@/app/server-actions/organizations/get-organization-permissions.server-action';
 import type { OrganizationMember } from '@/lib/api/organization-members';
-import type { OrganizationPermission } from '@/lib/api/organization-permissions';
 import MembersManager from './MembersManager';
 import MembersEmptyState from './MembersEmptyState';
 
@@ -19,9 +17,9 @@ interface MembersSectionProps {
  * reparto entre tabla y estado vacío. El navegador no hace ninguna petición inicial; recibe el
  * HTML ya con los datos y sólo hidrata las partes interactivas.
  *
- * Las dos consultas van en paralelo porque son independientes: el listado de miembros trae ya los
- * permisos que cada uno hereda de su rol, y el catálogo de etiquetas se adelanta para que el
- * modal de asignación no tenga que pedirlo cuando el administrador ya está esperando.
+ * Una sola consulta: el listado de miembros trae ya los permisos que cada uno hereda de su rol.
+ * El catálogo de etiquetas de la organización se pedía aquí en paralelo para el modal "Etiquetas
+ * del catálogo"; esa opción se retiró de la sección, y con ella la consulta que la alimentaba.
  *
  * @param props - Organización de la ruta.
  * @returns La sección renderizada: tabla con miembros, o estado vacío si no hay ninguno.
@@ -38,13 +36,9 @@ export default async function MembersSection({
   organizationId,
 }: MembersSectionProps) {
   let members: OrganizationMember[];
-  let permissions: OrganizationPermission[];
 
   try {
-    [members, permissions] = await Promise.all([
-      getOrganizationMembersAction(organizationId),
-      getOrganizationPermissionsAction(organizationId),
-    ]);
+    members = await getOrganizationMembersAction(organizationId);
   } catch (error) {
     if (error instanceof BackendRequestError && error.status === 401) {
       // La cookie caducó o se limpió entre la navegación y el render. Mandarlo al login es la
@@ -80,7 +74,6 @@ export default async function MembersSection({
         <MembersManager
           organizationId={organizationId}
           members={members}
-          permissions={permissions}
         />
       )}
     </PageContainer>

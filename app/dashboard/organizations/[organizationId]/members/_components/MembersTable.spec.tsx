@@ -147,25 +147,29 @@ describe('MembersTable', () => {
     expect(onEditRole).toHaveBeenCalledWith(MEMBERS[0]);
   });
 
-  it('al elegir "Etiquetas del catálogo" llama a onConfigurePermissions con el miembro de esa fila', async () => {
+  /**
+   * "Etiquetas del catálogo" se retiró del menú: asignar etiquetas a una membresía no es cosa de
+   * este módulo. El menú queda con las dos acciones que sí lo son, y se comprueban las tres cosas
+   * juntas —que la opción no está y que las otras dos siguen— porque quitar una entrada de un
+   * menú es justo el cambio que se lleva por delante a las vecinas.
+   */
+  it('el menú ofrece editar rol y desactivar, y ya no las etiquetas del catálogo', async () => {
     const user = userEvent.setup();
-    const onConfigurePermissions = jest.fn();
-    render(
-      <MembersTable
-        members={MEMBERS}
-        canManage
-        onConfigurePermissions={onConfigurePermissions}
-      />,
-    );
+    render(<MembersTable members={MEMBERS} canManage />);
 
     await user.click(
       screen.getByRole('button', { name: 'Acciones de admin@empresa.com' }),
     );
-    await user.click(
-      await screen.findByRole('menuitem', { name: /etiquetas del catálogo/i }),
-    );
 
-    expect(onConfigurePermissions).toHaveBeenCalledWith(MEMBERS[0]);
+    expect(
+      await screen.findByRole('menuitem', { name: /editar rol/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: /desactivar/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: /etiquetas del catálogo/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('al elegir "Desactivar" llama a onRemove con el miembro de esa fila', async () => {

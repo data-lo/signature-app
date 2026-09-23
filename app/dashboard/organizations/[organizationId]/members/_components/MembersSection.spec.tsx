@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { redirect } from 'next/navigation';
 import { BackendRequestError } from '@/lib/server/backend-request';
 import { getOrganizationMembersAction } from '@/app/server-actions/organizations/get-organization-members.server-action';
-import { getOrganizationPermissionsAction } from '@/app/server-actions/organizations/get-organization-permissions.server-action';
 import type { OrganizationMember } from '@/lib/api/organization-members';
 import MembersSection from './MembersSection';
 
@@ -14,9 +13,6 @@ jest.mock('next/navigation', () => ({
 }));
 jest.mock(
   '@/app/server-actions/organizations/get-organization-members.server-action',
-);
-jest.mock(
-  '@/app/server-actions/organizations/get-organization-permissions.server-action',
 );
 
 /*
@@ -36,7 +32,6 @@ jest.mock('./MembersEmptyState', () => ({
 }));
 
 const mockedGetMembers = getOrganizationMembersAction as jest.Mock;
-const mockedGetPermissions = getOrganizationPermissionsAction as jest.Mock;
 const mockedRedirect = redirect as unknown as jest.Mock;
 
 const MEMBER: OrganizationMember = {
@@ -55,14 +50,13 @@ describe('MembersSection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    mockedGetPermissions.mockResolvedValue([]);
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('pide miembros y permisos en el servidor y renderiza la tabla', async () => {
+  it('pide los miembros en el servidor y renderiza la tabla', async () => {
     mockedGetMembers.mockResolvedValue([MEMBER]);
 
     render(
@@ -70,7 +64,6 @@ describe('MembersSection', () => {
     );
 
     expect(mockedGetMembers).toHaveBeenCalledWith('org-1');
-    expect(mockedGetPermissions).toHaveBeenCalledWith('org-1');
     expect(screen.getByTestId('members-manager')).toHaveTextContent(
       '1 miembros',
     );
