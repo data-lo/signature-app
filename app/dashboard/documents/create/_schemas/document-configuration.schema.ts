@@ -31,8 +31,9 @@ export const REVIEWER_REQUIRED_MESSAGE =
  * de otro campo de esta misma sección y de nada más: exigir un aprobador cuando —y sólo
  * cuando— el documento requiere aprobación (ver el `superRefine` de abajo).
  *
- * `requiresOrder` e `includeMeAsSigner` se **renderizan** en `DocumentParticipantsSection`, no en
- * la sección que da nombre a este esquema. Se quedan acá a propósito: el esquema compuesto aplana
+ * `requiresOrder` e `includeMeAsSigner` se **renderizan** en `DocumentParticipantsSection`, e
+ * `isIndexable` en la card que acompaña al botón de enviar: ninguno en la sección que da nombre a
+ * este esquema. Se quedan acá a propósito: el esquema compuesto aplana
  * ambos objetos (`.extend(shape)`), así que repartir los campos entre uno y otro no cambiaría ni
  * los valores del formulario ni el payload — solo produciría un diff sin efecto. Lo que decide en
  * qué acordeón aparece cada control es dónde se monta su componente.
@@ -51,6 +52,13 @@ export const documentConfigurationSchema = z
     reviewerUserId: z.string().nullable(),
     includeMeAsSigner: z.boolean(),
     requiresOrder: z.boolean(),
+    /**
+     * Si el documento entra a Búsqueda Inteligente (ver `SmartSearchCard`). Antes no era un
+     * campo del formulario sino la respuesta a un modal que se interponía al pulsar "Enviar";
+     * ahora es una casilla más, visible junto al botón, y por eso vive con el resto de los
+     * valores que el usuario captura.
+     */
+    isIndexable: z.boolean(),
   })
   .superRefine((values, ctx) => {
     /**
