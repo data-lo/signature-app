@@ -1,16 +1,4 @@
-'use client';
-
-import { useState } from 'react';
-import { Check, Eye, Minus, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Check, Minus, X } from 'lucide-react';
 import { IdentityCheckOutcome } from '@/lib/enums/identity';
 import type {
   CurrentIdentityVerification,
@@ -26,68 +14,53 @@ const CHECK_LABELS: Array<{
   key: keyof IdentityVerificationChecks;
   label: string;
 }> = [
-  { key: 'documentReading', label: 'Lectura de tu identificación' },
-  { key: 'faceMatch', label: 'Tu rostro coincide con la identificación' },
+  { key: 'documentReading', label: 'Lectura de la identificación' },
+  { key: 'faceMatch', label: 'Comparación del rostro con la identificación' },
   { key: 'liveness', label: 'Prueba de vida' },
 ];
 
 /**
- * "Ver detalle de la validación": qué se comprobó y cuándo.
+ * Detalle de la validación, visible directamente dentro de la tarjeta: qué se comprobó y cuándo.
  *
  * El desglose viene ya resumido del backend (`verification.checks`), que filtra el veredicto
  * crudo del proveedor: acá sólo llega cómo salió cada comprobación, nunca el nombre, el número de
  * documento, las imágenes de la INE ni las puntuaciones de los modelos.
  */
-export default function IdentityDetailDialog({
+export default function IdentityVerificationDetails({
   data,
 }: IdentityDetailDialogProps) {
-  const [open, setOpen] = useState(false);
   const checks = data.verification?.checks ?? null;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button type="button" variant="outline" />}>
-        <Eye className="size-4" aria-hidden />
-        Detalles
-      </DialogTrigger>
+    <section className="flex flex-col gap-4" aria-labelledby="verification-details-title">
+      <h3 id="verification-details-title" className="text-sm font-normal">
+        Resultado de la validación de identidad
+      </h3>
 
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Detalle de la validación</DialogTitle>
-          <DialogDescription>
-            Qué comprobamos para confirmar tu identidad.
-          </DialogDescription>
-        </DialogHeader>
+      {checks ? (
+        <ul className="flex flex-col gap-2 text-sm">
+          {CHECK_LABELS.map(({ key, label }) => (
+            <CheckRow key={key} label={label} outcome={checks[key]} />
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          No contamos con el detalle de las comprobaciones para esta
+          verificación.
+        </p>
+      )}
 
-        {checks ? (
-          <ul className="flex flex-col gap-2 text-sm">
-            {CHECK_LABELS.map(({ key, label }) => (
-              <CheckRow key={key} label={label} outcome={checks[key]} />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No contamos con el detalle de las comprobaciones para esta
-            verificación.
-          </p>
-        )}
-
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t pt-4 text-sm">
-          <DetailRow
-            label="Validada el"
-            value={formatDateTime(data.identityVerifiedAt)}
-          />
-          <DetailRow
-            label="Verificación"
-            value={data.verification?.id ?? 'No disponible'}
-          />
-          <DetailRow
-            label="Firma registrada"
-            value={data.signatureRegistered ? 'Sí' : 'Todavía no'}
-          />
-        </dl>
-      </DialogContent>
-    </Dialog>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t pt-4 text-sm">
+        <DetailRow
+          label="Validada el"
+          value={formatDateTime(data.identityVerifiedAt)}
+        />
+        <DetailRow
+          label="Verificación"
+          value={data.verification?.id ?? 'No disponible'}
+        />
+      </dl>
+    </section>
   );
 }
 

@@ -21,7 +21,7 @@ import {
 import { SigningCredentialStatus } from '@/lib/enums/identity';
 import type { CurrentIdentityVerification } from '../_requests';
 import VerificationQrPanel from './VerificationQrPanel';
-import IdentityDetailDialog from './IdentityDetailDialog';
+import IdentityVerificationDetails from './IdentityDetailDialog';
 
 interface DiditVerificationCardProps {
   data: CurrentIdentityVerification;
@@ -152,9 +152,7 @@ export default function DiditVerificationCard({
           icon={<BadgeCheck className="size-5" />}
           title="Tu identidad ha sido verificada"
         >
-          <CardActions align="end">
-            <IdentityDetailDialog data={data} />
-          </CardActions>
+          <IdentityVerificationDetails data={data} />
         </StateCard>
       );
 
@@ -230,7 +228,7 @@ function StateCard({
   );
 }
 
-/** Fila de acciones centrada, salvo los detalles de una identidad ya validada. */
+/** Fila de acciones centrada, salvo las que se alinean al final de la tarjeta. */
 function CardActions({
   children,
   align = 'center',

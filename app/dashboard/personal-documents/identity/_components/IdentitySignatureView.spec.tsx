@@ -240,10 +240,10 @@ describe('IdentitySignatureView', () => {
      */
     expect(screen.getByText(/registra tu firma/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /dibujar aquí/i }),
+      screen.getByRole('button', { name: /dibujar mi firma/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /firmar desde mi celular/i }),
+      screen.getByRole('button', { name: /dibujar en mi celular/i }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/selecciona el archivo/i),
@@ -338,10 +338,10 @@ describe('IdentitySignatureView', () => {
       );
 
       expect(
-        await screen.findByRole('button', { name: /dibujar aquí/i }),
+        await screen.findByRole('button', { name: /dibujar mi firma/i }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: /firmar desde mi celular/i }),
+        screen.getByRole('button', { name: /dibujar en mi celular/i }),
       ).toBeInTheDocument();
     });
   });
@@ -360,17 +360,11 @@ describe('IdentitySignatureView', () => {
 
       renderWithProviders(<IdentitySignatureView />);
 
-      await userEvent.click(
-        await screen.findByRole('button', {
-          name: 'Detalles',
-        }),
-      );
-
       expect(
-        await screen.findByText(/lectura de tu identificación/i),
+        await screen.findByText(/lectura de la identificación/i),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/tu rostro coincide con la identificación/i),
+        screen.getByText(/comparación del rostro con la identificación/i),
       ).toBeInTheDocument();
       expect(screen.getByText(/prueba de vida/i)).toBeInTheDocument();
     });
@@ -388,12 +382,6 @@ describe('IdentitySignatureView', () => {
 
       renderWithProviders(<IdentitySignatureView />);
 
-      await userEvent.click(
-        await screen.findByRole('button', {
-          name: 'Detalles',
-        }),
-      );
-
       expect(await screen.findByText(/no superada/i)).toBeInTheDocument();
       expect(screen.getByText(/no reportada/i)).toBeInTheDocument();
     });
@@ -406,12 +394,6 @@ describe('IdentitySignatureView', () => {
       });
 
       renderWithProviders(<IdentitySignatureView />);
-
-      await userEvent.click(
-        await screen.findByRole('button', {
-          name: 'Detalles',
-        }),
-      );
 
       expect(
         await screen.findByText(

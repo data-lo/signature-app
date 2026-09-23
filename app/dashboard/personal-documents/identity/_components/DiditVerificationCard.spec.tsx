@@ -67,12 +67,11 @@ describe('DiditVerificationCard · distribución', () => {
     expect(action.parentElement).toHaveClass('flex', 'justify-center');
   });
 
-  it('coloca los detalles a la derecha cuando la identidad ya está validada', () => {
+  it('muestra los detalles dentro de la card cuando la identidad ya está validada', () => {
     renderCard(SigningCredentialStatus.Configured);
 
-    const action = screen.getByRole('button', { name: 'Detalles' });
-
-    expect(action.parentElement).toHaveClass('flex', 'justify-end');
+    expect(screen.getByText('Resultado de la validación de identidad')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Detalles' })).not.toBeInTheDocument();
   });
 
   /**
