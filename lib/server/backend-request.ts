@@ -77,10 +77,9 @@ interface BackendRequestOptions {
  *
  * @example
  * ```ts
- * const members = await backendRequest<OrganizationMember[]>(
- *   `organizations/${organizationId}/members`,
- *   { searchParams: { includeInactive: 'true' } },
- * );
+ * const documents = await backendRequest<DocumentSummary[]>('document', {
+ *   searchParams: { status: 'PENDING' },
+ * });
  * ```
  */
 export async function backendRequest<T>(

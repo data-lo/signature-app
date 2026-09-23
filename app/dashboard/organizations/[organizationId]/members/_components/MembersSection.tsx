@@ -8,8 +8,6 @@ import MembersEmptyState from './MembersEmptyState';
 
 interface MembersSectionProps {
   organizationId: string;
-  /** Incluir las membresías dadas de baja. Llega como `?includeInactive=true`. */
-  includeInactive: boolean;
 }
 
 /**
@@ -23,7 +21,7 @@ interface MembersSectionProps {
  * El catálogo de etiquetas de la organización se pedía aquí en paralelo para el modal "Etiquetas
  * del catálogo"; esa opción se retiró de la sección, y con ella la consulta que la alimentaba.
  *
- * @param props - Organización de la ruta y si deben incluirse las membresías dadas de baja.
+ * @param props - Organización de la ruta.
  * @returns La sección renderizada: tabla con miembros, o estado vacío si no hay ninguno.
  * @throws Relanza cualquier fallo que no sea 401 ni 403 para que lo recoja `error.tsx`. El 401
  * redirige al login y el 403 se renderiza como falta de acceso, porque ambos tienen una salida
@@ -31,20 +29,16 @@ interface MembersSectionProps {
  *
  * @example
  * ```tsx
- * <MembersSection organizationId="org-1" includeInactive={false} />
+ * <MembersSection organizationId="org-1" />
  * ```
  */
 export default async function MembersSection({
   organizationId,
-  includeInactive,
 }: MembersSectionProps) {
   let members: OrganizationMember[];
 
   try {
-    members = await getOrganizationMembersAction(
-      organizationId,
-      includeInactive,
-    );
+    members = await getOrganizationMembersAction(organizationId);
   } catch (error) {
     if (error instanceof BackendRequestError && error.status === 401) {
       // La cookie caducó o se limpió entre la navegación y el render. Mandarlo al login es la
@@ -80,7 +74,6 @@ export default async function MembersSection({
         <MembersManager
           organizationId={organizationId}
           members={members}
-          includeInactive={includeInactive}
         />
       )}
     </PageContainer>

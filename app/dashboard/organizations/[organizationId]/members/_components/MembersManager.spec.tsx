@@ -1,7 +1,6 @@
 import userEvent from '@testing-library/user-event';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
-import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
@@ -11,13 +10,11 @@ import type { OrganizationMember } from '@/lib/api/organization-members';
 import MembersManager from './MembersManager';
 
 const mockRefresh = jest.fn();
-const mockReplace = jest.fn();
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: mockRefresh, replace: mockReplace }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }));
-jest.mock('@/lib/hooks/useSystemRoles');
-// El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
+// Invitar y editar rol piden los roles de la ORGANIZACIÓN, no sólo los de sistema.
 jest.mock('@/lib/hooks/useOrganizationRoles');
 jest.mock(
   '@/app/server-actions/organizations/update-organization-member-role.server-action',
@@ -32,7 +29,6 @@ jest.mock(
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
 
-const mockedUseSystemRoles = useSystemRoles as jest.Mock;
 const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 const mockedUpdateRole = updateOrganizationMemberRoleAction as jest.Mock;
 const mockedRemoveMember = removeOrganizationMemberAction as jest.Mock;
@@ -59,19 +55,30 @@ const MEMBERS: OrganizationMember[] = [
 ];
 
 /**
+ * El catálogo que devuelve `GET /organizations/:id/roles`: los roles de sistema —OWNER entre
+ * ellos— más los propios de la organización. Se monta con OWNER y con un rol personalizado a
+ * propósito: son los dos casos que el selector de "Editar rol" trataba mal cuando pedía el
+ * catálogo de sistema.
+ */
+const ORGANIZATION_ROLES = [
+  { id: 'admin-role-1', name: 'ADMIN', isSystemRole: true, permissions: [] },
+  { id: 'member-role-1', name: 'MEMBER', isSystemRole: true, permissions: [] },
+  { id: 'owner-role-1', name: 'OWNER', isSystemRole: true, permissions: [] },
+  { id: 'custom-role-1', name: 'Aprobador', isSystemRole: false, permissions: [] },
+];
+
+/**
  * Por defecto se monta con `MEMBER.READ` y `MEMBER.INVITE`: es el rol que llega a esta pantalla
  * pudiendo dar de alta, que es el caso que ejercitan casi todas las pruebas. Las que miran el
  * otro lado pasan sólo `MEMBER.READ`.
  */
 function renderManager(
-  includeInactive = false,
   memberPermissions: readonly PermissionKey[] = ['MEMBER.READ', 'MEMBER.INVITE'],
 ) {
   return renderWithProviders(
     <MembersManager
       organizationId="org-1"
       members={MEMBERS}
-      includeInactive={includeInactive}
     />,
     { permissions: memberPermissions },
   );
@@ -85,28 +92,11 @@ describe('MembersManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedUseOrganizationRoles.mockImplementation(() => ({
-      data: mockedUseSystemRoles().data,
+      data: ORGANIZATION_ROLES,
       isPending: false,
       isError: false,
       isSuccess: true,
     }));
-    mockedUseSystemRoles.mockReturnValue({
-      data: [
-        {
-          id: 'admin-role-1',
-          name: 'ADMIN',
-          isSystemRole: true,
-          permissions: [],
-        },
-        {
-          id: 'member-role-1',
-          name: 'MEMBER',
-          isSystemRole: true,
-          permissions: [],
-        },
-      ],
-      isLoading: false,
-    });
     mockedUpdateRole.mockResolvedValue({ ok: true });
     mockedRemoveMember.mockResolvedValue({ ok: true });
     useAuthStore.setState({ activeAccount: ORG_ACCOUNT });
@@ -209,38 +199,18 @@ describe('MembersManager', () => {
   });
 
   /**
-   * El filtro vive en la URL y no en un estado de React: así lo resuelve el mismo render del
-   * servidor que trae la lista, en vez de que el navegador vuelva a pedir los miembros — que es
-   * justo lo que esta migración vino a quitar.
+   * La vista de miembros dados de baja se retiró de la interfaz. No basta con que el conmutador
+   * no se dibuje: no debe quedar ningún control ni texto que la ofrezca, porque el parámetro de
+   * URL que la sostenía ya no existe y el servidor tampoco devuelve esas membresías.
    */
-  it('el filtro de dados de baja navega, no dispara una consulta desde el cliente', async () => {
-    const user = userEvent.setup();
+  it('no ofrece ya mostrar a los miembros dados de baja', () => {
     renderManager();
 
-    await user.click(
-      screen.getByRole('switch', { name: /mostrar miembros dados de baja/i }),
-    );
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/dashboard/organizations/org-1/members?includeInactive=true',
-      );
-    });
-  });
-
-  it('al desmarcar el filtro quita el parámetro de la URL', async () => {
-    const user = userEvent.setup();
-    renderManager(true);
-
-    await user.click(
-      screen.getByRole('switch', { name: /mostrar miembros dados de baja/i }),
-    );
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/dashboard/organizations/org-1/members',
-      );
-    });
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: /dados de baja/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/dados de baja/i)).not.toBeInTheDocument();
   });
 
   /**
@@ -259,7 +229,7 @@ describe('MembersManager', () => {
   });
 
   it('a quien sólo puede leer no le ofrece ninguna acción', () => {
-    renderManager(false, ['MEMBER.READ']);
+    renderManager(['MEMBER.READ']);
 
     // La lista se sigue viendo: tiene permiso de lectura, que es como llegó hasta acá.
     expect(screen.getByText('miembro@empresa.com')).toBeInTheDocument();
