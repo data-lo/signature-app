@@ -181,6 +181,7 @@ export default function MembersManager({
       />
 
       <EditRoleModal
+        organizationId={organizationId}
         member={editingMember}
         onOpenChange={(open) => !open && setEditingMember(null)}
         onConfirm={(accountId, roleId) =>

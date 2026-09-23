@@ -1,7 +1,6 @@
 import userEvent from '@testing-library/user-event';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
-import { useSystemRoles } from '@/lib/hooks/useSystemRoles';
 import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useMemberPermissions } from '../_hooks/useMemberPermissions';
@@ -19,8 +18,7 @@ const mockReplace = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mockRefresh, replace: mockReplace }),
 }));
-jest.mock('@/lib/hooks/useSystemRoles');
-// El modal de invitar pide los roles de la ORGANIZACIÓN, no sólo los de sistema.
+// Invitar y editar rol piden los roles de la ORGANIZACIÓN, no sólo los de sistema.
 jest.mock('@/lib/hooks/useOrganizationRoles');
 jest.mock('../_hooks/useMemberPermissions');
 jest.mock(
@@ -40,7 +38,6 @@ jest.mock(
   () => ({ inviteOrganizationMemberAction: jest.fn() }),
 );
 
-const mockedUseSystemRoles = useSystemRoles as jest.Mock;
 const mockedUseOrganizationRoles = useOrganizationRoles as jest.Mock;
 const mockedUseMemberPermissions = useMemberPermissions as jest.Mock;
 const mockedUpdateRole = updateOrganizationMemberRoleAction as jest.Mock;
@@ -67,6 +64,19 @@ const MEMBERS: OrganizationMember[] = [
     isActive: true,
     permissions: [],
   },
+];
+
+/**
+ * El catálogo que devuelve `GET /organizations/:id/roles`: los roles de sistema —OWNER entre
+ * ellos— más los propios de la organización. Se monta con OWNER y con un rol personalizado a
+ * propósito: son los dos casos que el selector de "Editar rol" trataba mal cuando pedía el
+ * catálogo de sistema.
+ */
+const ORGANIZATION_ROLES = [
+  { id: 'admin-role-1', name: 'ADMIN', isSystemRole: true, permissions: [] },
+  { id: 'member-role-1', name: 'MEMBER', isSystemRole: true, permissions: [] },
+  { id: 'owner-role-1', name: 'OWNER', isSystemRole: true, permissions: [] },
+  { id: 'custom-role-1', name: 'Aprobador', isSystemRole: false, permissions: [] },
 ];
 
 const PERMISSIONS: OrganizationPermission[] = [
@@ -107,28 +117,11 @@ describe('MembersManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedUseOrganizationRoles.mockImplementation(() => ({
-      data: mockedUseSystemRoles().data,
+      data: ORGANIZATION_ROLES,
       isPending: false,
       isError: false,
       isSuccess: true,
     }));
-    mockedUseSystemRoles.mockReturnValue({
-      data: [
-        {
-          id: 'admin-role-1',
-          name: 'ADMIN',
-          isSystemRole: true,
-          permissions: [],
-        },
-        {
-          id: 'member-role-1',
-          name: 'MEMBER',
-          isSystemRole: true,
-          permissions: [],
-        },
-      ],
-      isLoading: false,
-    });
     mockedUseMemberPermissions.mockReturnValue({ data: [], isLoading: false });
     mockedUpdateRole.mockResolvedValue({ ok: true });
     mockedRemoveMember.mockResolvedValue({ ok: true });
