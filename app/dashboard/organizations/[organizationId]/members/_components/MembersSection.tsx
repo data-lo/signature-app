@@ -10,8 +10,6 @@ import MembersEmptyState from './MembersEmptyState';
 
 interface MembersSectionProps {
   organizationId: string;
-  /** Incluir las membresías dadas de baja. Llega como `?includeInactive=true`. */
-  includeInactive: boolean;
 }
 
 /**
@@ -25,7 +23,7 @@ interface MembersSectionProps {
  * permisos que cada uno hereda de su rol, y el catálogo de etiquetas se adelanta para que el
  * modal de asignación no tenga que pedirlo cuando el administrador ya está esperando.
  *
- * @param props - Organización de la ruta y si deben incluirse las membresías dadas de baja.
+ * @param props - Organización de la ruta.
  * @returns La sección renderizada: tabla con miembros, o estado vacío si no hay ninguno.
  * @throws Relanza cualquier fallo que no sea 401 ni 403 para que lo recoja `error.tsx`. El 401
  * redirige al login y el 403 se renderiza como falta de acceso, porque ambos tienen una salida
@@ -33,19 +31,18 @@ interface MembersSectionProps {
  *
  * @example
  * ```tsx
- * <MembersSection organizationId="org-1" includeInactive={false} />
+ * <MembersSection organizationId="org-1" />
  * ```
  */
 export default async function MembersSection({
   organizationId,
-  includeInactive,
 }: MembersSectionProps) {
   let members: OrganizationMember[];
   let permissions: OrganizationPermission[];
 
   try {
     [members, permissions] = await Promise.all([
-      getOrganizationMembersAction(organizationId, includeInactive),
+      getOrganizationMembersAction(organizationId),
       getOrganizationPermissionsAction(organizationId),
     ]);
   } catch (error) {
@@ -84,7 +81,6 @@ export default async function MembersSection({
           organizationId={organizationId}
           members={members}
           permissions={permissions}
-          includeInactive={includeInactive}
         />
       )}
     </PageContainer>

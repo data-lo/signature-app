@@ -3,8 +3,6 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organizations/update-organization-member-role.server-action';
 import { removeOrganizationMemberAction } from '@/app/server-actions/organizations/remove-organization-member.server-action';
@@ -24,7 +22,6 @@ interface MembersManagerProps {
   members: OrganizationMember[];
   /** Catálogo de etiquetas de la organización, también resuelto en el servidor. */
   permissions: OrganizationPermission[];
-  includeInactive: boolean;
 }
 
 /**
@@ -35,12 +32,12 @@ interface MembersManagerProps {
  * quedado en el servidor. Por eso no hay aquí ninguna copia local de la lista que pudiera quedar
  * desincronizada de la real.
  *
- * El filtro de miembros dados de baja es un parámetro de la URL y no un estado de React: así lo
- * resuelve el mismo render del servidor que trae la lista, en vez de obligar al navegador a pedir
- * otra vez los miembros al marcar la casilla —que es justo lo que esta migración vino a quitar—.
- * Además deja la vista enlazable y la conserva al recargar.
+ * La tabla muestra a los miembros de la organización; quien fue dado de baja no aparece. El
+ * conmutador "Mostrar miembros dados de baja" que había aquí se retiró junto con el parámetro
+ * `?includeInactive=true` que lo sostenía: esa vista no debe estar disponible en la interfaz, y
+ * es el servidor el que ya no los devuelve.
  *
- * @param props - Organización, datos ya cargados y el filtro activo.
+ * @param props - Organización y datos ya cargados.
  * @returns La cabecera con las acciones de alta, la tabla y los modales.
  * @throws Nada: los Server Actions devuelven el fallo como resultado y aquí se muestra.
  *
@@ -50,7 +47,6 @@ interface MembersManagerProps {
  *   organizationId="org-1"
  *   members={members}
  *   permissions={permissions}
- *   includeInactive={false}
  * />
  * ```
  */
@@ -58,7 +54,6 @@ export default function MembersManager({
   organizationId,
   members,
   permissions,
-  includeInactive,
 }: MembersManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -128,13 +123,6 @@ export default function MembersManager({
     });
   }
 
-  function handleShowInactiveChange(checked: boolean) {
-    const path = `/dashboard/organizations/${organizationId}/members`;
-    startTransition(() => {
-      router.replace(checked ? `${path}?includeInactive=true` : path);
-    });
-  }
-
   return (
     <div className="flex flex-col gap-4">
       {/*
@@ -156,20 +144,6 @@ export default function MembersManager({
             <InviteMemberModal organizationId={organizationId} />
           </div>
         )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Switch
-          id="show-inactive-members"
-          checked={includeInactive}
-          disabled={isPending}
-          onCheckedChange={(checked) =>
-            handleShowInactiveChange(checked === true)
-          }
-        />
-        <Label htmlFor="show-inactive-members" className="text-sm font-normal">
-          Mostrar miembros dados de baja
-        </Label>
       </div>
 
       <MembersTable
