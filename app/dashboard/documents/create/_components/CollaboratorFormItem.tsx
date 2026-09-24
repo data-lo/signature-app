@@ -32,11 +32,11 @@ interface CollaboratorFormItemProps {
 
 /**
  * Un bloque del arreglo unificado `collaborators` (ver historia "Frontend: Carga de Documentos
- * y Configuración de Firmantes") — el mismo componente renderiza SIGNER y VIEWER, mostrando
+ * y Configuración de Firmantes") — el mismo componente renderiza SIGNER y WITNESS, mostrando
  * solo los campos que aplican a cada uno:
  *  - SIGNER: nombre/apellido/email siempre; la configuración de 2FA aplica a todo el documento
  *    y se decide en la segunda sección.
- *  - VIEWER: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
+ *  - WITNESS: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
  *
  * Historia "Selección de tipo de firma al crear documentos": el tipo de firma ya no se elige por
  * firmante (era un checkbox acá) sino una sola vez para todo el documento. El
@@ -60,7 +60,7 @@ export default function CollaboratorFormItem({
     name: `collaborators.${index}.collaboratorType`,
   });
   const isSigner = collaboratorType === 'SIGNER';
-  const showTaxId = collaboratorType === 'VIEWER';
+  const showTaxId = collaboratorType === 'WITNESS';
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -86,7 +86,7 @@ export default function CollaboratorFormItem({
             </span>
           )}
           <span className="text-xs font-semibold tracking-wide text-muted-foreground">
-            {isSigner ? 'Firmante' : 'Espectador'}
+            {isSigner ? 'Firmante' : 'Testigo'}
           </span>
           {isSelf && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">

@@ -333,13 +333,13 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await user.click(screen.getByRole('button', { name: /espectador/i }));
+      await user.click(screen.getByRole('button', { name: /testigo/i }));
       await selectSignatureType(user, /firma simple/i);
 
       // Cada encabezado muestra su resumen al abrir otro, porque solo un panel queda expandido.
       await user.click(trigger(/cargar documento/i));
       expect(trigger(/añadir participantes/i)).toHaveTextContent(
-        '1 firmante · 1 espectador',
+        '1 firmante · 1 testigo',
       );
 
       await user.click(trigger(/configurar firma/i));
@@ -366,7 +366,7 @@ describe('CreateDocumentView', () => {
       expect(summary).toHaveTextContent(/documento\s*Pendiente/i);
       expect(summary).toHaveTextContent(/páginas\s*Pendiente/i);
       expect(summary).toHaveTextContent(/firmantes\s*Pendiente/i);
-      expect(summary).toHaveTextContent(/espectadores\s*0 espectadores/i);
+      expect(summary).toHaveTextContent(/testigos\s*0 testigos/i);
 
       await selectFile(user);
       await addSigner(user);
@@ -644,12 +644,12 @@ describe('CreateDocumentView', () => {
       ).toBeInTheDocument();
     });
 
-    it('el espectador sigue siendo el único participante al que se le pide RFC', async () => {
+    it('el testigo sigue siendo el único participante al que se le pide RFC', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
       await openSection(user, /añadir participantes/i);
-      await user.click(screen.getByRole('button', { name: /espectador/i }));
+      await user.click(screen.getByRole('button', { name: /testigo/i }));
 
       expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
     });
@@ -662,13 +662,13 @@ describe('CreateDocumentView', () => {
      * podría quedarse con el nombre viejo sin que las pruebas de unidad de los otros dos lo
      * noten.
      */
-    it('lo que el espectador escribe en RFC viaja al backend como taxId', async () => {
+    it('lo que el testigo escribe en RFC viaja al backend como taxId', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
       await addSigner(user);
-      await user.click(screen.getByRole('button', { name: /espectador/i }));
+      await user.click(screen.getByRole('button', { name: /testigo/i }));
       const viewerInputs = screen.getAllByLabelText(/nombre\(s\)/i);
       await user.type(viewerInputs[viewerInputs.length - 1], 'Ana');
       const lastNames = screen.getAllByLabelText(/apellido/i);
@@ -684,7 +684,7 @@ describe('CreateDocumentView', () => {
         expect.objectContaining({
           collaborators: expect.arrayContaining([
             expect.objectContaining({
-              collaboratorType: 'VIEWER',
+              collaboratorType: 'WITNESS',
               taxId: 'AURU800101ABC',
             }),
           ]),

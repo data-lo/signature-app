@@ -89,7 +89,7 @@ export default function CreateDocumentView({
     requiresApproval: createDocumentForm.requiresApproval,
     reviewerUserId: createDocumentForm.reviewerUserId,
     signerCount: createDocumentForm.signerCount,
-    viewerCount: createDocumentForm.viewerCount,
+    witnessCount: createDocumentForm.witnessCount,
   });
 
   const sections = buildCreateDocumentSections({

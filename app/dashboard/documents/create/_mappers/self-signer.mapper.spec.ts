@@ -1,7 +1,7 @@
 import { buildSelfSigner, resolveSelfSignerSync } from './self-signer.mapper';
 import {
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   type CollaboratorFormValues,
 } from '../_schemas';
 import type { CurrentUser } from '@/lib/api/auth';
@@ -49,7 +49,7 @@ describe('resolveSelfSignerSync', () => {
     });
 
     it('la agrega también cuando ya hay participantes capturados a mano', () => {
-      const result = sync(true, [emptySigner(), emptyViewer()]);
+      const result = sync(true, [emptySigner(), emptyWitness()]);
 
       expect(result.action).toBe('add');
     });
@@ -92,7 +92,7 @@ describe('resolveSelfSignerSync', () => {
     it('devuelve su posición real, sin tocar a los participantes capturados a mano', () => {
       const result = sync(false, [
         emptySigner(),
-        emptyViewer(),
+        emptyWitness(),
         buildSelfSigner(CURRENT_USER),
       ]);
 

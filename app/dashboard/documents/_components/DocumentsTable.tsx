@@ -41,7 +41,7 @@ export interface DocumentListItem {
   fileName: string;
   fileType: string;
   signers: string[];
-  spectators: string[];
+  witnesses: string[];
   creator: string;
   /** RFC de quien creó el documento; null mientras no lo haya registrado en su perfil. */
   creatorRfc?: string | null;

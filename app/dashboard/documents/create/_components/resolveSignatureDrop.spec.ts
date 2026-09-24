@@ -1,7 +1,7 @@
 import { resolveSignatureDrop } from './resolveSignatureDrop';
 import {
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   type CollaboratorFormValues,
 } from '../_schemas';
 
@@ -158,7 +158,7 @@ describe('resolveSignatureDrop', () => {
   it('no hace nada si el índice de colaborador no corresponde a un SIGNER (p. ej. un viewer)', () => {
     const collaborators: CollaboratorFormValues[] = [
       {
-        ...emptyViewer(),
+        ...emptyWitness(),
         firstName: 'Carlos',
         lastName: 'Solares',
         email: 'c@correo.com',

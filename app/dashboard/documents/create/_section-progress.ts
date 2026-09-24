@@ -28,7 +28,7 @@ export interface CreateDocumentProgressParams {
   /** Usuario elegido para aprobar, cuando la aprobación está activa. */
   reviewerUserId?: string | null;
   signerCount: number;
-  viewerCount: number;
+  witnessCount: number;
 }
 
 export interface SectionProgress {
@@ -43,7 +43,7 @@ export interface CreateDocumentSummary {
   pageCount: string;
   signatureType: string;
   signerCount: string;
-  viewerCount: string;
+  witnessCount: string;
 }
 
 export interface CreateDocumentProgress {
@@ -69,7 +69,7 @@ export function buildCreateDocumentProgress({
   requiresApproval = false,
   reviewerUserId = null,
   signerCount,
-  viewerCount,
+  witnessCount,
 }: CreateDocumentProgressParams): CreateDocumentProgress {
   // Un archivo a medio procesar no cuenta como cargado: es el mismo criterio con el que
   // `_section-rules.ts` decide que todavía no hay nada que previsualizar.
@@ -111,7 +111,7 @@ export function buildCreateDocumentProgress({
     isComplete: hasSigners,
     collapsedSummary: [
       pluralize(signerCount, 'firmante', 'firmantes'),
-      pluralize(viewerCount, 'espectador', 'espectadores'),
+      pluralize(witnessCount, 'testigo', 'testigos'),
     ].join(' · '),
   };
 
@@ -126,7 +126,7 @@ export function buildCreateDocumentProgress({
       signerCount: hasSigners
         ? pluralize(signerCount, 'firmante', 'firmantes')
         : PENDING_LABEL,
-      viewerCount: pluralize(viewerCount, 'espectador', 'espectadores'),
+      witnessCount: pluralize(witnessCount, 'testigo', 'testigos'),
     },
     isReadyToSubmit:
       upload.isComplete && configuration.isComplete && participants.isComplete,

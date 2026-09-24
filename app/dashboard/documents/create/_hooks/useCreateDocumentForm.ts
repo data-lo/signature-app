@@ -7,7 +7,7 @@ import { getErrorMessage } from '@/lib/error-handler';
 import {
   createDocumentSignaturesSchema,
   countSigners,
-  countViewers,
+  countWitnesses,
   CREATE_DOCUMENT_DEFAULT_VALUES,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
@@ -119,8 +119,8 @@ export function useCreateDocumentForm({
     handleSubmit: form.handleSubmit(onValidSubmit, onInvalid),
     /** Cuántos firmantes hay hoy en el formulario (gobierna el orden de firma). */
     signerCount: countSigners(collaborators),
-    /** Cuántos espectadores hay hoy en el formulario (solo informativo: alimenta el resumen). */
-    viewerCount: countViewers(collaborators),
+    /** Cuántos testigos hay hoy en el formulario (solo informativo: alimenta el resumen). */
+    witnessCount: countWitnesses(collaborators),
     /** Tipo de firma elegido para todo el documento (ver `SignatureTypeField`). */
     signatureType: signatureType ?? undefined,
     /** Si el documento necesita que alguien lo apruebe antes de salir a firma. */

@@ -5,7 +5,7 @@ import {
 } from './collaborator-payload.mapper';
 import {
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   type CollaboratorFormValues,
   type SignerFormValues,
 } from '../_schemas';
@@ -22,7 +22,7 @@ function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
 
 function viewer(): CollaboratorFormValues {
   return {
-    ...emptyViewer(),
+    ...emptyWitness(),
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
@@ -105,18 +105,18 @@ describe('toCollaboratorPayload', () => {
   it('un viewer no manda signatures ni requiresTwoFactorAuth, pero sí su taxId', () => {
     const payload = toCollaboratorPayload(viewer(), 'ADVANCED');
 
-    expect(payload.collaboratorType).toBe('VIEWER');
+    expect(payload.collaboratorType).toBe('WITNESS');
     expect(payload.signatures).toBeUndefined();
     expect(payload.requiresTwoFactorAuth).toBeUndefined();
     expect(payload.taxId).toBe('AURU800101ABC');
   });
 
   it('historia "Eliminar campo RFC de la sección de Espectadores": un viewer sin taxId lo manda vacío, no lo omite', () => {
-    // `emptyViewer()` (no `viewer()`) porque tipa como ViewerFormValues y no como el union
+    // `emptyWitness()` (no `viewer()`) porque tipa como WitnessFormValues y no como el union
     // CollaboratorFormValues: spreadear un union en un literal dispara el excess-property-check
     // de TypeScript contra la rama SIGNER, que no tiene `taxId`.
     const payload = toCollaboratorPayload(
-      { ...emptyViewer(), taxId: '' },
+      { ...emptyWitness(), taxId: '' },
       'ADVANCED',
     );
 

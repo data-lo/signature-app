@@ -32,10 +32,10 @@ export interface SignaturePositionPayload {
 /**
  * Forma exacta que espera el backend por cada colaborador (campo `collaborators`). Sin
  * `signatureType`: lo define el documento entero (`DocumentDataPayload.signatureType`). `taxId`
- * solo viaja para VIEWER — a los firmantes ya no se les pide en ningún flujo.
+ * solo viaja para WITNESS — a los firmantes ya no se les pide en ningún flujo.
  */
 export interface CollaboratorPayload {
-  collaboratorType: 'SIGNER' | 'VIEWER';
+  collaboratorType: 'SIGNER' | 'WITNESS';
   firstName: string;
   lastName: string;
   email: string;
