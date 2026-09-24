@@ -1,6 +1,10 @@
 import type { OrganizationRole } from '@/lib/api/organization-roles';
 
-import { assignableMemberRoles, OWNER_ROLE_NAME } from './assignable-member-roles';
+import {
+  assignableMemberRoles,
+  isOwnerMember,
+  OWNER_ROLE_NAME,
+} from './assignable-member-roles';
 
 function role(name: string, isSystemRole = true): OrganizationRole {
   return {
@@ -44,5 +48,23 @@ describe('assignableMemberRoles', () => {
     assignableMemberRoles(roles);
 
     expect(roles).toHaveLength(2);
+  });
+});
+
+/** Historia "Impedir desactivación de cuentas con perfil Owner". */
+describe('isOwnerMember', () => {
+  it('reconoce al propietario por su rol', () => {
+    expect(isOwnerMember({ role: { name: OWNER_ROLE_NAME } })).toBe(true);
+  });
+
+  it.each([['ADMIN'], ['MEMBER'], ['Propietario']])(
+    'un rol %s no es el propietario',
+    (name) => {
+      expect(isOwnerMember({ role: { name } })).toBe(false);
+    },
+  );
+
+  it('sin rol no es el propietario', () => {
+    expect(isOwnerMember({ role: null })).toBe(false);
   });
 });
