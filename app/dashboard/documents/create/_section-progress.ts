@@ -1,5 +1,8 @@
 import { SIGNATURE_TYPE_LABELS } from './_config/signature-type.config';
-import type { DocumentSignatureType } from './_schemas';
+import {
+  SIGNATURE_POSITION_REQUIRED_MESSAGE,
+  type DocumentSignatureType,
+} from './_schemas';
 
 /**
  * Qué tan completa está cada sección de la solicitud de firma, qué muestra su encabezado cuando
@@ -29,6 +32,11 @@ export interface CreateDocumentProgressParams {
   reviewerUserId?: string | null;
   signerCount: number;
   viewerCount: number;
+  /**
+   * Firmantes que todavía no tienen ninguna ubicación de firma sobre el PDF (ver
+   * `signersWithoutPosition`). Vacío cuando a nadie le falta.
+   */
+  signersWithoutPosition?: string[];
 }
 
 export interface SectionProgress {
@@ -50,9 +58,19 @@ export interface CreateDocumentProgress {
   upload: SectionProgress;
   configuration: SectionProgress;
   participants: SectionProgress;
+  /**
+   * Ubicación de firmas (historia "Hacer obligatorias las coordenadas de posición de firma"):
+   * completa cuando cada firmante tiene al menos una firma colocada. `missingMessage` dice a
+   * quién le falta, y sólo existe cuando hay PDF y firmantes —antes no hay dónde ni a quién
+   * ubicar, y el aviso sería ruido—.
+   */
+  signaturePlacement: { isComplete: boolean; missingMessage?: string };
   /** Siempre presente: los datos que faltan se muestran como "Pendiente", no se ocultan. */
   summary: CreateDocumentSummary;
-  /** Las tres secciones completas: PDF cargado, tipo de firma elegido y al menos un firmante. */
+  /**
+   * Todo lo que la solicitud necesita: PDF cargado, tipo de firma elegido, al menos un firmante y
+   * la firma de cada firmante ubicada en el documento.
+   */
   isReadyToSubmit: boolean;
 }
 
@@ -70,6 +88,7 @@ export function buildCreateDocumentProgress({
   reviewerUserId = null,
   signerCount,
   viewerCount,
+  signersWithoutPosition = [],
 }: CreateDocumentProgressParams): CreateDocumentProgress {
   // Un archivo a medio procesar no cuenta como cargado: es el mismo criterio con el que
   // `_section-rules.ts` decide que todavía no hay nada que previsualizar.
@@ -115,10 +134,20 @@ export function buildCreateDocumentProgress({
     ].join(' · '),
   };
 
+  const hasAllSignaturesPlaced = signersWithoutPosition.length === 0;
+  const signaturePlacement = {
+    isComplete: hasSigners && hasAllSignaturesPlaced,
+    missingMessage:
+      hasUsableFile && hasSigners && !hasAllSignaturesPlaced
+        ? `${SIGNATURE_POSITION_REQUIRED_MESSAGE} Falta: ${signersWithoutPosition.join(', ')}.`
+        : undefined,
+  };
+
   return {
     upload,
     configuration,
     participants,
+    signaturePlacement,
     summary: {
       documentName: hasUsableFile && fileName ? fileName : PENDING_LABEL,
       pageCount: hasUsableFile ? pageCountLabel : PENDING_LABEL,
@@ -129,6 +158,9 @@ export function buildCreateDocumentProgress({
       viewerCount: pluralize(viewerCount, 'espectador', 'espectadores'),
     },
     isReadyToSubmit:
-      upload.isComplete && configuration.isComplete && participants.isComplete,
+      upload.isComplete &&
+      configuration.isComplete &&
+      participants.isComplete &&
+      signaturePlacement.isComplete,
   };
 }

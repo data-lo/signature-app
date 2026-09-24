@@ -90,6 +90,7 @@ export default function CreateDocumentView({
     reviewerUserId: createDocumentForm.reviewerUserId,
     signerCount: createDocumentForm.signerCount,
     viewerCount: createDocumentForm.viewerCount,
+    signersWithoutPosition: createDocumentForm.signersWithoutPosition,
   });
 
   const sections = buildCreateDocumentSections({
@@ -179,6 +180,17 @@ export default function CreateDocumentView({
               ? 'Enviando solicitud...'
               : 'Enviar solicitud de firma'}
           </Button>
+
+          {/*
+            Junto al botón porque es lo que explica por qué sigue deshabilitado. La ubicación se
+            hace en la columna del PDF, que no tiene un lugar propio para este aviso: su estado de
+            error reemplaza la vista previa entera.
+          */}
+          {progress.signaturePlacement.missingMessage && (
+            <p role="status" className="text-sm text-destructive">
+              {progress.signaturePlacement.missingMessage}
+            </p>
+          )}
 
           {sections.submission.hasError && (
             <FieldError>{sections.submission.errorMessage}</FieldError>
