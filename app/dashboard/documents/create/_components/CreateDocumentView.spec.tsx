@@ -6,7 +6,7 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useDocuments } from '../../_hooks/useDocuments';
 import { useCreateDocumentSignatures } from '../_hooks/useCreateDocumentSignatures';
 import { useDocumentsCount } from '@/app/_components/DocumentsCountContext';
-import { getOrganizationMembersRequest } from '@/lib/api/organization-members';
+import { getDocumentApproversRequest } from '../_requests';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { MISSING_FILE_MESSAGE } from '../_section-rules';
 import { NO_APPROVERS_MESSAGE } from './ApproverUserField';
@@ -22,7 +22,12 @@ jest.mock('../_hooks/useCreateDocumentSignatures', () => ({
   useCreateDocumentSignatures: jest.fn(),
 }));
 jest.mock('@/app/_components/DocumentsCountContext');
-jest.mock('@/lib/api/organization-members');
+// Sólo el request de aprobadores: el resto de `_requests` (el envío) ya lo cubre el mock de
+// `useCreateDocumentSignatures`.
+jest.mock('../_requests', () => ({
+  ...jest.requireActual('../_requests'),
+  getDocumentApproversRequest: jest.fn(),
+}));
 // El selector real monta FilePond (que necesita APIs de archivos del navegador): se reemplaza por
 // dos botones que disparan los mismos callbacks — archivo listo y archivo procesándose.
 jest.mock('./DocumentFilePicker', () => ({
@@ -107,7 +112,7 @@ const mockedUseDocuments = useDocuments as jest.Mock;
 const mockedUseCreateDocumentSignatures =
   useCreateDocumentSignatures as jest.Mock;
 const mockedUseDocumentsCount = useDocumentsCount as jest.Mock;
-const mockedGetOrganizationMembers = getOrganizationMembersRequest as jest.Mock;
+const mockedGetApprovers = getDocumentApproversRequest as jest.Mock;
 
 function selectFile(user: ReturnType<typeof userEvent.setup>) {
   return user.click(
@@ -202,7 +207,7 @@ describe('CreateDocumentView', () => {
       error: null,
     });
     mockedUseDocumentsCount.mockReturnValue({ setDocumentsCount: jest.fn() });
-    mockedGetOrganizationMembers.mockReset();
+    mockedGetApprovers.mockReset();
     /**
      * Sin cuenta activa, que es el punto de partida de casi toda esta suite: "Requiere
      * aprobación" sólo se muestra en cuentas ORGANIZATION, así que el bloque que la prueba es el
@@ -1128,31 +1133,16 @@ describe('CreateDocumentView', () => {
 
   /**
    * Historia "Selección de aprobador al requerir aprobación en nuevo documento": la opción sólo
-   * existe en cuentas ORGANIZATION, consulta a los miembros con permiso para aprobar en cuanto se
-   * marca, y deja el envío preparado con el usuario elegido.
+   * existe en cuentas ORGANIZATION, consulta a los aprobadores (`GET /documents/approvers`) en
+   * cuanto se marca, y deja el envío preparado con el usuario elegido.
    */
   describe('aprobación', () => {
     function approverMember() {
       return {
-        accountId: 'account-9',
         userId: 'user-9',
         email: 'ana@empresa.com',
-        rfc: null,
-        role: { id: 'role-9', name: 'Aprobador' },
-        joinedAt: '2026-01-01T00:00:00Z',
-        status: 'active',
-        isActive: true,
-        permissions: [
-          {
-            id: 'permission-approve',
-            key: 'DOCUMENT.APPROVE',
-            resource: 'DOCUMENT',
-            action: 'APPROVE',
-            scope: 'ORGANIZATION',
-            description: 'APROBAR DOCUMENTOS',
-            isStaticCatalog: true,
-          },
-        ],
+        firstName: 'Ana',
+        lastName: 'Ruiz',
       };
     }
 
@@ -1183,12 +1173,12 @@ describe('CreateDocumentView', () => {
       expect(
         screen.getByRole('checkbox', { name: /requiere aprobación/i }),
       ).toBeInTheDocument();
-      expect(mockedGetOrganizationMembers).not.toHaveBeenCalled();
+      expect(mockedGetApprovers).not.toHaveBeenCalled();
     });
 
     it('al marcarla, consulta y prepara el envío con el aprobador elegido', async () => {
       const user = userEvent.setup();
-      mockedGetOrganizationMembers.mockResolvedValue([approverMember()]);
+      mockedGetApprovers.mockResolvedValue([approverMember()]);
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
@@ -1198,7 +1188,7 @@ describe('CreateDocumentView', () => {
       await requireApproval(user);
 
       await waitFor(() =>
-        expect(mockedGetOrganizationMembers).toHaveBeenCalledWith('org-1'),
+        expect(mockedGetApprovers).toHaveBeenCalled(),
       );
 
       // Con la aprobación marcada y sin aprobador, la configuración está a medias.
@@ -1229,7 +1219,7 @@ describe('CreateDocumentView', () => {
 
     it('sin usuarios aprobadores lo dice y no deja enviar', async () => {
       const user = userEvent.setup();
-      mockedGetOrganizationMembers.mockResolvedValue([]);
+      mockedGetApprovers.mockResolvedValue([]);
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
