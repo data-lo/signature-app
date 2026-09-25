@@ -20,6 +20,10 @@ import { DOCUMENTS_SECTIONS } from '../_config/sections';
 
 const DOCUMENTS_PAGE_SIZE = 25;
 
+/** Lo que dice la tabla si la consulta del listado falla. */
+export const DOCUMENTS_LOAD_ERROR_MESSAGE =
+  'No se pudieron cargar los documentos. Intenta de nuevo más tarde.';
+
 /**
  * Cuánto se espera tras la última tecla antes de consultar.
  *
@@ -125,6 +129,13 @@ export default function DocumentsView() {
         totalPages={result?.pagination.totalPages}
         onPageChange={setPage}
         onRowSelect={(id) => router.push(`/dashboard/documents/${id}`)}
+        // `isPending` y no `isLoading`: también cubre la espera a la cuenta activa (la consulta
+        // está deshabilitada hasta entonces) y cada cambio de página o filtro, que estrena
+        // `queryKey` y por tanto vuelve a no tener datos.
+        isLoading={documentsQuery.isPending}
+        errorMessage={
+          documentsQuery.isError ? DOCUMENTS_LOAD_ERROR_MESSAGE : undefined
+        }
       />
     </PageContainer>
   );
