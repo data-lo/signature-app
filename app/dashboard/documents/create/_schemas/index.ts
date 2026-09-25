@@ -11,16 +11,17 @@ export {
 
 export {
   signerSchema,
-  viewerSchema,
+  witnessSchema,
   collaboratorSchema,
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   countSigners,
-  countViewers,
+  signersWithoutPosition,
+  countWitnesses,
   isSelfSigner,
   findSelfSignerIndex,
   type SignerFormValues,
-  type ViewerFormValues,
+  type WitnessFormValues,
   type CollaboratorFormValues,
 } from './collaborator.schema';
 
@@ -40,5 +41,6 @@ export {
 export {
   createDocumentSignaturesSchema,
   CREATE_DOCUMENT_DEFAULT_VALUES,
+  SIGNATURE_POSITION_REQUIRED_MESSAGE,
   type CreateDocumentSignaturesFormValues,
 } from './create-document-signatures.schema';

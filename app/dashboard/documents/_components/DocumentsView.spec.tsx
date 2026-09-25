@@ -201,7 +201,7 @@ describe('DocumentsView', () => {
             fileName: 'contrato.pdf',
             fileType: 'application/pdf',
             signers: [],
-            spectators: [],
+            witnesses: [],
             creator: 'Sara Ramírez',
             totalPages: 1,
             status: DocumentStatus.PendingSignature,

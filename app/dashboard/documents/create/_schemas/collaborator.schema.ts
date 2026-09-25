@@ -15,12 +15,12 @@ const emailField = z
   .min(1, { message: 'Ingresa el correo electrónico del participante.' })
   .email({ message: 'Ingresa un correo electrónico válido.' });
 /**
- * Identificador fiscal del espectador —en México, su RFC, que es lo que sigue diciendo la
+ * Identificador fiscal del testigo —en México, su RFC, que es lo que sigue diciendo la
  * etiqueta en pantalla—. Se llamaba `rfc` hasta la historia "Estandarizar campos de
  * colaboradores": el nombre del campo deja de dar por hecho el régimen fiscal, el dato que se
  * captura es el mismo.
  *
- * Opcional desde la historia "Eliminar campo RFC de la sección de Espectadores": un espectador
+ * Opcional desde la historia "Eliminar campo RFC de la sección de Espectadores": un testigo
  * puede guardarse sin él. `.trim()` sigue aplicando por si acaso llega solo espacios; un string
  * vacío es válido y así viaja al backend, donde `CollaboratorPayloadDto.taxId` también lo acepta.
  */
@@ -39,8 +39,10 @@ export const signerSchema = z.object({
   lastName: lastNameField,
   email: emailField,
   // Ubicaciones de firma colocadas por arrastre sobre el PDF (ver historia "Ubicación de
-  // firmas por usuario") — un arreglo vacío es válido: el firmante firma sin estampado visual.
-  // Sin `.default()` a propósito: con `.default()` el input/output del schema divergen
+  // firmas por usuario"). El arreglo vacío es un estado válido MIENTRAS se llena el formulario
+  // —el firmante se agrega antes de colocar su firma—, pero no se puede enviar así: lo impide
+  // `createDocumentSignaturesSchema` (historia "Hacer obligatorias las coordenadas de posición de
+  // firma"). Sin `.default()` a propósito: con `.default()` el input/output del schema divergen
   // (input optativo, output requerido), lo que rompe la inferencia de tipos de zodResolver
   // contra `CreateDocumentSignaturesFormValues`. Todo lugar que arma un SignerFormValues
   // (`emptySigner`, `buildSelfSigner`) ya manda `signatures` explícito.
@@ -54,25 +56,25 @@ export const signerSchema = z.object({
 });
 
 /**
- * El identificador fiscal sobrevive solo acá: un espectador no firma, así que no hay certificado
+ * El identificador fiscal sobrevive solo acá: un testigo no firma, así que no hay certificado
  * del que leerlo.
  */
-export const viewerSchema = z.object({
-  collaboratorType: z.literal('VIEWER'),
+export const witnessSchema = z.object({
+  collaboratorType: z.literal('WITNESS'),
   firstName: firstNameField,
   lastName: lastNameField,
   email: emailField,
   taxId: taxIdField,
 });
 
-/** Firmantes y espectadores viven en un solo arreglo, diferenciados por `collaboratorType`. */
+/** Firmantes y testigos viven en un solo arreglo, diferenciados por `collaboratorType`. */
 export const collaboratorSchema = z.discriminatedUnion('collaboratorType', [
   signerSchema,
-  viewerSchema,
+  witnessSchema,
 ]);
 
 export type SignerFormValues = z.infer<typeof signerSchema>;
-export type ViewerFormValues = z.infer<typeof viewerSchema>;
+export type WitnessFormValues = z.infer<typeof witnessSchema>;
 export type CollaboratorFormValues = z.infer<typeof collaboratorSchema>;
 
 export function emptySigner(): SignerFormValues {
@@ -86,9 +88,9 @@ export function emptySigner(): SignerFormValues {
   };
 }
 
-export function emptyViewer(): ViewerFormValues {
+export function emptyWitness(): WitnessFormValues {
   return {
-    collaboratorType: 'VIEWER',
+    collaboratorType: 'WITNESS',
     firstName: '',
     lastName: '',
     email: '',
@@ -103,10 +105,47 @@ export function countSigners(collaborators: CollaboratorFormValues[]): number {
   ).length;
 }
 
+/**
+ * Nombre con el que se identifica a un firmante en los mensajes de la pantalla: su nombre
+ * completo, o su correo si todavía no lo capturó, o su posición en la lista si no tiene ninguno.
+ */
+function signerLabel(signer: SignerFormValues, signerNumber: number): string {
+  const fullName = `${signer.firstName} ${signer.lastName}`.trim();
+  return fullName || signer.email.trim() || `Firmante ${signerNumber}`;
+}
+
+/**
+ * Firmantes que todavía no tienen ninguna ubicación de firma colocada sobre el PDF, por nombre y
+ * en el orden de la lista. Único criterio de "falta ubicar firmas": lo consultan el esquema (que
+ * bloquea el envío) y la pantalla (que dice a quién le falta).
+ *
+ * @param collaborators - Colaboradores del formulario.
+ * @returns Los nombres de los firmantes sin posición; vacío si a nadie le falta.
+ *
+ * @example
+ * ```ts
+ * signersWithoutPosition([juanSinFirma, mariaConFirma]); // ['Juan Pérez']
+ * ```
+ */
+export function signersWithoutPosition(
+  collaborators: CollaboratorFormValues[],
+): string[] {
+  return collaborators
+    .filter(
+      (collaborator): collaborator is SignerFormValues =>
+        collaborator.collaboratorType === 'SIGNER',
+    )
+    .map((signer, index) => ({ signer, label: signerLabel(signer, index + 1) }))
+    .filter(({ signer }) => signer.signatures.length === 0)
+    .map(({ label }) => label);
+}
+
 /** Contraparte de `countSigners` para el resumen de la solicitud (ver `_section-progress.ts`). */
-export function countViewers(collaborators: CollaboratorFormValues[]): number {
+export function countWitnesses(
+  collaborators: CollaboratorFormValues[],
+): number {
   return collaborators.filter(
-    (collaborator) => collaborator.collaboratorType === 'VIEWER',
+    (collaborator) => collaborator.collaboratorType === 'WITNESS',
   ).length;
 }
 
