@@ -346,61 +346,51 @@ describe('IdentitySignatureView', () => {
     });
   });
 
+  /**
+   * Historia "Ocultar información de tipo de validación DIDI en Identidad y Firma": el desglose
+   * de comprobaciones de Didit ya no se muestra, llegue o no en la respuesta. La fecha y la
+   * verificación sí.
+   */
   describe('detalle de la validación', () => {
-    it('muestra qué se comprobó, sin filtrar datos del veredicto crudo', async () => {
-      givenStatus(SigningCredentialStatus.SignaturePending, {
-        ...openSession(null),
-        status: IdentityVerificationStatus.Approved,
-        checks: {
-          documentReading: IdentityCheckOutcome.Passed,
-          faceMatch: IdentityCheckOutcome.Passed,
-          liveness: IdentityCheckOutcome.Passed,
-        },
-      });
+    const CHECK_TEXTS = [
+      /resultado de la validación de identidad/i,
+      /lectura de la identificación/i,
+      /comparación del rostro/i,
+      /prueba de vida/i,
+      /no superada/i,
+      /no reportada/i,
+      /no contamos con el detalle de las comprobaciones/i,
+    ];
 
-      renderWithProviders(<IdentitySignatureView />);
-
-      expect(
-        await screen.findByText(/lectura de la identificación/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/comparación del rostro con la identificación/i),
-      ).toBeInTheDocument();
-      expect(screen.getByText(/prueba de vida/i)).toBeInTheDocument();
-    });
-
-    it('distingue "no reportada" de "no superada": no alarma por una comprobación ausente', async () => {
-      givenStatus(SigningCredentialStatus.SignaturePending, {
-        ...openSession(null),
-        status: IdentityVerificationStatus.Approved,
-        checks: {
+    it.each([
+      [
+        'con comprobaciones',
+        {
           documentReading: IdentityCheckOutcome.Passed,
           faceMatch: IdentityCheckOutcome.Failed,
           liveness: null,
         },
-      });
+      ],
+      ['sin comprobaciones', null],
+    ])(
+      '%s: no muestra el tipo de validación y sí la fecha y la verificación',
+      async (_name, checks) => {
+        givenStatus(SigningCredentialStatus.SignaturePending, {
+          ...openSession(null),
+          id: 'verification-1',
+          status: IdentityVerificationStatus.Approved,
+          checks,
+        });
 
-      renderWithProviders(<IdentitySignatureView />);
+        renderWithProviders(<IdentitySignatureView />);
 
-      expect(await screen.findByText(/no superada/i)).toBeInTheDocument();
-      expect(screen.getByText(/no reportada/i)).toBeInTheDocument();
-    });
-
-    it('sin detalle de comprobaciones lo indica, en vez de pintar tres renglones vacíos', async () => {
-      givenStatus(SigningCredentialStatus.SignaturePending, {
-        ...openSession(null),
-        status: IdentityVerificationStatus.Approved,
-        checks: null,
-      });
-
-      renderWithProviders(<IdentitySignatureView />);
-
-      expect(
-        await screen.findByText(
-          /no contamos con el detalle de las comprobaciones/i,
-        ),
-      ).toBeInTheDocument();
-    });
+        expect(await screen.findByText('Validada el')).toBeInTheDocument();
+        expect(screen.getByText('verification-1')).toBeInTheDocument();
+        for (const text of CHECK_TEXTS) {
+          expect(screen.queryByText(text)).not.toBeInTheDocument();
+        }
+      },
+    );
   });
 
   describe('sin aviso de credencial', () => {
