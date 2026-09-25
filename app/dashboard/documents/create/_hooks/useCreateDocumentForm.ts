@@ -7,7 +7,7 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import {
   createDocumentSignaturesSchema,
   countSigners,
-  countViewers,
+  countWitnesses,
   signersWithoutPosition,
   CREATE_DOCUMENT_DEFAULT_VALUES,
   type CreateDocumentSignaturesFormValues,
@@ -128,8 +128,8 @@ export function useCreateDocumentForm({
     handleSubmit: form.handleSubmit(onValidSubmit, onInvalid),
     /** Cuántos firmantes hay hoy en el formulario (gobierna el orden de firma). */
     signerCount: countSigners(collaborators),
-    /** Cuántos espectadores hay hoy en el formulario (solo informativo: alimenta el resumen). */
-    viewerCount: countViewers(collaborators),
+    /** Cuántos testigos hay hoy en el formulario (solo informativo: alimenta el resumen). */
+    witnessCount: countWitnesses(collaborators),
     /** Firmantes a los que todavía les falta colocar su firma en el PDF, por nombre. */
     signersWithoutPosition: signersWithoutPosition(collaborators),
     /** Tipo de firma elegido para todo el documento (ver `SignatureTypeField`). */

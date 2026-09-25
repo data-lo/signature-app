@@ -12,7 +12,7 @@ function params(
     isFileLoading: false,
     pageCount: null,
     signerCount: 0,
-    viewerCount: 0,
+    witnessCount: 0,
     ...overrides,
   };
 }
@@ -130,20 +130,20 @@ describe('buildCreateDocumentProgress', () => {
   describe('añadir participantes', () => {
     it('sin firmantes no está completa', () => {
       const progress = buildCreateDocumentProgress(
-        params({ signerCount: 0, viewerCount: 2 }),
+        params({ signerCount: 0, witnessCount: 2 }),
       );
 
       expect(progress.participants.isComplete).toBe(false);
     });
 
-    it('el encabezado contraído siempre muestra cuántos firmantes y espectadores hay', () => {
+    it('el encabezado contraído siempre muestra cuántos firmantes y testigos hay', () => {
       const progress = buildCreateDocumentProgress(
-        params({ signerCount: 1, viewerCount: 2 }),
+        params({ signerCount: 1, witnessCount: 2 }),
       );
 
       expect(progress.participants.isComplete).toBe(true);
       expect(progress.participants.collapsedSummary).toBe(
-        '1 firmante · 2 espectadores',
+        '1 firmante · 2 testigos',
       );
     });
   });
@@ -157,14 +157,14 @@ describe('buildCreateDocumentProgress', () => {
         pageCount: PENDING_LABEL,
         signatureType: PENDING_LABEL,
         signerCount: PENDING_LABEL,
-        // Cero espectadores es un dato conocido, no información faltante.
-        viewerCount: '0 espectadores',
+        // Cero testigos es un dato conocido, no información faltante.
+        witnessCount: '0 testigos',
       });
     });
 
     it('refleja el documento, la configuración y los participantes ya elegidos', () => {
       const progress = buildCreateDocumentProgress(
-        completeParams({ signatureType: 'ADVANCED', signerCount: 2, viewerCount: 1 }),
+        completeParams({ signatureType: 'ADVANCED', signerCount: 2, witnessCount: 1 }),
       );
 
       expect(progress.summary).toEqual({
@@ -172,7 +172,7 @@ describe('buildCreateDocumentProgress', () => {
         pageCount: '3 páginas',
         signatureType: 'Firma Electrónica Avanzada (e.firma)',
         signerCount: '2 firmantes',
-        viewerCount: '1 espectador',
+        witnessCount: '1 testigo',
       });
     });
   });

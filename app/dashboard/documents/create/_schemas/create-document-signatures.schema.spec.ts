@@ -3,12 +3,12 @@ import {
   SIGNATURE_POSITION_REQUIRED_MESSAGE,
   createDocumentSignaturesSchema,
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   countSigners,
   signersWithoutPosition,
   type CollaboratorFormValues,
   type SignerFormValues,
-  type ViewerFormValues,
+  type WitnessFormValues,
 } from './index';
 
 /** Una ubicación de firma cualquiera, válida: el envío exige al menos una por firmante. */
@@ -32,9 +32,9 @@ function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
   };
 }
 
-function viewer(): ViewerFormValues {
+function viewer(): WitnessFormValues {
   return {
-    ...emptyViewer(),
+    ...emptyWitness(),
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
@@ -86,7 +86,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
-  it('acepta un espectador sin taxId', () => {
+  it('acepta un testigo sin taxId', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([signer(), { ...viewer(), taxId: '' }]),
     );
@@ -103,7 +103,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['collaborators', 0, 'email']);
   });
 
-  it('rechaza si solo hay espectadores', () => {
+  it('rechaza si solo hay testigos', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([viewer()]),
     );

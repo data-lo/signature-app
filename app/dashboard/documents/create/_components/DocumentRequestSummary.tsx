@@ -20,7 +20,7 @@ export default function DocumentRequestSummary({
     { label: 'Páginas', value: summary.pageCount },
     { label: 'Tipo de firma', value: summary.signatureType },
     { label: 'Firmantes', value: summary.signerCount },
-    { label: 'Espectadores', value: summary.viewerCount },
+    { label: 'Testigos', value: summary.witnessCount },
   ];
 
   return (

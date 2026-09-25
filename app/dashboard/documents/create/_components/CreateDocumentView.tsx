@@ -92,7 +92,7 @@ export default function CreateDocumentView({
     requiresApproval: createDocumentForm.requiresApproval,
     reviewerUserId: createDocumentForm.reviewerUserId,
     signerCount: createDocumentForm.signerCount,
-    viewerCount: createDocumentForm.viewerCount,
+    witnessCount: createDocumentForm.witnessCount,
     signersWithoutPosition: createDocumentForm.signersWithoutPosition,
   });
 
@@ -185,6 +185,13 @@ export default function CreateDocumentView({
                 : uploadStatusLabel(createDocumentForm.uploadProgress)
               : 'Enviar solicitud de firma'}
           </Button>
+
+          {sections.submission.isLoading &&
+            createDocumentForm.uploadProgress !== null && (
+              <DocumentUploadProgress
+                percent={createDocumentForm.uploadProgress}
+              />
+            )}
 
           {/*
             Junto al botón porque es lo que explica por qué sigue deshabilitado. La ubicación se

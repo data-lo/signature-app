@@ -11,17 +11,17 @@ export {
 
 export {
   signerSchema,
-  viewerSchema,
+  witnessSchema,
   collaboratorSchema,
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   countSigners,
   signersWithoutPosition,
-  countViewers,
+  countWitnesses,
   isSelfSigner,
   findSelfSignerIndex,
   type SignerFormValues,
-  type ViewerFormValues,
+  type WitnessFormValues,
   type CollaboratorFormValues,
 } from './collaborator.schema';
 

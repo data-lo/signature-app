@@ -13,7 +13,7 @@ const STATUS_LABELS: Record<ParticipantStatus, string> = {
 const ROLE_LABELS: Record<ParticipantRole, string> = {
   [ParticipantRole.Signer]: 'Firmante',
   [ParticipantRole.Reviewer]: 'Revisor',
-  [ParticipantRole.Watcher]: 'Espectador',
+  [ParticipantRole.Witness]: 'Testigo',
   [ParticipantRole.Creator]: 'Creador',
 };
 

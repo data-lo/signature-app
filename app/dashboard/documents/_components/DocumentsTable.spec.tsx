@@ -56,7 +56,7 @@ function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
     fileName: 'contrato.pdf',
     fileType: 'application/pdf',
     signers: ['Juan Pérez'],
-    spectators: [],
+    witnesses: [],
     creator: 'Creador Uno',
     creatorRfc: 'CRUN850315HN2',
     totalPages: 1,
