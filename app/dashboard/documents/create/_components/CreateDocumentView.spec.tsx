@@ -519,8 +519,10 @@ describe('CreateDocumentView', () => {
       expect(
         screen.getByRole('button', { name: /enviar solicitud de firma/i }),
       ).toBeDisabled();
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento. Falta: Juan Pérez.',
+      const positionAlert = screen.getByRole('alert');
+      expect(positionAlert).toHaveTextContent('Falta ubicar la firma');
+      expect(positionAlert).toHaveTextContent(
+        'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento antes de continuar. Falta: Juan Pérez.',
       );
       expect(mutate).not.toHaveBeenCalled();
 
