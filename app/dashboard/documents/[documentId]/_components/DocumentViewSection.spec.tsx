@@ -751,7 +751,7 @@ describe('DocumentViewSection', () => {
     ).toBeInTheDocument();
   });
 
-  it('permite al creador solicitar la cancelación de un documento firmado', async () => {
+  it('no muestra "Solicitar cancelación" aunque el backend lo permita', () => {
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         status: DocumentStatus.Signed,
@@ -762,18 +762,12 @@ describe('DocumentViewSection', () => {
       isLoading: false,
       isError: false,
     });
-    const user = userEvent.setup();
     renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
-    await user.click(
-      screen.getByRole('button', { name: /solicitar cancelación/i }),
-    );
-    const dialog = await screen.findByRole('dialog');
-    await user.click(
-      within(dialog).getByRole('button', { name: /solicitar cancelación/i }),
-    );
-
-    expect(requestCancellationMutate).toHaveBeenCalled();
+    expect(
+      screen.queryByRole('button', { name: /solicitar cancelación/i }),
+    ).not.toBeInTheDocument();
+    expect(requestCancellationMutate).not.toHaveBeenCalled();
   });
 
   it('permite a un firmante confirmar la cancelación pendiente', async () => {

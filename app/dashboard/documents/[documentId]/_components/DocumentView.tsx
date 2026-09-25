@@ -26,6 +26,15 @@ import SignatureRequiredDialog from './SignatureRequiredDialog';
 import SignatureSuccessDialog from './SignatureSuccessDialog';
 import type { SignatureVerificationProps } from './SignatureVerificationCard';
 
+/**
+ * Interruptor del botón "Solicitar cancelación". Apagado por decisión de producto: el botón no
+ * se dibuja aunque el backend mande `canRequestCancellation` en true. El diálogo, el hook y el
+ * endpoint siguen conectados, así que volver a mostrarlo es cambiar esta constante.
+ * "Confirmar cancelación" no depende de ella: los documentos que ya estén en
+ * `CANCELLATION_PENDING` se pueden seguir resolviendo.
+ */
+const IS_CANCELLATION_REQUEST_ENABLED = false;
+
 export interface DocumentViewProps {
   /** Estados de la carga del detalle: la vista los dibuja, no los resuelve. */
   isLoading: boolean;
@@ -217,7 +226,7 @@ export default function DocumentView({
           canConfirmCancellation={document.canConfirmCancellation}
         />
 
-        {document.canRequestCancellation && (
+        {IS_CANCELLATION_REQUEST_ENABLED && document.canRequestCancellation && (
           <Button
             type="button"
             variant="destructive"
