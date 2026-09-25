@@ -2,10 +2,11 @@
 
 import type { FormEventHandler } from 'react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
 import type { DocumentDetail } from '../_requests';
+import type { DocumentLoadErrorKind } from '../_errors';
 import type { ShareLinkStatus } from '../_hooks/useShareDocumentLink';
 import AdvancedSignatureDialog, {
   type AdvancedSignatureSubmitValues,
@@ -37,7 +38,8 @@ const IS_CANCELLATION_REQUEST_ENABLED = false;
 export interface DocumentViewProps {
   /** Estados de la carga del detalle: la vista los dibuja, no los resuelve. */
   isLoading: boolean;
-  isError: boolean;
+  /** Por qué falló la carga del detalle, o `null` si no falló. */
+  loadError: DocumentLoadErrorKind | null;
   document: DocumentDetail | null;
 
   /** Archivo del documento (endpoint aparte del detalle). */
@@ -110,7 +112,7 @@ export interface DocumentViewProps {
  */
 export default function DocumentView({
   isLoading,
-  isError,
+  loadError,
   document,
   file,
   needsSimpleSignatureSetup,
@@ -132,7 +134,37 @@ export default function DocumentView({
     );
   }
 
-  if (isError || !document) {
+  /**
+   * Sin permiso no es un fallo que se arregle esperando: se dice qué pasa y qué se puede hacer,
+   * en vez del "Intenta de nuevo más tarde" que se mostraba para todo.
+   */
+  if (loadError === 'forbidden') {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 text-center">
+        <Lock className="size-6 text-muted-foreground" />
+        <p className="text-sm font-medium">
+          No tienes permiso para ver este documento
+        </p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Tu rol no incluye la lectura de este documento en ninguna de tus
+          cuentas. Si crees que deberías tener acceso, pídeselo a un
+          administrador de su organización.
+        </p>
+      </div>
+    );
+  }
+
+  if (loadError === 'not-found') {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-sm text-destructive">
+          El documento no existe o fue eliminado.
+        </p>
+      </div>
+    );
+  }
+
+  if (loadError || !document) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <p className="text-sm text-destructive">

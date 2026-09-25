@@ -84,12 +84,13 @@ export default function SignaturePlacementField({
   const [rejectionNonce, setRejectionNonce] = useState(0);
 
   /**
-   * Tamaño en puntos de cada página, tal como se ve. Lo reporta el visor conforme carga cada hoja
-   * y de él sale el tamaño del cuadro de firma, que es constante en puntos: en una hoja apaisada
-   * ocupa menos fracción de ancho y más de alto que en una vertical.
+   * Tamaño en puntos de cada página, tal como se ve. Lo reporta el visor de todas las hojas a
+   * la vez, al terminar de parsear el documento, y de él sale el tamaño del cuadro de firma,
+   * que es constante en puntos: en una hoja apaisada ocupa menos fracción de ancho y más de
+   * alto que en una vertical.
    *
    * Va en un ref y no en estado porque sólo se lee al soltar una firma: guardarlo en estado
-   * volvería a renderizar el visor una vez por página cargada, sin que nada de lo que se ve
+   * volvería a renderizar el visor una vez por página, sin que nada de lo que se ve
    * cambie.
    */
   const pageSizesRef = useRef(new Map<number, PageSizePt>());

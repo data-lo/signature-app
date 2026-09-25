@@ -7,6 +7,11 @@ import 'react-pdf/dist/Page/TextLayer.css';
 // Configura el worker de PDF.js desde el propio origen (ver lib/pdf-worker.ts).
 import '@/lib/pdf-worker';
 import type { PageSizePt } from '@/lib/signature-geometry';
+import {
+  PdfLoadErrorMessage,
+  PdfLoadingMessage,
+} from '@/components/pdf/PdfDocumentStatus';
+import { usePdfDocumentLoader } from '@/components/pdf/use-pdf-document-loader';
 import SignaturePageDropZone, {
   type PlacedBoxView,
 } from './SignaturePageDropZone';
@@ -28,9 +33,9 @@ interface SignaturePlacementPdfPreviewProps {
    */
   onPageCountChange?: (pageCount: number) => void;
   /**
-   * Tamaño en puntos de cada página, conforme el visor las va cargando. Este componente ya parsea
-   * el PDF para dibujarlo, así que es el único lugar donde ese dato existe sin volver a leer y
-   * decodificar el archivo — igual que `onPageCountChange`.
+   * Tamaño en puntos de cada página. Se publican todas juntas en cuanto el PDF termina de
+   * parsearse (ver `usePdfDocumentLoader`), no conforme se dibuja cada hoja: el visor sólo dibuja
+   * las cercanas a lo visible, y el tamaño de una hoja todavía sin dibujar también hace falta.
    */
   onPageSize: (pageNumber: number, size: PageSizePt) => void;
 }
@@ -41,6 +46,24 @@ interface SignaturePlacementPdfPreviewProps {
  * `pageWidth` a propósito en vez de modificar `PdfPreview.tsx`, que sigue usándose tal cual, sin
  * interactividad, en las vistas de solo lectura (firma y previsualización de documentos
  * firmados).
+ *
+ * Comparte con esos visores `components/pdf/`: dibujo diferido de páginas, progreso de carga y
+ * reintento ante error.
+ *
+ * @param props.file - PDF local recién cargado por el usuario.
+ * @param props.boxesByPage - Firmas ya colocadas, agrupadas por página.
+ * @param props.rejectedId - Caja cuyo último arrastre se rechazó (para animarla).
+ * @param props.rejectionNonce - Cambia en cada rechazo, para reiniciar la animación.
+ * @param props.onDeleteBox - Quita una firma colocada.
+ * @param props.onPageCountChange - Recibe el número de páginas al cargar el documento.
+ * @param props.onPageSize - Recibe el tamaño de cada página al cargar el documento.
+ * @returns El panel con scroll y una zona de suelta por página.
+ *
+ * @example
+ * ```tsx
+ * <SignaturePlacementPdfPreview file={file} boxesByPage={boxes} rejectedId={null}
+ *   rejectionNonce={0} onDeleteBox={remove} onPageSize={setSize} />
+ * ```
  */
 function SignaturePlacementPdfPreview({
   file,
@@ -51,7 +74,10 @@ function SignaturePlacementPdfPreview({
   onPageCountChange,
   onPageSize,
 }: SignaturePlacementPdfPreviewProps) {
-  const [numPages, setNumPages] = useState(0);
+  const loader = usePdfDocumentLoader(file, ({ numPages, pageSizes }) => {
+    onPageCountChange?.(numPages);
+    pageSizes.forEach((size, i) => onPageSize(i + 1, size));
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageWidth, setPageWidth] = useState(520);
 
@@ -86,39 +112,41 @@ function SignaturePlacementPdfPreview({
       ref={containerRef}
       className="flex h-full flex-col items-center gap-4 overflow-y-auto bg-muted py-6"
     >
-      <Document
-        file={file}
-        onLoadSuccess={({ numPages }) => {
-          setNumPages(numPages);
-          onPageCountChange?.(numPages);
-        }}
-        loading={
-          <p className="mt-20 text-sm text-muted-foreground">
-            Cargando documento...
-          </p>
-        }
-        error={
-          <p className="mt-20 text-sm text-destructive">
-            Error al cargar el documento.
-          </p>
-        }
-      >
-        {Array.from({ length: numPages }, (_, i) => {
-          const pageNumber = i + 1;
-          return (
-            <SignaturePageDropZone
-              key={pageNumber}
-              pageNumber={pageNumber}
-              pageWidth={pageWidth}
-              boxes={boxesByPage.get(pageNumber) ?? []}
-              rejectedId={rejectedId}
-              rejectionNonce={rejectionNonce}
-              onDeleteBox={onDeleteBox}
-              onPageSize={onPageSize}
-            />
-          );
-        })}
-      </Document>
+      {loader.hasError ? (
+        <PdfLoadErrorMessage onRetry={loader.retry} />
+      ) : (
+        <Document
+          key={loader.attempt}
+          file={file}
+          onLoadProgress={loader.handleLoadProgress}
+          onLoadSuccess={loader.handleLoadSuccess}
+          onLoadError={loader.handleLoadError}
+          loading={<PdfLoadingMessage progress={loader.progress} />}
+          // El error se pinta arriba con su botón de reintento (ver PdfPreview).
+          error={null}
+        >
+          {loader.pageSizes === null ? (
+            <PdfLoadingMessage progress={loader.progress} />
+          ) : (
+            loader.pageSizes.map((size, i) => {
+              const pageNumber = i + 1;
+              return (
+                <SignaturePageDropZone
+                  key={pageNumber}
+                  pageNumber={pageNumber}
+                  pageWidth={pageWidth}
+                  pageSize={size}
+                  scrollRootRef={containerRef}
+                  boxes={boxesByPage.get(pageNumber) ?? []}
+                  rejectedId={rejectedId}
+                  rejectionNonce={rejectionNonce}
+                  onDeleteBox={onDeleteBox}
+                />
+              );
+            })
+          )}
+        </Document>
+      )}
     </div>
   );
 }
