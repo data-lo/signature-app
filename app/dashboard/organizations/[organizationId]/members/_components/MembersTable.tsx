@@ -28,6 +28,11 @@ import type {
 } from '@/lib/api/organization-members';
 import type { RolePermission } from '@/lib/api/roles';
 import { formatRoleName } from '@/lib/format-role-name';
+import {
+  isOwnerMember,
+  OWNER_CANNOT_BE_DEACTIVATED_MESSAGE,
+  OWNER_ROLE_CANNOT_CHANGE_MESSAGE,
+} from '@/lib/assignable-member-roles';
 
 interface MembersTableProps {
   members: OrganizationMember[];
@@ -63,6 +68,24 @@ function catalogPermissionsOf(member: OrganizationMember): RolePermission[] {
   return member.permissions.filter((permission) => permission.isStaticCatalog);
 }
 
+/** Texto de una opción del menú, con una línea que explica por qué está deshabilitada. */
+function MenuItemLabel({
+  label,
+  hint,
+}: {
+  label: string;
+  hint: string | null;
+}) {
+  if (!hint) return <>{label}</>;
+
+  return (
+    <span className="flex flex-col">
+      <span>{label}</span>
+      <span className="text-xs text-muted-foreground">{hint}</span>
+    </span>
+  );
+}
+
 export default function MembersTable({
   members,
   canManage,
@@ -89,6 +112,7 @@ export default function MembersTable({
             variant: 'outline' as const,
           };
           const permissions = catalogPermissionsOf(member);
+          const isOwner = isOwnerMember(member);
 
           return (
             <TableRow key={member.accountId}>
@@ -153,18 +177,36 @@ export default function MembersTable({
                     >
                       <MoreVertical className="size-4" />
                     </DropdownMenuTrigger>
+                    {/*
+                      Sobre el propietario las dos acciones se ven deshabilitadas y dicen por qué,
+                      en vez de desaparecer: un menú que en una fila tiene opciones y en otra no
+                      deja a quien administra preguntándose si es un error.
+                    */}
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEditRole?.(member)}>
+                      <DropdownMenuItem
+                        onClick={() => onEditRole?.(member)}
+                        disabled={isOwner}
+                      >
                         <Pencil className="size-4" />
-                        Editar Rol
+                        <MenuItemLabel
+                          label="Editar Rol"
+                          hint={
+                            isOwner ? OWNER_ROLE_CANNOT_CHANGE_MESSAGE : null
+                          }
+                        />
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         variant="destructive"
                         onClick={() => onRemove?.(member)}
-                        disabled={!member.isActive}
+                        disabled={!member.isActive || isOwner}
                       >
                         <Trash2 className="size-4" />
-                        Desactivar
+                        <MenuItemLabel
+                          label="Desactivar"
+                          hint={
+                            isOwner ? OWNER_CANNOT_BE_DEACTIVATED_MESSAGE : null
+                          }
+                        />
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

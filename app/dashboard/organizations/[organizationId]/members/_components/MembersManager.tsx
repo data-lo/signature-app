@@ -8,6 +8,11 @@ import { updateOrganizationMemberRoleAction } from '@/app/server-actions/organiz
 import { removeOrganizationMemberAction } from '@/app/server-actions/organizations/remove-organization-member.server-action';
 import type { ActionResult } from '@/app/server-actions/organizations/_result';
 import type { OrganizationMember } from '@/lib/api/organization-members';
+import {
+  isOwnerMember,
+  OWNER_CANNOT_BE_DEACTIVATED_MESSAGE,
+  OWNER_ROLE_CANNOT_CHANGE_MESSAGE,
+} from '@/lib/assignable-member-roles';
 import MembersTable from './MembersTable';
 import InviteMemberModal from './InviteMemberModal';
 import EditRoleModal from './EditRoleModal';
@@ -71,6 +76,28 @@ export default function MembersManager({
   );
   const [removingMember, setRemovingMember] =
     useState<OrganizationMember | null>(null);
+
+  /**
+   * Abre el diálogo de baja, salvo sobre el propietario: la tabla ya deshabilita la opción, pero
+   * el aviso cubre cualquier otro camino que llegue aquí (historia "Impedir desactivación de
+   * cuentas con perfil Owner").
+   */
+  function requestRemove(member: OrganizationMember) {
+    if (isOwnerMember(member)) {
+      toast.error(OWNER_CANNOT_BE_DEACTIVATED_MESSAGE);
+      return;
+    }
+    setRemovingMember(member);
+  }
+
+  /** Igual que `requestRemove`, para el cambio de rol. */
+  function requestEditRole(member: OrganizationMember) {
+    if (isOwnerMember(member)) {
+      toast.error(OWNER_ROLE_CANNOT_CHANGE_MESSAGE);
+      return;
+    }
+    setEditingMember(member);
+  }
 
   /**
    * Ejecuta una mutación y deja la sección al día.
@@ -140,8 +167,8 @@ export default function MembersManager({
       <MembersTable
         members={members}
         canManage={canManage}
-        onEditRole={setEditingMember}
-        onRemove={setRemovingMember}
+        onEditRole={requestEditRole}
+        onRemove={requestRemove}
       />
 
       <EditRoleModal
