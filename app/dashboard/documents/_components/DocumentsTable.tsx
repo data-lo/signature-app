@@ -45,6 +45,12 @@ export interface DocumentListItem {
   creator: string;
   /** RFC de quien creó el documento; null mientras no lo haya registrado en su perfil. */
   creatorRfc?: string | null;
+  /**
+   * Nombre visible de la organización dueña del documento. Null en los documentos de cuenta
+   * personal, y ausente en respuestas anteriores a que el listado lo informara: en ambos casos la
+   * columna "Organización" muestra "Ninguna".
+   */
+  organizationName?: string | null;
   totalPages: number;
   status: DocumentStatus;
   /**
@@ -102,6 +108,31 @@ const PARTICIPATION_LABELS: Record<DocumentParticipation, string> = {
 
 /** Lo que muestra "Fecha de firma" mientras el documento no está firmado por todos. */
 const UNSIGNED_DATE_LABEL = 'No disponible';
+
+/** Lo que muestra "Organización" cuando el documento no pertenece a ninguna organización. */
+const NO_ORGANIZATION_LABEL = 'Ninguna';
+
+/**
+ * Texto de la columna "Organización" para un documento.
+ *
+ * Es sólo presentación: el dato del documento no cambia. Un nombre nulo, ausente o en blanco se
+ * trata igual —el documento no tiene organización que mostrar— para que la celda nunca quede
+ * vacía, que era lo que confundía.
+ *
+ * @param organizationName - Nombre visible de la organización, tal como lo manda el listado.
+ * @returns El nombre sin espacios sobrantes, o "Ninguna" si no hay organización.
+ *
+ * @example
+ * ```ts
+ * resolveOrganizationLabel('Acme'); // 'Acme'
+ * resolveOrganizationLabel(null); // 'Ninguna'
+ * ```
+ */
+function resolveOrganizationLabel(
+  organizationName: string | null | undefined,
+): string {
+  return organizationName?.trim() || NO_ORGANIZATION_LABEL;
+}
 
 const STATUS_DOT: Record<DocumentStatus, string> = {
   [DocumentStatus.Created]: 'bg-amber-400',
@@ -170,6 +201,7 @@ export default function DocumentsTable({
               </TableHead>
               <TableHead>Creado por</TableHead>
               <TableHead>Participación</TableHead>
+              <TableHead>Organización</TableHead>
               <TableHead>Estatus</TableHead>
               <TableHead>Fecha de creación</TableHead>
               <TableHead>Fecha de firma</TableHead>
@@ -204,6 +236,9 @@ export default function DocumentsTable({
               const signedAtLabel = formatShortDate(
                 doc.signedAt,
                 UNSIGNED_DATE_LABEL,
+              );
+              const organizationLabel = resolveOrganizationLabel(
+                doc.organizationName,
               );
 
               return (
@@ -253,6 +288,17 @@ export default function DocumentsTable({
                         doc.participation ?? DocumentParticipation.Participant
                       ]
                     }
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <span
+                      className={
+                        organizationLabel === NO_ORGANIZATION_LABEL
+                          ? 'text-muted-foreground'
+                          : undefined
+                      }
+                    >
+                      {organizationLabel}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
