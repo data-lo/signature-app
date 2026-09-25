@@ -70,7 +70,7 @@ describe('DiditVerificationCard · distribución', () => {
   it('muestra los detalles dentro de la card cuando la identidad ya está validada', () => {
     renderCard(SigningCredentialStatus.Configured);
 
-    expect(screen.getByText('Resultado de la validación de identidad')).toBeInTheDocument();
+    expect(screen.getByText('Validada el')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Detalles' })).not.toBeInTheDocument();
   });
 
