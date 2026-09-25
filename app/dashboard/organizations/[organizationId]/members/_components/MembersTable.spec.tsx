@@ -200,4 +200,82 @@ describe('MembersTable', () => {
       await screen.findByRole('menuitem', { name: /desactivar/i }),
     ).toHaveAttribute('data-disabled');
   });
+
+  /** Historia "Impedir desactivación de cuentas con perfil Owner". */
+  describe('propietario', () => {
+    const OWNER: OrganizationMember = {
+      accountId: 'account-owner',
+      userId: 'user-owner',
+      email: 'duena@empresa.com',
+      rfc: null,
+      role: { id: 'owner-role-1', name: 'OWNER' },
+      joinedAt: '2023-01-01T10:00:00Z',
+      status: 'active',
+      isActive: true,
+      permissions: [],
+    };
+
+    async function openOwnerMenu() {
+      const user = userEvent.setup();
+      const onRemove = jest.fn();
+      const onEditRole = jest.fn();
+      render(
+        <MembersTable
+          members={[OWNER, MEMBERS[0]]}
+          canManage
+          onRemove={onRemove}
+          onEditRole={onEditRole}
+        />,
+      );
+      await user.click(
+        screen.getByRole('button', { name: 'Acciones de duena@empresa.com' }),
+      );
+      return { user, onRemove, onEditRole };
+    }
+
+    it('deshabilita "Desactivar" y explica por qué', async () => {
+      const { user, onRemove } = await openOwnerMenu();
+
+      const item = await screen.findByRole('menuitem', { name: /desactivar/i });
+      expect(item).toHaveAttribute('data-disabled');
+      expect(item).toHaveTextContent(
+        'La cuenta del propietario (Owner) no se puede desactivar.',
+      );
+
+      await user.click(item);
+      expect(onRemove).not.toHaveBeenCalled();
+    });
+
+    it('deshabilita "Editar Rol" y explica por qué', async () => {
+      const { user, onEditRole } = await openOwnerMenu();
+
+      const item = await screen.findByRole('menuitem', { name: /editar rol/i });
+      expect(item).toHaveAttribute('data-disabled');
+      expect(item).toHaveTextContent(
+        'El rol del propietario (Owner) no se puede cambiar.',
+      );
+
+      await user.click(item);
+      expect(onEditRole).not.toHaveBeenCalled();
+    });
+
+    it('a los demás miembros les sigue ofreciendo desactivar', async () => {
+      const user = userEvent.setup();
+      render(
+        <MembersTable
+          members={[OWNER, MEMBERS[0]]}
+          canManage
+          onRemove={jest.fn()}
+        />,
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Acciones de admin@empresa.com' }),
+      );
+
+      expect(
+        await screen.findByRole('menuitem', { name: /desactivar/i }),
+      ).not.toHaveAttribute('data-disabled');
+    });
+  });
 });

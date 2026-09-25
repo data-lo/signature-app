@@ -30,11 +30,20 @@ export interface FormFileUploadProps {
   /** Mensaje de error del campo (normalmente `fieldState.error?.message`). */
   errorMessage?: string;
   acceptedFileTypes?: string[];
-  /** Tamaño máximo en el formato de FilePond, p. ej. `'20MB'`. */
-  maxFileSize?: string;
+  /**
+   * Tamaño máximo: en bytes, o en el formato de FilePond (p. ej. `'20MB'`). Ojo: FilePond convierte
+   * las cadenas con base 1000; para un límite binario, pasar los bytes.
+   */
+  maxFileSize?: string | number;
+  /** Base (1000 o 1024) con la que FilePond formatea los tamaños que muestra. */
+  fileSizeBase?: number;
   labelIdle?: string;
   labelFileTypeNotAllowed?: string;
+  /** Segunda línea del error de tipo (en FilePond, `fileValidateTypeLabelExpectedTypes`). */
+  labelFileTypeExpected?: string;
   labelMaxFileSizeExceeded?: string;
+  /** Segunda línea del error de tamaño; `{filesize}` se sustituye por el límite. */
+  labelMaxFileSize?: string;
   disabled?: boolean;
   id?: string;
   className?: string;
@@ -52,6 +61,22 @@ export interface FormFileUploadProps {
  * todas hacía que cualquier previsualización aguas abajo (react-pdf) recargara el documento en
  * cada una y parpadeara. Por eso solo se propaga el archivo cuando FilePond lo deja en IDLE, y
  * mientras tanto se avisa por `onLoadingChange`.
+ *
+ * Bug corregido: un archivo rechazado por la validación (tamaño o tipo) dejaba al consumidor
+ * "cargando" para siempre. FilePond anuncia el ítem por `onupdatefiles` al agregarlo, todavía
+ * cargando, pero cuando la validación lo rechaza NO vuelve a disparar ese evento (en su código,
+ * el rechazo no pasa por `listUpdated`): la única señal es `onaddfile` con `error`. Ahí se
+ * cierra la carga y se vacía el valor. FilePond sigue mostrando su propio mensaje de error en el
+ * widget, y el consumidor ya no se queda con el archivo anterior ni con un estado a medias.
+ *
+ * @param props - Ver `FormFileUploadProps`.
+ * @returns El campo con el widget de FilePond.
+ *
+ * @example
+ * ```tsx
+ * <FormFileUpload name="documentFile" value={file} onChange={setFile}
+ *   acceptedFileTypes={['application/pdf']} maxFileSize={20 * 1024 * 1024} fileSizeBase={1024} />
+ * ```
  */
 export function FormFileUpload({
   name,
@@ -65,9 +90,12 @@ export function FormFileUpload({
   errorMessage,
   acceptedFileTypes,
   maxFileSize,
+  fileSizeBase,
   labelIdle,
   labelFileTypeNotAllowed,
+  labelFileTypeExpected,
   labelMaxFileSizeExceeded,
+  labelMaxFileSize,
   disabled,
   id,
   className,
@@ -80,6 +108,15 @@ export function FormFileUpload({
   const [remountKey, setRemountKey] = useState(0);
   const previousValueRef = useRef<File | null>(value ?? null);
   const clearedFromWidgetRef = useRef(false);
+  // Sólo se pasan a FilePond si llegan: con `undefined` explícito FilePond pierde su valor por
+  // omisión en vez de conservarlo.
+  const optionalFilePondOptions = {
+    ...(labelFileTypeExpected !== undefined && {
+      fileValidateTypeLabelExpectedTypes: labelFileTypeExpected,
+    }),
+    ...(fileSizeBase !== undefined && { fileSizeBase }),
+    ...(labelMaxFileSize !== undefined && { labelMaxFileSize }),
+  };
 
   useEffect(() => {
     const hadFile = previousValueRef.current !== null;
@@ -124,11 +161,23 @@ export function FormFileUpload({
               onChange(item.file as File);
             }
           }}
+          onaddfile={(error) => {
+            if (!error) return;
+            onLoadingChange?.(false);
+            clearedFromWidgetRef.current = true;
+            onChange(null);
+          }}
           allowMultiple={false}
           acceptedFileTypes={acceptedFileTypes}
           labelFileTypeNotAllowed={labelFileTypeNotAllowed}
-          maxFileSize={maxFileSize}
+          // Los tipos de FilePond sólo declaran cadenas, pero su conversor lee una cadena
+          // numérica ("20971520") como bytes exactos: así se pasa un límite binario sin
+          // que FilePond lo reinterprete con base 1000.
+          maxFileSize={
+            maxFileSize === undefined ? undefined : String(maxFileSize)
+          }
           labelMaxFileSizeExceeded={labelMaxFileSizeExceeded}
+          {...optionalFilePondOptions}
           labelIdle={labelIdle}
           credits={false}
         />

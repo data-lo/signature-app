@@ -11,6 +11,7 @@ import {
   confirmCancellationRequest,
 } from '../_requests';
 import { getDocumentFileUrlRequest } from '../../_requests';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 
 jest.mock('../_requests');
 jest.mock('../../_requests');
@@ -67,6 +68,16 @@ function renderFileUrlWith<T>(useMutationHook: () => T) {
 describe('invalidación de la URL del archivo al cambiar el estatus del documento', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // La URL del archivo se consulta desde la cuenta activa y espera a que exista (ver
+    // `useDocumentFileUrl`): sin ella el visor nunca pediría nada.
+    useAuthStore.setState({
+      activeAccount: {
+        id: 'account-1',
+        accountType: 'PERSONAL',
+        organizationId: null,
+        roleId: null,
+      },
+    });
     mockedSignDocumentRequest.mockResolvedValue({
       id: DOCUMENT_ID,
       documentCompleted: false,

@@ -35,6 +35,9 @@ export default function UserInfoCard({ user }: UserInfoCardProps) {
   });
 
   function onSubmit(values: UpdatePersonalInfoFormValues) {
+    // El botón ya se deshabilita mientras guarda; esto cubre el envío con Enter desde un campo,
+    // que no pasa por el botón.
+    if (updateMutation.isPending) return;
     updateMutation.mutate(values);
   }
 

@@ -32,3 +32,34 @@ export function assignableMemberRoles(
     (role) => !(role.isSystemRole && role.name === OWNER_ROLE_NAME),
   );
 }
+
+/**
+ * Por qué no se ofrecen "Desactivar" ni "Editar Rol" sobre el propietario (historia "Impedir
+ * desactivación de cuentas con perfil Owner"). El backend lo rechaza igual con un 409; esto es
+ * lo que ve el usuario antes de intentarlo.
+ */
+export const OWNER_CANNOT_BE_DEACTIVATED_MESSAGE =
+  'La cuenta del propietario (Owner) no se puede desactivar.';
+export const OWNER_ROLE_CANNOT_CHANGE_MESSAGE =
+  'El rol del propietario (Owner) no se puede cambiar.';
+
+/**
+ * Si la membresía es la del propietario de la organización.
+ *
+ * Mira sólo el nombre porque es lo único que trae el listado de miembros; basta para decidir qué
+ * se ofrece en pantalla. Quien de verdad decide es el backend, que compara contra el id del rol
+ * de sistema.
+ *
+ * @param member - Miembro del listado (sólo se lee su rol).
+ * @returns `true` si su rol es OWNER.
+ *
+ * @example
+ * ```ts
+ * isOwnerMember({ role: { id: 'r1', name: 'OWNER' } }); // true
+ * ```
+ */
+export function isOwnerMember(member: {
+  role: { name: string } | null;
+}): boolean {
+  return member.role?.name === OWNER_ROLE_NAME;
+}
