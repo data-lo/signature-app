@@ -53,9 +53,53 @@ jest.mock('./DocumentFilePicker', () => ({
     </>
   ),
 }));
+/**
+ * El panel real arrastra firmas sobre un PDF renderizado (react-pdf + dnd-kit), que jsdom no
+ * puede dibujar. Se reemplaza por un botón que hace lo mismo que soltar una firma: escribe una
+ * posición en `collaborators.{i}.signatures` de cada firmante que todavía no tenga ninguna. Desde
+ * la historia "Hacer obligatorias las coordenadas de posición de firma" sin ese paso no se puede
+ * enviar.
+ */
 jest.mock('./SignaturePlacementField', () => ({
   __esModule: true,
-  default: () => <div>Panel de ubicación de firmas</div>,
+  default: ({
+    getValues,
+    setValue,
+  }: {
+    getValues: (name: 'collaborators') => Array<{
+      collaboratorType: string;
+      signatures?: unknown[];
+    }>;
+    setValue: (name: string, value: unknown) => void;
+  }) => (
+    <>
+      <div>Panel de ubicación de firmas</div>
+      <button
+        type="button"
+        onClick={() =>
+          getValues('collaborators').forEach((collaborator, index) => {
+            if (
+              collaborator.collaboratorType === 'SIGNER' &&
+              collaborator.signatures?.length === 0
+            ) {
+              setValue(`collaborators.${index}.signatures`, [
+                {
+                  id: `sig-${index}`,
+                  page: 1,
+                  xRatio: 0.1,
+                  yRatio: 0.1 + index * 0.1,
+                  widthRatio: 0.2,
+                  heightRatio: 0.08,
+                },
+              ]);
+            }
+          })
+        }
+      >
+        Colocar firmas de prueba
+      </button>
+    </>
+  ),
 }));
 
 const mockedUseCurrentUser = useCurrentUser as jest.Mock;
@@ -104,6 +148,13 @@ async function selectSignatureType(
   await user.click(screen.getByRole('option', { name: optionName }));
 }
 
+/** Coloca la firma de cada firmante que todavía no la tenga (ver el mock del panel). */
+function placeSignatures(user: ReturnType<typeof userEvent.setup>) {
+  return user.click(
+    screen.getByRole('button', { name: /colocar firmas de prueba/i }),
+  );
+}
+
 /** La casilla de la card de Búsqueda Inteligente, que acompaña al botón de enviar. */
 function smartSearchCheckbox() {
   return screen.getByRole('checkbox', {
@@ -123,6 +174,7 @@ async function submitRequest(
     await user.click(smartSearchCheckbox());
   }
 
+  await placeSignatures(user);
   await user.click(
     screen.getByRole('button', { name: /enviar solicitud de firma/i }),
   );
@@ -186,6 +238,7 @@ describe('CreateDocumentView', () => {
 
       await addSigner(user);
       await selectSignatureType(user, /firma grafo/i);
+      await placeSignatures(user);
 
       expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeEnabled();
     });
@@ -436,6 +489,7 @@ describe('CreateDocumentView', () => {
       await selectSignatureType(user, /firma grafo/i);
       await openSection(user, /añadir participantes/i);
       await user.click(screen.getByRole('button', { name: /^firmante$/i }));
+      await placeSignatures(user);
 
       await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
 
@@ -443,6 +497,67 @@ describe('CreateDocumentView', () => {
       expect(
         screen.getByText('Ingresa el nombre del participante.'),
       ).toBeInTheDocument();
+    });
+
+    /**
+     * Historia "Hacer obligatorias las coordenadas de posición de firma": con todo lo demás listo,
+     * un firmante sin su firma ubicada deja el botón deshabilitado y el aviso dice a quién le falta.
+     */
+    it('no deja enviar mientras un firmante no tenga su firma ubicada, y dice a quién le falta', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeDisabled();
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento. Falta: Juan Pérez.',
+      );
+      expect(mutate).not.toHaveBeenCalled();
+
+      await placeSignatures(user);
+
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeEnabled();
+      expect(
+        screen.queryByText(/es obligatorio seleccionar la ubicación/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('envía las coordenadas de la firma de cada firmante', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+
+      await submitRequest(user);
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          collaborators: [
+            expect.objectContaining({
+              collaboratorType: 'SIGNER',
+              signatures: [
+                expect.objectContaining({
+                  page: 1,
+                  xRatio: 0.1,
+                  yRatio: 0.1,
+                  widthRatio: 0.2,
+                  heightRatio: 0.08,
+                }),
+              ],
+            }),
+          ],
+        }),
+        expect.anything(),
+      );
     });
 
     it('agrega un firmante y envía el payload con firma simple', async () => {
@@ -802,6 +917,7 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await selectSignatureType(user, /firma grafo/i);
+      await placeSignatures(user);
       await user.click(
         screen.getByRole('button', { name: /enviar solicitud de firma/i }),
       );
@@ -905,6 +1021,7 @@ describe('CreateDocumentView', () => {
       await selectSignatureType(user, /firma grafo/i);
       await user.click(smartSearchCheckbox());
       await user.click(smartSearchCheckbox());
+      await placeSignatures(user);
       await user.click(
         screen.getByRole('button', { name: /enviar solicitud de firma/i }),
       );
@@ -1077,6 +1194,7 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await selectSignatureType(user, /firma grafo/i);
+      await placeSignatures(user);
       await requireApproval(user);
 
       await waitFor(() =>

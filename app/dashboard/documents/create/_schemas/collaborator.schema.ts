@@ -39,8 +39,10 @@ export const signerSchema = z.object({
   lastName: lastNameField,
   email: emailField,
   // Ubicaciones de firma colocadas por arrastre sobre el PDF (ver historia "Ubicación de
-  // firmas por usuario") — un arreglo vacío es válido: el firmante firma sin estampado visual.
-  // Sin `.default()` a propósito: con `.default()` el input/output del schema divergen
+  // firmas por usuario"). El arreglo vacío es un estado válido MIENTRAS se llena el formulario
+  // —el firmante se agrega antes de colocar su firma—, pero no se puede enviar así: lo impide
+  // `createDocumentSignaturesSchema` (historia "Hacer obligatorias las coordenadas de posición de
+  // firma"). Sin `.default()` a propósito: con `.default()` el input/output del schema divergen
   // (input optativo, output requerido), lo que rompe la inferencia de tipos de zodResolver
   // contra `CreateDocumentSignaturesFormValues`. Todo lugar que arma un SignerFormValues
   // (`emptySigner`, `buildSelfSigner`) ya manda `signatures` explícito.
@@ -101,6 +103,41 @@ export function countSigners(collaborators: CollaboratorFormValues[]): number {
   return collaborators.filter(
     (collaborator) => collaborator.collaboratorType === 'SIGNER',
   ).length;
+}
+
+/**
+ * Nombre con el que se identifica a un firmante en los mensajes de la pantalla: su nombre
+ * completo, o su correo si todavía no lo capturó, o su posición en la lista si no tiene ninguno.
+ */
+function signerLabel(signer: SignerFormValues, signerNumber: number): string {
+  const fullName = `${signer.firstName} ${signer.lastName}`.trim();
+  return fullName || signer.email.trim() || `Firmante ${signerNumber}`;
+}
+
+/**
+ * Firmantes que todavía no tienen ninguna ubicación de firma colocada sobre el PDF, por nombre y
+ * en el orden de la lista. Único criterio de "falta ubicar firmas": lo consultan el esquema (que
+ * bloquea el envío) y la pantalla (que dice a quién le falta).
+ *
+ * @param collaborators - Colaboradores del formulario.
+ * @returns Los nombres de los firmantes sin posición; vacío si a nadie le falta.
+ *
+ * @example
+ * ```ts
+ * signersWithoutPosition([juanSinFirma, mariaConFirma]); // ['Juan Pérez']
+ * ```
+ */
+export function signersWithoutPosition(
+  collaborators: CollaboratorFormValues[],
+): string[] {
+  return collaborators
+    .filter(
+      (collaborator): collaborator is SignerFormValues =>
+        collaborator.collaboratorType === 'SIGNER',
+    )
+    .map((signer, index) => ({ signer, label: signerLabel(signer, index + 1) }))
+    .filter(({ signer }) => signer.signatures.length === 0)
+    .map(({ label }) => label);
 }
 
 /** Contraparte de `countSigners` para el resumen de la solicitud (ver `_section-progress.ts`). */

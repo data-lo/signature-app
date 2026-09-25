@@ -8,6 +8,7 @@ import {
   createDocumentSignaturesSchema,
   countSigners,
   countViewers,
+  signersWithoutPosition,
   CREATE_DOCUMENT_DEFAULT_VALUES,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
@@ -129,6 +130,8 @@ export function useCreateDocumentForm({
     signerCount: countSigners(collaborators),
     /** Cuántos espectadores hay hoy en el formulario (solo informativo: alimenta el resumen). */
     viewerCount: countViewers(collaborators),
+    /** Firmantes a los que todavía les falta colocar su firma en el PDF, por nombre. */
+    signersWithoutPosition: signersWithoutPosition(collaborators),
     /** Tipo de firma elegido para todo el documento (ver `SignatureTypeField`). */
     signatureType: signatureType ?? undefined,
     /** Si el documento necesita que alguien lo apruebe antes de salir a firma. */
