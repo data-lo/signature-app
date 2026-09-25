@@ -2,10 +2,10 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { getErrorMessage } from '@/lib/error-handler';
 import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { createDocumentSignaturesRequest } from '../_requests';
+import { getUploadErrorMessage } from '../_upload-errors';
 import {
   toRequiresDifferentSignatures,
   toCollaboratorPayloads,
@@ -44,9 +44,11 @@ export function useCreateDocumentSignatures() {
       requiresTwoFactorAuth,
       collaborators,
       isIndexable,
+      onUploadProgress,
     }: CreateDocumentSignaturesInput) =>
       createDocumentSignaturesRequest({
         file,
+        onUploadProgress,
         documentData: {
           fileName,
           requiresApproval,
@@ -85,7 +87,8 @@ export function useCreateDocumentSignatures() {
       });
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error, CREATE_DOCUMENT_ERROR_MESSAGE));
+      // El documento y la configuración siguen en pantalla: el mismo botón de envío reintenta.
+      toast.error(getUploadErrorMessage(error, CREATE_DOCUMENT_ERROR_MESSAGE));
     },
   });
 }
