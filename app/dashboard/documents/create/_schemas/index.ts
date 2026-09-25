@@ -16,6 +16,7 @@ export {
   emptySigner,
   emptyWitness,
   countSigners,
+  signersWithoutPosition,
   countWitnesses,
   isSelfSigner,
   findSelfSignerIndex,

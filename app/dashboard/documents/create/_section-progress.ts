@@ -32,6 +32,11 @@ export interface CreateDocumentProgressParams {
   reviewerUserId?: string | null;
   signerCount: number;
   witnessCount: number;
+  /**
+   * Firmantes que todavía no tienen ninguna ubicación de firma sobre el PDF (ver
+   * `signersWithoutPosition`). Vacío cuando a nadie le falta.
+   */
+  signersWithoutPosition?: string[];
 }
 
 export interface SectionProgress {
@@ -83,6 +88,7 @@ export function buildCreateDocumentProgress({
   reviewerUserId = null,
   signerCount,
   witnessCount,
+  signersWithoutPosition = [],
 }: CreateDocumentProgressParams): CreateDocumentProgress {
   // Un archivo a medio procesar no cuenta como cargado: es el mismo criterio con el que
   // `_section-rules.ts` decide que todavía no hay nada que previsualizar.

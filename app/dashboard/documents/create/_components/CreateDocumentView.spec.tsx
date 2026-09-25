@@ -390,7 +390,7 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await user.click(screen.getByRole('button', { name: /testigo/i }));
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
 
       // Cada encabezado muestra su resumen al abrir otro, porque solo un panel queda expandido.
       await user.click(trigger(/cargar documento/i));
