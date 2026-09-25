@@ -14,6 +14,7 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import { isSigningCredentialConfigured } from '@/lib/store/auth.slice';
 import { SignatureType } from '@/lib/enums/document';
 import { useDocumentDetail } from '../_hooks/useDocumentDetail';
+import { toDocumentLoadErrorKind } from '../_errors';
 import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
 import { useSignDocument } from '../_hooks/useSignDocument';
 import { useRejectDocument } from '../_hooks/useRejectDocument';
@@ -86,7 +87,16 @@ export default function DocumentViewSection({
 
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const { data: document, isLoading, isError } = useDocumentDetail(documentId);
+  /**
+   * `isPending` y no `isLoading`: la consulta espera a que se hidrate la cuenta activa, y en ese
+   * rato está deshabilitada — `isLoading` sería `false` y la vista, sin documento ni error, caería
+   * en "No se pudo cargar".
+   */
+  const {
+    data: document,
+    isPending: isDocumentPending,
+    error: documentError,
+  } = useDocumentDetail(documentId);
   const {
     data: fileUrl,
     isLoading: isFileUrlLoading,
@@ -229,8 +239,8 @@ export default function DocumentViewSection({
 
   return (
     <DocumentView
-      isLoading={isLoading}
-      isError={isError}
+      isLoading={isDocumentPending}
+      loadError={documentError ? toDocumentLoadErrorKind(documentError) : null}
       document={document ?? null}
       file={{
         url: fileUrl?.secureUrl ?? null,

@@ -1,4 +1,5 @@
 import userEvent from '@testing-library/user-event';
+import { act } from '@testing-library/react';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import CreateDocumentView from './CreateDocumentView';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
@@ -10,8 +11,9 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import { MISSING_FILE_MESSAGE } from '../_section-rules';
 import { NO_APPROVERS_MESSAGE } from './ApproverUserField';
 
+const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }));
 jest.mock('@/lib/hooks/useCurrentUser');
 jest.mock('../../_hooks/useDocuments');
@@ -183,6 +185,7 @@ describe('CreateDocumentView', () => {
 
   beforeEach(() => {
     mutate.mockReset();
+    mockPush.mockReset();
     mockedUseCurrentUser.mockReturnValue({
       data: {
         firstName: 'Creador',
@@ -690,12 +693,62 @@ describe('CreateDocumentView', () => {
         /te notificaremos por correo cuando el proceso finalice/i,
       );
 
-      // Manda a la sección real donde el creador ve lo que envió, con el mismo nombre que usa
-      // el sidebar (ver DOCUMENTS_SECTIONS).
+      // Mientras el modal está abierto no se navega: el usuario tiene que reconocerlo primero.
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('"Entendido" cierra la confirmación y lleva al listado de documentos creados por el usuario', async () => {
+      const mutateWithSuccess = jest.fn((_vars, opts) => opts?.onSuccess?.());
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: mutateWithSuccess,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+
+      await screen.findByRole('alertdialog');
       await user.click(screen.getByRole('button', { name: /entendido/i }));
+
       await waitFor(() =>
         expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
       );
+      // El mismo recorte al que apunta el enlace del mensaje: ahí siempre aparece lo recién enviado.
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith(
+        '/dashboard/documents?view=created_by_me',
+      );
+    });
+
+    it('cerrar la confirmación con Escape no redirige: sólo "Entendido" lleva al listado', async () => {
+      const mutateWithSuccess = jest.fn((_vars, opts) => opts?.onSuccess?.());
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: mutateWithSuccess,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+
+      await screen.findByRole('alertdialog');
+      await user.keyboard('{Escape}');
+
+      await waitFor(() =>
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+      );
+      expect(mockPush).not.toHaveBeenCalled();
     });
 
     it('no muestra la confirmación mientras el envío no haya salido bien', async () => {
@@ -709,6 +762,7 @@ describe('CreateDocumentView', () => {
 
       expect(mutate).toHaveBeenCalled();
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
     });
 
     it('mientras la mutación está pendiente, el botón se deshabilita y muestra el progreso', () => {
@@ -723,6 +777,48 @@ describe('CreateDocumentView', () => {
 
       expect(
         screen.getByRole('button', { name: /enviando solicitud/i }),
+      ).toBeDisabled();
+    });
+
+    /**
+     * Con documentos de varios MB la subida tarda: el botón y la barra dicen cuánto va, y al
+     * llegar al 100% pasan a "Procesando", porque el servidor todavía guarda el archivo.
+     */
+    it('durante el envío muestra el avance de la subida y después que el servidor lo procesa', async () => {
+      let reportProgress: (percent: number) => void = () => {};
+      const pendingMutate = jest.fn((variables) => {
+        // A partir de aquí la mutación está en curso, como en React Query tras `mutate`.
+        mockedUseCreateDocumentSignatures.mockReturnValue({
+          mutate: pendingMutate,
+          isPending: true,
+          isError: false,
+          error: null,
+        });
+        reportProgress = variables.onUploadProgress;
+      });
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: pendingMutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+
+      act(() => reportProgress(40));
+      expect(
+        screen.getByRole('button', { name: /subiendo documento\.\.\. 40%/i }),
+      ).toBeDisabled();
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
+
+      act(() => reportProgress(100));
+      expect(
+        screen.getByRole('button', { name: /procesando documento/i }),
       ).toBeDisabled();
     });
   });

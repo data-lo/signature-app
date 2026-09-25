@@ -1,7 +1,35 @@
 import type { NextConfig } from 'next';
 
+/**
+ * Cuerpo máximo que el proxy de `/api/*` (ver `rewrites`) reenvía al backend: 25 MB, igual que la
+ * red de seguridad de multer en signature-server (`MAX_UPLOAD_SAFETY_NET_BYTES`), para que un PDF
+ * de hasta 20 MB más los campos del multipart llegue completo.
+ *
+ * Bug corregido: "los documentos de ~12 MB fallan al enviarse". El navegador no habla con el
+ * backend directamente: `/api/*` pasa por el rewrite de Next, y Next reenvía el cuerpo desde una
+ * copia que corta en `middlewareClientMaxBodySize` (10 MB por omisión, en
+ * `server/lib/router-server.js` → `cloneBodyStream()`), aunque el middleware ni siquiera corra en
+ * `/api` (el matcher lo excluye). Todo lo que pasaba de 10 MB llegaba truncado y multer respondía
+ * `400 Multipart: Unexpected end of form`, sin ninguna relación con el límite de 20 MB.
+ */
+const PROXY_MAX_BODY_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Tiempo máximo que el proxy de `/api/*` espera la respuesta del backend: 2 minutos.
+ *
+ * El valor por omisión de Next son 30 s, y cuentan desde que empieza la subida: con 20 MB en una
+ * conexión modesta, más lo que el backend tarda en validar el PDF, guardarlo en MinIO y registrar
+ * la solicitud, esos 30 s se agotaban y el usuario recibía un error aunque el envío siguiera en
+ * curso del lado del servidor.
+ */
+const PROXY_TIMEOUT_MS = 120_000;
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+  experimental: {
+    middlewareClientMaxBodySize: PROXY_MAX_BODY_BYTES,
+    proxyTimeout: PROXY_TIMEOUT_MS,
+  },
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;
