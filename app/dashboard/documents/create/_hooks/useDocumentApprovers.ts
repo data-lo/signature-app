@@ -1,23 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 
-import {
-  getOrganizationMembersRequest,
-  type OrganizationMember,
-} from '@/lib/api/organization-members';
-import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-
-/**
- * Capacidad del catálogo estático que distingue a un aprobador: no es un rol ni un puesto, así
- * que la lista no se arma por nombre de rol ("Aprobador") sino por el permiso que ese rol otorgue.
- * Una organización que lo reparte desde un rol propio aparece igual.
- *
- * Es el mismo permiso que el backend vuelve a exigir al crear el documento (ver
- * `DocumentReviewerService`): esta lista es una comodidad para elegir, no la autorización.
- */
-const APPROVE_DOCUMENT_PERMISSION: PermissionKey = 'DOCUMENT.APPROVE';
+import {
+  getDocumentApproversRequest,
+  type DocumentApprover,
+} from '../_requests';
 
 /** Un aprobador listo para alimentar el `FormSelect`. */
 export interface ApproverOption {
@@ -28,10 +18,8 @@ export interface ApproverOption {
    */
   value: string;
   /**
-   * El correo del miembro, que es la única identidad que publica hoy
-   * `GET /organizations/:id/members` (ver `OrganizationMemberData` en el backend: trae email, RFC
-   * y rol, pero no nombre). En cuanto ese endpoint publique nombre y apellido, esto pasa a ser
-   * "Nombre Apellido" y no cambia nada más.
+   * "Nombre Apellido (correo)": el nombre es como lo reconoce quien elige, y el correo desempata a
+   * dos personas que se llamen igual. Sin nombre registrado, sólo el correo.
    */
   label: string;
 }
@@ -54,34 +42,41 @@ export function documentApproversQueryKey(organizationId: string | null) {
 }
 
 /**
- * Traduce los miembros de la organización a la lista de aprobadores elegibles.
+ * Traduce los aprobadores a opciones del selector.
  *
- * Deja fuera a quien no ha entrado todavía (`pending_invite`) o ya no está (`suspended`,
- * `removed`): el permiso lo tendrán por su rol, pero un miembro que no puede iniciar sesión no
- * puede aprobar nada, y ofrecerlo dejaría el documento esperando a alguien que nunca lo verá.
+ * Ya no filtra: el backend devuelve sólo a los miembros activos cuyo rol concede
+ * `DOCUMENT.APPROVE`, que es lo que antes se filtraba aquí sobre el listado completo de miembros.
  *
- * @param members - Miembros tal como los devuelve el backend.
- * @returns Los aprobadores, en el orden en que llegan (por antigüedad en la organización).
+ * @param approvers - Aprobadores tal como los devuelve el backend.
+ * @returns Las opciones, en el mismo orden.
  * @throws Nada: es una función pura.
  *
  * @example
  * ```ts
- * toApproverOptions(members); // [{ value: 'user-1', label: 'ana@empresa.com' }]
+ * toApproverOptions(approvers); // [{ value: 'user-1', label: 'Ana Ruiz (ana@empresa.com)' }]
  * ```
  */
 export function toApproverOptions(
-  members: OrganizationMember[],
+  approvers: DocumentApprover[],
 ): ApproverOption[] {
-  return members
-    .filter(
-      (member) =>
-        member.isActive &&
-        member.status === 'active' &&
-        member.permissions.some(
-          (permission) => permission.key === APPROVE_DOCUMENT_PERMISSION,
-        ),
-    )
-    .map((member) => ({ value: member.userId, label: member.email }));
+  return approvers.map((approver) => {
+    const name = `${approver.firstName} ${approver.lastName}`.trim();
+    return {
+      value: approver.userId,
+      label: name ? `${name} (${approver.email})` : approver.email,
+    };
+  });
+}
+
+/**
+ * Un error de permisos o de la petición no cambia por reintentar: se muestra al primer intento en
+ * vez de dejar varios segundos el "Cargando" mientras React Query insiste. Sólo los fallos del
+ * servidor o de la red se reintentan.
+ */
+function retryUnlessClientError(failureCount: number, error: unknown) {
+  const status = isAxiosError(error) ? error.response?.status : undefined;
+  if (status !== undefined && status < 500) return false;
+  return failureCount < 2;
 }
 
 /**
@@ -99,8 +94,8 @@ export function toApproverOptions(
  * @param enabled - Si la opción "Requiere aprobación" está activa.
  * @returns La consulta, con `data` ya reducida a opciones del selector.
  *
- * @throws Nada por sí mismo: el fallo llega como `query.isError` (un 403 cuando el usuario no
- * tiene `MEMBER.READ` en su organización).
+ * @throws Nada por sí mismo: el fallo llega como `query.isError` (un 403 si el rol del usuario no
+ * tiene `DOCUMENT.CREATE`).
  *
  * @example
  * ```tsx
@@ -114,10 +109,11 @@ export function useDocumentApprovers(enabled: boolean) {
 
   return useQuery({
     queryKey: documentApproversQueryKey(organizationId),
-    queryFn: () => getOrganizationMembersRequest(organizationId as string),
+    queryFn: getDocumentApproversRequest,
     // Una cuenta PERSONAL no tiene `organizationId` — y tampoco llega aquí, porque sin
     // organización la opción "Requiere aprobación" ni siquiera se muestra.
     enabled: enabled && !!organizationId,
     select: toApproverOptions,
+    retry: retryUnlessClientError,
   });
 }

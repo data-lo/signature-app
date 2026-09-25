@@ -99,7 +99,7 @@ describe('DocumentParticipantsDialog', () => {
     /** Criterio "el modal muestra siempre la sección Firmantes". */
     it('muestra la sección aunque el documento no traiga firmantes', () => {
       renderWithParticipants([
-        buildParticipant({ role: ParticipantRole.Watcher }),
+        buildParticipant({ role: ParticipantRole.Witness }),
       ]);
 
       expect(
@@ -108,19 +108,19 @@ describe('DocumentParticipantsDialog', () => {
     });
   });
 
-  describe('observadores', () => {
-    it('muestra la sección con nombre y correo cuando el documento tiene observadores', () => {
+  describe('testigos', () => {
+    it('muestra la sección con nombre y correo cuando el documento tiene testigos', () => {
       renderWithParticipants([
         buildParticipant({ id: 'p-1' }),
         buildParticipant({
           id: 'p-2',
           name: 'Luis Ramos',
           email: 'luis.ramos@empresa.com',
-          role: ParticipantRole.Watcher,
+          role: ParticipantRole.Witness,
         }),
       ]);
 
-      expect(sectionItems('Observadores')).toEqual([
+      expect(sectionItems('Testigos')).toEqual([
         'Luis Ramosluis.ramos@empresa.com',
       ]);
     });
@@ -131,29 +131,27 @@ describe('DocumentParticipantsDialog', () => {
         buildParticipant({
           id: 'p-2',
           name: 'Luis Ramos',
-          role: ParticipantRole.Watcher,
+          role: ParticipantRole.Witness,
         }),
       ]);
 
       expect(sectionItems('Firmantes')).toHaveLength(1);
       expect(sectionItems('Firmantes')[0]).toContain('Juan Pérez');
-      expect(sectionItems('Observadores')[0]).toContain('Luis Ramos');
+      expect(sectionItems('Testigos')[0]).toContain('Luis Ramos');
     });
 
     /**
-     * Criterio explícito de la historia: sin observadores no se muestra la sección NI un texto
+     * Criterio explícito de la historia: sin testigos no se muestra la sección NI un texto
      * que anuncie que está vacía.
      */
-    it('no muestra la sección ni un estado vacío cuando no hay observadores', () => {
+    it('no muestra la sección ni un estado vacío cuando no hay testigos', () => {
       renderWithParticipants([buildParticipant()]);
 
       expect(
-        screen.queryByRole('heading', { name: 'Observadores' }),
+        screen.queryByRole('heading', { name: 'Testigos' }),
       ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText(/no hay observadores/i),
-      ).not.toBeInTheDocument();
-      expect(screen.queryByText(/sin observadores/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/no hay testigos/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/sin testigos/i)).not.toBeInTheDocument();
     });
   });
 

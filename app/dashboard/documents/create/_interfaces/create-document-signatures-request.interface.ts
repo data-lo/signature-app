@@ -32,10 +32,10 @@ export interface SignaturePositionPayload {
 /**
  * Forma exacta que espera el backend por cada colaborador (campo `collaborators`). Sin
  * `signatureType`: lo define el documento entero (`DocumentDataPayload.signatureType`). `taxId`
- * solo viaja para VIEWER — a los firmantes ya no se les pide en ningún flujo.
+ * solo viaja para WITNESS — a los firmantes ya no se les pide en ningún flujo.
  */
 export interface CollaboratorPayload {
-  collaboratorType: 'SIGNER' | 'VIEWER';
+  collaboratorType: 'SIGNER' | 'WITNESS';
   firstName: string;
   lastName: string;
   email: string;
@@ -79,12 +79,19 @@ export interface DocumentDataPayload {
   isIndexable: boolean;
 }
 
+/**
+ * Recibe el porcentaje (0–100) del documento ya subido al servidor. Llegar a 100 no significa que
+ * el envío terminó: el servidor todavía procesa y guarda el archivo antes de responder.
+ */
+export type UploadProgressCallback = (percent: number) => void;
+
 /** Solicitud completa que arma `createDocumentSignaturesRequest` (un solo multipart). */
 export interface CreateDocumentSignaturesRequest {
   file: File;
   documentData: DocumentDataPayload;
   collaborators: CollaboratorPayload[];
   requiresDifferentSignatures: RequiresDifferentSignatures;
+  onUploadProgress?: UploadProgressCallback;
 }
 
 /**
@@ -109,4 +116,6 @@ export interface CreateDocumentSignaturesInput {
    * porque esta entrada refleja el contrato de la mutación, no la forma del formulario.
    */
   isIndexable: boolean;
+  /** Avance de la subida del archivo (ver `UploadProgressCallback`). */
+  onUploadProgress?: UploadProgressCallback;
 }

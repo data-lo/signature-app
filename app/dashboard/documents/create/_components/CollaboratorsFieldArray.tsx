@@ -30,7 +30,7 @@ import { resolveSelfSignerSync } from '../_mappers/self-signer.mapper';
 import {
   countSigners,
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   isSelfSigner,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
@@ -40,7 +40,7 @@ interface CollaboratorsFieldArrayProps {
 }
 
 /**
- * Escenario 2 de la historia: firmantes y espectadores viven en un solo arreglo
+ * Escenario 2 de la historia: firmantes y testigos viven en un solo arreglo
  * (`collaborators`), diferenciados por `collaboratorType`. Este componente es dueño del arreglo
  * (alta, baja y reordenamiento); los errores de cada campo los muestra cada campo, y el error
  * general de "agrega al menos un firmante" lo muestra la sección que lo envuelve
@@ -134,10 +134,10 @@ export default function CollaboratorsFieldArray({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append(emptyViewer())}
+            onClick={() => append(emptyWitness())}
           >
             <Eye className="size-3.5" />
-            Espectador
+            Testigo
           </Button>
         </div>
       </div>

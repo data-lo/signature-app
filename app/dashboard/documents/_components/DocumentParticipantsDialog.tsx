@@ -74,12 +74,12 @@ export default function DocumentParticipantsDialog({
     (participant) => participant.role === ParticipantRole.Signer,
   );
   /**
-   * Observadores son los `watcher` —los "espectadores" del formulario de creación—, únicos
-   * participantes sin acción sobre el documento. Un revisor no entra acá: tiene su propio rol y
-   * esta consulta no lo contempla.
+   * Testigos son los colaboradores `WITNESS` (antes `WATCHER`, "espectadores" en el formulario de
+   * creación), únicos participantes sin acción sobre el documento. Un revisor no entra acá: tiene
+   * su propio rol y esta consulta no lo contempla.
    */
-  const watchers = participants.filter(
-    (participant) => participant.role === ParticipantRole.Watcher,
+  const witnesses = participants.filter(
+    (participant) => participant.role === ParticipantRole.Witness,
   );
 
   return (
@@ -115,15 +115,12 @@ export default function DocumentParticipantsDialog({
 
         {data && (
           <div className="flex flex-col gap-4">
-            {/* Firmantes se muestra siempre: es la razón de ser del documento. Observadores solo
-              si hay alguno — un documento sin observadores no dice "no hay observadores", no
+            {/* Firmantes se muestra siempre: es la razón de ser del documento. Testigos solo
+              si hay alguno — un documento sin testigos no dice "no hay testigos", no
               muestra nada. */}
             <ParticipantsSection title="Firmantes" participants={signers} />
-            {watchers.length > 0 && (
-              <ParticipantsSection
-                title="Observadores"
-                participants={watchers}
-              />
+            {witnesses.length > 0 && (
+              <ParticipantsSection title="Testigos" participants={witnesses} />
             )}
           </div>
         )}

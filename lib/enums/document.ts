@@ -30,7 +30,7 @@ export enum DocumentStatus {
 /**
  * Espejo de COLLABORATOR_STATUS_ENUM
  * (signature-server/src/document/enum/collaborator-status.enum.ts).
- * `Notified` es exclusivo de un colaborador WATCHER: se le asigna cuando se le envía con éxito el
+ * `Notified` es exclusivo de un colaborador WITNESS (testigo): se le asigna cuando se le envía con éxito el
  * correo de aviso (ver `SendPendingSignatureNotificationUseCase` en el backend).
  */
 export enum ParticipantStatus {
@@ -57,7 +57,7 @@ export enum ParticipantStatus {
 export enum ParticipantRole {
   Signer = 'SIGNER',
   Reviewer = 'REVIEWER',
-  Watcher = 'WATCHER',
+  Witness = 'WITNESS',
   Creator = 'creator',
 }
 
