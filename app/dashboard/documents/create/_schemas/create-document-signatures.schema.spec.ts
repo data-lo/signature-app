@@ -1,13 +1,25 @@
 import {
   REVIEWER_REQUIRED_MESSAGE,
+  SIGNATURE_POSITION_REQUIRED_MESSAGE,
   createDocumentSignaturesSchema,
   emptySigner,
-  emptyViewer,
+  emptyWitness,
   countSigners,
+  signersWithoutPosition,
   type CollaboratorFormValues,
   type SignerFormValues,
-  type ViewerFormValues,
+  type WitnessFormValues,
 } from './index';
+
+/** Una ubicación de firma cualquiera, válida: el envío exige al menos una por firmante. */
+const PLACED_SIGNATURE = {
+  id: 'sig-1',
+  page: 1,
+  xRatio: 0.1,
+  yRatio: 0.1,
+  widthRatio: 0.2,
+  heightRatio: 0.08,
+};
 
 function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
   return {
@@ -15,13 +27,14 @@ function signer(overrides: Partial<SignerFormValues> = {}): SignerFormValues {
     firstName: 'Juan',
     lastName: 'Pérez',
     email: 'juan.perez@mail.com',
+    signatures: [PLACED_SIGNATURE],
     ...overrides,
   };
 }
 
-function viewer(): ViewerFormValues {
+function viewer(): WitnessFormValues {
   return {
-    ...emptyViewer(),
+    ...emptyWitness(),
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
@@ -73,7 +86,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
-  it('acepta un espectador sin taxId', () => {
+  it('acepta un testigo sin taxId', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([signer(), { ...viewer(), taxId: '' }]),
     );
@@ -90,7 +103,7 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['collaborators', 0, 'email']);
   });
 
-  it('rechaza si solo hay espectadores', () => {
+  it('rechaza si solo hay testigos', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([viewer()]),
     );
@@ -126,6 +139,44 @@ describe('createDocumentSignaturesSchema', () => {
     );
 
     expect(result.success).toBe(true);
+  });
+
+  /**
+   * Historia "Hacer obligatorias las coordenadas de posición de firma": no se envía una solicitud
+   * con un firmante cuya firma no está ubicada en el documento.
+   */
+  describe('ubicación de firma', () => {
+    it('rechaza un firmante sin ubicación, con el error en su campo de firmas', () => {
+      const result = createDocumentSignaturesSchema.safeParse(
+        formValues([signer(), signer({ signatures: [] })]),
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues).toEqual([
+        expect.objectContaining({
+          path: ['collaborators', 1, 'signatures'],
+          message: SIGNATURE_POSITION_REQUIRED_MESSAGE,
+        }),
+      ]);
+    });
+
+    it('no se lo exige a un espectador', () => {
+      const result = createDocumentSignaturesSchema.safeParse(
+        formValues([signer(), viewer()]),
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('rechaza una ubicación con ratios fuera de rango', () => {
+      const result = createDocumentSignaturesSchema.safeParse(
+        formValues([
+          signer({ signatures: [{ ...PLACED_SIGNATURE, xRatio: 1.5 }] }),
+        ]),
+      );
+
+      expect(result.success).toBe(false);
+    });
   });
 
   /**
@@ -173,5 +224,30 @@ describe('countSigners', () => {
 
   it('sin colaboradores, es 0', () => {
     expect(countSigners([])).toBe(0);
+  });
+});
+
+describe('signersWithoutPosition', () => {
+  it('devuelve por nombre, y en orden, los firmantes sin ninguna firma ubicada', () => {
+    expect(
+      signersWithoutPosition([
+        signer({ signatures: [] }),
+        viewer(),
+        signer({ firstName: 'María', lastName: 'Gómez' }),
+        signer({ firstName: '', lastName: '', email: '', signatures: [] }),
+      ]),
+    ).toEqual(['Juan Pérez', 'Firmante 3']);
+  });
+
+  it('usa el correo si el firmante todavía no tiene nombre', () => {
+    expect(
+      signersWithoutPosition([
+        signer({ firstName: '', lastName: '', signatures: [] }),
+      ]),
+    ).toEqual(['juan.perez@mail.com']);
+  });
+
+  it('está vacío si todos tienen su firma ubicada', () => {
+    expect(signersWithoutPosition([signer(), viewer()])).toEqual([]);
   });
 });

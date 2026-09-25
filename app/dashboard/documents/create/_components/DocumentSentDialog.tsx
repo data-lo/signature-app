@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ThumbsUp } from 'lucide-react';
 import {
   AlertDialog,
@@ -21,18 +22,44 @@ interface DocumentSentDialogProps {
 }
 
 /**
- * Confirmación de que el documento salió a firma. Sustituye al toast que había antes: el envío
- * cierra un flujo largo (cargar el PDF, configurarlo, elegir firmantes y ubicar las firmas) y su
- * confirmación trae información que el usuario necesita retener —que le llegará un correo y
- * dónde seguir el estado—, así que no puede desvanecerse sola a los pocos segundos.
+ * Listado de documentos con el recorte "Creados por mí": ahí aparece siempre la solicitud recién
+ * enviada. Lo comparten el enlace del mensaje y el botón "Entendido", para que ambos lleven al
+ * mismo lugar.
+ */
+export const CREATED_BY_ME_DOCUMENTS_HREF = `${DOCUMENTS_SECTIONS.list.href}?view=${DocumentView.CreatedByMe}`;
+
+/**
+ * Confirmación de que el documento salió a firma, que al reconocerla lleva al listado de documentos.
+ *
+ * Sustituye al toast que había antes: el envío cierra un flujo largo (cargar el PDF, configurarlo,
+ * elegir firmantes y ubicar las firmas) y su confirmación trae información que el usuario necesita
+ * retener —que le llegará un correo y dónde seguir el estado—, así que no puede desvanecerse sola
+ * a los pocos segundos.
+ *
+ * "Entendido" es un `AlertDialogAction` (un `Close` de base-ui): el clic cierra el modal y, además,
+ * navega a `CREATED_BY_ME_DOCUMENTS_HREF`. El listado vuelve a pedir los documentos al montarse y
+ * `useCreateDocumentSignatures` ya invalidó la caché `documents` en el `onSuccess`, así que la
+ * solicitud nueva aparece sin recargar. Cerrar con Escape NO redirige: sólo el botón expresa la
+ * intención de ir al listado.
  *
  * El nombre del recorte se toma de `DOCUMENT_VIEW_LABELS` y no se escribe a mano, para que
  * coincida con el filtro que el enlace deja aplicado al llegar al listado.
+ *
+ * @param props.open - Si el modal está visible.
+ * @param props.onOpenChange - Recibe cada cambio de visibilidad, incluido el cierre desde "Entendido".
+ * @returns El AlertDialog de confirmación.
+ *
+ * @example
+ * ```tsx
+ * <DocumentSentDialog open={isSentDialogOpen} onOpenChange={setIsSentDialogOpen} />
+ * ```
  */
 export default function DocumentSentDialog({
   open,
   onOpenChange,
 }: DocumentSentDialogProps) {
+  const router = useRouter();
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="sm:max-w-xl">
@@ -58,7 +85,7 @@ export default function DocumentSentDialog({
                   descripción, y aquí el <a> va dentro de un <p>: se aplica a mano para que se
                   vea como enlace y no como texto plano. */}
               <Link
-                href={`${DOCUMENTS_SECTIONS.list.href}?view=${DocumentView.CreatedByMe}`}
+                href={CREATED_BY_ME_DOCUMENTS_HREF}
                 className="font-medium text-emerald-600 hover:underline hover:underline-offset-3 dark:text-emerald-400"
               >
                 {DOCUMENT_VIEW_LABELS[DocumentView.CreatedByMe]}
@@ -69,7 +96,9 @@ export default function DocumentSentDialog({
         </AlertDialogHeader>
 
         <AlertDialogFooter>
-          <AlertDialogAction>
+          <AlertDialogAction
+            onClick={() => router.push(CREATED_BY_ME_DOCUMENTS_HREF)}
+          >
             <ThumbsUp aria-hidden />
             Entendido
           </AlertDialogAction>

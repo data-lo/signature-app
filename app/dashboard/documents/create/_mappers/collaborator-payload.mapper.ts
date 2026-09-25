@@ -41,9 +41,9 @@ export function toCollaboratorPayload(
   orderIndex = 0,
   requiresTwoFactorAuth = true,
 ): CollaboratorPayload {
-  if (collaborator.collaboratorType === 'VIEWER') {
+  if (collaborator.collaboratorType === 'WITNESS') {
     return {
-      collaboratorType: 'VIEWER',
+      collaboratorType: 'WITNESS',
       firstName: collaborator.firstName,
       lastName: collaborator.lastName,
       email: collaborator.email,

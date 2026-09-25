@@ -12,7 +12,7 @@ function params(
     isFileLoading: false,
     pageCount: null,
     signerCount: 0,
-    viewerCount: 0,
+    witnessCount: 0,
     ...overrides,
   };
 }
@@ -130,20 +130,20 @@ describe('buildCreateDocumentProgress', () => {
   describe('añadir participantes', () => {
     it('sin firmantes no está completa', () => {
       const progress = buildCreateDocumentProgress(
-        params({ signerCount: 0, viewerCount: 2 }),
+        params({ signerCount: 0, witnessCount: 2 }),
       );
 
       expect(progress.participants.isComplete).toBe(false);
     });
 
-    it('el encabezado contraído siempre muestra cuántos firmantes y espectadores hay', () => {
+    it('el encabezado contraído siempre muestra cuántos firmantes y testigos hay', () => {
       const progress = buildCreateDocumentProgress(
-        params({ signerCount: 1, viewerCount: 2 }),
+        params({ signerCount: 1, witnessCount: 2 }),
       );
 
       expect(progress.participants.isComplete).toBe(true);
       expect(progress.participants.collapsedSummary).toBe(
-        '1 firmante · 2 espectadores',
+        '1 firmante · 2 testigos',
       );
     });
   });
@@ -157,14 +157,14 @@ describe('buildCreateDocumentProgress', () => {
         pageCount: PENDING_LABEL,
         signatureType: PENDING_LABEL,
         signerCount: PENDING_LABEL,
-        // Cero espectadores es un dato conocido, no información faltante.
-        viewerCount: '0 espectadores',
+        // Cero testigos es un dato conocido, no información faltante.
+        witnessCount: '0 testigos',
       });
     });
 
     it('refleja el documento, la configuración y los participantes ya elegidos', () => {
       const progress = buildCreateDocumentProgress(
-        completeParams({ signatureType: 'ADVANCED', signerCount: 2, viewerCount: 1 }),
+        completeParams({ signatureType: 'ADVANCED', signerCount: 2, witnessCount: 1 }),
       );
 
       expect(progress.summary).toEqual({
@@ -172,7 +172,7 @@ describe('buildCreateDocumentProgress', () => {
         pageCount: '3 páginas',
         signatureType: 'Firma Electrónica Avanzada (e.firma)',
         signerCount: '2 firmantes',
-        viewerCount: '1 espectador',
+        witnessCount: '1 testigo',
       });
     });
   });
@@ -193,6 +193,52 @@ describe('buildCreateDocumentProgress', () => {
       expect(
         buildCreateDocumentProgress(completeParams(overrides)).isReadyToSubmit,
       ).toBe(false);
+    });
+  });
+
+  /** Historia "Hacer obligatorias las coordenadas de posición de firma". */
+  describe('ubicación de firmas', () => {
+    it('no deja enviar mientras algún firmante no tenga su firma ubicada', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({ signersWithoutPosition: ['Juan Pérez'] }),
+      );
+
+      expect(progress.signaturePlacement.isComplete).toBe(false);
+      expect(progress.isReadyToSubmit).toBe(false);
+    });
+
+    it('dice que es obligatorio y a quién le falta', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({
+          signerCount: 2,
+          signersWithoutPosition: ['Juan Pérez', 'María Gómez'],
+        }),
+      );
+
+      expect(progress.signaturePlacement.missingMessage).toBe(
+        'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento. Falta: Juan Pérez, María Gómez.',
+      );
+    });
+
+    it('no avisa nada mientras no hay PDF donde ubicarlas', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({
+          hasFile: false,
+          signersWithoutPosition: ['Juan Pérez'],
+        }),
+      );
+
+      expect(progress.signaturePlacement.missingMessage).toBeUndefined();
+    });
+
+    it('con todas las firmas ubicadas, se puede enviar', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({ signersWithoutPosition: [] }),
+      );
+
+      expect(progress.signaturePlacement.isComplete).toBe(true);
+      expect(progress.signaturePlacement.missingMessage).toBeUndefined();
+      expect(progress.isReadyToSubmit).toBe(true);
     });
   });
 });

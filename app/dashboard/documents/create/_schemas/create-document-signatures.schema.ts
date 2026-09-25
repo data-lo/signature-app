@@ -3,6 +3,10 @@ import { documentParticipantsSchema } from './document-participants.schema';
 import { countSigners } from './collaborator.schema';
 import { z } from 'zod';
 
+/** Por qué no se puede enviar la solicitud mientras algún firmante no tenga su firma ubicada. */
+export const SIGNATURE_POSITION_REQUIRED_MESSAGE =
+  'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento.';
+
 /**
  * Esquema del formulario completo de la pantalla: la composición de los esquemas de cada sección
  * más las reglas que ninguna sección puede validar sola. El archivo PDF no forma parte de estos
@@ -35,6 +39,24 @@ export const createDocumentSignaturesSchema = documentConfigurationSchema
         path: ['collaborators'],
       });
     }
+
+    // Historia "Hacer obligatorias las coordenadas de posición de firma": cada firmante necesita
+    // al menos una ubicación en el PDF. El error va en el campo `signatures` de cada firmante y no
+    // en el arreglo, para no mezclarse con el mensaje general de la sección de participantes. Lo
+    // que ve el usuario es el aviso junto al botón de envío (ver `_section-progress.ts`); esto es
+    // lo que impide el envío aunque el botón se habilitara por otro camino.
+    values.collaborators.forEach((collaborator, index) => {
+      if (
+        collaborator.collaboratorType === 'SIGNER' &&
+        collaborator.signatures.length === 0
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: SIGNATURE_POSITION_REQUIRED_MESSAGE,
+          path: ['collaborators', index, 'signatures'],
+        });
+      }
+    });
   });
 
 export type CreateDocumentSignaturesFormValues = z.infer<
