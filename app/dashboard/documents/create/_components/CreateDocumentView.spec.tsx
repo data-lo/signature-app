@@ -11,8 +11,9 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 import { MISSING_FILE_MESSAGE } from '../_section-rules';
 import { NO_APPROVERS_MESSAGE } from './ApproverUserField';
 
+const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }));
 jest.mock('@/lib/hooks/useCurrentUser');
 jest.mock('../../_hooks/useDocuments');
@@ -132,6 +133,7 @@ describe('CreateDocumentView', () => {
 
   beforeEach(() => {
     mutate.mockReset();
+    mockPush.mockReset();
     mockedUseCurrentUser.mockReturnValue({
       data: {
         firstName: 'Creador',
@@ -183,7 +185,7 @@ describe('CreateDocumentView', () => {
       expect(screen.queryByText(MISSING_FILE_MESSAGE)).not.toBeInTheDocument();
 
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
 
       expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeEnabled();
     });
@@ -318,7 +320,7 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await user.click(trigger(/añadir participantes/i));
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
 
       expect(
         trigger(/cargar documento/i).querySelector('[data-complete="true"]'),
@@ -335,7 +337,7 @@ describe('CreateDocumentView', () => {
       await selectFile(user);
       await addSigner(user);
       await user.click(screen.getByRole('button', { name: /espectador/i }));
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
 
       // Cada encabezado muestra su resumen al abrir otro, porque solo un panel queda expandido.
       await user.click(trigger(/cargar documento/i));
@@ -347,7 +349,7 @@ describe('CreateDocumentView', () => {
       expect(trigger(/cargar documento/i)).toHaveTextContent('contrato.pdf');
 
       await user.click(trigger(/añadir participantes/i));
-      expect(trigger(/configurar firma/i)).toHaveTextContent('Firma Simple');
+      expect(trigger(/configurar firma/i)).toHaveTextContent('Firma Grafo');
       /*
        * El panel recién abierto permanece disponible para continuar editando participantes.
        */
@@ -431,7 +433,7 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await openSection(user, /añadir participantes/i);
       await user.click(screen.getByRole('button', { name: /^firmante$/i }));
 
@@ -449,7 +451,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
 
       await submitRequest(user);
 
@@ -523,7 +525,7 @@ describe('CreateDocumentView', () => {
       await user.click(
         screen.getByRole('checkbox', { name: /incluirme como firmante/i }),
       );
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
 
       expect(
         screen.getByText(/firmarás este documento con tu perfil personal/i),
@@ -564,7 +566,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await submitRequest(user);
 
       const dialog = await screen.findByRole('alertdialog');
@@ -576,12 +578,62 @@ describe('CreateDocumentView', () => {
         /te notificaremos por correo cuando el proceso finalice/i,
       );
 
-      // Manda a la sección real donde el creador ve lo que envió, con el mismo nombre que usa
-      // el sidebar (ver DOCUMENTS_SECTIONS).
+      // Mientras el modal está abierto no se navega: el usuario tiene que reconocerlo primero.
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('"Entendido" cierra la confirmación y lleva al listado de documentos creados por el usuario', async () => {
+      const mutateWithSuccess = jest.fn((_vars, opts) => opts?.onSuccess?.());
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: mutateWithSuccess,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+
+      await screen.findByRole('alertdialog');
       await user.click(screen.getByRole('button', { name: /entendido/i }));
+
       await waitFor(() =>
         expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
       );
+      // El mismo recorte al que apunta el enlace del mensaje: ahí siempre aparece lo recién enviado.
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith(
+        '/dashboard/documents?view=created_by_me',
+      );
+    });
+
+    it('cerrar la confirmación con Escape no redirige: sólo "Entendido" lleva al listado', async () => {
+      const mutateWithSuccess = jest.fn((_vars, opts) => opts?.onSuccess?.());
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: mutateWithSuccess,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+
+      await screen.findByRole('alertdialog');
+      await user.keyboard('{Escape}');
+
+      await waitFor(() =>
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+      );
+      expect(mockPush).not.toHaveBeenCalled();
     });
 
     it('no muestra la confirmación mientras el envío no haya salido bien', async () => {
@@ -590,11 +642,12 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await submitRequest(user);
 
       expect(mutate).toHaveBeenCalled();
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
     });
 
     it('mientras la mutación está pendiente, el botón se deshabilita y muestra el progreso', () => {
@@ -719,7 +772,7 @@ describe('CreateDocumentView', () => {
       const emails = screen.getAllByLabelText(/^email/i);
       await user.type(emails[emails.length - 1], 'ana.ruiz@mail.com');
       await user.type(screen.getByLabelText(/^rfc/i), 'AURU800101ABC');
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
 
       await submitRequest(user);
 
@@ -748,7 +801,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await user.click(
         screen.getByRole('button', { name: /enviar solicitud de firma/i }),
       );
@@ -804,7 +857,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await submitRequest(user);
 
       expect(mutate).toHaveBeenCalledWith(
@@ -823,7 +876,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await submitRequest(user, { addToSmartSearch: false });
 
       expect(smartSearchCheckbox()).not.toBeChecked();
@@ -849,7 +902,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await user.click(smartSearchCheckbox());
       await user.click(smartSearchCheckbox());
       await user.click(
@@ -876,7 +929,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await submitRequest(user, { addToSmartSearch: false });
 
       expect(await screen.findByRole('alertdialog')).toHaveTextContent(
@@ -898,7 +951,7 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await openSection(user, /añadir participantes/i);
       await user.click(screen.getByRole('button', { name: /^firmante$/i }));
 
@@ -1023,7 +1076,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await requireApproval(user);
 
       await waitFor(() =>
@@ -1063,7 +1116,7 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
       await addSigner(user);
-      await selectSignatureType(user, /firma simple/i);
+      await selectSignatureType(user, /firma grafo/i);
       await requireApproval(user);
 
       expect(
