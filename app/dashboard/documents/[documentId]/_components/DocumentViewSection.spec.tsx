@@ -1,4 +1,5 @@
 import userEvent from '@testing-library/user-event';
+import { AxiosError, type AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentViewSection from './DocumentViewSection';
@@ -1269,6 +1270,79 @@ describe('DocumentViewSection', () => {
       expect(
         screen.getByRole('button', { name: /compartir enlace/i }),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Corregir acceso y carga de documentos de todas las organizaciones para usuarios con
+   * permiso de lectura": quien no tiene acceso ve por qué, no un "Intenta de nuevo más tarde".
+   */
+  describe('cuando el detalle no se puede cargar', () => {
+    function httpError(status: number) {
+      return new AxiosError(
+        'Request failed',
+        'ERR_BAD_REQUEST',
+        undefined,
+        undefined,
+        { status, data: {} } as AxiosResponse,
+      );
+    }
+
+    function detailFailsWith(error: unknown) {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isLoading: false,
+        isError: true,
+        error,
+      });
+    }
+
+    it('con 403 muestra un mensaje de permisos en vez del error genérico', () => {
+      detailFailsWith(httpError(403));
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByText(/no tienes permiso para ver este documento/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/intenta de nuevo más tarde/i),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/cargando documento/i)).not.toBeInTheDocument();
+    });
+
+    it('con 404 dice que el documento no existe', () => {
+      detailFailsWith(httpError(404));
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByText(/el documento no existe o fue eliminado/i),
+      ).toBeInTheDocument();
+    });
+
+    it('con un fallo del servidor conserva el mensaje de reintentar más tarde', () => {
+      detailFailsWith(httpError(500));
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByText(/no se pudo cargar el documento/i),
+      ).toBeInTheDocument();
+    });
+
+    it('mientras la consulta está pendiente muestra el cargando, no un error', () => {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: undefined,
+        isPending: true,
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(screen.getByText(/cargando documento/i)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/no se pudo cargar el documento/i),
+      ).not.toBeInTheDocument();
     });
   });
 });
