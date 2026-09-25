@@ -40,5 +40,6 @@ export {
 export {
   createDocumentSignaturesSchema,
   CREATE_DOCUMENT_DEFAULT_VALUES,
+  SIGNATURE_POSITION_REQUIRED_MESSAGE,
   type CreateDocumentSignaturesFormValues,
 } from './create-document-signatures.schema';

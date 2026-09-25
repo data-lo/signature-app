@@ -195,4 +195,50 @@ describe('buildCreateDocumentProgress', () => {
       ).toBe(false);
     });
   });
+
+  /** Historia "Hacer obligatorias las coordenadas de posición de firma". */
+  describe('ubicación de firmas', () => {
+    it('no deja enviar mientras algún firmante no tenga su firma ubicada', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({ signersWithoutPosition: ['Juan Pérez'] }),
+      );
+
+      expect(progress.signaturePlacement.isComplete).toBe(false);
+      expect(progress.isReadyToSubmit).toBe(false);
+    });
+
+    it('dice que es obligatorio y a quién le falta', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({
+          signerCount: 2,
+          signersWithoutPosition: ['Juan Pérez', 'María Gómez'],
+        }),
+      );
+
+      expect(progress.signaturePlacement.missingMessage).toBe(
+        'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento. Falta: Juan Pérez, María Gómez.',
+      );
+    });
+
+    it('no avisa nada mientras no hay PDF donde ubicarlas', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({
+          hasFile: false,
+          signersWithoutPosition: ['Juan Pérez'],
+        }),
+      );
+
+      expect(progress.signaturePlacement.missingMessage).toBeUndefined();
+    });
+
+    it('con todas las firmas ubicadas, se puede enviar', () => {
+      const progress = buildCreateDocumentProgress(
+        completeParams({ signersWithoutPosition: [] }),
+      );
+
+      expect(progress.signaturePlacement.isComplete).toBe(true);
+      expect(progress.signaturePlacement.missingMessage).toBeUndefined();
+      expect(progress.isReadyToSubmit).toBe(true);
+    });
+  });
 });

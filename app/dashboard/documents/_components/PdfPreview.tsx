@@ -1,11 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Document, Page } from 'react-pdf';
+import { Document } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 // Configura el worker de PDF.js desde el propio origen (ver lib/pdf-worker.ts).
 import '@/lib/pdf-worker';
+import LazyPdfPage from '@/components/pdf/LazyPdfPage';
+import {
+  PdfLoadErrorMessage,
+  PdfLoadingMessage,
+} from '@/components/pdf/PdfDocumentStatus';
+import { usePdfDocumentLoader } from '@/components/pdf/use-pdf-document-loader';
 
 interface PdfPreviewProps {
   file: File | string;
@@ -15,8 +21,23 @@ const CONTAINER_PADDING = 48;
 const MIN_PAGE_WIDTH = 320;
 const MAX_PAGE_WIDTH = 900;
 
+/**
+ * Visor de sólo lectura del PDF (vista de firma y previsualización de documentos).
+ *
+ * Dibuja sólo las páginas cercanas a lo visible (ver `LazyPdfPage`), muestra el porcentaje de
+ * descarga mientras llega el archivo y, si falla, ofrece reintentar sin recargar la pantalla (ver
+ * `usePdfDocumentLoader`).
+ *
+ * @param props.file - URL prefirmada del documento o el `File` local.
+ * @returns El panel con scroll y las páginas del documento.
+ *
+ * @example
+ * ```tsx
+ * <PdfPreview file={fileUrl} />
+ * ```
+ */
 export default function PdfPreview({ file }: PdfPreviewProps) {
-  const [numPages, setNumPages] = useState(0);
+  const loader = usePdfDocumentLoader(file);
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageWidth, setPageWidth] = useState(520);
 
@@ -55,31 +76,36 @@ export default function PdfPreview({ file }: PdfPreviewProps) {
       ref={containerRef}
       className="flex h-full flex-col items-center gap-4 overflow-y-auto bg-muted py-6"
     >
-      <Document
-        file={file}
-        onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-        loading={
-          <p className="mt-20 text-sm text-muted-foreground">
-            Cargando documento...
-          </p>
-        }
-        error={
-          <p className="mt-20 text-sm text-destructive">
-            Error al cargar el documento.
-          </p>
-        }
-      >
-        {Array.from({ length: numPages }, (_, i) => (
-          <div key={i} className="shadow-xl">
-            <Page
-              pageNumber={i + 1}
-              width={pageWidth}
-              renderTextLayer
-              renderAnnotationLayer
-            />
-          </div>
-        ))}
-      </Document>
+      {loader.hasError ? (
+        <PdfLoadErrorMessage onRetry={loader.retry} />
+      ) : (
+        <Document
+          key={loader.attempt}
+          file={file}
+          onLoadProgress={loader.handleLoadProgress}
+          onLoadSuccess={loader.handleLoadSuccess}
+          onLoadError={loader.handleLoadError}
+          loading={<PdfLoadingMessage progress={loader.progress} />}
+          // El error real se pinta arriba con su botón de reintento; aquí sólo se evita el texto
+          // en inglés que react-pdf muestra por defecto durante el render en que se detecta.
+          error={null}
+        >
+          {loader.pageSizes === null ? (
+            <PdfLoadingMessage progress={loader.progress} />
+          ) : (
+            loader.pageSizes.map((size, i) => (
+              <div key={i} className="shadow-xl">
+                <LazyPdfPage
+                  pageNumber={i + 1}
+                  width={pageWidth}
+                  size={size}
+                  scrollRootRef={containerRef}
+                />
+              </div>
+            ))
+          )}
+        </Document>
+      )}
     </div>
   );
 }
