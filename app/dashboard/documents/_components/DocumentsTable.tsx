@@ -29,7 +29,7 @@ import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
-import { formatShortDate } from '@/lib/format-datetime';
+import DocumentDate from './DocumentDate';
 import {
   DocumentParticipation,
   DocumentStatus,
@@ -100,7 +100,12 @@ const PARTICIPATION_LABELS: Record<DocumentParticipation, string> = {
   [DocumentParticipation.Participant]: 'Participas',
 };
 
-/** Lo que muestra "Fecha de firma" mientras el documento no está firmado por todos. */
+/**
+ * Lo que muestra "Fecha de firma" cuando no hay fecha que mostrar: el documento todavía no está
+ * firmado por todos, o el backend no la informó (endpoint antiguo, dato ilegible). Se lee mejor que
+ * un guion en una columna que la mayoría de las veces está vacía. Va sin tooltip (ver
+ * `DocumentDate`).
+ */
 const UNSIGNED_DATE_LABEL = 'No disponible';
 
 const STATUS_DOT: Record<DocumentStatus, string> = {
@@ -195,16 +200,6 @@ export default function DocumentsTable({
                * firmado, así que el estatus de CADA documento es lo único que puede decidirlo.
                */
               const canArchive = doc.status === DocumentStatus.Signed;
-              /**
-               * "No disponible" cubre los dos casos en que no hay fecha de firma que mostrar: el
-               * documento todavía no está firmado por todos, o el backend no la informó (endpoint
-               * antiguo, dato ilegible). Se lee mejor que un guion en una columna que la mayoría
-               * de las veces está vacía.
-               */
-              const signedAtLabel = formatShortDate(
-                doc.signedAt,
-                UNSIGNED_DATE_LABEL,
-              );
 
               return (
                 <TableRow
@@ -263,18 +258,13 @@ export default function DocumentsTable({
                     </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {formatShortDate(doc.createdAt)}
+                    <DocumentDate date={doc.createdAt} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    <span
-                      className={
-                        signedAtLabel === UNSIGNED_DATE_LABEL
-                          ? 'text-muted-foreground'
-                          : undefined
-                      }
-                    >
-                      {signedAtLabel}
-                    </span>
+                    <DocumentDate
+                      date={doc.signedAt}
+                      emptyLabel={UNSIGNED_DATE_LABEL}
+                    />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {doc.signatureType ? (

@@ -205,6 +205,96 @@ describe('DocumentsTable', () => {
 
       expect(dataCell('Fecha de firma')).toHaveTextContent('No disponible');
     });
+
+    /**
+     * Historia "Mostrar fecha y hora completa con Tooltip": la fecha compacta se queda en la celda
+     * y el detalle con hora de 24 horas aparece en el Tooltip de shadcn al pasar el cursor.
+     */
+    describe('tooltip con la fecha completa', () => {
+      it('la fecha de creación muestra su fecha y hora completas al pasar el cursor', async () => {
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+        const trigger = within(dataCell('Fecha de creación')).getByRole(
+          'button',
+        );
+        expect(trigger).toHaveTextContent('15/03/2026');
+
+        await user.hover(trigger);
+
+        const tooltip = await screen.findByText('DOMINGO 15 DE MARZO 23:55', {
+          selector: '[data-slot="tooltip-content"]',
+        });
+        expect(tooltip).toBeVisible();
+      });
+
+      it('la fecha de firma muestra su fecha y hora completas al pasar el cursor', async () => {
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+        await user.hover(
+          within(dataCell('Fecha de firma')).getByRole('button'),
+        );
+
+        expect(
+          await screen.findByText('DOMINGO 10 DE MAYO 09:30', {
+            selector: '[data-slot="tooltip-content"]',
+          }),
+        ).toBeVisible();
+      });
+
+      /** Sin hover (teclado, lector de pantalla) el detalle sigue formando parte del nombre. */
+      it('el disparador incluye la fecha completa en su nombre accesible', () => {
+        renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+        expect(
+          within(dataCell('Fecha de creación')).getByRole('button', {
+            name: /^15\/03\/2026\s*, DOMINGO 15 DE MARZO 23:55$/,
+          }),
+        ).toBeInTheDocument();
+      });
+
+      it.each([
+        [
+          'sin firmar',
+          { status: DocumentStatus.PendingSignature, signedAt: null },
+        ],
+        ['sin fecha informada', { signedAt: undefined }],
+        ['con fecha ilegible', { signedAt: 'no-es-fecha' }],
+      ])(
+        'un documento %s no tiene tooltip en "Fecha de firma"',
+        async (_label, overrides) => {
+          const user = userEvent.setup();
+          renderWithProviders(
+            <DocumentsTable documents={[buildDoc(overrides)]} />,
+          );
+
+          const cell = dataCell('Fecha de firma');
+          expect(cell).toHaveTextContent('No disponible');
+          expect(within(cell).queryByRole('button')).not.toBeInTheDocument();
+
+          await user.hover(within(cell).getByText('No disponible'));
+
+          expect(
+            document.querySelector('[data-slot="tooltip-content"]'),
+          ).toBeNull();
+        },
+      );
+
+      it('hacer clic en la fecha sigue abriendo el detalle del documento', async () => {
+        const user = userEvent.setup();
+        const onRowSelect = jest.fn();
+        renderWithProviders(
+          <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+        );
+
+        await user.click(
+          within(dataCell('Fecha de creación')).getByRole('button'),
+        );
+
+        expect(onRowSelect).toHaveBeenCalledWith('doc-1');
+      });
+    });
   });
 
   describe('menú de acciones', () => {
