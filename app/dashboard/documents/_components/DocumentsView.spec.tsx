@@ -223,6 +223,81 @@ describe('DocumentsView', () => {
   });
 
   /**
+   * Historia "Mostrar 'Ninguna' en la columna Organización": cualquier recorte, filtro o página
+   * que devuelva el listado pasa por la misma tabla, así que el texto no depende de cómo se llegó
+   * a la fila.
+   */
+  it('muestra la organización o "Ninguna" también con un filtro aplicado y en otra página', async () => {
+    const baseDocument = {
+      fileType: 'application/pdf',
+      signers: [],
+      witnesses: [],
+      creator: 'Sara Ramírez',
+      totalPages: 1,
+      status: DocumentStatus.Signed,
+      createdAt: new Date(2026, 2, 15).toISOString(),
+      signedAt: null,
+    };
+    mockedUseDocuments.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...baseDocument,
+            id: 'doc-1',
+            fileName: 'con-organizacion.pdf',
+            organizationName: 'Acme',
+          },
+          {
+            ...baseDocument,
+            id: 'doc-2',
+            fileName: 'sin-organizacion.pdf',
+            organizationName: null,
+          },
+        ],
+        pagination: { page: 1, limit: 25, total: 60, totalPages: 3 },
+      },
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.click(screen.getByRole('button', { name: /filtros/i }));
+    const panel = await screen.findByRole('dialog');
+    await user.click(
+      within(panel).getByRole('button', { name: 'Firmado por todos' }),
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(lastFilters().statuses).toEqual([DocumentStatus.Signed]),
+    );
+
+    // Los botones de paginación son sólo íconos y no tienen nombre accesible: "siguiente" se
+    // ubica por el suyo.
+    const nextPage = document
+      .querySelector('svg.lucide-chevron-right')
+      ?.closest('button') as HTMLElement;
+    await user.click(nextPage);
+    await waitFor(() => {
+      const calls = mockedUseDocuments.mock.calls;
+      expect(calls[calls.length - 1][0].page).toBe(2);
+    });
+
+    const organizationCell = (fileName: string) => {
+      const columnIndex = screen
+        .getAllByRole('columnheader')
+        .findIndex((header) => header.textContent?.trim() === 'Organización');
+      const row = screen.getByText(fileName).closest('tr') as HTMLElement;
+      return within(row).getAllByRole('cell')[columnIndex];
+    };
+
+    expect(organizationCell('con-organizacion.pdf')).toHaveTextContent('Acme');
+    expect(organizationCell('sin-organizacion.pdf')).toHaveTextContent(
+      'Ninguna',
+    );
+  });
+
+  /**
    * El alta salió del sidebar: este botón es el único acceso a la creación desde la navegación,
    * así que si desaparece la pantalla queda sin manera de llegar al alta salvo tecleando la
    * URL a mano.

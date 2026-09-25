@@ -111,7 +111,7 @@ describe('DocumentsTable', () => {
   });
 
   describe('estructura de la tabla', () => {
-    it('renderiza las columnas en el orden Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
+    it('renderiza las columnas en el orden Documento / Creado por / Participación / Organización / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const headers = screen
@@ -122,6 +122,7 @@ describe('DocumentsTable', () => {
         'Documento',
         'Creado por',
         'Participación',
+        'Organización',
         'Estatus',
         'Fecha de creación',
         'Fecha de firma',
@@ -544,6 +545,90 @@ describe('DocumentsTable', () => {
    * Historia "Mostrar tipo de firma en las tablas de documentos". El valor lo resuelve el backend
    * a partir de los firmantes del documento; acá solo se traduce a la etiqueta de la columna.
    */
+  /**
+   * Historia "Mostrar 'Ninguna' en la columna Organización cuando el documento no tenga
+   * participación": el backend manda el nombre visible de la organización o null; la tabla nunca
+   * deja la celda vacía. Es sólo presentación: el documento recibido no se modifica.
+   */
+  describe('columna Organización', () => {
+    it('muestra el nombre de la organización cuando el documento tiene una asociada', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ organizationName: 'Acme' })]} />,
+      );
+
+      expect(dataCell('Organización')).toHaveTextContent('Acme');
+      expect(dataCell('Organización')).not.toHaveTextContent('Ninguna');
+    });
+
+    it('muestra "Ninguna" cuando el documento no tiene organización (null)', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ organizationName: null })]} />,
+      );
+
+      expect(dataCell('Organización')).toHaveTextContent(/^Ninguna$/);
+    });
+
+    it('muestra "Ninguna" si la respuesta no informa la organización', () => {
+      // `buildDoc` no trae `organizationName`: es la forma de las respuestas anteriores al campo.
+      const docWithoutOrganization = buildDoc();
+      expect(docWithoutOrganization).not.toHaveProperty('organizationName');
+
+      renderWithProviders(
+        <DocumentsTable documents={[docWithoutOrganization]} />,
+      );
+
+      expect(dataCell('Organización')).toHaveTextContent(/^Ninguna$/);
+    });
+
+    it('muestra "Ninguna" en vez de una celda en blanco si el nombre llega vacío', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ organizationName: '   ' })]} />,
+      );
+
+      expect(dataCell('Organización')).toHaveTextContent(/^Ninguna$/);
+    });
+
+    it('presenta "Ninguna" como texto secundario, igual que los demás valores ausentes', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ organizationName: null })]} />,
+      );
+
+      expect(within(dataCell('Organización')).getByText('Ninguna')).toHaveClass(
+        'text-muted-foreground',
+      );
+    });
+
+    it('resuelve cada fila por separado: con y sin organización en la misma página', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1', organizationName: 'Acme' }),
+            buildDoc({ id: 'doc-2', organizationName: null }),
+          ]}
+        />,
+      );
+
+      const columnIndex = screen
+        .getAllByRole('columnheader')
+        .findIndex((header) => header.textContent?.trim() === 'Organización');
+      const cells = screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[columnIndex]);
+
+      expect(cells[0]).toHaveTextContent('Acme');
+      expect(cells[1]).toHaveTextContent('Ninguna');
+    });
+
+    it('no modifica el documento recibido', () => {
+      const doc = buildDoc({ organizationName: null });
+
+      renderWithProviders(<DocumentsTable documents={[doc]} />);
+
+      expect(doc.organizationName).toBeNull();
+    });
+  });
+
   describe('columna Tipo de firma', () => {
     it('muestra "Simple" para un documento de firma simple', () => {
       renderWithProviders(
