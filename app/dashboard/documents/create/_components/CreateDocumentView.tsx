@@ -19,6 +19,9 @@ import DocumentSignaturePlacementSection from './DocumentSignaturePlacementSecti
 import DocumentRequestSummary from './DocumentRequestSummary';
 import CreatedDocumentsSection from './CreatedDocumentsSection';
 import DocumentSentDialog from './DocumentSentDialog';
+import DocumentUploadProgress, {
+  uploadStatusLabel,
+} from './DocumentUploadProgress';
 import SmartSearchCard from './SmartSearchCard';
 import { Form } from '@/components/form/form';
 
@@ -176,9 +179,18 @@ export default function CreateDocumentView({
           >
             <Send aria-hidden />
             {sections.submission.isLoading
-              ? 'Enviando solicitud...'
+              ? createDocumentForm.uploadProgress === null
+                ? 'Enviando solicitud...'
+                : uploadStatusLabel(createDocumentForm.uploadProgress)
               : 'Enviar solicitud de firma'}
           </Button>
+
+          {sections.submission.isLoading &&
+            createDocumentForm.uploadProgress !== null && (
+              <DocumentUploadProgress
+                percent={createDocumentForm.uploadProgress}
+              />
+            )}
 
           {sections.submission.hasError && (
             <FieldError>{sections.submission.errorMessage}</FieldError>

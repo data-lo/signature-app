@@ -1,9 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm, useWatch, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import { getErrorMessage } from '@/lib/error-handler';
 import {
   createDocumentSignaturesSchema,
   countSigners,
@@ -15,6 +15,7 @@ import {
   useCreateDocumentSignatures,
   CREATE_DOCUMENT_ERROR_MESSAGE,
 } from './useCreateDocumentSignatures';
+import { getUploadErrorMessage } from '../_upload-errors';
 
 interface UseCreateDocumentFormParams {
   /** Archivo ya cargado; sin él no hay nada que enviar (ver `_section-rules.ts`). */
@@ -42,6 +43,11 @@ export function useCreateDocumentForm({
 }: UseCreateDocumentFormParams) {
   const currentUserQuery = useCurrentUser();
   const createDocumentSignaturesMutation = useCreateDocumentSignatures();
+  /**
+   * Porcentaje del documento ya subido en el envío en curso, o `null` antes de que empiece. Vive
+   * aquí y no en la mutación para no cambiar la forma que devuelve `useCreateDocumentSignatures`.
+   */
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const form = useForm<CreateDocumentSignaturesFormValues>({
     resolver: zodResolver(createDocumentSignaturesSchema),
@@ -79,6 +85,7 @@ export function useCreateDocumentForm({
     // también acá y no depende de que la UI haya deshabilitado el botón.
     if (!file || !values.signatureType) return;
 
+    setUploadProgress(0);
     createDocumentSignaturesMutation.mutate(
       {
         file,
@@ -94,6 +101,7 @@ export function useCreateDocumentForm({
         // una tarjeta más dentro de `collaborators` (la agrega `CollaboratorsFieldArray`), así que
         // agregarlo acá otra vez lo mandaría duplicado.
         collaborators: values.collaborators,
+        onUploadProgress: setUploadProgress,
       },
       {
         onSuccess: () => {
@@ -127,12 +135,14 @@ export function useCreateDocumentForm({
     requiresApproval,
     /** Aprobador elegido, o `null` mientras no se haya elegido ninguno. */
     reviewerUserId,
+    /** Porcentaje subido del envío en curso (ver `DocumentUploadProgress`). */
+    uploadProgress,
     /** Error general de la sección de participantes (no pertenece a ningún campo). */
     participantsErrorMessage: getParticipantsErrorMessage(
       form.formState.errors,
     ),
     submitErrorMessage: createDocumentSignaturesMutation.isError
-      ? getErrorMessage(
+      ? getUploadErrorMessage(
           createDocumentSignaturesMutation.error,
           CREATE_DOCUMENT_ERROR_MESSAGE,
         )

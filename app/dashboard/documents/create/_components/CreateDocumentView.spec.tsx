@@ -1,4 +1,5 @@
 import userEvent from '@testing-library/user-event';
+import { act } from '@testing-library/react';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import CreateDocumentView from './CreateDocumentView';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
@@ -661,6 +662,48 @@ describe('CreateDocumentView', () => {
 
       expect(
         screen.getByRole('button', { name: /enviando solicitud/i }),
+      ).toBeDisabled();
+    });
+
+    /**
+     * Con documentos de varios MB la subida tarda: el botón y la barra dicen cuánto va, y al
+     * llegar al 100% pasan a "Procesando", porque el servidor todavía guarda el archivo.
+     */
+    it('durante el envío muestra el avance de la subida y después que el servidor lo procesa', async () => {
+      let reportProgress: (percent: number) => void = () => {};
+      const pendingMutate = jest.fn((variables) => {
+        // A partir de aquí la mutación está en curso, como en React Query tras `mutate`.
+        mockedUseCreateDocumentSignatures.mockReturnValue({
+          mutate: pendingMutate,
+          isPending: true,
+          isError: false,
+          error: null,
+        });
+        reportProgress = variables.onUploadProgress;
+      });
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: pendingMutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+
+      act(() => reportProgress(40));
+      expect(
+        screen.getByRole('button', { name: /subiendo documento\.\.\. 40%/i }),
+      ).toBeDisabled();
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
+
+      act(() => reportProgress(100));
+      expect(
+        screen.getByRole('button', { name: /procesando documento/i }),
       ).toBeDisabled();
     });
   });
