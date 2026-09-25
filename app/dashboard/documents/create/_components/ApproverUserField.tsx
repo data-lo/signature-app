@@ -1,8 +1,10 @@
 'use client';
 
+import { isAxiosError } from 'axios';
 import { Loader2 } from 'lucide-react';
 import { useWatch, type Control } from 'react-hook-form';
 
+import { Button } from '@/components/ui/button';
 import { FormSelect } from '@/components/form/form-select';
 import { FieldError } from '@/components/ui/field';
 
@@ -21,6 +23,13 @@ export const APPROVERS_LOADING_MESSAGE = 'Cargando usuarios aprobadores...';
  */
 export const APPROVERS_ERROR_MESSAGE =
   'No se pudieron cargar los usuarios aprobadores. Intenta de nuevo.';
+
+/**
+ * Un 403 no se arregla reintentando: el rol del usuario no le deja crear documentos en esta
+ * organización, y por lo tanto tampoco configurarles aprobación.
+ */
+export const APPROVERS_FORBIDDEN_MESSAGE =
+  'No tienes permiso para configurar aprobaciones en esta organización.';
 
 /**
  * Selector del usuario que aprobará el documento, dependiente de "Requiere aprobación" (historia
@@ -60,7 +69,28 @@ export default function ApproverUserField({
   }
 
   if (approversQuery.isError) {
-    return <FieldError>{APPROVERS_ERROR_MESSAGE}</FieldError>;
+    const isForbidden =
+      isAxiosError(approversQuery.error) &&
+      approversQuery.error.response?.status === 403;
+
+    if (isForbidden) {
+      return <FieldError>{APPROVERS_FORBIDDEN_MESSAGE}</FieldError>;
+    }
+
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <FieldError>{APPROVERS_ERROR_MESSAGE}</FieldError>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void approversQuery.refetch()}
+          disabled={approversQuery.isFetching}
+        >
+          Reintentar
+        </Button>
+      </div>
+    );
   }
 
   const approvers = approversQuery.data ?? [];
