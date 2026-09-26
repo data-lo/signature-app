@@ -5,7 +5,10 @@ import { z } from 'zod';
 
 /** Por qué no se puede enviar la solicitud mientras algún firmante no tenga su firma ubicada. */
 export const SIGNATURE_POSITION_REQUIRED_MESSAGE =
-  'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento.';
+  'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento antes de continuar.';
+
+/** Encabezado del aviso de error que acompaña a `SIGNATURE_POSITION_REQUIRED_MESSAGE` junto al botón de envío. */
+export const SIGNATURE_POSITION_REQUIRED_TITLE = 'Falta ubicar la firma';
 
 /**
  * Esquema del formulario completo de la pantalla: la composición de los esquemas de cada sección
