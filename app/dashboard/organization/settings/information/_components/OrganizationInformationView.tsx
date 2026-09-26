@@ -29,7 +29,7 @@ const PROFILE_FIELDS: {
 }[] = [
   { key: 'displayName', label: 'Nombre de visualización' },
   { key: 'name', label: 'Razón social' },
-  { key: 'rfc', label: 'RFC' },
+  { key: 'taxId', label: 'RFC' },
   { key: 'phoneNumber', label: 'Teléfono' },
   { key: 'address', label: 'Domicilio' },
   { key: 'domainAllowed', label: 'Dominio permitido' },
