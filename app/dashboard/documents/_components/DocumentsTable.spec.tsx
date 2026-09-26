@@ -90,6 +90,15 @@ async function openRowMenu(user: ReturnType<typeof userEvent.setup>) {
   return screen.findByRole('menu');
 }
 
+/**
+ * Permisos de lectura con los que se ofrece "Archivar" (ver `ARCHIVE_DOCUMENT_PERMISSIONS`): los de
+ * un OWNER o ADMIN de fábrica. Las pruebas que no los pasan renderizan sin permisos.
+ */
+const DOCUMENT_READER_PERMISSIONS = [
+  'DOCUMENT.READ_OWN',
+  'DOCUMENT.READ_ORGANIZATION',
+] as const;
+
 describe('DocumentsTable', () => {
   const downloadMutate = jest.fn();
   const archiveMutate = jest.fn();
@@ -306,6 +315,7 @@ describe('DocumentsTable', () => {
       const user = userEvent.setup();
       renderWithProviders(
         <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
       );
 
       const menu = await openRowMenu(user);
@@ -426,6 +436,7 @@ describe('DocumentsTable', () => {
         <DocumentsTable
           documents={[buildDoc({ status: DocumentStatus.Signed })]}
         />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
       );
 
       const menu = await openRowMenu(user);
@@ -441,10 +452,13 @@ describe('DocumentsTable', () => {
         <DocumentsTable
           documents={[buildDoc({ id: 'doc-9', status: DocumentStatus.Signed })]}
         />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
       );
 
       const menu = await openRowMenu(user);
-      await user.click(within(menu).getByRole('menuitem', { name: 'Archivar' }));
+      await user.click(
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      );
 
       expect(archiveMutate).toHaveBeenCalledWith('doc-9');
     });
@@ -458,21 +472,19 @@ describe('DocumentsTable', () => {
       DocumentStatus.Cancelled,
       DocumentStatus.CancellationPending,
       DocumentStatus.Rejected,
-    ])(
-      'no ofrece archivar un documento en estatus %s',
-      async (status) => {
-        const user = userEvent.setup();
-        renderWithProviders(
-          <DocumentsTable documents={[buildDoc({ status })]} />,
-        );
+    ])('no ofrece archivar un documento en estatus %s', async (status) => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ status })]} />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
 
-        const menu = await openRowMenu(user);
+      const menu = await openRowMenu(user);
 
-        expect(
-          within(menu).queryByRole('menuitem', { name: /archivar/i }),
-        ).not.toBeInTheDocument();
-      },
-    );
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+    });
 
     it('muestra "Archivando..." y deshabilita la acción mientras ese documento se archiva', async () => {
       mockedUseArchiveCompletedDocument.mockReturnValue({
@@ -485,6 +497,7 @@ describe('DocumentsTable', () => {
         <DocumentsTable
           documents={[buildDoc({ status: DocumentStatus.Signed })]}
         />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
       );
 
       const menu = await openRowMenu(user);
@@ -492,6 +505,70 @@ describe('DocumentsTable', () => {
       expect(
         within(menu).getByRole('menuitem', { name: /archivando/i }),
       ).toHaveAttribute('data-disabled');
+    });
+
+    /**
+     * El caso de la historia: el documento lo creó otra persona y quien mira no participa en
+     * él, pero su rol ve los documentos de toda la organización. La opción depende del permiso,
+     * no de quién creó el documento.
+     */
+    it('ofrece "Archivar" a quien no creó el documento si tiene DOCUMENT.READ_ORGANIZATION', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({
+              id: 'doc-ajeno',
+              creator: 'Otra Persona',
+              status: DocumentStatus.Signed,
+            }),
+          ]}
+        />,
+        { permissions: ['DOCUMENT.READ_ORGANIZATION'] },
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      );
+
+      expect(archiveMutate).toHaveBeenCalledWith('doc-ajeno');
+    });
+
+    it('ofrece "Archivar" al creador con DOCUMENT.READ_OWN', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+        { permissions: ['DOCUMENT.READ_OWN'] },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      ).toBeInTheDocument();
+    });
+
+    /** Sin permiso de lectura no se ofrece, aunque el documento esté firmado. */
+    it('no ofrece "Archivar" sin permiso de lectura de documentos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+        { permissions: ['DOCUMENT.CREATE'] },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Descargar' }),
+      ).toBeInTheDocument();
     });
   });
 

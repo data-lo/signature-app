@@ -1,9 +1,42 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { archiveDocumentRequest } from '../_requests';
+
+/** Lo que se le dice a quien el backend no deja archivar. Dice qué hacer, no qué falló por dentro. */
+export const ARCHIVE_FORBIDDEN_MESSAGE =
+  'No tienes permiso para archivar este documento. Si lo necesitas, pide a un administrador de la organización que revise tu rol.';
+
+/** Mensaje genérico cuando el backend no manda uno propio. */
+export const ARCHIVE_GENERIC_ERROR_MESSAGE =
+  'Ocurrió un error al archivar el documento. Intenta de nuevo.';
+
+/**
+ * Traduce el rechazo de `POST /document/:id/archive` al mensaje que ve el usuario.
+ *
+ * Un 403 lleva su propio texto porque el del backend no sirve aquí: la autorización de archivar
+ * es la misma Policy que la del detalle, y su mensaje habla de "consultar" el documento. El resto
+ * —el 400 de un documento que no está firmado, el 404— sí trae un mensaje del backend que se
+ * entiende tal cual.
+ *
+ * @param error - Lo que rechazó la petición.
+ * @returns El mensaje para el aviso de error.
+ *
+ * @example
+ * ```ts
+ * archiveErrorMessage(axiosErrorWithStatus403); // ARCHIVE_FORBIDDEN_MESSAGE
+ * ```
+ */
+export function archiveErrorMessage(error: unknown): string {
+  if (isAxiosError(error) && error.response?.status === 403) {
+    return ARCHIVE_FORBIDDEN_MESSAGE;
+  }
+
+  return getErrorMessage(error, ARCHIVE_GENERIC_ERROR_MESSAGE);
+}
 
 /**
  * Archiva un documento completado y lo saca del listado del usuario.
@@ -31,12 +64,7 @@ export function useArchiveCompletedDocument() {
       toast.success('Documento archivado');
     },
     onError: (error) => {
-      toast.error(
-        getErrorMessage(
-          error,
-          'Ocurrió un error al archivar el documento. Intenta de nuevo.',
-        ),
-      );
+      toast.error(archiveErrorMessage(error));
     },
   });
 }

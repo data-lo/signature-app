@@ -30,6 +30,8 @@ import ShareDocumentDialog from './ShareDocumentDialog';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import DocumentDate from './DocumentDate';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import {
   DocumentParticipation,
   DocumentStatus,
@@ -132,6 +134,17 @@ interface DocumentsTableProps {
   onRowSelect?: (documentId: string) => void;
 }
 
+/**
+ * Permisos con los que se puede archivar: los mismos que dejan ver el documento, porque el
+ * backend autoriza `POST /document/:id/archive` con `DOCUMENT + READ` y la misma Policy que el
+ * detalle. Archivar sólo lo esconde de la bandeja de quien lo pide, así que no hace falta un
+ * permiso más fuerte que el que ya lo pone en ella — y en ningún caso depende de quién lo creó.
+ */
+export const ARCHIVE_DOCUMENT_PERMISSIONS: readonly PermissionKey[] = [
+  'DOCUMENT.READ_OWN',
+  'DOCUMENT.READ_ORGANIZATION',
+];
+
 function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1 cursor-pointer select-none">
@@ -153,6 +166,8 @@ export default function DocumentsTable({
     useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
   const archiveMutation = useArchiveCompletedDocument();
+  const { canAny } = usePermissions();
+  const canArchiveDocuments = canAny(ARCHIVE_DOCUMENT_PERMISSIONS);
 
   /**
    * Si hay página anterior o siguiente se deduce de dónde estamos: el endpoint unificado devuelve
@@ -197,9 +212,14 @@ export default function DocumentsTable({
                * Antes esta condición tenía una mitad más —la sección tenía que ser "Completados"—
                * porque la acción vivía únicamente en esa pantalla. Con la lista unificada ya no
                * hay sección que consultar: la misma tabla muestra a la vez lo pendiente y lo
-               * firmado, así que el estatus de CADA documento es lo único que puede decidirlo.
+               * firmado, así que el estatus de CADA documento es lo que decide sobre la fila.
+               *
+               * La otra mitad es el permiso de la cuenta activa (`ARCHIVE_DOCUMENT_PERMISSIONS`),
+               * nunca quién creó el documento: un administrador que ve los documentos de toda la
+               * organización puede archivar también los que no creó.
                */
-              const canArchive = doc.status === DocumentStatus.Signed;
+              const canArchive =
+                canArchiveDocuments && doc.status === DocumentStatus.Signed;
 
               return (
                 <TableRow
