@@ -216,7 +216,7 @@ describe('buildCreateDocumentProgress', () => {
       );
 
       expect(progress.signaturePlacement.missingMessage).toBe(
-        'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento. Falta: Juan Pérez, María Gómez.',
+        'Es obligatorio seleccionar la ubicación de la firma de cada firmante en el documento antes de continuar. Falta: Juan Pérez, María Gómez.',
       );
     });
 
