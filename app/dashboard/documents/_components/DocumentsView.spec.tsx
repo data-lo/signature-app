@@ -192,6 +192,179 @@ describe('DocumentsView', () => {
     await waitFor(() => expect(lastFilters().statuses).toEqual([]));
   });
 
+  /** Historia "Agregar filtro de documentos archivados". */
+  describe('filtro "Archivados"', () => {
+    async function openPanel(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole('button', { name: /filtros/i }));
+      return screen.findByRole('dialog');
+    }
+
+    /** Una respuesta ya resuelta, que es cuando tiene sentido hablar de "vacío". */
+    function respondWith(items: unknown[]) {
+      mockedUseDocuments.mockReturnValue({
+        data: {
+          items,
+          pagination: {
+            page: 1,
+            limit: 25,
+            total: items.length,
+            totalPages: items.length ? 1 : 0,
+          },
+        },
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+      });
+    }
+
+    it('se ofrece en el panel y se combina con el recorte elegido', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Creados por mí' }),
+      );
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(true));
+      expect(lastFilters().view).toBe(DocumentView.CreatedByMe);
+      expect(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    /** Elegir un filtro vuelve a la primera página, también éste. */
+    it('al aplicarlo vuelve a la primera página', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(true));
+      const calls = mockedUseDocuments.mock.calls;
+      expect(calls[calls.length - 1][0].page).toBe(1);
+    });
+
+    it('se quita desde su chip para volver a los documentos activos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.keyboard('{Escape}');
+
+      await user.click(
+        await screen.findByRole('button', {
+          name: /quitar filtro: archivados/i,
+        }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(false));
+    });
+
+    it('sin archivados muestra un estado vacío claro y la salida a los activos', async () => {
+      respondWith([]);
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.keyboard('{Escape}');
+
+      expect(
+        await screen.findByText('No tienes documentos archivados'),
+      ).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /ver documentos activos/i }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(false));
+      expect(
+        screen.queryByText('No tienes documentos archivados'),
+      ).not.toBeInTheDocument();
+    });
+
+    /** Con otros criterios, "no tienes archivados" podría ser falso: se dice otra cosa. */
+    it('con búsqueda u otros filtros, el vacío no afirma que no haya archivados', async () => {
+      respondWith([]);
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.click(
+        within(panel).getByRole('button', { name: 'Creados por mí' }),
+      );
+      await user.keyboard('{Escape}');
+
+      expect(
+        await screen.findByText(
+          'Ningún documento archivado coincide con la búsqueda o los filtros',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('No tienes documentos archivados'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('fuera del filtro no muestra el estado vacío de archivados', () => {
+      respondWith([]);
+      renderWithProviders(<DocumentsView />);
+
+      expect(
+        screen.queryByText(/documentos archivados/i),
+      ).not.toBeInTheDocument();
+    });
+
+    /** Lo que se lista ahí ya está archivado: ofrecer "Archivar" otra vez no tiene sentido. */
+    it('en la vista de archivados no ofrece "Archivar"', async () => {
+      respondWith([
+        {
+          id: 'doc-archivado',
+          fileName: 'contrato.pdf',
+          creator: 'Ana López',
+          totalPages: 1,
+          status: DocumentStatus.Signed,
+          createdAt: '2026-03-15T12:00:00.000Z',
+          signedAt: '2026-05-10T12:00:00.000Z',
+        },
+      ]);
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.keyboard('{Escape}');
+
+      await user.click(
+        screen.getByRole('button', { name: /acciones del documento/i }),
+      );
+      const menu = await screen.findByRole('menu');
+
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Descargar' }),
+      ).toBeInTheDocument();
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('lleva al detalle al seleccionar una fila', async () => {
     mockedUseDocuments.mockReturnValue({
       data: {

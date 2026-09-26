@@ -18,6 +18,15 @@ export interface DocumentsFilters {
   search: string;
   /** Vacío significa "cualquier estado"; el backend ignora la lista vacía. */
   statuses: DocumentStatus[];
+  /**
+   * Filtro "Archivados": en `true`, la lista trae SÓLO lo que el usuario archivó; en `false` —el
+   * valor por omisión—, lo deja fuera, como siempre.
+   *
+   * Es un filtro aparte y no un estado ni una vista: archivar es una preferencia personal, no un
+   * estatus del documento, y como `view` es excluyente, meterlo ahí impediría pedir "archivados
+   * que creé yo". Así se combina con todo lo demás.
+   */
+  archived: boolean;
   participant: string;
   createdFrom: string;
   createdTo: string;
@@ -41,6 +50,7 @@ export const DEFAULT_DOCUMENTS_FILTERS: DocumentsFilters = {
   view: DocumentView.All,
   search: '',
   statuses: [],
+  archived: false,
   participant: '',
   createdFrom: '',
   createdTo: '',
@@ -62,6 +72,9 @@ export const DOCUMENT_VIEW_OPTIONS: DocumentView[] = [
   DocumentView.Completed,
   DocumentView.All,
 ];
+
+/** Rótulo del filtro de archivados, igual en el panel y en su chip. */
+export const ARCHIVED_FILTER_LABEL = 'Archivados';
 
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
   [DocumentStatus.Created]: 'Creado',
@@ -124,6 +137,14 @@ export function activeFilterChips(
     });
   }
 
+  if (filters.archived) {
+    chips.push({
+      id: 'archived',
+      label: ARCHIVED_FILTER_LABEL,
+      remove: (current) => ({ ...current, archived: false }),
+    });
+  }
+
   filters.statuses.forEach((status) => {
     chips.push({
       id: `status:${status}`,
@@ -177,6 +198,8 @@ export function buildDocumentsQueryParams(
 
   if (filters.search) params.search = filters.search;
   if (filters.statuses.length) params.statuses = filters.statuses.join(',');
+  // Sólo viaja encendido: sin el parámetro el backend ya excluye lo archivado.
+  if (filters.archived) params.archived = 'true';
   if (filters.participant) params.participant = filters.participant;
   if (filters.createdFrom) params.createdFrom = filters.createdFrom;
   if (filters.createdTo) params.createdTo = filters.createdTo;

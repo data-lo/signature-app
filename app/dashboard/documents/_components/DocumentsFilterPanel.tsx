@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DocumentStatus, DocumentView } from '@/lib/enums/document';
 import {
+  ARCHIVED_FILTER_LABEL,
   DEFAULT_DOCUMENTS_FILTERS,
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_STATUS_OPTIONS,
@@ -131,6 +132,20 @@ export default function DocumentsFilterPanel({
               {DOCUMENT_STATUS_LABELS[status]}
             </ToggleChip>
           ))}
+        </div>
+      </div>
+
+      <div>
+        <FilterLabel>Archivo</FilterLabel>
+        {/* Un interruptor y no una opción más de "Estado": archivar es una decisión personal y no
+          un estatus del documento. Encendido trae sólo lo archivado; apagado, lo deja fuera. */}
+        <div className="flex flex-wrap gap-1.5">
+          <ToggleChip
+            active={filters.archived}
+            onClick={() => update('archived', !filters.archived)}
+          >
+            {ARCHIVED_FILTER_LABEL}
+          </ToggleChip>
         </div>
       </div>
 

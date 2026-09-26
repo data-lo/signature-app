@@ -130,7 +130,21 @@ interface DocumentsTableProps {
    * contenedora no ofrece esa ruta: entonces las filas no son seleccionables.
    */
   onRowSelect?: (documentId: string) => void;
+  /**
+   * Lo que se muestra en lugar de las filas cuando la lista llega vacía. Ausente —o mientras la
+   * consulta todavía no responde— la tabla queda sin filas, como hasta ahora: un "no hay nada"
+   * pintado durante la carga sería mentira.
+   */
+  emptyState?: React.ReactNode;
+  /**
+   * Si el menú de cada fila ofrece "Archivar". En `false` en la vista de archivados: todo lo que
+   * hay ahí ya está archivado, y ofrecerlo otra vez sólo movería la fecha.
+   */
+  canArchiveRows?: boolean;
 }
+
+/** Columnas de la tabla; la fila de estado vacío ocupa todas. */
+const COLUMN_COUNT = 8;
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -147,6 +161,8 @@ export default function DocumentsTable({
   totalPages = 1,
   onPageChange,
   onRowSelect,
+  emptyState,
+  canArchiveRows = true,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
@@ -183,6 +199,16 @@ export default function DocumentsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {documents.length === 0 && emptyState && (
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={COLUMN_COUNT}
+                  className="py-10 text-center whitespace-normal"
+                >
+                  {emptyState}
+                </TableCell>
+              </TableRow>
+            )}
             {documents.map((doc) => {
               const isDownloading =
                 downloadMutation.isPending &&
@@ -199,7 +225,8 @@ export default function DocumentsTable({
                * hay sección que consultar: la misma tabla muestra a la vez lo pendiente y lo
                * firmado, así que el estatus de CADA documento es lo único que puede decidirlo.
                */
-              const canArchive = doc.status === DocumentStatus.Signed;
+              const canArchive =
+                canArchiveRows && doc.status === DocumentStatus.Signed;
 
               return (
                 <TableRow
