@@ -1,6 +1,6 @@
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
-import DocumentsView from './DocumentsView';
+import DocumentsView, { DOCUMENTS_LOAD_ERROR_MESSAGE } from './DocumentsView';
 import { useDocuments } from '../_hooks/useDocuments';
 import { DocumentStatus, DocumentView } from '@/lib/enums/document';
 
@@ -233,5 +233,44 @@ describe('DocumentsView', () => {
     expect(
       screen.getByRole('button', { name: /crear documento/i }),
     ).toHaveAttribute('href', '/dashboard/documents/create');
+  });
+  /** Historia "Actualizar tabla de documentos a fondo blanco": los estados de la consulta. */
+  describe('estados de la consulta', () => {
+    it('mientras la consulta no tiene datos, la tabla muestra la carga', () => {
+      mockedUseDocuments.mockReturnValue({
+        data: undefined,
+        isPending: true,
+        isError: false,
+      });
+
+      renderWithProviders(<DocumentsView />);
+
+      expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Cargando documentos',
+      );
+    });
+
+    it('si la consulta falla, la tabla muestra el error', () => {
+      mockedUseDocuments.mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isError: true,
+      });
+
+      renderWithProviders(<DocumentsView />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        DOCUMENTS_LOAD_ERROR_MESSAGE,
+      );
+    });
+
+    it('sin documentos, la tabla muestra el estado vacío', () => {
+      renderWithProviders(<DocumentsView />);
+
+      expect(
+        screen.getByText('No hay documentos para mostrar.'),
+      ).toBeInTheDocument();
+    });
   });
 });
