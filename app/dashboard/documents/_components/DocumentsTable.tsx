@@ -9,6 +9,7 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -30,6 +31,8 @@ import ShareDocumentDialog from './ShareDocumentDialog';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import DocumentDate from './DocumentDate';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import {
   DocumentParticipation,
   DocumentStatus,
@@ -119,6 +122,15 @@ const STATUS_DOT: Record<DocumentStatus, string> = {
   [DocumentStatus.Cancelled]: 'bg-gray-400',
 };
 
+/** Columnas de la tabla; lo usan las filas de estado para ocupar todo el ancho. */
+const COLUMN_COUNT = 8;
+
+/** Filas del esqueleto de carga: las suficientes para que la tarjeta no salte al llegar los datos. */
+const LOADING_ROW_COUNT = 5;
+
+/** Lo que dice la tabla cuando la consulta respondió sin documentos. */
+export const EMPTY_DOCUMENTS_MESSAGE = 'No hay documentos para mostrar.';
+
 interface DocumentsTableProps {
   documents: DocumentListItem[];
   page?: number;
@@ -169,6 +181,8 @@ export default function DocumentsTable({
     useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
   const archiveMutation = useArchiveCompletedDocument();
+  const { canAny } = usePermissions();
+  const canArchiveDocuments = canAny(ARCHIVE_DOCUMENT_PERMISSIONS);
 
   /**
    * Si hay página anterior o siguiente se deduce de dónde estamos: el endpoint unificado devuelve
@@ -177,14 +191,29 @@ export default function DocumentsTable({
    */
   const hasPrevPage = page > 1;
   const hasNextPage = page < totalPages;
+  /** Error primero, luego carga: con datos viejos y un error nuevo, lo que importa es el error. */
+  const bodyState = errorMessage
+    ? 'error'
+    : isLoading
+      ? 'loading'
+      : documents.length === 0
+        ? 'empty'
+        : 'rows';
+  const visibleDocuments = bodyState === 'rows' ? documents : [];
 
   return (
     <div className="flex-1 min-w-0">
-      {/* La tabla vive dentro de una tarjeta con borde y encabezado gris, igual en las tres
-          secciones; `components/ui/table` se deja intacto porque también lo usa MembersTable. */}
-      <div className="overflow-hidden rounded-xl border border-border">
-        <Table>
-          <TableHeader className="bg-muted/50">
+      {/* La tabla vive dentro de una tarjeta blanca (`bg-card`) con borde y encabezado gris, y la
+          paginación va en su pie: sobre el fondo beige de la aplicación, la tarjeta es lo que
+          separa la lista del resto de la pantalla. Los ajustes se hacen con `className` sobre los
+          componentes de shadcn y no en `components/ui/table`, que también usan MembersTable y
+          RolesTable. `bg-card` y no `bg-white` para que el tema oscuro siga funcionando. */}
+      <div
+        data-slot="documents-table-card"
+        className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs"
+      >
+        <Table aria-busy={bodyState === 'loading' || undefined}>
+          <TableHeader className="bg-muted/60">
             <TableRow className="hover:bg-transparent">
               <TableHead>
                 <SortableHeader>Documento</SortableHeader>
@@ -223,7 +252,11 @@ export default function DocumentsTable({
                * Antes esta condición tenía una mitad más —la sección tenía que ser "Completados"—
                * porque la acción vivía únicamente en esa pantalla. Con la lista unificada ya no
                * hay sección que consultar: la misma tabla muestra a la vez lo pendiente y lo
-               * firmado, así que el estatus de CADA documento es lo único que puede decidirlo.
+               * firmado, así que el estatus de CADA documento es lo que decide sobre la fila.
+               *
+               * La otra mitad es el permiso de la cuenta activa (`ARCHIVE_DOCUMENT_PERMISSIONS`),
+               * nunca quién creó el documento: un administrador que ve los documentos de toda la
+               * organización puede archivar también los que no creó.
                */
               const canArchive =
                 canArchiveRows && doc.status === DocumentStatus.Signed;
@@ -233,7 +266,9 @@ export default function DocumentsTable({
                   key={doc.id}
                   // La fila entera es el camino al detalle del documento. `TableRow` ya resalta
                   // en hover; el cursor de mano es lo que anuncia que además se puede activar.
-                  className={onRowSelect ? 'cursor-pointer' : undefined}
+                  // Sobre blanco, el `hover:bg-muted/50` del componente casi no se distingue:
+                  // aquí se usa el tono completo.
+                  className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
                   onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
                 >
                   <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
@@ -330,59 +365,62 @@ export default function DocumentsTable({
             })}
           </TableBody>
         </Table>
-      </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Documentos por página</span>
-          <Select defaultValue="25">
-            <SelectTrigger size="sm" className="w-16">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="25">25</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <div
+          data-slot="documents-table-pagination"
+          className="flex items-center justify-between border-t border-border px-3 py-2"
+        >
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Documentos por página</span>
+            <Select defaultValue="25">
+              <SelectTrigger size="sm" className="w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={!onPageChange || !hasPrevPage}
-            onClick={() => onPageChange?.(1)}
-          >
-            <ChevronsLeft className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={!onPageChange || !hasPrevPage}
-            onClick={() => onPageChange?.(page - 1)}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="px-2 text-sm font-medium text-emerald-600">
-            {page}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={!onPageChange || !hasNextPage}
-            onClick={() => onPageChange?.(page + 1)}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={!onPageChange || !hasNextPage}
-            onClick={() => onPageChange?.(totalPages)}
-          >
-            <ChevronsRight className="size-4" />
-          </Button>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={!onPageChange || !hasPrevPage}
+              onClick={() => onPageChange?.(1)}
+            >
+              <ChevronsLeft className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={!onPageChange || !hasPrevPage}
+              onClick={() => onPageChange?.(page - 1)}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="px-2 text-sm font-medium text-emerald-600">
+              {page}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={!onPageChange || !hasNextPage}
+              onClick={() => onPageChange?.(page + 1)}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={!onPageChange || !hasNextPage}
+              onClick={() => onPageChange?.(totalPages)}
+            >
+              <ChevronsRight className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
