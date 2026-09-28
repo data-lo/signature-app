@@ -13,8 +13,10 @@ import DocumentsFilterChips from './DocumentsFilterChips';
 import { useDocuments } from '../_hooks/useDocuments';
 import { useDocumentsListState } from '../_hooks/useDocumentsListState';
 import {
+  activeFilterChips,
   DEFAULT_DOCUMENTS_FILTERS,
   DOCUMENT_VIEW_LABELS,
+  type DocumentsFilters,
 } from '../_config/filters';
 import { DOCUMENTS_SECTIONS } from '../_config/sections';
 
@@ -31,6 +33,54 @@ export const DOCUMENTS_LOAD_ERROR_MESSAGE =
  * es una. Corto a propósito: por encima de medio segundo la lista se siente trabada.
  */
 const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * Estado vacío del filtro "Archivados": dice por qué no hay nada y cómo volver a lo activo.
+ *
+ * Distingue dos vacíos que no significan lo mismo. Sin ningún otro filtro ni búsqueda, el usuario
+ * simplemente no ha archivado nada, y se le explica cómo se archiva. Con otros filtros, puede que
+ * sí tenga archivados y sea la combinación la que no encuentra ninguno: decirle "no tienes
+ * archivados" ahí sería falso.
+ *
+ * @param props.filters - Filtros aplicados, con `archived` encendido.
+ * @param props.onShowActive - Apaga el filtro de archivados y conserva el resto.
+ * @returns El mensaje y el botón para volver a los documentos activos.
+ *
+ * @example
+ * ```tsx
+ * <ArchivedEmptyState filters={filters} onShowActive={() => …} />
+ * ```
+ */
+function ArchivedEmptyState({
+  filters,
+  onShowActive,
+}: {
+  filters: DocumentsFilters;
+  onShowActive: () => void;
+}) {
+  const hasOtherCriteria =
+    activeFilterChips(filters).length > 1 || filters.search !== '';
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium text-foreground">
+          {hasOtherCriteria
+            ? 'Ningún documento archivado coincide con la búsqueda o los filtros'
+            : 'No tienes documentos archivados'}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {hasOtherCriteria
+            ? 'Prueba con otros criterios o vuelve a tus documentos activos.'
+            : 'Archiva un documento firmado desde su menú de acciones para encontrarlo aquí.'}
+        </p>
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={onShowActive}>
+        Ver documentos activos
+      </Button>
+    </div>
+  );
+}
 
 /**
  * La pantalla de documentos: una sola lista con búsqueda y filtros.
@@ -133,6 +183,18 @@ export default function DocumentsView() {
         isLoading={documentsQuery.isPending}
         errorMessage={
           documentsQuery.isError ? DOCUMENTS_LOAD_ERROR_MESSAGE : undefined
+        }
+        canArchiveRows={!filters.archived}
+        emptyState={
+          // Sólo con respuesta: mientras carga, la lista también llega vacía.
+          documentsQuery.isSuccess && filters.archived ? (
+            <ArchivedEmptyState
+              filters={filters}
+              onShowActive={() =>
+                handleFiltersChange({ ...filters, archived: false })
+              }
+            />
+          ) : undefined
         }
       />
     </PageContainer>

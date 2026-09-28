@@ -74,6 +74,39 @@ describe('filtros del listado unificado', () => {
         signedTo: '2026-11-30',
       });
     });
+
+    /**
+     * Historia "Agregar filtro de documentos archivados". Sin el parámetro, el backend ya deja
+     * fuera lo archivado, así que `archived` sólo viaja cuando está encendido.
+     */
+    it('manda archived=true sólo con el filtro de archivados encendido', () => {
+      expect(buildDocumentsQueryParams(filters())).not.toHaveProperty(
+        'archived',
+      );
+      expect(buildDocumentsQueryParams(filters({ archived: true }))).toEqual({
+        view: DocumentView.All,
+        archived: 'true',
+      });
+    });
+
+    /** Se combina con los demás en vez de reemplazarlos. */
+    it('combina archivados con el recorte, los estados y la búsqueda', () => {
+      expect(
+        buildDocumentsQueryParams(
+          filters({
+            archived: true,
+            view: DocumentView.CreatedByMe,
+            statuses: [DocumentStatus.Signed],
+            search: 'contrato',
+          }),
+        ),
+      ).toEqual({
+        view: DocumentView.CreatedByMe,
+        archived: 'true',
+        statuses: DocumentStatus.Signed,
+        search: 'contrato',
+      });
+    });
   });
 
   describe('chips de filtros activos', () => {
@@ -155,6 +188,28 @@ describe('filtros del listado unificado', () => {
       expect(chip.remove(current)).toEqual(
         expect.objectContaining({ signedFrom: '', signedTo: '' }),
       );
+    });
+
+    it('el filtro de archivados produce su chip, y quitarlo vuelve a los activos', () => {
+      const current = filters({
+        archived: true,
+        statuses: [DocumentStatus.Signed],
+      });
+      const chip = activeFilterChips(current).find(
+        (item) => item.id === 'archived',
+      )!;
+
+      expect(chip.label).toBe('Archivados');
+      expect(chip.remove(current)).toEqual({
+        ...current,
+        archived: false,
+      });
+    });
+
+    it('sin el filtro de archivados no hay chip de archivados', () => {
+      expect(
+        activeFilterChips(filters()).some((chip) => chip.id === 'archived'),
+      ).toBe(false);
     });
 
     /** Un rango a medias también es un filtro: se dice cuál de los dos extremos está puesto. */

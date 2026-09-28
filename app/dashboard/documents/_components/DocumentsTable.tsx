@@ -149,6 +149,16 @@ interface DocumentsTableProps {
   isLoading?: boolean;
   /** Mensaje si la consulta falló; tiene prioridad sobre la lista y sobre el estado vacío. */
   errorMessage?: string;
+  /**
+   * Lo que se muestra en lugar de las filas cuando la lista llega vacía. Ausente, se muestra
+   * `EMPTY_DOCUMENTS_MESSAGE`. Nunca se pinta durante la carga ni con error: esos estados mandan.
+   */
+  emptyState?: React.ReactNode;
+  /**
+   * Si el menú de cada fila ofrece "Archivar". En `false` en la vista de archivados: todo lo que
+   * hay ahí ya está archivado, y ofrecerlo otra vez sólo movería la fecha.
+   */
+  canArchiveRows?: boolean;
 }
 
 /**
@@ -242,6 +252,8 @@ export default function DocumentsTable({
   onRowSelect,
   isLoading = false,
   errorMessage,
+  emptyState,
+  canArchiveRows = true,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
@@ -302,7 +314,9 @@ export default function DocumentsTable({
             )}
             {bodyState === 'loading' && <DocumentsLoadingRows />}
             {bodyState === 'empty' && (
-              <DocumentsStateRow>{EMPTY_DOCUMENTS_MESSAGE}</DocumentsStateRow>
+              <DocumentsStateRow>
+                {emptyState ?? EMPTY_DOCUMENTS_MESSAGE}
+              </DocumentsStateRow>
             )}
             {visibleDocuments.map((doc) => {
               const isDownloading =
@@ -325,7 +339,9 @@ export default function DocumentsTable({
                * organización puede archivar también los que no creó.
                */
               const canArchive =
-                canArchiveDocuments && doc.status === DocumentStatus.Signed;
+                canArchiveRows &&
+                canArchiveDocuments &&
+                doc.status === DocumentStatus.Signed;
 
               return (
                 <TableRow

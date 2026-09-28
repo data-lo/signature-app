@@ -676,6 +676,45 @@ describe('DocumentsTable', () => {
         within(menu).getByRole('menuitem', { name: 'Descargar' }),
       ).toBeInTheDocument();
     });
+
+    /** La vista de archivados apaga la acción: todo lo que lista ya está archivado. */
+    it('con canArchiveRows en false no ofrece "Archivar" ni en un documento firmado', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+          canArchiveRows={false}
+        />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('estado vacío', () => {
+    it('pinta el estado vacío cuando la lista no trae documentos', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[]} emptyState={<p>Nada por aquí</p>} />,
+      );
+
+      expect(screen.getByText('Nada por aquí')).toBeInTheDocument();
+    });
+
+    it('no lo pinta si hay documentos', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          emptyState={<p>Nada por aquí</p>}
+        />,
+      );
+
+      expect(screen.queryByText('Nada por aquí')).not.toBeInTheDocument();
+    });
   });
 
   describe('fila seleccionable', () => {
