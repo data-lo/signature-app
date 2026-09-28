@@ -14,7 +14,8 @@ export interface OrganizationProfile {
   name: string;
   /** Nombre corto con el que la organización se presenta en la interfaz. */
   displayName: string;
-  rfc: string | null;
+  /** Identificador fiscal; en México, su RFC (antes `rfc`). */
+  taxId: string | null;
   phoneNumber: string | null;
   address: string | null;
   domainAllowed: string | null;
@@ -37,7 +38,7 @@ export interface OrganizationProfile {
  * @example
  * ```ts
  * const organization = await getOrganizationRequest('org-1');
- * organization.rfc; // 'ACM010101AAA'
+ * organization.taxId; // 'ACM010101AAA'
  * ```
  */
 export async function getOrganizationRequest(
