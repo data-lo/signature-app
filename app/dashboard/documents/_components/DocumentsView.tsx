@@ -113,9 +113,7 @@ export default function DocumentsView() {
           onChange={handleFiltersChange}
         />
       </div>
-
-      {/* Qué recorte está aplicado, siempre a la vista: es lo que antes decía el sidebar por el
-        solo hecho de estar en una sección u otra. */}
+      
       <p className="mb-3 text-sm text-primary">
         {isDefaultView ? 'Vista predeterminada: ' : 'Vista: '}
         {DOCUMENT_VIEW_LABELS[filters.view]}
