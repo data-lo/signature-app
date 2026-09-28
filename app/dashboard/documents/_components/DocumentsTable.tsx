@@ -143,9 +143,15 @@ interface DocumentsTableProps {
    */
   onRowSelect?: (documentId: string) => void;
   /**
-   * Lo que se muestra en lugar de las filas cuando la lista llega vacía. Ausente —o mientras la
-   * consulta todavía no responde— la tabla queda sin filas, como hasta ahora: un "no hay nada"
-   * pintado durante la carga sería mentira.
+   * La consulta todavía no tiene datos. Se dibuja un esqueleto dentro de la tarjeta en vez de una
+   * tabla vacía, que se leería como "no hay documentos".
+   */
+  isLoading?: boolean;
+  /** Mensaje si la consulta falló; tiene prioridad sobre la lista y sobre el estado vacío. */
+  errorMessage?: string;
+  /**
+   * Lo que se muestra en lugar de las filas cuando la lista llega vacía. Ausente, se muestra
+   * `EMPTY_DOCUMENTS_MESSAGE`. Nunca se pinta durante la carga ni con error: esos estados mandan.
    */
   emptyState?: React.ReactNode;
   /**
@@ -155,8 +161,79 @@ interface DocumentsTableProps {
   canArchiveRows?: boolean;
 }
 
-/** Columnas de la tabla; la fila de estado vacío ocupa todas. */
-const COLUMN_COUNT = 8;
+/**
+ * Fila que ocupa todo el ancho de la tabla para los estados sin documentos (vacío o error). No
+ * reacciona al hover: no es un documento y no se puede seleccionar.
+ *
+ * @param props.children - Contenido de la fila.
+ * @param props.className - Clases extra de la celda (p. ej. el color del error).
+ * @returns Una fila con una sola celda de ancho completo.
+ *
+ * @example
+ * ```tsx
+ * <DocumentsStateRow>No hay documentos para mostrar.</DocumentsStateRow>
+ * ```
+ */
+function DocumentsStateRow({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <TableRow className="hover:bg-transparent">
+      <TableCell
+        colSpan={COLUMN_COUNT}
+        className={`h-24 text-center whitespace-normal text-muted-foreground ${className ?? ''}`}
+      >
+        {children}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/**
+ * Esqueleto de carga de la tabla: `LOADING_ROW_COUNT` filas de barras con el ancho de la tabla.
+ * Es sólo visual; el anuncio para lectores de pantalla lo hace el `aria-busy` de la tabla y el
+ * texto `sr-only` de la primera fila.
+ *
+ * @returns Las filas del esqueleto.
+ *
+ * @example
+ * ```tsx
+ * <TableBody>{isLoading && <DocumentsLoadingRows />}</TableBody>
+ * ```
+ */
+function DocumentsLoadingRows() {
+  return Array.from({ length: LOADING_ROW_COUNT }, (_, index) => (
+    <TableRow
+      key={index}
+      data-slot="documents-loading-row"
+      className="hover:bg-transparent"
+    >
+      <TableCell colSpan={COLUMN_COUNT} className="py-3">
+        {index === 0 && (
+          <span role="status" className="sr-only">
+            Cargando documentos
+          </span>
+        )}
+        <Skeleton className="h-5 w-full" />
+      </TableCell>
+    </TableRow>
+  ));
+}
+
+/**
+ * Permisos con los que se puede archivar: los mismos que dejan ver el documento, porque el
+ * backend autoriza `POST /document/:id/archive` con `DOCUMENT + READ` y la misma Policy que el
+ * detalle. Archivar sólo lo esconde de la bandeja de quien lo pide, así que no hace falta un
+ * permiso más fuerte que el que ya lo pone en ella — y en ningún caso depende de quién lo creó.
+ */
+export const ARCHIVE_DOCUMENT_PERMISSIONS: readonly PermissionKey[] = [
+  'DOCUMENT.READ_OWN',
+  'DOCUMENT.READ_ORGANIZATION',
+];
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -173,6 +250,8 @@ export default function DocumentsTable({
   totalPages = 1,
   onPageChange,
   onRowSelect,
+  isLoading = false,
+  errorMessage,
   emptyState,
   canArchiveRows = true,
 }: DocumentsTableProps) {
@@ -228,17 +307,18 @@ export default function DocumentsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {documents.length === 0 && emptyState && (
-              <TableRow className="hover:bg-transparent">
-                <TableCell
-                  colSpan={COLUMN_COUNT}
-                  className="py-10 text-center whitespace-normal"
-                >
-                  {emptyState}
-                </TableCell>
-              </TableRow>
+            {bodyState === 'error' && (
+              <DocumentsStateRow className="text-destructive">
+                <span role="alert">{errorMessage}</span>
+              </DocumentsStateRow>
             )}
-            {documents.map((doc) => {
+            {bodyState === 'loading' && <DocumentsLoadingRows />}
+            {bodyState === 'empty' && (
+              <DocumentsStateRow>
+                {emptyState ?? EMPTY_DOCUMENTS_MESSAGE}
+              </DocumentsStateRow>
+            )}
+            {visibleDocuments.map((doc) => {
               const isDownloading =
                 downloadMutation.isPending &&
                 downloadMutation.variables === doc.id;
@@ -259,7 +339,9 @@ export default function DocumentsTable({
                * organización puede archivar también los que no creó.
                */
               const canArchive =
-                canArchiveRows && doc.status === DocumentStatus.Signed;
+                canArchiveRows &&
+                canArchiveDocuments &&
+                doc.status === DocumentStatus.Signed;
 
               return (
                 <TableRow

@@ -177,6 +177,13 @@ export default function DocumentsView() {
         totalPages={result?.pagination.totalPages}
         onPageChange={setPage}
         onRowSelect={(id) => router.push(`/dashboard/documents/${id}`)}
+        // `isPending` y no `isLoading`: también cubre la espera a la cuenta activa (la consulta
+        // está deshabilitada hasta entonces) y cada cambio de página o filtro, que estrena
+        // `queryKey` y por tanto vuelve a no tener datos.
+        isLoading={documentsQuery.isPending}
+        errorMessage={
+          documentsQuery.isError ? DOCUMENTS_LOAD_ERROR_MESSAGE : undefined
+        }
         canArchiveRows={!filters.archived}
         emptyState={
           // Sólo con respuesta: mientras carga, la lista también llega vacía.
