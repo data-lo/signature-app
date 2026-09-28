@@ -23,7 +23,7 @@ const ORGANIZATION: OrganizationProfile = {
   id: 'org-1',
   name: 'Acme Corp S.A. de C.V.',
   displayName: 'Acme',
-  rfc: 'ACM010101AAA',
+  taxId: 'ACM010101AAA',
   phoneNumber: '5512345678',
   address: 'Av. Reforma 123, CDMX',
   domainAllowed: 'acme.com',
@@ -116,7 +116,7 @@ describe('OrganizationInformationView', () => {
   it('marca "Sin capturar" los campos que la organización no tiene', async () => {
     mockedGetOrganization.mockResolvedValue({
       ...ORGANIZATION,
-      rfc: null,
+      taxId: null,
       phoneNumber: null,
       address: null,
       domainAllowed: null,
