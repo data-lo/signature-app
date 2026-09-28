@@ -1,15 +1,21 @@
 'use client';
 
-import { AlertCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { TextField } from '@/components/form/text-field';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useOrganization } from '@/lib/hooks/useOrganization';
 import type { OrganizationProfile } from '@/lib/api/organizations';
 
-/** Lo que se pinta donde la organización todavía no capturó un dato. */
+/** Lo que se lee donde la organización todavía no capturó un dato. */
 export const EMPTY_FIELD_LABEL = 'Sin capturar';
 
 /** Texto del error. Dice qué hacer, no qué falló por dentro. */
@@ -20,11 +26,11 @@ export const ORGANIZATION_LOAD_ERROR_MESSAGE =
  * Los campos del perfil, en el orden en que se leen: primero cómo se llama la organización
  * —dentro y fuera de la aplicación—, después sus datos fiscales y de contacto.
  *
- * Es una lista de datos y no seis bloques escritos a mano para que el orden y el rótulo de cada
- * campo se lean de un vistazo, y añadir uno sea una línea.
+ * Es una lista de datos y no seis campos escritos a mano para que el orden y el rótulo de cada
+ * uno se lean de un vistazo, y añadir uno sea una línea.
  */
 const PROFILE_FIELDS: {
-  key: keyof OrganizationProfile;
+  key: Exclude<keyof OrganizationProfile, 'id' | 'isActive'>;
   label: string;
 }[] = [
   { key: 'displayName', label: 'Nombre de visualización' },
@@ -36,29 +42,54 @@ const PROFILE_FIELDS: {
 ];
 
 /**
- * Silueta del perfil mientras llega, con una fila por campo real.
+ * Tarjeta con el perfil de la organización, con la misma estructura que "Mi información" en
+ * Información personal (`UserInfoCard`).
  *
- * @returns El esqueleto de la tarjeta, anunciado como región ocupada.
+ * Toma de aquella el contenedor (`max-w-3xl`, centrado por la vista), el encabezado con
+ * `CardTitle`, la rejilla de dos columnas que en móvil se apila en una, y la presentación de cada
+ * dato como `TextField` deshabilitado con su etiqueta. Es exactamente como "Mi información"
+ * enseña los datos que no se editan desde ahí (nombre, correo, CURP, RFC), así que las dos
+ * pantallas se leen igual.
+ *
+ * Un dato vacío deja el campo en blanco con "Sin capturar" como marcador —el mismo recurso que
+ * usa "Mi información" con el RFC ("No registrado")—: un hueco sin rótulo no distingue entre un
+ * dato que falta y uno que la pantalla no supo pintar.
+ *
+ * @param props.organization - Perfil de la organización a mostrar.
+ * @returns La tarjeta con los seis campos del perfil.
  *
  * @example
  * ```tsx
- * if (organizationQuery.isPending) return <OrganizationInformationSkeleton />;
+ * <OrganizationInfoCard organization={organizationQuery.data} />
  * ```
  */
-function OrganizationInformationSkeleton() {
+function OrganizationInfoCard({
+  organization,
+}: {
+  organization: OrganizationProfile;
+}) {
   return (
-    <Card
-      role="status"
-      aria-busy="true"
-      aria-label="Cargando la información de la organización"
-    >
-      <CardContent className="grid gap-6 sm:grid-cols-2">
-        {PROFILE_FIELDS.map((field) => (
-          <div key={field.key} className="flex flex-col gap-2">
-            <Skeleton className="h-3 w-32" />
-            <Skeleton className="h-4 w-48 max-w-full" />
-          </div>
-        ))}
+    <Card id="organization-info" className="w-full max-w-3xl scroll-mt-6">
+      <CardHeader>
+        <CardTitle>Información de la organización</CardTitle>
+        <CardDescription>
+          Los datos con los que tu organización se identifica dentro y fuera de
+          Firmalo.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-5 md:grid-cols-2">
+          {PROFILE_FIELDS.map((field) => (
+            <TextField
+              key={field.key}
+              id={`organization-${field.key}`}
+              label={field.label}
+              value={organization[field.key] ?? ''}
+              placeholder={EMPTY_FIELD_LABEL}
+              disabled
+            />
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
@@ -72,10 +103,12 @@ function OrganizationInformationSkeleton() {
  * volver a verlo. Esta pantalla cierra ese hueco por el lado de la lectura; editarlos desde aquí
  * es una historia aparte.
  *
- * Un campo vacío se rotula "Sin capturar" en vez de dejarse en blanco: un hueco no distingue
- * entre un dato que falta y un dato que la pantalla no supo pintar.
+ * Los estados siguen el patrón de Información personal (`PersonalDocumentsView`): mientras carga,
+ * el indicador giratorio con su texto; si falla, el mensaje en rojo; con datos, la tarjeta
+ * centrada. Los avisos de cuenta personal y de falta de permiso no tienen equivalente allá y se
+ * pintan con el mismo texto secundario.
  *
- * @returns La tarjeta con el perfil, su esqueleto de carga o el motivo por el que no hay nada que
+ * @returns La tarjeta con el perfil, el indicador de carga o el motivo por el que no hay nada que
  *   mostrar.
  *
  * @example
@@ -93,87 +126,45 @@ export default function OrganizationInformationView() {
     canReadOrganization,
   );
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-lg font-semibold">
-          Información de la organización
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Los datos con los que tu organización se identifica dentro y fuera de
-          Firmalo.
-        </p>
-      </div>
-
-      {renderBody()}
-    </div>
-  );
-
-  function renderBody() {
-    if (activeAccount?.accountType !== 'ORGANIZATION') {
-      return (
-        <p className="text-sm text-muted-foreground">
-          Selecciona una organización para ver su información.
-        </p>
-      );
-    }
-
-    if (!canReadOrganization) {
-      return (
-        <p className="text-sm text-muted-foreground">
-          No tienes permisos para ver la información de esta organización.
-        </p>
-      );
-    }
-
-    if (organizationQuery.isPending) {
-      return <OrganizationInformationSkeleton />;
-    }
-
-    if (organizationQuery.isError) {
-      return (
-        <div
-          role="alert"
-          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span>{ORGANIZATION_LOAD_ERROR_MESSAGE}</span>
-        </div>
-      );
-    }
-
-    const organization = organizationQuery.data;
-
+  if (activeAccount?.accountType !== 'ORGANIZATION') {
     return (
-      <Card>
-        <CardContent>
-          {/* Una lista de definiciones y no una tabla: son pares dato-valor de UNA entidad, y en
-              móvil se apilan sin el desplazamiento horizontal que arrastraría una tabla. */}
-          <dl className="grid gap-6 sm:grid-cols-2">
-            {PROFILE_FIELDS.map((field) => {
-              const value = organization[field.key];
-              const isEmpty = value === null || value === '';
-
-              return (
-                <div key={field.key} className="flex flex-col gap-1">
-                  <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    {field.label}
-                  </dt>
-                  <dd
-                    className={
-                      isEmpty
-                        ? 'text-sm break-words text-muted-foreground italic'
-                        : 'text-sm break-words text-foreground'
-                    }
-                  >
-                    {isEmpty ? EMPTY_FIELD_LABEL : String(value)}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-        </CardContent>
-      </Card>
+      <p className="text-sm text-muted-foreground">
+        Selecciona una organización para ver su información.
+      </p>
     );
   }
+
+  if (!canReadOrganization) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No tienes permisos para ver la información de esta organización.
+      </p>
+    );
+  }
+
+  if (organizationQuery.isPending) {
+    return (
+      <div
+        role="status"
+        className="flex items-center gap-2 text-sm text-muted-foreground"
+      >
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        Cargando la información de la organización...
+      </div>
+    );
+  }
+
+  if (organizationQuery.isError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {ORGANIZATION_LOAD_ERROR_MESSAGE}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col items-center gap-6">
+      <OrganizationInfoCard organization={organizationQuery.data} />
+    </div>
+  );
 }
