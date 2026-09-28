@@ -5,6 +5,14 @@ import { useDocuments } from '../_hooks/useDocuments';
 import { DocumentStatus, DocumentView } from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDocuments');
+const restoreMutate = jest.fn();
+jest.mock('../_hooks/useRestoreArchivedDocument', () => ({
+  useRestoreArchivedDocument: () => ({
+    mutate: restoreMutate,
+    isPending: false,
+    variables: undefined,
+  }),
+}));
 jest.mock('../_hooks/useDownloadDocument', () => ({
   useDownloadDocument: () => ({
     mutate: jest.fn(),
@@ -362,6 +370,88 @@ describe('DocumentsView', () => {
       expect(
         within(menu).queryByRole('menuitem', { name: /archivar/i }),
       ).not.toBeInTheDocument();
+    });
+
+    /**
+     * Recuperar es el camino de vuelta de "Archivar": vive en la vista de archivados y pide el mismo
+     * permiso de lectura que archivar.
+     */
+    describe('recuperar un documento archivado', () => {
+      const ARCHIVED_DOCUMENT = {
+        id: 'doc-archivado',
+        fileName: 'contrato.pdf',
+        creator: 'Ana López',
+        totalPages: 1,
+        status: DocumentStatus.Signed,
+        createdAt: '2026-03-15T12:00:00.000Z',
+        signedAt: '2026-05-10T12:00:00.000Z',
+      };
+
+      beforeEach(() => restoreMutate.mockReset());
+
+      async function openRowMenu(
+        user: ReturnType<typeof userEvent.setup>,
+        { archived }: { archived: boolean },
+      ) {
+        if (archived) {
+          const panel = await openPanel(user);
+          await user.click(
+            within(panel).getByRole('button', { name: 'Archivados' }),
+          );
+          await user.keyboard('{Escape}');
+        }
+        await user.click(
+          screen.getByRole('button', { name: /acciones del documento/i }),
+        );
+        return screen.findByRole('menu');
+      }
+
+      it('en la vista de archivados ofrece "Recuperar" y lo ejecuta sobre esa fila', async () => {
+        respondWith([ARCHIVED_DOCUMENT]);
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsView />, {
+          permissions: ['DOCUMENT.READ_OWN'],
+        });
+
+        const menu = await openRowMenu(user, { archived: true });
+        await user.click(
+          within(menu).getByRole('menuitem', { name: 'Recuperar' }),
+        );
+
+        expect(restoreMutate).toHaveBeenCalledWith('doc-archivado');
+        expect(
+          screen.queryByRole('menuitem', { name: 'Archivar' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('fuera de la vista de archivados no ofrece "Recuperar"', async () => {
+        respondWith([ARCHIVED_DOCUMENT]);
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsView />, {
+          permissions: ['DOCUMENT.READ_OWN'],
+        });
+
+        const menu = await openRowMenu(user, { archived: false });
+
+        expect(
+          within(menu).getByRole('menuitem', { name: 'Archivar' }),
+        ).toBeInTheDocument();
+        expect(
+          within(menu).queryByRole('menuitem', { name: 'Recuperar' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('sin permiso de lectura de documentos no ofrece "Recuperar"', async () => {
+        respondWith([ARCHIVED_DOCUMENT]);
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsView />);
+
+        const menu = await openRowMenu(user, { archived: true });
+
+        expect(
+          within(menu).queryByRole('menuitem', { name: 'Recuperar' }),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 

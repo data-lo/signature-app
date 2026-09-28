@@ -30,6 +30,7 @@ import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
+import { useRestoreArchivedDocument } from '../_hooks/useRestoreArchivedDocument';
 import DocumentDate from './DocumentDate';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
@@ -159,6 +160,11 @@ interface DocumentsTableProps {
    * hay ahí ya está archivado, y ofrecerlo otra vez sólo movería la fecha.
    */
   canArchiveRows?: boolean;
+  /**
+   * Si el menú de cada fila ofrece "Recuperar". Sólo en la vista de archivados, que es donde
+   * están los documentos que se pueden devolver al listado.
+   */
+  canRestoreRows?: boolean;
 }
 
 /**
@@ -254,12 +260,14 @@ export default function DocumentsTable({
   errorMessage,
   emptyState,
   canArchiveRows = true,
+  canRestoreRows = false,
 }: DocumentsTableProps) {
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
     useState<DocumentListItem | null>(null);
   const downloadMutation = useDownloadDocument();
   const archiveMutation = useArchiveCompletedDocument();
+  const restoreMutation = useRestoreArchivedDocument();
   const { canAny } = usePermissions();
   const canArchiveDocuments = canAny(ARCHIVE_DOCUMENT_PERMISSIONS);
 
@@ -342,6 +350,14 @@ export default function DocumentsTable({
                 canArchiveRows &&
                 canArchiveDocuments &&
                 doc.status === DocumentStatus.Signed;
+              /**
+               * Recuperar pide el mismo permiso que archivar y no mira el estatus: todo lo que
+               * aparece en "Archivados" se puede devolver al listado.
+               */
+              const canRestore = canRestoreRows && canArchiveDocuments;
+              const isRestoring =
+                restoreMutation.isPending &&
+                restoreMutation.variables === doc.id;
 
               return (
                 <TableRow
@@ -439,6 +455,12 @@ export default function DocumentsTable({
                             : undefined
                         }
                         isArchiving={isArchiving}
+                        onRestore={
+                          canRestore
+                            ? () => restoreMutation.mutate(doc.id)
+                            : undefined
+                        }
+                        isRestoring={isRestoring}
                       />
                     </div>
                   </TableCell>
