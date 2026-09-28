@@ -2,8 +2,24 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import toast from 'react-hot-toast';
-import { useArchiveCompletedDocument } from './useArchiveCompletedDocument';
+import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
+import {
+  ARCHIVE_FORBIDDEN_MESSAGE,
+  ARCHIVE_GENERIC_ERROR_MESSAGE,
+  useArchiveCompletedDocument,
+} from './useArchiveCompletedDocument';
 import { archiveDocumentRequest } from '../_requests';
+
+/** Rechazo de axios con el código y el cuerpo que mandaría el backend. */
+function axiosErrorWith(status: number, data?: unknown) {
+  return new AxiosError('fallo', undefined, undefined, undefined, {
+    status,
+    statusText: '',
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+    data,
+  } as AxiosResponse);
+}
 
 jest.mock('../_requests');
 jest.mock('react-hot-toast', () => ({
@@ -100,8 +116,51 @@ describe('useArchiveCompletedDocument', () => {
 
     result.current.mutate('doc-1');
 
-    await waitFor(() => expect(mockedToast.error).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockedToast.error).toHaveBeenCalledWith(
+        ARCHIVE_GENERIC_ERROR_MESSAGE,
+      ),
+    );
     expect(mockedToast.success).not.toHaveBeenCalled();
     expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  /**
+   * El 403 lleva un mensaje propio: el del backend sale de la Policy de lectura y habla de
+   * "consultar" el documento, que no es lo que la persona intentó.
+   */
+  it('ante un 403 explica que falta el permiso para archivar', async () => {
+    mockedArchiveDocumentRequest.mockRejectedValue(
+      axiosErrorWith(403, {
+        message: 'No tienes permiso para consultar este documento',
+      }),
+    );
+    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+      wrapper,
+    });
+
+    result.current.mutate('doc-1');
+
+    await waitFor(() =>
+      expect(mockedToast.error).toHaveBeenCalledWith(ARCHIVE_FORBIDDEN_MESSAGE),
+    );
+  });
+
+  /** Fuera del 403, el mensaje del backend ya se entiende tal cual (p. ej. el de estatus). */
+  it('en otros rechazos muestra el mensaje del backend', async () => {
+    const backendMessage =
+      "El documento no puede archivarse. Solo se permiten documentos con estatus 'SIGNED', el estatus actual es 'PENDING_SIGNATURE'";
+    mockedArchiveDocumentRequest.mockRejectedValue(
+      axiosErrorWith(400, { message: backendMessage }),
+    );
+    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+      wrapper,
+    });
+
+    result.current.mutate('doc-1');
+
+    await waitFor(() =>
+      expect(mockedToast.error).toHaveBeenCalledWith(backendMessage),
+    );
   });
 });
