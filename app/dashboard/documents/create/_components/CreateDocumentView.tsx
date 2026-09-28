@@ -5,9 +5,11 @@ import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { Accordion } from '@/components/ui/accordion';
+import { ErrorAlert } from '@/components/ui/error-alert';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
 import { buildCreateDocumentSections } from '../_section-rules';
 import { buildCreateDocumentProgress } from '../_section-progress';
+import { SIGNATURE_POSITION_REQUIRED_TITLE } from '../_schemas';
 import { useDocumentFileSelection } from '../_hooks/useDocumentFileSelection';
 import { useCreateDocumentForm } from '../_hooks/useCreateDocumentForm';
 import { useCreatedDocuments } from '../_hooks/useCreatedDocuments';
@@ -198,11 +200,10 @@ export default function CreateDocumentView({
             hace en la columna del PDF, que no tiene un lugar propio para este aviso: su estado de
             error reemplaza la vista previa entera.
           */}
-          {progress.signaturePlacement.missingMessage && (
-            <p role="status" className="text-sm text-destructive">
-              {progress.signaturePlacement.missingMessage}
-            </p>
-          )}
+          <ErrorAlert
+            title={SIGNATURE_POSITION_REQUIRED_TITLE}
+            message={progress.signaturePlacement.missingMessage}
+          />
 
           {sections.submission.hasError && (
             <FieldError>{sections.submission.errorMessage}</FieldError>

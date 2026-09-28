@@ -115,3 +115,60 @@ export function formatShortDate(
 
   return `${day}/${month}/${date.getFullYear()}`;
 }
+
+/** Mismo orden que `Date.prototype.getDay()`, en la forma en que `Intl` los nombra en `en-US`. */
+const INTL_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * Fecha completa con hora de 24 horas, en mayúsculas: `"LUNES 20 DE NOVIEMBRE 16:00"`.
+ *
+ * Es el detalle que acompaña, en un tooltip, a la fecha compacta de `formatShortDate` en la tabla
+ * de documentos. Las partes numéricas se piden a `Intl` —con `en-US` y `hourCycle: 'h23'`, cuya
+ * salida sí es estable entre runtimes— sólo para poder resolverlas en una zona horaria
+ * concreta; los nombres de día y mes en español se siguen componiendo a mano, por la misma razón
+ * que en `formatLongDateTime`.
+ *
+ * Devuelve `null` —y no un marcador— cuando la fecha falta o no es parseable, para que quien lo
+ * consume pueda omitir el tooltip en vez de mostrar uno vacío o con un valor inválido.
+ *
+ * @param isoDate - Fecha ISO tal como la devuelve el backend (`createdAt`, `signedAt`).
+ * @param timeZone - Zona horaria IANA (`'America/Mexico_City'`). Sin ella se usa la del
+ *   navegador, que es la del usuario: la aplicación no tiene hoy una zona configurada.
+ * @returns p. ej. `"LUNES 20 DE NOVIEMBRE 16:00"`, o `null` si no hay fecha válida.
+ *
+ * @throws {RangeError} Si `timeZone` no es una zona horaria IANA válida.
+ *
+ * @example
+ * ```ts
+ * formatFullDateTime('2026-11-20T22:00:00.000Z', 'America/Mexico_City'); // 'VIERNES 20 DE NOVIEMBRE 16:00'
+ * formatFullDateTime(null); // null
+ * ```
+ */
+export function formatFullDateTime(
+  isoDate: string | Date | null | undefined,
+  timeZone?: string,
+): string | null {
+  if (!isoDate) return null;
+
+  const date = isoDate instanceof Date ? isoDate : new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      weekday: 'short',
+      day: 'numeric',
+      month: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .map(({ type, value }) => [type, value]),
+  );
+
+  const weekday = WEEKDAYS[INTL_WEEKDAYS.indexOf(parts.weekday)];
+  const month = MONTHS[Number(parts.month) - 1];
+
+  return `${weekday} ${parts.day} de ${month} ${parts.hour}:${parts.minute}`.toUpperCase();
+}

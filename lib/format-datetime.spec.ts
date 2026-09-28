@@ -1,6 +1,7 @@
 import {
   EMPTY_DATE_PLACEHOLDER,
   formatEpochMillis,
+  formatFullDateTime,
   formatLongDateTime,
   formatShortDate,
 } from './format-datetime';
@@ -116,5 +117,56 @@ describe('formatEpochMillis', () => {
     expect(formatEpochMillis('')).toBeNull();
     expect(formatEpochMillis('no es una fecha')).toBeNull();
     expect(EMPTY_DATE_PLACEHOLDER).not.toBeNull();
+  });
+});
+
+describe('formatFullDateTime', () => {
+  it('devuelve día de la semana, día, mes y hora de 24 horas, en mayúsculas', () => {
+    expect(formatFullDateTime(new Date(2026, 10, 23, 16, 0))).toBe(
+      'LUNES 23 DE NOVIEMBRE 16:00',
+    );
+  });
+
+  it('rellena con cero horas y minutos de un dígito, sin rellenar el día', () => {
+    expect(formatFullDateTime(new Date(2026, 0, 2, 8, 5))).toBe(
+      'VIERNES 2 DE ENERO 08:05',
+    );
+  });
+
+  it('la medianoche es 00:00 y no 24:00', () => {
+    expect(formatFullDateTime(new Date(2026, 2, 15, 0, 0))).toBe(
+      'DOMINGO 15 DE MARZO 00:00',
+    );
+  });
+
+  it('acepta un string ISO', () => {
+    expect(formatFullDateTime(new Date(2026, 4, 10, 9, 30).toISOString())).toBe(
+      'DOMINGO 10 DE MAYO 09:30',
+    );
+  });
+
+  /** Aquí sí se usan literales UTC: con la zona explícita, el resultado no depende del entorno. */
+  it('resuelve la fecha en la zona horaria indicada', () => {
+    const instant = '2026-11-21T04:30:00.000Z';
+
+    expect(formatFullDateTime(instant, 'America/Mexico_City')).toBe(
+      'VIERNES 20 DE NOVIEMBRE 22:30',
+    );
+    expect(formatFullDateTime(instant, 'UTC')).toBe(
+      'SÁBADO 21 DE NOVIEMBRE 04:30',
+    );
+  });
+
+  it.each([null, undefined, '', 'no-es-fecha'])(
+    'devuelve null sin fecha válida (%p)',
+    (value) => {
+      expect(formatFullDateTime(value)).toBeNull();
+    },
+  );
+
+  it('lanza RangeError con una zona horaria inválida', () => {
+    expect(() =>
+      formatFullDateTime(new Date(2026, 0, 1), 'Zona/Inexistente'),
+    ).toThrow(RangeError);
   });
 });
