@@ -297,6 +297,112 @@ describe('DocumentsTable', () => {
     });
   });
 
+  /**
+   * Historia "Actualizar tabla de documentos a fondo blanco": la tabla y su paginación viven en
+   * una tarjeta `bg-card` (blanca en tema claro), y los estados sin documentos se dibujan dentro
+   * de ella en vez de dejar un cuerpo vacío.
+   */
+  describe('tarjeta blanca y estados', () => {
+    function card(): HTMLElement {
+      const element = document.querySelector<HTMLElement>(
+        '[data-slot="documents-table-card"]',
+      );
+      expect(element).not.toBeNull();
+      return element!;
+    }
+
+    it('la tabla y la paginación van dentro de una tarjeta con fondo de tarjeta', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(card()).toHaveClass('bg-card', 'border', 'rounded-xl');
+      expect(card()).toContainElement(screen.getByRole('table'));
+      expect(card()).toContainElement(
+        document.querySelector<HTMLElement>(
+          '[data-slot="documents-table-pagination"]',
+        ),
+      );
+    });
+
+    it('con información, muestra una fila por documento y resalta la fila en hover', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc(), buildDoc({ id: 'doc-2', fileName: 'b.pdf' })]}
+        />,
+      );
+
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveClass('hover:bg-muted');
+      expect(screen.getByRole('table')).not.toHaveAttribute('aria-busy');
+    });
+
+    it('sin documentos, muestra el estado vacío en una fila de ancho completo', () => {
+      renderWithProviders(<DocumentsTable documents={[]} />);
+
+      const cell = screen.getByRole('cell', {
+        name: 'No hay documentos para mostrar.',
+      });
+      expect(cell).toHaveAttribute('colspan', '8');
+    });
+
+    it('cargando, muestra el esqueleto, marca la tabla como ocupada y lo anuncia', () => {
+      renderWithProviders(<DocumentsTable documents={[]} isLoading />);
+
+      expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Cargando documentos',
+      );
+      expect(
+        document.querySelectorAll('[data-slot="documents-loading-row"]'),
+      ).toHaveLength(5);
+      expect(
+        screen.queryByText('No hay documentos para mostrar.'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('con error, muestra el mensaje en lugar de la lista, aunque haya datos o esté cargando', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          isLoading
+          errorMessage="No se pudieron cargar los documentos."
+        />,
+      );
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'No se pudieron cargar los documentos.',
+      );
+      expect(screen.queryByText('contrato.pdf')).not.toBeInTheDocument();
+      expect(
+        document.querySelector('[data-slot="documents-loading-row"]'),
+      ).toBeNull();
+    });
+
+    it('la paginación sigue visible y funcional en todos los estados', async () => {
+      const user = userEvent.setup();
+      const onPageChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[]}
+          page={1}
+          totalPages={3}
+          onPageChange={onPageChange}
+          isLoading
+        />,
+      );
+
+      const pagination = document.querySelector<HTMLElement>(
+        '[data-slot="documents-table-pagination"]',
+      )!;
+      expect(pagination).toHaveTextContent('Documentos por página');
+
+      const buttons = within(pagination).getAllByRole('button');
+      await user.click(buttons[buttons.length - 2]);
+
+      expect(onPageChange).toHaveBeenCalledWith(2);
+    });
+  });
+
   describe('menú de acciones', () => {
     /**
      * `buildDoc()` construye un documento ya firmado por todos, así que su menú incluye
