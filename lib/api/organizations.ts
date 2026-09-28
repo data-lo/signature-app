@@ -52,3 +52,54 @@ export async function getOrganizationRequest(
 
   return data.data;
 }
+
+/**
+ * Lo que acepta `PATCH /organizations/:organizationId` — espejo de `UpdateOrganizationDto` en el
+ * backend. Usa los mismos nombres que `OrganizationProfile`, así que se manda lo que se leyó.
+ *
+ * Todo es opcional: sólo se escribe lo que viaja. Los opcionales en `null` se borran; los dos
+ * nombres no se pueden borrar.
+ */
+export type UpdateOrganizationPayload = Partial<
+  Pick<
+    OrganizationProfile,
+    | 'displayName'
+    | 'name'
+    | 'taxId'
+    | 'phoneNumber'
+    | 'address'
+    | 'domainAllowed'
+  >
+>;
+
+/**
+ * Guarda el perfil de una organización (`PATCH /organizations/:organizationId`).
+ *
+ * El backend responde con el perfil completo tal como quedó —la misma forma que la lectura—, así
+ * que quien llama puede pintarlo sin volver a pedirlo.
+ *
+ * @param organizationId - Organización a editar.
+ * @param payload - Campos a escribir; los ausentes no se tocan.
+ * @returns El perfil actualizado.
+ *
+ * @throws {AxiosError} 400 si algún campo no tiene un formato válido; 403 si quien edita no es
+ *   miembro activo de esa organización o su rol no tiene `ORGANIZATION.UPDATE`; 404 si no existe.
+ *
+ * @example
+ * ```ts
+ * const organization = await updateOrganizationRequest('org-1', { phoneNumber: '5512345678' });
+ * organization.phoneNumber; // '5512345678'
+ * ```
+ */
+export async function updateOrganizationRequest(
+  organizationId: string,
+  payload: UpdateOrganizationPayload,
+): Promise<OrganizationProfile> {
+  const { data } = await apiClient.patch<{
+    success: boolean;
+    message: string;
+    data: OrganizationProfile;
+  }>(`/api/v1/organizations/${organizationId}`, payload);
+
+  return data.data;
+}
