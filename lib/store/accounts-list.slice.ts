@@ -54,4 +54,17 @@ export const createAccountsListSlice: StateCreator<
     set((state) => ({
       accountsList: [...state.accountsList, toAccountListEntry(account)],
     })),
+
+  renameOrganization: (organizationId, { name, displayName }) =>
+    set((state) => ({
+      accountsList: state.accountsList.map((entry) =>
+        entry.organizationId === organizationId
+          ? {
+              ...entry,
+              organizationName: name,
+              organizationDisplayName: displayName,
+            }
+          : entry,
+      ),
+    })),
 });

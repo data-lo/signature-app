@@ -1,6 +1,13 @@
 'use client';
 
-import { Archive, FileDown, MoreVertical, Share2, Users } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  FileDown,
+  MoreVertical,
+  Share2,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -25,6 +32,13 @@ interface DocumentRowActionsProps {
   onArchive?: () => void;
   /** true mientras se archiva ESTE documento (no otro de la lista). */
   isArchiving?: boolean;
+  /**
+   * Devuelve el documento archivado al listado del usuario. Sólo llega en la vista "Archivados",
+   * que es donde "Archivar" no aparece: las dos acciones nunca se ofrecen juntas.
+   */
+  onRestore?: () => void;
+  /** true mientras se recupera ESTE documento (no otro de la lista). */
+  isRestoring?: boolean;
 }
 
 /**
@@ -43,6 +57,8 @@ export default function DocumentRowActions({
   onShare,
   onArchive,
   isArchiving = false,
+  onRestore,
+  isRestoring = false,
 }: DocumentRowActionsProps) {
   return (
     <DropdownMenu>
@@ -72,13 +88,19 @@ export default function DocumentRowActions({
           <Share2 className="size-4" />
           Compartir
         </DropdownMenuItem>
-        {/* Va al final y separada del resto por su efecto: las de arriba consultan o copian el
-          documento, ésta lo saca de la lista. Es reversible en el fondo —la preferencia guarda
-          una fecha, no borra nada— pero todavía no hay pantalla para deshacerlo. */}
+        {/* Van al final y separadas del resto por su efecto: las de arriba consultan o copian
+          el documento, éstas lo mueven entre el listado y los archivados. Archivar se deshace
+          con "Recuperar", desde el filtro "Archivados". */}
         {onArchive && (
           <DropdownMenuItem disabled={isArchiving} onClick={onArchive}>
             <Archive className="size-4" />
             {isArchiving ? 'Archivando...' : 'Archivar'}
+          </DropdownMenuItem>
+        )}
+        {onRestore && (
+          <DropdownMenuItem disabled={isRestoring} onClick={onRestore}>
+            <ArchiveRestore className="size-4" />
+            {isRestoring ? 'Recuperando...' : 'Recuperar'}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
