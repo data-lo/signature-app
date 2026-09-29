@@ -74,6 +74,41 @@ export async function archiveDocumentRequest(
   return data.data;
 }
 
+/** Lo que devuelve recuperar un documento: ya no está entre los archivados del usuario. */
+export interface RestoredDocument {
+  documentId: string;
+  archived: false;
+}
+
+/**
+ * Recupera un documento archivado: lo devuelve al listado del USUARIO EN SESIÓN.
+ *
+ * Es el inverso de `archiveDocumentRequest` (`DELETE` sobre la misma ruta). Tampoco cambia el
+ * documento ni lo que otros participantes archivaron, y es idempotente: recuperar algo que ya no
+ * estaba archivado responde igual.
+ *
+ * @param documentId - Documento a recuperar.
+ * @returns El documento, con `archived: false`.
+ *
+ * @throws {AxiosError} 403 si el rol no permite ver el documento; 404 si no existe.
+ *
+ * @example
+ * ```ts
+ * await restoreArchivedDocumentRequest('doc-1');
+ * ```
+ */
+export async function restoreArchivedDocumentRequest(
+  documentId: string,
+): Promise<RestoredDocument> {
+  const { data } = await apiClient.delete<{
+    success: boolean;
+    message: string;
+    data: RestoredDocument;
+  }>(`/api/v1/document/${documentId}/archive`);
+
+  return data.data;
+}
+
 export interface GetDocumentsParams {
   filters?: DocumentsFilters;
   page?: number;

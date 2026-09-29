@@ -185,6 +185,7 @@ export default function DocumentsView() {
           documentsQuery.isError ? DOCUMENTS_LOAD_ERROR_MESSAGE : undefined
         }
         canArchiveRows={!filters.archived}
+        canRestoreRows={filters.archived}
         emptyState={
           // Sólo con respuesta: mientras carga, la lista también llega vacía.
           documentsQuery.isSuccess && filters.archived ? (
