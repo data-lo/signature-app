@@ -31,6 +31,7 @@ import ShareDocumentDialog from './ShareDocumentDialog';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import DocumentDate from './DocumentDate';
+import DocumentFileName from './DocumentFileName';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import {
@@ -353,26 +354,24 @@ export default function DocumentsTable({
                   className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
                   onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
                 >
-                  <TableCell className="w-64 max-w-64 whitespace-normal text-emerald-700 dark:text-emerald-400">
-                    <div className="flex items-start gap-1.5">
+                  {/* Ancho fijo (`w-64 max-w-64`) en todas las resoluciones: el nombre se recorta
+                    dentro de él en una sola línea y el completo va en el tooltip (ver
+                    `DocumentFileName`), así la columna y la altura de la fila no dependen de lo
+                    largo que sea. En pantallas angostas la tabla se desplaza en horizontal. */}
+                  <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       <span
-                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
+                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
                       />
-                      <span className="min-w-0 flex-1 break-words">
-                        {onRowSelect ? (
-                          // El botón no lleva `onClick` propio: existe para que la fila sea
-                          // alcanzable con Tab y activable con Enter/Espacio, que emiten un clic
-                          // y éste sube hasta el manejador de la fila. Así la tabla conserva su
-                          // semántica (un `tr` no es un control) sin dejar fuera al teclado.
-                          <button
-                            type="button"
-                            className="rounded-sm text-left break-words outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                          >
-                            {doc.fileName}
-                          </button>
-                        ) : (
-                          doc.fileName
-                        )}
+                      {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
+                        alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
+                        sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
+                        `tr` no es un control) sin dejar fuera al teclado. */}
+                      <span className="min-w-0 flex-1">
+                        <DocumentFileName
+                          fileName={doc.fileName}
+                          interactive={Boolean(onRowSelect)}
+                        />
                       </span>
                     </div>
                   </TableCell>
