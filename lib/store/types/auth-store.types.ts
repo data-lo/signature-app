@@ -64,6 +64,15 @@ export interface AccountsListSlice {
   accountsList: AccountListEntry[];
   setAccountsList: (accounts: AccountData[]) => void;
   addAccount: (account: AccountData) => void;
+  /**
+   * Cambia la razón social y el nombre de visualización de una organización en todas las cuentas
+   * del catálogo que la apuntan. Lo usa "Información de la organización" al guardar, para que el
+   * selector de cuentas no siga rotulándola con el nombre viejo hasta recargar.
+   */
+  renameOrganization: (
+    organizationId: string,
+    names: { name: string; displayName: string },
+  ) => void;
 }
 
 export interface ActiveAccountSlice {
