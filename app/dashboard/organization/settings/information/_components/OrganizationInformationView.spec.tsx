@@ -1,5 +1,11 @@
-import { renderWithProviders, screen } from '@/test-utils';
-import { getOrganizationRequest } from '@/lib/api/organizations';
+import userEvent from '@testing-library/user-event';
+import toast from 'react-hot-toast';
+
+import { renderWithProviders, screen, waitFor } from '@/test-utils';
+import {
+  getOrganizationRequest,
+  updateOrganizationRequest,
+} from '@/lib/api/organizations';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import type { ActiveAccount } from '@/lib/store/types/auth-store.types';
 import type { OrganizationProfile } from '@/lib/api/organizations';
@@ -8,9 +14,16 @@ import OrganizationInformationView, {
   ORGANIZATION_LOAD_ERROR_MESSAGE,
 } from './OrganizationInformationView';
 
+import { ORGANIZATION_UPDATED_MESSAGE } from '../_hooks/useUpdateOrganization';
+
 jest.mock('@/lib/api/organizations');
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: { success: jest.fn(), error: jest.fn() },
+}));
 
 const mockedGetOrganization = getOrganizationRequest as jest.Mock;
+const mockedUpdateOrganization = updateOrganizationRequest as jest.Mock;
 
 const ORG_ACCOUNT: ActiveAccount = {
   id: 'org-account-1',
@@ -79,8 +92,8 @@ describe('OrganizationInformationView', () => {
   });
 
   /**
-   * Homologado con "Mi información": los datos que no se editan desde la tarjeta se muestran en
-   * campos deshabilitados, y la tarjeta no ofrece ninguna acción mientras sea de sólo lectura.
+   * Homologado con "Mi información": sin `ORGANIZATION.UPDATE` los datos se muestran en campos
+   * deshabilitados, y la tarjeta no ofrece ninguna acción.
    */
   it('muestra los campos deshabilitados y sin acciones de guardado', async () => {
     renderView();
@@ -187,5 +200,196 @@ describe('OrganizationInformationView', () => {
       screen.getByText(/selecciona una organización para ver su información/i),
     ).toBeInTheDocument();
     expect(mockedGetOrganization).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Con `ORGANIZATION.UPDATE` la tarjeta es un formulario: carga lo registrado, valida lo mismo que
+ * el backend, guarda sólo lo que cambió y deja la pantalla mostrando lo guardado.
+ */
+describe('OrganizationInformationView — edición', () => {
+  function renderEditableView() {
+    return renderWithProviders(<OrganizationInformationView />, {
+      permissions: ['ORGANIZATION.READ', 'ORGANIZATION.UPDATE'],
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetOrganization.mockResolvedValue(ORGANIZATION);
+    mockedUpdateOrganization.mockImplementation(
+      async (_id: string, payload: Record<string, unknown>) => ({
+        ...ORGANIZATION,
+        ...payload,
+      }),
+    );
+    useAuthStore.setState({
+      activeAccount: ORG_ACCOUNT,
+      accountsList: [
+        {
+          id: 'org-account-1',
+          accountType: 'ORGANIZATION',
+          organizationId: 'org-1',
+          organizationName: 'Acme Corp S.A. de C.V.',
+          organizationDisplayName: 'Acme',
+          roleId: 'admin-role-1',
+          status: 'ACTIVE',
+        },
+      ],
+    });
+  });
+
+  it('carga los datos registrados en campos editables', async () => {
+    renderEditableView();
+
+    await screen.findByLabelText('Nombre de visualización');
+
+    for (const [label, value] of EXPECTED_FIELDS) {
+      const field = screen.getByLabelText(label);
+      expect(field).toHaveValue(value);
+      expect(field).toBeEnabled();
+    }
+  });
+
+  it('no deja guardar mientras no haya cambios', async () => {
+    renderEditableView();
+
+    await screen.findByLabelText('Nombre de visualización');
+
+    expect(
+      screen.getByRole('button', { name: /guardar cambios/i }),
+    ).toBeDisabled();
+  });
+
+  it('guarda sólo el campo modificado, confirma y muestra lo guardado', async () => {
+    const user = userEvent.setup();
+    renderEditableView();
+
+    const phone = await screen.findByLabelText('Teléfono');
+    await user.clear(phone);
+    await user.type(phone, '5587654321');
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() =>
+      expect(mockedUpdateOrganization).toHaveBeenCalledWith('org-1', {
+        phoneNumber: '5587654321',
+      }),
+    );
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(ORGANIZATION_UPDATED_MESSAGE),
+    );
+    expect(screen.getByLabelText('Teléfono')).toHaveValue('5587654321');
+    // El formulario se reinicia con lo guardado: ya no hay cambios pendientes.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /guardar cambios/i }),
+      ).toBeDisabled(),
+    );
+  });
+
+  /** Vaciar un opcional es "bórralo": viaja en `null`, no como texto vacío. */
+  it('manda en null un campo opcional que se vació', async () => {
+    const user = userEvent.setup();
+    renderEditableView();
+
+    await user.clear(await screen.findByLabelText('Domicilio'));
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() =>
+      expect(mockedUpdateOrganization).toHaveBeenCalledWith('org-1', {
+        address: null,
+      }),
+    );
+  });
+
+  it('manda el RFC en mayúsculas', async () => {
+    const user = userEvent.setup();
+    renderEditableView();
+
+    const taxId = await screen.findByLabelText('RFC');
+    await user.clear(taxId);
+    await user.type(taxId, 'xyz020202bbb');
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() =>
+      expect(mockedUpdateOrganization).toHaveBeenCalledWith('org-1', {
+        taxId: 'XYZ020202BBB',
+      }),
+    );
+  });
+
+  it.each([
+    ['RFC', 'ABC', /el rfc no tiene un formato válido/i],
+    ['Teléfono', '55-12', /el teléfono debe tener entre 7 y 15 dígitos/i],
+    [
+      'Dominio permitido',
+      'https://acme',
+      /el dominio no tiene un formato válido/i,
+    ],
+  ])(
+    'no guarda y explica el error si %s es inválido',
+    async (label, value, message) => {
+      const user = userEvent.setup();
+      renderEditableView();
+
+      const field = await screen.findByLabelText(label);
+      await user.clear(field);
+      await user.type(field, value);
+      await user.click(
+        screen.getByRole('button', { name: /guardar cambios/i }),
+      );
+
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(mockedUpdateOrganization).not.toHaveBeenCalled();
+    },
+  );
+
+  it('no deja guardar una razón social vacía', async () => {
+    const user = userEvent.setup();
+    renderEditableView();
+
+    await user.clear(await screen.findByLabelText('Razón social'));
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    expect(
+      await screen.findByText(/la razón social es obligatoria/i),
+    ).toBeInTheDocument();
+    expect(mockedUpdateOrganization).not.toHaveBeenCalled();
+  });
+
+  /** El selector de cuentas lee el store; sin esto seguiría con el nombre viejo hasta recargar. */
+  it('renombra la organización en el catálogo de cuentas', async () => {
+    const user = userEvent.setup();
+    renderEditableView();
+
+    const displayName = await screen.findByLabelText('Nombre de visualización');
+    await user.clear(displayName);
+    await user.type(displayName, 'Acme MX');
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() =>
+      expect(useAuthStore.getState().accountsList[0]).toMatchObject({
+        organizationDisplayName: 'Acme MX',
+        organizationName: 'Acme Corp S.A. de C.V.',
+      }),
+    );
+  });
+
+  it('si el backend rechaza el guardado, lo avisa y conserva lo capturado', async () => {
+    mockedUpdateOrganization.mockRejectedValue(new Error('500'));
+    const user = userEvent.setup();
+    renderEditableView();
+
+    const phone = await screen.findByLabelText('Teléfono');
+    await user.clear(phone);
+    await user.type(phone, '5587654321');
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Teléfono')).toHaveValue('5587654321');
+    expect(
+      screen.getByRole('button', { name: /guardar cambios/i }),
+    ).toBeEnabled();
   });
 });
