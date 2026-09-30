@@ -6,9 +6,10 @@ import { getErrorMessage } from '@/lib/error-handler';
 import { DocumentView } from '@/lib/enums/document';
 import { useDocuments } from '../../_hooks/useDocuments';
 import { DEFAULT_DOCUMENTS_FILTERS } from '../../_config/filters';
+import type { DocumentsPageSize } from '../../_config/pagination';
 
 /** Cuántos documentos enviados se listan dentro de la pantalla de creación. */
-const CREATED_DOCUMENTS_PAGE_SIZE = 10;
+export const CREATED_DOCUMENTS_PAGE_SIZE: DocumentsPageSize = 10;
 
 interface UseCreatedDocumentsParams {
   /**
@@ -65,6 +66,9 @@ export function useCreatedDocuments({
     createdDocumentsQuery,
     page,
     setPage,
+    pageSize: CREATED_DOCUMENTS_PAGE_SIZE,
+    /** La consulta muestra el placeholder de la página anterior (ver `useDocuments`). */
+    isChangingPage: createdDocumentsQuery.isPlaceholderData,
     errorMessage: createdDocumentsQuery.isError
       ? getErrorMessage(
           createdDocumentsQuery.error,

@@ -138,4 +138,114 @@ describe('useDocuments', () => {
       expect(mockedGetDocumentsRequest).toHaveBeenCalledTimes(2),
     );
   });
+
+  /**
+   * Al pasar de página se conserva la respuesta anterior como placeholder —sólo para que los
+   * controles sepan cuántas páginas hay— y queda marcada con `isPlaceholderData`, que es lo que
+   * la pantalla usa para no pintarla como definitiva.
+   */
+  describe('transición entre páginas', () => {
+    const PAGE_1 = {
+      items: [{ id: 'doc-1' }],
+      pagination: { page: 1, limit: 25, total: 30, totalPages: 2 },
+    };
+    const PAGE_2 = {
+      items: [{ id: 'doc-26' }],
+      pagination: { page: 2, limit: 25, total: 30, totalPages: 2 },
+    };
+
+    it('pide la página nueva y marca como placeholder la anterior mientras llega', async () => {
+      setActiveAccount();
+      let resolvePage2!: (value: typeof PAGE_2) => void;
+      mockedGetDocumentsRequest.mockImplementation(({ page }) =>
+        page === 1
+          ? Promise.resolve(PAGE_1)
+          : new Promise((resolve) => {
+              resolvePage2 = resolve;
+            }),
+      );
+
+      const { result, rerender } = renderHook(
+        ({ page }: { page: number }) => useDocuments({ page, limit: 25 }),
+        { wrapper, initialProps: { page: 1 } },
+      );
+      await waitFor(() => expect(result.current.data).toEqual(PAGE_1));
+
+      rerender({ page: 2 });
+
+      await waitFor(() =>
+        expect(mockedGetDocumentsRequest).toHaveBeenLastCalledWith({
+          filters: DEFAULT_DOCUMENTS_FILTERS,
+          page: 2,
+          limit: 25,
+        }),
+      );
+      expect(result.current.isPlaceholderData).toBe(true);
+      expect(result.current.data).toEqual(PAGE_1);
+
+      resolvePage2(PAGE_2);
+
+      await waitFor(() => expect(result.current.data).toEqual(PAGE_2));
+      expect(result.current.isPlaceholderData).toBe(false);
+    });
+
+    /** Con otra cuenta, reutilizar la respuesta anterior sería mostrar documentos ajenos. */
+    it('no conserva la respuesta anterior al cambiar de cuenta', async () => {
+      setActiveAccount();
+      mockedGetDocumentsRequest.mockResolvedValueOnce(PAGE_1);
+      mockedGetDocumentsRequest.mockImplementation(() => new Promise(() => {}));
+
+      const { result, rerender } = renderHook(
+        () => useDocuments({ page: 1, limit: 25 }),
+        { wrapper },
+      );
+      await waitFor(() => expect(result.current.data).toEqual(PAGE_1));
+
+      useAuthStore.setState({
+        activeAccount: {
+          id: 'account-2',
+          accountType: 'ORGANIZATION',
+          organizationId: 'org-1',
+          roleId: null,
+        },
+      });
+      rerender();
+
+      await waitFor(() => expect(result.current.isPending).toBe(true));
+      expect(result.current.data).toBeUndefined();
+    });
+
+    it.each([
+      [
+        'los filtros',
+        {
+          filters: { ...DEFAULT_DOCUMENTS_FILTERS, search: 'contrato' },
+          limit: 25,
+        },
+      ],
+      [
+        'el tamaño de página',
+        { filters: DEFAULT_DOCUMENTS_FILTERS, limit: 50 },
+      ],
+    ])('no conserva la respuesta anterior si cambian %s', async (_, next) => {
+      setActiveAccount();
+      mockedGetDocumentsRequest.mockResolvedValueOnce(PAGE_1);
+      mockedGetDocumentsRequest.mockImplementation(() => new Promise(() => {}));
+
+      const { result, rerender } = renderHook(
+        (props: { filters: typeof DEFAULT_DOCUMENTS_FILTERS; limit: number }) =>
+          useDocuments({ ...props, page: 1 }),
+        {
+          wrapper,
+          initialProps: { filters: DEFAULT_DOCUMENTS_FILTERS, limit: 25 },
+        },
+      );
+      await waitFor(() => expect(result.current.data).toEqual(PAGE_1));
+
+      rerender(next);
+
+      await waitFor(() => expect(result.current.isPending).toBe(true));
+      expect(result.current.data).toBeUndefined();
+    });
+  });
 });
