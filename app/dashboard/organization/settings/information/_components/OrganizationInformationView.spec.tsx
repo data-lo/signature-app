@@ -41,6 +41,7 @@ const ORGANIZATION: OrganizationProfile = {
   address: 'Av. Reforma 123, CDMX',
   domainAllowed: 'acme.com',
   isActive: true,
+  indexDocuments: true,
 };
 
 const EXPECTED_FIELDS: [string, string][] = [
@@ -232,6 +233,7 @@ describe('OrganizationInformationView — edición', () => {
           organizationId: 'org-1',
           organizationName: 'Acme Corp S.A. de C.V.',
           organizationDisplayName: 'Acme',
+          organizationIndexDocuments: true,
           roleId: 'admin-role-1',
           status: 'ACTIVE',
         },

@@ -30,6 +30,7 @@ const PERSONAL: AccountListEntry = {
   organizationId: null,
   organizationName: null,
   organizationDisplayName: null,
+  organizationIndexDocuments: null,
   roleId: 'OWNER',
   status: 'ACTIVE',
 };
@@ -40,6 +41,7 @@ const ORG: AccountListEntry = {
   organizationId: 'org-1',
   organizationName: 'Acme Corp S.A. de C.V.',
   organizationDisplayName: 'Acme',
+  organizationIndexDocuments: true,
   roleId: 'OWNER',
   status: 'ACTIVE',
 };
