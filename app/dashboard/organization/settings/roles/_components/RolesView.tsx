@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { DataTablePageHeader } from '@/components/data-table/data-table-page-header';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useOrganizationRoles } from '@/lib/hooks/useOrganizationRoles';
@@ -10,6 +11,24 @@ import RolesTable from './RolesTable';
 import CreateOrganizationRoleModal from './CreateOrganizationRoleModal';
 import EditOrganizationRoleModal from './EditOrganizationRoleModal';
 
+/** Texto del error de carga. Dice qué hacer, no qué falló por dentro. */
+export const ROLES_LOAD_ERROR_MESSAGE =
+  'No pudimos cargar los roles. Vuelve a intentarlo en un momento.';
+
+/**
+ * "Roles y permisos" de la organización activa: la tabla de roles, el alta y la edición.
+ *
+ * Ver con `ROLE.READ`; crear y editar con `ROLE.MANAGE`. La cabecera y la tabla siguen la
+ * estructura de Documentos (`DataTablePageHeader`, `RolesTable`): la carga y el error se pintan
+ * dentro de la tarjeta de la tabla y no como texto suelto.
+ *
+ * @returns La pantalla de roles, o el motivo por el que no hay nada que mostrar.
+ *
+ * @example
+ * ```tsx
+ * <RolesView />
+ * ```
+ */
 export default function RolesView() {
   const activeAccount = useAuthStore((state) => state.activeAccount);
   /**
@@ -24,10 +43,8 @@ export default function RolesView() {
   const [editingRole, setEditingRole] = useState<OrganizationRole | null>(null);
 
   const organizationId = activeAccount?.organizationId ?? null;
-  const { data: roles, isLoading: rolesLoading } = useOrganizationRoles(
-    organizationId,
-    canReadRoles,
-  );
+  const rolesQuery = useOrganizationRoles(organizationId, canReadRoles);
+  const roles = rolesQuery.data;
   const updateRoleMutation = useUpdateOrganizationRole(organizationId);
 
   if (activeAccount?.accountType !== 'ORGANIZATION') {
@@ -66,31 +83,27 @@ export default function RolesView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold">Roles y permisos</h1>
-          <p className="text-sm text-muted-foreground">
-            Administra los roles de tu organización. Los roles personalizados
-            sólo usan los permisos técnicos del catálogo.
-          </p>
-        </div>
-        {organizationId && canManageRoles && (
-          <CreateOrganizationRoleModal
-            organizationId={organizationId}
-            availablePermissions={availablePermissions}
-          />
-        )}
-      </div>
+      <DataTablePageHeader
+        title="Roles y permisos"
+        description="Administra los roles de tu organización. Los roles personalizados sólo usan los permisos técnicos del catálogo."
+        actions={
+          organizationId &&
+          canManageRoles && (
+            <CreateOrganizationRoleModal
+              organizationId={organizationId}
+              availablePermissions={availablePermissions}
+            />
+          )
+        }
+      />
 
-      {rolesLoading ? (
-        <p className="text-sm text-muted-foreground">Cargando roles...</p>
-      ) : (
-        <RolesTable
-          roles={roles ?? []}
-          canManage={canManageRoles}
-          onEdit={setEditingRole}
-        />
-      )}
+      <RolesTable
+        roles={roles ?? []}
+        canManage={canManageRoles}
+        onEdit={setEditingRole}
+        isLoading={rolesQuery.isLoading}
+        errorMessage={rolesQuery.isError ? ROLES_LOAD_ERROR_MESSAGE : undefined}
+      />
 
       {/*
         Editar es `ROLE.MANAGE`, no `ROLE.READ`: quien sólo puede consultar ve la tabla y no la
