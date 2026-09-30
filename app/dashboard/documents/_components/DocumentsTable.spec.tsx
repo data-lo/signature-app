@@ -219,6 +219,64 @@ describe('DocumentsTable', () => {
      * Historia "Mostrar fecha y hora completa con Tooltip": la fecha compacta se queda en la celda
      * y el detalle con hora de 24 horas aparece en el Tooltip de shadcn al pasar el cursor.
      */
+    /**
+     * Historia "Truncar el nombre del documento y mostrarlo completo en un tooltip": el nombre
+     * ocupa una sola línea dentro de una columna de ancho fijo y el completo va en el Tooltip.
+     * El detalle de cuándo abre (sólo si está recortado, también con el foco) lo cubre
+     * `DocumentFileName.spec.tsx`.
+     */
+    describe('nombre del documento recortado', () => {
+      const LONG_NAME =
+        'Contrato de prestación de servicios profesionales 2026.pdf';
+
+      afterEach(() => jest.restoreAllMocks());
+
+      it('la columna tiene un ancho fijo y el nombre no se parte en varias líneas', () => {
+        renderWithProviders(
+          <DocumentsTable
+            documents={[buildDoc({ fileName: LONG_NAME })]}
+            onRowSelect={jest.fn()}
+          />,
+        );
+
+        const cell = dataCell('Documento');
+        expect(cell).toHaveClass('w-64', 'max-w-64');
+        expect(cell).not.toHaveClass('whitespace-normal');
+
+        const name = within(cell).getByRole('button', { name: LONG_NAME });
+        expect(name).toHaveClass('truncate');
+        expect(name).not.toHaveClass('break-words');
+      });
+
+      it('un nombre recortado muestra el nombre completo en el tooltip al pasar el cursor', async () => {
+        jest
+          .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+          .mockReturnValue(480);
+        jest
+          .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+          .mockReturnValue(256);
+        const user = userEvent.setup();
+        renderWithProviders(
+          <DocumentsTable
+            documents={[buildDoc({ fileName: LONG_NAME })]}
+            onRowSelect={jest.fn()}
+          />,
+        );
+
+        await user.hover(
+          within(dataCell('Documento')).getByRole('button', {
+            name: LONG_NAME,
+          }),
+        );
+
+        expect(
+          await screen.findByText(LONG_NAME, {
+            selector: '[data-slot="tooltip-content"]',
+          }),
+        ).toBeVisible();
+      });
+    });
+
     describe('tooltip con la fecha completa', () => {
       it('la fecha de creación muestra su fecha y hora completas al pasar el cursor', async () => {
         const user = userEvent.setup();
