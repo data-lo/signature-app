@@ -21,8 +21,6 @@ import {
 } from '../_config/filters';
 import { DOCUMENTS_SECTIONS } from '../_config/sections';
 
-const DOCUMENTS_PAGE_SIZE = 25;
-
 /** Lo que dice la tabla si la consulta del listado falla. */
 export const DOCUMENTS_LOAD_ERROR_MESSAGE =
   'No se pudieron cargar los documentos. Intenta de nuevo más tarde.';
@@ -97,8 +95,15 @@ function ArchivedEmptyState({
  */
 export default function DocumentsView() {
   const router = useRouter();
-  const { page, setPage, filters, handleFiltersChange } =
-    useDocumentsListState();
+  const {
+    page,
+    pageSize,
+    filters,
+    goToPage,
+    setPageSize,
+    syncWithTotalPages,
+    handleFiltersChange,
+  } = useDocumentsListState();
 
   /**
    * Lo tecleado se guarda aparte de los filtros y sólo baja a ellos tras la pausa. Si el input
@@ -121,12 +126,23 @@ export default function DocumentsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput, filters.search]);
 
-  const documentsQuery = useDocuments({
-    filters,
-    page,
-    limit: DOCUMENTS_PAGE_SIZE,
-  });
+  const documentsQuery = useDocuments({ filters, page, limit: pageSize });
   const result = documentsQuery.data;
+  /**
+   * Respuesta de la página anterior, conservada mientras llega la pedida (ver `useDocuments`).
+   * Sirve para que los controles sepan cuántas páginas hay; sus filas no se pintan.
+   */
+  const isShowingPreviousPage = documentsQuery.isPlaceholderData;
+  /**
+   * Con una respuesta definitiva, la página se corrige si ya no existe: pasa al archivar o
+   * cancelar el último documento de la última página, cuando el refetch trae una página menos.
+   * Mientras se corrige se muestra la carga, no un "no hay documentos" falso.
+   */
+  const isCorrectingPage =
+    result !== undefined &&
+    !isShowingPreviousPage &&
+    syncWithTotalPages(result.pagination.totalPages);
+  const knownTotalPages = result?.pagination.totalPages ?? 1;
   const isDefaultView = filters.view === DEFAULT_DOCUMENTS_FILTERS.view;
 
   return (
@@ -174,15 +190,25 @@ export default function DocumentsView() {
       <DocumentsFilterChips filters={filters} onChange={handleFiltersChange} />
 
       <DocumentsTable
-        documents={result?.items ?? []}
-        page={result?.pagination.page}
-        totalPages={result?.pagination.totalPages}
-        onPageChange={setPage}
+        documents={
+          isShowingPreviousPage || isCorrectingPage ? [] : (result?.items ?? [])
+        }
+        // La página pedida y no la de la respuesta: mientras carga, el indicador ya dice a dónde
+        // se va, y los botones se calculan desde ahí.
+        page={page}
+        totalPages={knownTotalPages}
+        onPageChange={(nextPage) => goToPage(nextPage, knownTotalPages)}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
         onRowSelect={(id) => router.push(`/dashboard/documents/${id}`)}
         // `isPending` y no `isLoading`: también cubre la espera a la cuenta activa (la consulta
-        // está deshabilitada hasta entonces) y cada cambio de página o filtro, que estrena
-        // `queryKey` y por tanto vuelve a no tener datos.
-        isLoading={documentsQuery.isPending}
+        // está deshabilitada hasta entonces) y cada cambio de filtro, cuenta o tamaño, que
+        // estrena `queryKey` sin datos. Al pasar de página la consulta tiene el placeholder de la
+        // anterior, que tampoco es un resultado definitivo; y mientras se corrige una página
+        // fuera de rango, la respuesta vacía tampoco lo es.
+        isLoading={
+          documentsQuery.isPending || isShowingPreviousPage || isCorrectingPage
+        }
         errorMessage={
           documentsQuery.isError ? DOCUMENTS_LOAD_ERROR_MESSAGE : undefined
         }

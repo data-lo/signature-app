@@ -1,6 +1,9 @@
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
-import DocumentsTable, { type DocumentListItem } from './DocumentsTable';
+import DocumentsTable, {
+  EMPTY_DOCUMENTS_MESSAGE,
+  type DocumentListItem,
+} from './DocumentsTable';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
@@ -467,6 +470,136 @@ describe('DocumentsTable', () => {
       await user.click(buttons[buttons.length - 2]);
 
       expect(onPageChange).toHaveBeenCalledWith(2);
+    });
+  });
+
+  /**
+   * Los controles se calculan con la página y el `totalPages` que recibe la tabla. El backend
+   * numera desde 1 y responde `totalPages: 0` cuando no hay documentos.
+   */
+  describe('controles de paginación', () => {
+    function renderPagination({
+      page,
+      totalPages,
+    }: {
+      page: number;
+      totalPages: number;
+    }) {
+      const onPageChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          page={page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+        />,
+      );
+      return onPageChange;
+    }
+
+    function control(name: string) {
+      return screen.getByRole('button', { name });
+    }
+
+    function indicator() {
+      return document.querySelector(
+        '[data-slot="documents-table-page-indicator"]',
+      );
+    }
+
+    it('en la primera página deshabilita "Primera" y "Anterior"', () => {
+      renderPagination({ page: 1, totalPages: 3 });
+
+      expect(control('Primera página')).toBeDisabled();
+      expect(control('Página anterior')).toBeDisabled();
+      expect(control('Página siguiente')).toBeEnabled();
+      expect(control('Última página')).toBeEnabled();
+      expect(indicator()).toHaveTextContent('1 de 3');
+    });
+
+    it('en una página intermedia habilita todo y pide la vecina correcta', async () => {
+      const user = userEvent.setup();
+      const onPageChange = renderPagination({ page: 2, totalPages: 3 });
+
+      for (const name of [
+        'Primera página',
+        'Página anterior',
+        'Página siguiente',
+        'Última página',
+      ]) {
+        expect(control(name)).toBeEnabled();
+      }
+
+      await user.click(control('Página anterior'));
+      await user.click(control('Página siguiente'));
+      await user.click(control('Primera página'));
+      await user.click(control('Última página'));
+
+      expect(onPageChange.mock.calls).toEqual([[1], [3], [1], [3]]);
+    });
+
+    it('en la última página deshabilita "Siguiente" y "Última"', () => {
+      renderPagination({ page: 3, totalPages: 3 });
+
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(control('Última página')).toBeDisabled();
+      expect(control('Página anterior')).toBeEnabled();
+      expect(indicator()).toHaveTextContent('3 de 3');
+    });
+
+    it('con una sola página deshabilita toda la navegación', () => {
+      renderPagination({ page: 1, totalPages: 1 });
+
+      for (const name of [
+        'Primera página',
+        'Página anterior',
+        'Página siguiente',
+        'Última página',
+      ]) {
+        expect(control(name)).toBeDisabled();
+      }
+      expect(indicator()).toHaveTextContent('1 de 1');
+    });
+
+    /** `totalPages: 0` no significa "página 0": la tabla está en la 1 de 1, vacía. */
+    it('con total cero se queda en "1 de 1" y sin navegación', () => {
+      const onPageChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[]}
+          page={1}
+          totalPages={0}
+          onPageChange={onPageChange}
+        />,
+      );
+
+      expect(screen.getByText(EMPTY_DOCUMENTS_MESSAGE)).toBeInTheDocument();
+      expect(control('Última página')).toBeDisabled();
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(indicator()).toHaveTextContent('1 de 1');
+    });
+
+    it('elegir otro tamaño de página lo notifica', async () => {
+      const user = userEvent.setup();
+      const onPageSizeChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          page={1}
+          totalPages={2}
+          onPageChange={jest.fn()}
+          pageSize={25}
+          onPageSizeChange={onPageSizeChange}
+        />,
+      );
+
+      screen
+        .getByRole('combobox', { name: 'Documentos por página' })
+        .focus();
+      await user.keyboard('{Enter}');
+      await user.click(await screen.findByRole('option', { name: '50' }));
+
+      expect(onPageSizeChange).toHaveBeenCalledWith(50);
     });
   });
 

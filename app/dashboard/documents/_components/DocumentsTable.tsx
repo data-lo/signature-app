@@ -53,6 +53,13 @@ import {
   DocumentStatus,
   SignatureType,
 } from '@/lib/enums/document';
+import {
+  DEFAULT_DOCUMENTS_PAGE_SIZE,
+  DOCUMENTS_PAGE_SIZES,
+  isDocumentsPageSize,
+  lastDocumentsPage,
+  type DocumentsPageSize,
+} from '../_config/pagination';
 
 export interface DocumentListItem {
   id: string;
@@ -146,9 +153,19 @@ export const EMPTY_DOCUMENTS_MESSAGE = 'No hay documentos para mostrar.';
 
 interface DocumentsTableProps {
   documents: DocumentListItem[];
+  /** Página actual, desde 1. */
   page?: number;
+  /**
+   * `pagination.totalPages` del backend. Puede ser 0 (sin documentos): la tabla lo trata como
+   * una sola página.
+   */
   totalPages?: number;
+  /** Recibe siempre una página dentro de `[1, totalPages]`: los botones no piden otra. */
   onPageChange?: (page: number) => void;
+  /** Tamaño de página elegido; controla el selector "Documentos por página". */
+  pageSize?: DocumentsPageSize;
+  /** Cambio de tamaño de página. Ausente, el selector se muestra deshabilitado. */
+  onPageSizeChange?: (pageSize: DocumentsPageSize) => void;
   /**
    * Navegación al detalle del documento, disparada al seleccionar la fila (clic en cualquier
    * punto de ella, o Enter/Espacio sobre el nombre del documento). Ausente sólo si la vista
@@ -204,6 +221,8 @@ export default function DocumentsTable({
   page = 1,
   totalPages = 1,
   onPageChange,
+  pageSize = DEFAULT_DOCUMENTS_PAGE_SIZE,
+  onPageSizeChange,
   onRowSelect,
   isLoading = false,
   errorMessage,
@@ -225,13 +244,27 @@ export default function DocumentsTable({
    * `page` y `totalPages` y ya no manda `hasNextPage`/`hasPrevPage`. Eran dos campos que repetían
    * lo mismo, y dos fuentes para un mismo hecho terminan discrepando.
    */
+  const lastPage = lastDocumentsPage(totalPages);
   const hasPrevPage = page > 1;
-  const hasNextPage = page < totalPages;
-  const bodyState = resolveDataTableBodyState({
-    errorMessage,
-    isLoading,
-    rowCount: documents.length,
-  });
+  const hasNextPage = page < lastPage;
+  const canNavigate = Boolean(onPageChange);
+
+  /**
+   * Pide una página sólo si existe y es distinta de la actual: ningún botón puede sacar la tabla
+   * del rango, aunque se pulse durante una carga o con un `totalPages` que acaba de cambiar.
+   */
+  function requestPage(nextPage: number) {
+    const target = Math.min(Math.max(nextPage, 1), lastPage);
+    if (target !== page) onPageChange?.(target);
+  }
+  /** Error primero, luego carga: con datos viejos y un error nuevo, lo que importa es el error. */
+  const bodyState = errorMessage
+    ? 'error'
+    : isLoading
+      ? 'loading'
+      : documents.length === 0
+        ? 'empty'
+        : 'rows';
   const visibleDocuments = bodyState === 'rows' ? documents : [];
 
   return (
@@ -416,15 +449,32 @@ export default function DocumentsTable({
           className="flex items-center justify-between border-t border-border px-3 py-2"
         >
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Documentos por página</span>
-            <Select defaultValue="25">
-              <SelectTrigger size="sm" className="w-16">
+            <span id="documents-page-size-label">Documentos por página</span>
+            {/* Controlado: antes era un `defaultValue` sin manejador, así que cambiarlo no pedía
+              otra cantidad de documentos. */}
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => {
+                const nextPageSize = Number(value);
+                if (isDocumentsPageSize(nextPageSize)) {
+                  onPageSizeChange?.(nextPageSize);
+                }
+              }}
+              disabled={!onPageSizeChange}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-16"
+                aria-labelledby="documents-page-size-label"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
+                {DOCUMENTS_PAGE_SIZES.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -433,35 +483,44 @@ export default function DocumentsTable({
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled={!onPageChange || !hasPrevPage}
-              onClick={() => onPageChange?.(1)}
+              aria-label="Primera página"
+              disabled={!canNavigate || !hasPrevPage}
+              onClick={() => requestPage(1)}
             >
               <ChevronsLeft className="size-4" />
             </Button>
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled={!onPageChange || !hasPrevPage}
-              onClick={() => onPageChange?.(page - 1)}
+              aria-label="Página anterior"
+              disabled={!canNavigate || !hasPrevPage}
+              onClick={() => requestPage(page - 1)}
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <span className="px-2 text-sm font-medium text-emerald-600">
-              {page}
+            <span
+              data-slot="documents-table-page-indicator"
+              aria-live="polite"
+              className="px-2 text-sm"
+            >
+              <span className="font-medium text-emerald-600">{page}</span>
+              <span className="text-muted-foreground"> de {lastPage}</span>
             </span>
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled={!onPageChange || !hasNextPage}
-              onClick={() => onPageChange?.(page + 1)}
+              aria-label="Página siguiente"
+              disabled={!canNavigate || !hasNextPage}
+              onClick={() => requestPage(page + 1)}
             >
               <ChevronRight className="size-4" />
             </Button>
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled={!onPageChange || !hasNextPage}
-              onClick={() => onPageChange?.(totalPages)}
+              aria-label="Última página"
+              disabled={!canNavigate || !hasNextPage}
+              onClick={() => requestPage(lastPage)}
             >
               <ChevronsRight className="size-4" />
             </Button>

@@ -3,6 +3,9 @@ import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsView, { DOCUMENTS_LOAD_ERROR_MESSAGE } from './DocumentsView';
 import { useDocuments } from '../_hooks/useDocuments';
 import { DocumentStatus, DocumentView } from '@/lib/enums/document';
+import { act } from '@testing-library/react';
+import { useState } from 'react';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 
 jest.mock('../_hooks/useDocuments');
 const restoreMutate = jest.fn();
@@ -534,6 +537,243 @@ describe('DocumentsView', () => {
       expect(
         screen.getByText('No hay documentos para mostrar.'),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * La paginación contra un listado simulado que responde como el backend: páginas desde 1,
+   * `totalPages = ceil(total / limit)` (0 sin documentos) y la página pedida aunque ya no exista.
+   */
+  describe('paginación', () => {
+    let totalDocuments = 60;
+
+    function buildItems(page: number, limit: number) {
+      const first = (page - 1) * limit;
+      const count = Math.max(0, Math.min(limit, totalDocuments - first));
+      return Array.from({ length: count }, (_, index) => ({
+        id: `doc-${first + index + 1}`,
+        fileName: `documento-${first + index + 1}.pdf`,
+        creator: 'Ana López',
+        totalPages: 1,
+        status: DocumentStatus.PendingSignature,
+        createdAt: '2026-03-15T12:00:00.000Z',
+      }));
+    }
+
+    function lastQuery() {
+      const calls = mockedUseDocuments.mock.calls;
+      return calls[calls.length - 1][0];
+    }
+
+    function control(name: string) {
+      return screen.getByRole('button', { name });
+    }
+
+    function indicator() {
+      return document.querySelector(
+        '[data-slot="documents-table-page-indicator"]',
+      );
+    }
+
+    /**
+     * Vuelve a renderizar la vista dentro de los mismos providers, como cuando una mutación
+     * invalida `['documents']` y llega la respuesta nueva.
+     */
+    let simulateRefetch: () => void = () => {};
+    function RefetchHarness() {
+      const [, setTick] = useState(0);
+      simulateRefetch = () => setTick((tick) => tick + 1);
+      return <DocumentsView />;
+    }
+
+    beforeEach(() => {
+      totalDocuments = 60;
+      useAuthStore.setState({
+        activeAccount: {
+          id: 'account-1',
+          accountType: 'PERSONAL',
+          organizationId: null,
+          roleId: null,
+        },
+      });
+      mockedUseDocuments.mockImplementation(
+        ({ page, limit }: { page: number; limit: number }) => ({
+          data: {
+            items: buildItems(page, limit),
+            pagination: {
+              page,
+              limit,
+              total: totalDocuments,
+              totalPages: Math.ceil(totalDocuments / limit),
+            },
+          },
+          isPending: false,
+          isLoading: false,
+          isError: false,
+          isSuccess: true,
+          isPlaceholderData: false,
+        }),
+      );
+    });
+
+    it('abre en la página 1 con 25 por página y carga la primera página', () => {
+      renderWithProviders(<DocumentsView />);
+
+      expect(lastQuery()).toMatchObject({ page: 1, limit: 25 });
+      expect(screen.getByText('documento-1.pdf')).toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('1 de 3');
+      expect(control('Página anterior')).toBeDisabled();
+    });
+
+    it('carga la página intermedia y la última con sus documentos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      await user.click(control('Página siguiente'));
+
+      expect(lastQuery()).toMatchObject({ page: 2, limit: 25 });
+      expect(screen.getByText('documento-26.pdf')).toBeInTheDocument();
+      expect(screen.queryByText('documento-1.pdf')).not.toBeInTheDocument();
+
+      await user.click(control('Última página'));
+
+      expect(lastQuery()).toMatchObject({ page: 3, limit: 25 });
+      expect(screen.getByText('documento-60.pdf')).toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('3 de 3');
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(control('Última página')).toBeDisabled();
+    });
+
+    /**
+     * Mientras llega la página pedida, la consulta trae como placeholder la anterior. Sus filas no
+     * se pintan como si fueran de la página nueva: se ve la carga, y el indicador ya dice a dónde
+     * se va.
+     */
+    it('mientras cambia de página muestra la carga y no las filas anteriores', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      mockedUseDocuments.mockImplementation(({ limit }: { limit: number }) => ({
+        data: {
+          items: buildItems(1, limit),
+          pagination: { page: 1, limit, total: 60, totalPages: 3 },
+        },
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        isPlaceholderData: true,
+      }));
+      await user.click(control('Página siguiente'));
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Cargando documentos',
+      );
+      expect(screen.queryByText('documento-1.pdf')).not.toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('2 de 3');
+    });
+
+    it('vuelve a la primera página al buscar', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      await user.click(control('Página siguiente'));
+      expect(lastQuery().page).toBe(2);
+
+      await user.type(
+        screen.getByRole('searchbox', {
+          name: /buscar por nombre del documento o participante/i,
+        }),
+        'contrato',
+      );
+
+      await waitFor(() => expect(lastQuery().filters.search).toBe('contrato'));
+      expect(lastQuery().page).toBe(1);
+    });
+
+    it('vuelve a la primera página al cambiar de cuenta activa', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      await user.click(control('Última página'));
+      expect(lastQuery().page).toBe(3);
+
+      act(() => {
+        useAuthStore.setState({
+          activeAccount: {
+            id: 'account-2',
+            accountType: 'ORGANIZATION',
+            organizationId: 'org-1',
+            roleId: null,
+          },
+        });
+      });
+
+      expect(lastQuery().page).toBe(1);
+      expect(indicator()).toHaveTextContent('1 de 3');
+    });
+
+    it('vuelve a la primera página y pide otro límite al cambiar el tamaño', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      await user.click(control('Página siguiente'));
+
+      screen
+        .getByRole('combobox', { name: 'Documentos por página' })
+        .focus();
+      await user.keyboard('{Enter}');
+      await user.click(await screen.findByRole('option', { name: '10' }));
+
+      expect(lastQuery()).toMatchObject({ page: 1, limit: 10 });
+      expect(indicator()).toHaveTextContent('1 de 6');
+    });
+
+    /**
+     * Archivar o cancelar el último documento de la última página invalida la lista, y el
+     * refetch trae una página menos: la tabla no debe quedarse en una página que ya no existe
+     * diciendo "no hay documentos".
+     */
+    it('si la página actual deja de existir, pasa a la última válida', async () => {
+      const user = userEvent.setup();
+      totalDocuments = 51;
+      renderWithProviders(<RefetchHarness />);
+      await user.click(control('Última página'));
+      expect(lastQuery().page).toBe(3);
+      expect(screen.getByText('documento-51.pdf')).toBeInTheDocument();
+
+      totalDocuments = 50;
+      act(() => simulateRefetch());
+
+      await waitFor(() => expect(lastQuery().page).toBe(2));
+      expect(screen.getByText('documento-50.pdf')).toBeInTheDocument();
+      expect(
+        screen.queryByText('No hay documentos para mostrar.'),
+      ).not.toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('2 de 2');
+    });
+
+    it('si se va el último documento de todos, vuelve a la página 1 vacía', async () => {
+      const user = userEvent.setup();
+      totalDocuments = 26;
+      renderWithProviders(<RefetchHarness />);
+      await user.click(control('Página siguiente'));
+      expect(lastQuery().page).toBe(2);
+
+      totalDocuments = 0;
+      act(() => simulateRefetch());
+
+      await waitFor(() => expect(lastQuery().page).toBe(1));
+      expect(
+        screen.getByText('No hay documentos para mostrar.'),
+      ).toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('1 de 1');
+    });
+
+    it('con una sola página no ofrece navegación', () => {
+      totalDocuments = 3;
+      renderWithProviders(<DocumentsView />);
+
+      expect(indicator()).toHaveTextContent('1 de 1');
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(control('Última página')).toBeDisabled();
     });
   });
 });

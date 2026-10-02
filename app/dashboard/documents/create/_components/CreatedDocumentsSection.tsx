@@ -5,10 +5,20 @@ import { FormSection } from '@/components/form/form-section';
 import type { SectionState } from '../_interfaces/section-state.interface';
 import DocumentsTable from '../../_components/DocumentsTable';
 import type { DocumentsResult } from '../../_requests';
+import type { DocumentsPageSize } from '../../_config/pagination';
 
 interface CreatedDocumentsSectionProps {
   state: SectionState;
   documents: DocumentsResult | undefined;
+  /** Página pedida, desde 1; mientras carga puede no coincidir con la de `documents`. */
+  page: number;
+  /** Documentos por página que se piden al backend. */
+  pageSize: DocumentsPageSize;
+  /**
+   * `documents` es la respuesta de la página anterior, conservada mientras llega la pedida: la
+   * tabla muestra la carga en vez de esas filas.
+   */
+  isChangingPage?: boolean;
   onPageChange: (page: number) => void;
 }
 
@@ -23,6 +33,9 @@ interface CreatedDocumentsSectionProps {
 export default function CreatedDocumentsSection({
   state,
   documents,
+  page,
+  pageSize,
+  isChangingPage = false,
   onPageChange,
 }: CreatedDocumentsSectionProps) {
   const router = useRouter();
@@ -40,10 +53,12 @@ export default function CreatedDocumentsSection({
       className="mt-8 border-t border-border pt-6"
     >
       <DocumentsTable
-        documents={documents?.items ?? []}
-        page={documents?.pagination.page}
-        totalPages={documents?.pagination.totalPages}
+        documents={isChangingPage ? [] : (documents?.items ?? [])}
+        page={page}
+        totalPages={documents?.pagination.totalPages ?? 1}
         onPageChange={onPageChange}
+        pageSize={pageSize}
+        isLoading={isChangingPage}
         onRowSelect={(id) => router.push(`/dashboard/documents/${id}`)}
       />
     </FormSection>

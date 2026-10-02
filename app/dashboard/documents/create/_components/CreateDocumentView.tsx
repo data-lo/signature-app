@@ -228,6 +228,9 @@ export default function CreateDocumentView({
       <CreatedDocumentsSection
         state={sections.createdDocuments}
         documents={createdDocuments.createdDocumentsQuery.data}
+        page={createdDocuments.page}
+        pageSize={createdDocuments.pageSize}
+        isChangingPage={createdDocuments.isChangingPage}
         onPageChange={createdDocuments.setPage}
       />
 
