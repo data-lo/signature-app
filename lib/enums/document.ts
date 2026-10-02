@@ -101,4 +101,10 @@ export enum DocumentParticipation {
 export enum SignatureType {
   Simple = 'SIMPLE',
   Fiel = 'FIEL',
+  /**
+   * Firma biométrica. Clave en MAYÚSCULAS (a diferencia de sus vecinas) porque así lo pidió la
+   * historia "Agregar tipo de firma biométrica". Todavía sólo se reconoce el valor: el backend no
+   * la persiste ni la firma, y ninguna pantalla la ofrece.
+   */
+  BIOMETRIC = 'BIOMETRIC',
 }
