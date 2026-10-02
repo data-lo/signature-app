@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm, useWatch, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { useDocumentIndexingEnabled } from '@/lib/hooks/useDocumentIndexingEnabled';
 import {
   createDocumentSignaturesSchema,
   countSigners,
@@ -44,6 +45,7 @@ export function useCreateDocumentForm({
 }: UseCreateDocumentFormParams) {
   const currentUserQuery = useCurrentUser();
   const createDocumentSignaturesMutation = useCreateDocumentSignatures();
+  const isDocumentIndexingEnabled = useDocumentIndexingEnabled();
   /**
    * Porcentaje del documento ya subido en el envío en curso, o `null` antes de que empiece. Vive
    * aquí y no en la mutación para no cambiar la forma que devuelve `useCreateDocumentSignatures`.
@@ -96,7 +98,10 @@ export function useCreateDocumentForm({
         requiresOrder: values.requiresOrder,
         signatureType: values.signatureType,
         requiresTwoFactorAuth: values.requiresTwoFactorAuth,
-        isIndexable: values.isIndexable,
+        // Con la indexación apagada en la organización la casilla ni se muestra (ver
+        // `SmartSearchCard`), pero el formulario la conserva marcada por omisión: se manda `false`
+        // para no pedir algo que la organización no permite.
+        isIndexable: isDocumentIndexingEnabled && values.isIndexable,
         // Sin composición extra: desde la historia "Crear y eliminar automáticamente el
         // participante Usuario firmante", el creador que marcó "Incluirme como firmante" ya es
         // una tarjeta más dentro de `collaborators` (la agrega `CollaboratorsFieldArray`), así que
@@ -132,6 +137,11 @@ export function useCreateDocumentForm({
     witnessCount: countWitnesses(collaborators),
     /** Firmantes a los que todavía les falta colocar su firma en el PDF, por nombre. */
     signersWithoutPosition: signersWithoutPosition(collaborators),
+    /**
+     * Si la organización activa deja mandar documentos a Búsqueda Inteligente (ver
+     * `useDocumentIndexingEnabled`). Apagado, la casilla no se ofrece y se envía `false`.
+     */
+    isDocumentIndexingEnabled,
     /** Tipo de firma elegido para todo el documento (ver `SignatureTypeField`). */
     signatureType: signatureType ?? undefined,
     /** Si el documento necesita que alguien lo apruebe antes de salir a firma. */

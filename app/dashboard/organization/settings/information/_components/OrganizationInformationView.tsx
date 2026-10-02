@@ -29,6 +29,8 @@ import {
 } from '../_schemas';
 import { useUpdateOrganization } from '../_hooks/useUpdateOrganization';
 
+import SmartSearchSettingsCard from './SmartSearchSettingsCard';
+
 /** Lo que se lee donde la organización todavía no capturó un dato. */
 export const EMPTY_FIELD_LABEL = 'Sin capturar';
 
@@ -203,13 +205,17 @@ function OrganizationInfoCard({
  * aquí con `usePermissions`, igual que el backend los decide en `PermissionsGuard`: la pantalla
  * sólo evita ofrecer lo que el servidor va a rechazar.
  *
+ * Debajo del perfil va la tarjeta "Búsqueda inteligente" (`SmartSearchSettingsCard`), que sale
+ * de la misma consulta y sigue la misma regla de permisos: se ve con lectura y se cambia con
+ * `ORGANIZATION.UPDATE`.
+ *
  * Los estados siguen el patrón de Información personal (`PersonalDocumentsView`): mientras carga,
- * el indicador giratorio con su texto; si falla, el mensaje en rojo; con datos, la tarjeta
- * centrada. Los avisos de cuenta personal y de falta de permiso no tienen equivalente allá y se
+ * el indicador giratorio con su texto; si falla, el mensaje en rojo; con datos, las tarjetas
+ * centradas. Los avisos de cuenta personal y de falta de permiso no tienen equivalente allá y se
  * pintan con el mismo texto secundario.
  *
- * @returns La tarjeta con el perfil, el indicador de carga o el motivo por el que no hay nada que
- *   mostrar.
+ * @returns Las tarjetas del perfil y de Búsqueda inteligente, el indicador de carga o el motivo
+ *   por el que no hay nada que mostrar.
  *
  * @example
  * ```tsx
@@ -266,6 +272,10 @@ export default function OrganizationInformationView() {
   return (
     <div className="flex w-full flex-col items-center gap-6">
       <OrganizationInfoCard
+        organization={organizationQuery.data}
+        canEdit={canUpdateOrganization}
+      />
+      <SmartSearchSettingsCard
         organization={organizationQuery.data}
         canEdit={canUpdateOrganization}
       />

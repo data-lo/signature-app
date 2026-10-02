@@ -10,6 +10,7 @@ import { getDocumentApproversRequest } from '../_requests';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { MISSING_FILE_MESSAGE } from '../_section-rules';
 import { NO_APPROVERS_MESSAGE } from './ApproverUserField';
+import { SMART_SEARCH_UNAVAILABLE_MESSAGE } from './SmartSearchCard';
 
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -1085,6 +1086,93 @@ describe('CreateDocumentView', () => {
 
       expect(mutate).not.toHaveBeenCalled();
       expect(smartSearchCheckbox()).toBeInTheDocument();
+    });
+
+    /**
+     * El interruptor "Habilitar indexación de documentos" de la organización manda sobre la
+     * casilla. Se lee del catálogo de cuentas —no del perfil, que un miembro sin
+     * `ORGANIZATION.READ` no puede pedir—, en la entrada de la cuenta activa.
+     */
+    describe('con la indexación desactivada en la organización', () => {
+      function setOrganizationIndexDocuments(
+        organizationIndexDocuments: boolean | null,
+      ) {
+        useAuthStore.setState({
+          activeAccount: {
+            id: 'org-account-1',
+            accountType: 'ORGANIZATION',
+            organizationId: 'org-1',
+            roleId: 'member-role-1',
+          },
+          accountsList: [
+            {
+              id: 'org-account-1',
+              accountType: 'ORGANIZATION',
+              organizationId: 'org-1',
+              organizationName: 'Acme Corp S.A. de C.V.',
+              organizationDisplayName: 'Acme',
+              organizationIndexDocuments,
+              roleId: 'member-role-1',
+              status: 'ACTIVE',
+            },
+          ],
+        });
+      }
+
+      afterEach(() => {
+        useAuthStore.setState({ accountsList: [] });
+      });
+
+      it('no ofrece la casilla y explica por qué', () => {
+        setOrganizationIndexDocuments(false);
+        renderWithProviders(<CreateDocumentView />);
+
+        expect(
+          screen.queryByRole('checkbox', {
+            name: /agregar este documento a la búsqueda inteligente/i,
+          }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.getByText(SMART_SEARCH_UNAVAILABLE_MESSAGE),
+        ).toBeInTheDocument();
+      });
+
+      /**
+       * La casilla oculta conserva su valor por omisión (marcada); lo que viaja tiene que ser
+       * `false`, o se pediría indexar algo que la organización no permite.
+       */
+      it('envía el documento con isIndexable en false', async () => {
+        setOrganizationIndexDocuments(false);
+        const user = userEvent.setup();
+        renderWithProviders(<CreateDocumentView />);
+
+        await selectFile(user);
+        await addSigner(user);
+        await selectSignatureType(user, /firma grafo/i);
+        await submitRequest(user);
+
+        expect(mutate).toHaveBeenCalledWith(
+          expect.objectContaining({ isIndexable: false }),
+          expect.anything(),
+        );
+      });
+
+      /**
+       * Una entrada del catálogo cacheada antes del campo no dice nada: se ofrece la casilla como
+       * siempre y el backend aplica el interruptor al crear el documento.
+       */
+      it.each([true, null])(
+        'con indexDocuments en %p la casilla se ofrece como siempre',
+        (organizationIndexDocuments) => {
+          setOrganizationIndexDocuments(organizationIndexDocuments);
+          renderWithProviders(<CreateDocumentView />);
+
+          expect(smartSearchCheckbox()).toBeChecked();
+          expect(
+            screen.queryByText(SMART_SEARCH_UNAVAILABLE_MESSAGE),
+          ).not.toBeInTheDocument();
+        },
+      );
     });
   });
 

@@ -34,6 +34,7 @@ function buildAccount(overrides: Partial<AccountData> = {}): AccountData {
     organizationDetail: {
       name: 'Acme Corp S.A. de C.V.',
       displayName: 'Acme',
+      indexDocuments: true,
     },
     roleId: 'admin-role-1',
     isActive: true,
@@ -192,6 +193,7 @@ describe('useAuthStore', () => {
           organizationId: 'org-1',
           organizationName: 'Acme Corp S.A. de C.V.',
           organizationDisplayName: 'Acme',
+          organizationIndexDocuments: true,
           roleId: 'admin-role-1',
           status: 'ACTIVE',
         },
@@ -201,6 +203,7 @@ describe('useAuthStore', () => {
           organizationId: null,
           organizationName: null,
           organizationDisplayName: null,
+          organizationIndexDocuments: null,
           roleId: 'admin-role-1',
           status: 'ACTIVE',
         },
@@ -224,6 +227,35 @@ describe('useAuthStore', () => {
       expect(organization.organizationDisplayName).toBe(
         'Acme Corp S.A. de C.V.',
       );
+    });
+
+    /**
+     * Igual que `displayName`: una entrada cacheada antes del campo llega sin `indexDocuments`.
+     * Queda en `null` —"no se sabe"— y no en `false`, que apagaría la búsqueda por un dato viejo.
+     */
+    it('deja indexDocuments en null cuando el backend no lo manda', () => {
+      useAuthStore.getState().setAccountsList([
+        buildAccount({
+          id: 'org-1',
+          organizationDetail: { name: 'Acme Corp S.A. de C.V.', displayName: 'Acme' },
+        }),
+      ]);
+
+      const [organization] = useAuthStore.getState().accountsList;
+      expect(organization.organizationIndexDocuments).toBeNull();
+    });
+
+    it('setOrganizationIndexDocuments cambia sólo las cuentas de esa organización', () => {
+      useAuthStore.getState().setAccountsList([
+        buildAccount({ id: 'account-1', organizationId: 'org-1' }),
+        buildAccount({ id: 'account-2', organizationId: 'org-2' }),
+      ]);
+
+      useAuthStore.getState().setOrganizationIndexDocuments('org-1', false);
+
+      const [changed, untouched] = useAuthStore.getState().accountsList;
+      expect(changed.organizationIndexDocuments).toBe(false);
+      expect(untouched.organizationIndexDocuments).toBe(true);
     });
 
     it('mapea roleId=null y status=INACTIVE cuando el backend los manda así', () => {

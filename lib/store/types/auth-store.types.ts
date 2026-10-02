@@ -40,6 +40,12 @@ export interface AccountListEntry {
    * `null` en una cuenta personal, y cae a la razón social si el backend no lo trae.
    */
   organizationDisplayName: string | null;
+  /**
+   * Si la organización deja que sus documentos entren a Búsqueda Inteligente. `null` en una
+   * cuenta personal —no hay interruptor de organización— y cuando el catálogo cacheado todavía
+   * no trae el campo: en los dos casos decide sólo la casilla de cada documento.
+   */
+  organizationIndexDocuments: boolean | null;
   roleId: string | null;
   status: AccountStatus;
 }
@@ -72,6 +78,15 @@ export interface AccountsListSlice {
   renameOrganization: (
     organizationId: string,
     names: { name: string; displayName: string },
+  ) => void;
+  /**
+   * Cambia el interruptor de Búsqueda Inteligente de una organización en todas las cuentas del
+   * catálogo que la apuntan. Lo usa la tarjeta "Búsqueda inteligente" al guardar, para que crear
+   * un documento respete el valor nuevo sin recargar.
+   */
+  setOrganizationIndexDocuments: (
+    organizationId: string,
+    indexDocuments: boolean,
   ) => void;
 }
 
