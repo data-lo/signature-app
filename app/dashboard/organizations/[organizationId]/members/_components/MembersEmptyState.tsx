@@ -2,6 +2,7 @@
 
 import { Users } from 'lucide-react';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { DataTablePageHeader } from '@/components/data-table/data-table-page-header';
 import InviteMemberModal from './InviteMemberModal';
 
 interface MembersEmptyStateProps {
@@ -39,12 +40,10 @@ export default function MembersEmptyState({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-lg font-semibold">Miembros</h1>
-        <p className="text-sm text-muted-foreground">
-          Administra los miembros de tu organización, sus roles y su acceso.
-        </p>
-      </div>
+      <DataTablePageHeader
+        title="Miembros"
+        description="Administra los miembros de tu organización, sus roles y su acceso."
+      />
 
       <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border px-6 py-12 text-center">
         <Users className="size-10 text-muted-foreground" aria-hidden />

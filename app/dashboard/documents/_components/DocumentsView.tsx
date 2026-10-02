@@ -7,6 +7,7 @@ import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
+import { DataTablePageHeader } from '@/components/data-table/data-table-page-header';
 import DocumentsTable from './DocumentsTable';
 import DocumentsFilterButton from './DocumentsFilterButton';
 import DocumentsFilterChips from './DocumentsFilterChips';
@@ -130,21 +131,22 @@ export default function DocumentsView() {
 
   return (
     <PageContainer>
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h1 className="text-lg font-semibold text-foreground">
-          {DOCUMENTS_SECTIONS.list.label}
-        </h1>
-        {/* Única puerta de entrada al alta desde la navegación: dejó de ser una entrada del
-          sidebar, así que se ofrece acá, sobre la bandeja a la que el documento nuevo va a
-          parar. La ruta es la misma de siempre y sigue abriéndose por URL directa. */}
-        <Button
-          nativeButton={false}
-          render={<Link href={DOCUMENTS_SECTIONS.create.href} />}
-        >
-          <Plus />
-          {DOCUMENTS_SECTIONS.create.label}
-        </Button>
-      </div>
+      {/* Única puerta de entrada al alta desde la navegación: dejó de ser una entrada del
+        sidebar, así que se ofrece acá, sobre la bandeja a la que el documento nuevo va a
+        parar. La ruta es la misma de siempre y sigue abriéndose por URL directa. */}
+      <DataTablePageHeader
+        className="mb-4"
+        title={DOCUMENTS_SECTIONS.list.label}
+        actions={
+          <Button
+            nativeButton={false}
+            render={<Link href={DOCUMENTS_SECTIONS.create.href} />}
+          >
+            <Plus />
+            {DOCUMENTS_SECTIONS.create.label}
+          </Button>
+        }
+      />
 
       <div className="mb-3 flex items-center gap-2">
         <div className="relative flex-1">
