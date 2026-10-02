@@ -15,6 +15,12 @@ import { usePdfDocumentLoader } from '@/components/pdf/use-pdf-document-loader';
 
 interface PdfPreviewProps {
   file: File | string;
+  /**
+   * Pide un origen nuevo del archivo cuando el PDF no carga. Si se pasa, "Reintentar" lo usa en
+   * vez de repetir la descarga con la MISMA URL — que, vencida o rechazada por MinIO, volvería a
+   * fallar igual. Al llegar la URL nueva el visor se reinicia solo (ver `usePdfDocumentLoader`).
+   */
+  onRefreshFile?: () => void;
 }
 
 const CONTAINER_PADDING = 48;
@@ -28,15 +34,19 @@ const MAX_PAGE_WIDTH = 900;
  * descarga mientras llega el archivo y, si falla, ofrece reintentar sin recargar la pantalla (ver
  * `usePdfDocumentLoader`).
  *
+ * Con `onRefreshFile`, el reintento pide una URL prefirmada nueva en lugar de repetir la que
+ * falló: es lo que permite recuperarse de una URL vencida sin recargar la pantalla.
+ *
  * @param props.file - URL prefirmada del documento o el `File` local.
+ * @param props.onRefreshFile - Opcional: renueva el origen del archivo al reintentar.
  * @returns El panel con scroll y las páginas del documento.
  *
  * @example
  * ```tsx
- * <PdfPreview file={fileUrl} />
+ * <PdfPreview file={fileUrl} onRefreshFile={() => void refetchFileUrl()} />
  * ```
  */
-export default function PdfPreview({ file }: PdfPreviewProps) {
+export default function PdfPreview({ file, onRefreshFile }: PdfPreviewProps) {
   const loader = usePdfDocumentLoader(file);
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageWidth, setPageWidth] = useState(520);
@@ -77,7 +87,7 @@ export default function PdfPreview({ file }: PdfPreviewProps) {
       className="flex h-full flex-col items-center gap-4 overflow-y-auto bg-muted py-6"
     >
       {loader.hasError ? (
-        <PdfLoadErrorMessage onRetry={loader.retry} />
+        <PdfLoadErrorMessage onRetry={onRefreshFile ?? loader.retry} />
       ) : (
         <Document
           key={loader.attempt}
