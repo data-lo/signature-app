@@ -64,4 +64,41 @@ describe('PdfPreview', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(documentMounts).toBe(2);
   });
+
+  it('con onRefreshFile, "Reintentar" pide una URL nueva en vez de repetir la que falló', async () => {
+    const onRefreshFile = jest.fn();
+    render(
+      <PdfPreview
+        file="https://minio/doc.pdf?sig=1"
+        onRefreshFile={onRefreshFile}
+      />,
+    );
+
+    await screen.findByRole('alert');
+    await userEvent.click(screen.getByRole('button', { name: /reintentar/i }));
+
+    expect(onRefreshFile).toHaveBeenCalledTimes(1);
+    // No vuelve a montar el `<Document>` con la URL vencida: espera a la nueva.
+    expect(documentMounts).toBe(1);
+  });
+
+  it('al llegar la URL nueva se reinicia solo y muestra el documento', async () => {
+    const { rerender } = render(
+      <PdfPreview
+        file="https://minio/doc.pdf?sig=1"
+        onRefreshFile={jest.fn()}
+      />,
+    );
+    await screen.findByRole('alert');
+
+    rerender(
+      <PdfPreview
+        file="https://minio/doc.pdf?sig=2"
+        onRefreshFile={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('Página dibujada 1')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });
