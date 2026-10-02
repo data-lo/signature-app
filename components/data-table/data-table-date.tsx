@@ -11,40 +11,43 @@ import {
   formatShortDate,
 } from '@/lib/format-datetime';
 
-interface DocumentDateProps {
-  /** Fecha ISO tal como la devuelve el backend (`createdAt`, `signedAt`). */
+interface DataTableDateProps {
+  /** Fecha ISO tal como la devuelve el backend (`createdAt`, `signedAt`, `joinedAt`). */
   date: string | Date | null | undefined;
   /** Lo que se muestra, atenuado, cuando no hay fecha o no es parseable. */
   emptyLabel?: string;
 }
 
 /**
- * Fecha de la tabla de documentos: el formato compacto `DD/MM/YYYY` a la vista y, en un tooltip,
+ * Fecha de una tabla de listado: el formato compacto `DD/MM/YYYY` a la vista y, en un tooltip,
  * la fecha completa con hora de 24 horas (`"LUNES 20 DE NOVIEMBRE 16:00"`).
  *
  * Sin fecha válida no hay tooltip: se muestra `emptyLabel` como texto plano, para no abrir un
  * aviso vacío ni con un valor inválido. El disparador es un botón (el de `TooltipTrigger`) para
  * que el detalle también se alcance con el teclado; como el contenido del tooltip no se anuncia
  * por sí solo, la fecha completa va además en un texto `sr-only` dentro del disparador. El clic
- * sobre la fecha no se detiene: sigue subiendo a la fila y abre el detalle como cualquier otra
- * celda.
+ * sobre la fecha no se detiene: en una tabla con filas seleccionables (Documentos) sigue subiendo
+ * a la fila y abre el detalle como cualquier otra celda.
+ *
+ * Nació en la tabla de Documentos (`DocumentDate`) y se movió aquí para que Miembros y Roles
+ * muestren sus fechas igual.
  *
  * Las dos fechas se resuelven en la zona horaria del navegador, que es la del usuario: la
  * aplicación no tiene hoy una zona configurada. Si llega a tenerla, hay que pasarla a
  * `formatFullDateTime` y también a `formatShortDate`, para que ambas digan el mismo día.
  *
- * @param props - Ver `DocumentDateProps`.
+ * @param props - Ver `DataTableDateProps`.
  * @returns La fecha con su tooltip, o `emptyLabel` atenuado si no hay fecha válida.
  *
  * @example
  * ```tsx
- * <DocumentDate date={doc.signedAt} emptyLabel="No disponible" />
+ * <DataTableDate date={doc.signedAt} emptyLabel="No disponible" />
  * ```
  */
-export default function DocumentDate({
+export function DataTableDate({
   date,
   emptyLabel = EMPTY_DATE_PLACEHOLDER,
-}: DocumentDateProps) {
+}: DataTableDateProps) {
   const fullDateTime = formatFullDateTime(date);
 
   if (fullDateTime === null) {

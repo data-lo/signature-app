@@ -15,7 +15,16 @@ import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 
 interface SmartSearchCardProps {
   control: Control<CreateDocumentSignaturesFormValues>;
+  /**
+   * Si la organización activa deja mandar documentos a Búsqueda Inteligente. En `false` la
+   * casilla no se muestra y la tarjeta explica por qué.
+   */
+  isAvailable?: boolean;
 }
+
+/** Lo que se lee en lugar de la casilla cuando la organización apagó la indexación. */
+export const SMART_SEARCH_UNAVAILABLE_MESSAGE =
+  'Tu organización desactivó la indexación de documentos, así que este documento no se agregará a la Búsqueda Inteligente.';
 
 /** Da nombre al grupo: lo referencia el `aria-labelledby` de la card. */
 const TITLE_ID = 'smart-search-card-title';
@@ -38,15 +47,27 @@ const TITLE_ID = 'smart-search-card-title';
  * que todo documento sea encontrable salvo que su autor decida lo contrario, que es el mismo
  * valor por omisión que ofrecía el modal en su botón primario.
  *
- * @param props - Control del formulario de creación de documento.
- * @returns La card con la explicación y la casilla de `isIndexable`.
+ * **Si la organización apagó la indexación** ("Búsqueda inteligente" en Información de la
+ * organización), la casilla desaparece y en su lugar se explica que el documento no entrará. No
+ * se deja deshabilitada y marcada: se leería como "sí se va a indexar".
+ *
+ * @param props - Control del formulario de creación de documento y si la búsqueda está
+ *   disponible para la organización activa.
+ * @returns La card con la explicación y la casilla de `isIndexable`, o el aviso de que la
+ *   organización la desactivó.
  *
  * @example
  * ```tsx
- * <SmartSearchCard control={createDocumentForm.form.control} />
+ * <SmartSearchCard
+ *   control={createDocumentForm.form.control}
+ *   isAvailable={createDocumentForm.isDocumentIndexingEnabled}
+ * />
  * ```
  */
-export default function SmartSearchCard({ control }: SmartSearchCardProps) {
+export default function SmartSearchCard({
+  control,
+  isAvailable = true,
+}: SmartSearchCardProps) {
   return (
     /**
      * `role="group"` con nombre: sin él la card es un div suelto y un lector de pantalla lee la
@@ -73,12 +94,18 @@ export default function SmartSearchCard({ control }: SmartSearchCardProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <FormCheckbox
-          control={control}
-          name="isIndexable"
-          id="isIndexable"
-          label="Agregar este documento a la Búsqueda Inteligente"
-        />
+        {isAvailable ? (
+          <FormCheckbox
+            control={control}
+            name="isIndexable"
+            id="isIndexable"
+            label="Agregar este documento a la Búsqueda Inteligente"
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {SMART_SEARCH_UNAVAILABLE_MESSAGE}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

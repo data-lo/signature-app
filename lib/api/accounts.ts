@@ -15,7 +15,17 @@ export interface AccountData {
    * catálogo viaja cacheado en Redis, así que una entrada escrita antes de que la columna
    * existiera puede llegar sin él hasta que su key se reconstruya.
    */
-  organizationDetail?: { name: string; displayName?: string } | null;
+  organizationDetail?: {
+    name: string;
+    displayName?: string;
+    /**
+     * Si la organización deja que sus documentos entren a Búsqueda Inteligente. Viaja en el
+     * catálogo porque la pantalla de crear documento lo necesita y un miembro sin
+     * `ORGANIZATION.READ` no puede pedir el perfil. Opcional por la misma razón que
+     * `displayName`: una entrada cacheada antes del campo llega sin él.
+     */
+    indexDocuments?: boolean;
+  } | null;
   /** UUID del rol (ver GET /api/v1/roles) del usuario autenticado en esta cuenta; null solo si la membresía no tiene rol vigente. */
   roleId: string | null;
   /** Vigencia de la membresía del usuario autenticado en esta cuenta. */

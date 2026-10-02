@@ -9,7 +9,6 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -22,16 +21,30 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { DataTableCard } from '@/components/data-table/data-table-card';
+import {
+  DataTableActionsHead,
+  DataTableHeader,
+} from '@/components/data-table/data-table-header';
+import {
+  DataTableLoadingRows,
+  DataTableStateRow,
+  resolveDataTableBodyState,
+} from '@/components/data-table/data-table-body-state';
+import { DataTableDate } from '@/components/data-table/data-table-date';
+import {
+  StatusDot,
+  StatusIndicator,
+  type StatusTone,
+} from '@/components/data-table/status-indicator';
 import DocumentRowActions from './DocumentRowActions';
 import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import { useRestoreArchivedDocument } from '../_hooks/useRestoreArchivedDocument';
-import DocumentDate from './DocumentDate';
 import DocumentFileName from './DocumentFileName';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
@@ -120,22 +133,20 @@ const PARTICIPATION_LABELS: Record<DocumentParticipation, string> = {
  */
 const UNSIGNED_DATE_LABEL = 'No disponible';
 
-const STATUS_DOT: Record<DocumentStatus, string> = {
-  [DocumentStatus.Created]: 'bg-amber-400',
-  [DocumentStatus.PendingApproval]: 'bg-amber-400',
-  [DocumentStatus.PendingSignature]: 'bg-amber-400',
-  [DocumentStatus.Signed]: 'bg-emerald-500',
-  [DocumentStatus.Rejected]: 'bg-red-400',
-  [DocumentStatus.Expired]: 'bg-gray-400',
-  [DocumentStatus.CancellationPending]: 'bg-amber-400',
-  [DocumentStatus.Cancelled]: 'bg-gray-400',
+/** Tono del punto de cada estatus (ver `StatusIndicator`). */
+const STATUS_TONE: Record<DocumentStatus, StatusTone> = {
+  [DocumentStatus.Created]: 'warning',
+  [DocumentStatus.PendingApproval]: 'warning',
+  [DocumentStatus.PendingSignature]: 'warning',
+  [DocumentStatus.Signed]: 'success',
+  [DocumentStatus.Rejected]: 'danger',
+  [DocumentStatus.Expired]: 'neutral',
+  [DocumentStatus.CancellationPending]: 'warning',
+  [DocumentStatus.Cancelled]: 'neutral',
 };
 
 /** Columnas de la tabla; lo usan las filas de estado para ocupar todo el ancho. */
 const COLUMN_COUNT = 8;
-
-/** Filas del esqueleto de carga: las suficientes para que la tarjeta no salte al llegar los datos. */
-const LOADING_ROW_COUNT = 5;
 
 /** Lo que dice la tabla cuando la consulta respondió sin documentos. */
 export const EMPTY_DOCUMENTS_MESSAGE = 'No hay documentos para mostrar.';
@@ -183,69 +194,6 @@ interface DocumentsTableProps {
    * están los documentos que se pueden devolver al listado.
    */
   canRestoreRows?: boolean;
-}
-
-/**
- * Fila que ocupa todo el ancho de la tabla para los estados sin documentos (vacío o error). No
- * reacciona al hover: no es un documento y no se puede seleccionar.
- *
- * @param props.children - Contenido de la fila.
- * @param props.className - Clases extra de la celda (p. ej. el color del error).
- * @returns Una fila con una sola celda de ancho completo.
- *
- * @example
- * ```tsx
- * <DocumentsStateRow>No hay documentos para mostrar.</DocumentsStateRow>
- * ```
- */
-function DocumentsStateRow({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <TableRow className="hover:bg-transparent">
-      <TableCell
-        colSpan={COLUMN_COUNT}
-        className={`h-24 text-center whitespace-normal text-muted-foreground ${className ?? ''}`}
-      >
-        {children}
-      </TableCell>
-    </TableRow>
-  );
-}
-
-/**
- * Esqueleto de carga de la tabla: `LOADING_ROW_COUNT` filas de barras con el ancho de la tabla.
- * Es sólo visual; el anuncio para lectores de pantalla lo hace el `aria-busy` de la tabla y el
- * texto `sr-only` de la primera fila.
- *
- * @returns Las filas del esqueleto.
- *
- * @example
- * ```tsx
- * <TableBody>{isLoading && <DocumentsLoadingRows />}</TableBody>
- * ```
- */
-function DocumentsLoadingRows() {
-  return Array.from({ length: LOADING_ROW_COUNT }, (_, index) => (
-    <TableRow
-      key={index}
-      data-slot="documents-loading-row"
-      className="hover:bg-transparent"
-    >
-      <TableCell colSpan={COLUMN_COUNT} className="py-3">
-        {index === 0 && (
-          <span role="status" className="sr-only">
-            Cargando documentos
-          </span>
-        )}
-        <Skeleton className="h-5 w-full" />
-      </TableCell>
-    </TableRow>
-  ));
 }
 
 /**
@@ -322,40 +270,41 @@ export default function DocumentsTable({
   return (
     <div className="flex-1 min-w-0">
       {/* La tabla vive dentro de una tarjeta blanca (`bg-card`) con borde y encabezado gris, y la
-          paginación va en su pie: sobre el fondo beige de la aplicación, la tarjeta es lo que
-          separa la lista del resto de la pantalla. Los ajustes se hacen con `className` sobre los
-          componentes de shadcn y no en `components/ui/table`, que también usan MembersTable y
-          RolesTable. `bg-card` y no `bg-white` para que el tema oscuro siga funcionando. */}
-      <div
-        data-slot="documents-table-card"
-        className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs"
-      >
+          paginación va en su pie (ver `DataTableCard`, que comparten Miembros y Roles). */}
+      <DataTableCard data-slot="documents-table-card">
         <Table aria-busy={bodyState === 'loading' || undefined}>
-          <TableHeader className="bg-muted/60">
-            <TableRow className="hover:bg-transparent">
-              <TableHead>
-                <SortableHeader>Documento</SortableHeader>
-              </TableHead>
-              <TableHead>Creado por</TableHead>
-              <TableHead>Participación</TableHead>
-              <TableHead>Estatus</TableHead>
-              <TableHead>Fecha de creación</TableHead>
-              <TableHead>Fecha de firma</TableHead>
-              <TableHead>Tipo de firma</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
+          <DataTableHeader>
+            <TableHead>
+              <SortableHeader>Documento</SortableHeader>
+            </TableHead>
+            <TableHead>Creado por</TableHead>
+            <TableHead>Participación</TableHead>
+            <TableHead>Estatus</TableHead>
+            <TableHead>Fecha de creación</TableHead>
+            <TableHead>Fecha de firma</TableHead>
+            <TableHead>Tipo de firma</TableHead>
+            <DataTableActionsHead />
+          </DataTableHeader>
           <TableBody>
             {bodyState === 'error' && (
-              <DocumentsStateRow className="text-destructive">
+              <DataTableStateRow
+                columnCount={COLUMN_COUNT}
+                className="text-destructive"
+              >
                 <span role="alert">{errorMessage}</span>
-              </DocumentsStateRow>
+              </DataTableStateRow>
             )}
-            {bodyState === 'loading' && <DocumentsLoadingRows />}
+            {bodyState === 'loading' && (
+              <DataTableLoadingRows
+                columnCount={COLUMN_COUNT}
+                label="Cargando documentos"
+                rowSlot="documents-loading-row"
+              />
+            )}
             {bodyState === 'empty' && (
-              <DocumentsStateRow>
+              <DataTableStateRow columnCount={COLUMN_COUNT}>
                 {emptyState ?? EMPTY_DOCUMENTS_MESSAGE}
-              </DocumentsStateRow>
+              </DataTableStateRow>
             )}
             {visibleDocuments.map((doc) => {
               const isDownloading =
@@ -406,9 +355,7 @@ export default function DocumentsTable({
                     largo que sea. En pantallas angostas la tabla se desplaza en horizontal. */}
                   <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                      />
+                      <StatusDot tone={STATUS_TONE[doc.status]} />
                       {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
                         alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
                         sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
@@ -439,18 +386,16 @@ export default function DocumentsTable({
                     }
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[doc.status]}`}
-                      />
-                      <span>{STATUS_LABELS[doc.status]}</span>
-                    </div>
+                    <StatusIndicator
+                      tone={STATUS_TONE[doc.status]}
+                      label={STATUS_LABELS[doc.status]}
+                    />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    <DocumentDate date={doc.createdAt} />
+                    <DataTableDate date={doc.createdAt} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    <DocumentDate
+                    <DataTableDate
                       date={doc.signedAt}
                       emptyLabel={UNSIGNED_DATE_LABEL}
                     />
@@ -581,7 +526,7 @@ export default function DocumentsTable({
             </Button>
           </div>
         </div>
-      </div>
+      </DataTableCard>
 
       <ShareDocumentDialog
         documentId={shareDoc?.id ?? null}

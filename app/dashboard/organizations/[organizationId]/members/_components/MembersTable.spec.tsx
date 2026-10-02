@@ -1,6 +1,9 @@
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
-import MembersTable from './MembersTable';
+import MembersTable, {
+  EMPTY_MEMBERS_MESSAGE,
+  MEMBER_SECONDARY_COLUMN_CLASS,
+} from './MembersTable';
 import type { OrganizationMember } from '@/lib/api/organization-members';
 import type { RolePermission } from '@/lib/api/roles';
 
@@ -276,6 +279,113 @@ describe('MembersTable', () => {
       expect(
         await screen.findByRole('menuitem', { name: /desactivar/i }),
       ).not.toHaveAttribute('data-disabled');
+    });
+  });
+});
+
+/**
+ * Homologación con la tabla de Documentos: misma tarjeta, encabezado, estados con punto de color
+ * y tratamiento responsivo.
+ */
+describe('MembersTable — estructura de Documentos', () => {
+  it('va dentro de la tarjeta de tabla con el encabezado gris', () => {
+    const { container } = render(
+      <MembersTable members={MEMBERS} canManage={false} />,
+    );
+
+    expect(
+      container.querySelector('[data-slot="members-table-card"]'),
+    ).toHaveClass('bg-card', 'border', 'rounded-xl');
+    expect(container.querySelector('thead')).toHaveClass('bg-muted/60');
+  });
+
+  it('con canManage pinta las columnas en orden y "Acciones" al final', () => {
+    render(<MembersTable members={MEMBERS} canManage />);
+
+    expect(
+      screen.getAllByRole('columnheader').map((header) => header.textContent),
+    ).toEqual([
+      'Correo',
+      'RFC',
+      'Rol',
+      'Estado',
+      'Permisos',
+      'Fecha de ingreso',
+      'Acciones',
+    ]);
+  });
+
+  it('sin canManage no hay encabezado de acciones', () => {
+    render(<MembersTable members={MEMBERS} canManage={false} />);
+
+    expect(
+      screen.queryByRole('columnheader', { name: 'Acciones' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('muestra el estado con el punto de color de Documentos', () => {
+    render(<MembersTable members={MEMBERS} canManage={false} />);
+
+    expect(
+      screen
+        .getByText('Activo')
+        .parentElement?.querySelector('[data-slot="status-dot"]'),
+    ).toHaveClass('bg-emerald-500');
+    expect(
+      screen
+        .getByText('Dado de baja')
+        .parentElement?.querySelector('[data-slot="status-dot"]'),
+    ).toHaveClass('bg-gray-400');
+  });
+
+  it('sin miembros muestra el estado vacío dentro de la tabla', () => {
+    render(<MembersTable members={[]} canManage />);
+
+    expect(
+      screen.getByText(EMPTY_MEMBERS_MESSAGE).closest('td'),
+    ).toHaveAttribute('colspan', '7');
+  });
+
+  /**
+   * jsdom no aplica media queries, así que la regresión del layout móvil se fija en las clases
+   * responsivas: RFC y fecha se ocultan como columna y reaparecen bajo el correo sólo en móvil,
+   * y la columna de acciones nunca se oculta.
+   */
+  describe('layout móvil', () => {
+    it('oculta RFC y fecha de ingreso como columna en pantallas angostas', () => {
+      render(<MembersTable members={MEMBERS} canManage />);
+
+      for (const name of ['RFC', 'Fecha de ingreso']) {
+        expect(screen.getByRole('columnheader', { name })).toHaveClass(
+          ...MEMBER_SECONDARY_COLUMN_CLASS.split(' '),
+        );
+      }
+    });
+
+    it('apila RFC y fecha bajo el correo, visibles sólo en móvil', () => {
+      const { container } = render(
+        <MembersTable members={MEMBERS} canManage />,
+      );
+
+      const details = container.querySelector(
+        '[data-slot="member-mobile-details"]',
+      );
+      expect(details).toHaveClass('md:hidden');
+      expect(details).toHaveTextContent('RFC: XAXX010101000');
+      expect(details).toHaveTextContent('Ingreso: 25/10/2023');
+    });
+
+    it('la columna de acciones sigue visible en móvil', () => {
+      render(<MembersTable members={MEMBERS} canManage />);
+
+      expect(
+        screen.getByRole('columnheader', { name: 'Acciones' }),
+      ).not.toHaveClass('hidden');
+      expect(
+        screen
+          .getByRole('button', { name: 'Acciones de admin@empresa.com' })
+          .closest('td'),
+      ).not.toHaveClass('hidden');
     });
   });
 });

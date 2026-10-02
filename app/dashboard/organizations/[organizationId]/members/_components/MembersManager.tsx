@@ -13,6 +13,7 @@ import {
   OWNER_CANNOT_BE_DEACTIVATED_MESSAGE,
   OWNER_ROLE_CANNOT_CHANGE_MESSAGE,
 } from '@/lib/assignable-member-roles';
+import { DataTablePageHeader } from '@/components/data-table/data-table-page-header';
 import MembersTable from './MembersTable';
 import InviteMemberModal from './InviteMemberModal';
 import EditRoleModal from './EditRoleModal';
@@ -149,20 +150,13 @@ export default function MembersManager({
         retiró: resolvía a la persona por correo, y quien tiene su cuenta con el correo personal
         quedaba fuera.
       */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold">Miembros</h1>
-          <p className="text-sm text-muted-foreground">
-            Administra los miembros de tu organización, sus roles y su acceso.
-            Los permisos de cada persona son los de su rol.
-          </p>
-        </div>
-        {canManage && (
-          <div className="flex items-center gap-2">
-            <InviteMemberModal organizationId={organizationId} />
-          </div>
-        )}
-      </div>
+      <DataTablePageHeader
+        title="Miembros"
+        description="Administra los miembros de tu organización, sus roles y su acceso. Los permisos de cada persona son los de su rol."
+        actions={
+          canManage && <InviteMemberModal organizationId={organizationId} />
+        }
+      />
 
       <MembersTable
         members={members}

@@ -209,7 +209,10 @@ export default function CreateDocumentView({
             <FieldError>{sections.submission.errorMessage}</FieldError>
           )}
 
-          <SmartSearchCard control={createDocumentForm.form.control} />
+          <SmartSearchCard
+            control={createDocumentForm.form.control}
+            isAvailable={createDocumentForm.isDocumentIndexingEnabled}
+          />
         </div>
 
         <DocumentSignaturePlacementSection
