@@ -1,74 +1,77 @@
 'use client';
 
-import { Loader2, ScanFace } from 'lucide-react';
+import { useId, useState } from 'react';
+import { CheckCircle2, Loader2, ScanFace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { BiometricSignatureStatus } from '@/lib/enums/document';
+import type { BiometricSignatureSession } from '@/lib/biometric-signature';
 import VerificationQrPanel from '@/app/dashboard/personal-documents/identity/_components/VerificationQrPanel';
-import type { BiometricSignatureSession } from '../_requests';
 
 /**
  * Lo que la pantalla muestra de la firma biométrica: los seis estados que pide la historia
- * (pendiente, en proceso, aprobada, rechazada, expirada y reintento), más "sin iniciar".
+ * (pendiente, en captura, aprobada, rechazada, expirada y reintento), más "sin iniciar" y "firmada".
  */
 export type BiometricSignatureViewKind =
   | 'idle'
   | 'pending'
-  | 'inProgress'
+  | 'capturing'
   | 'approved'
+  | 'signed'
   | 'declined'
   | 'expired'
   | 'retry';
 
 /**
- * Traduce el estado del intento a lo que se dibuja.
+ * Traduce el último intento a lo que se dibuja.
  *
- * IN_REVIEW se muestra como "en proceso": para el firmante no hay nada distinto que hacer, sólo
- * esperar. ABANDONED se agrupa con EXPIRED porque los dos se resuelven igual, abriendo otra sesión.
- * FAILED es "reintento": la sesión no pudo crearse o la firma no pudo registrarse.
+ * `signed` cuando la firma ya quedó registrada, aunque el intento siga diciendo APPROVED: la
+ * aprobación sola todavía no es una firma. FAILED es "reintento": la sesión no pudo crearse, o la
+ * aprobación llegó pero la firma no pudo registrarse.
  *
- * @param session - Último estado conocido, o `null`/`undefined` si no hay intento.
+ * @param session - Último intento, o `null`/`undefined` si no hay.
  * @returns El estado de la vista.
  *
  * @example
  * ```ts
- * toBiometricSignatureViewKind({ status: 'IN_REVIEW', … }); // 'inProgress'
+ * toBiometricSignatureViewKind({ status: 'IN_PROGRESS', signatureCompleted: false, … }); // 'capturing'
  * ```
  */
 export function toBiometricSignatureViewKind(
   session: BiometricSignatureSession | null | undefined,
 ): BiometricSignatureViewKind {
   if (!session) return 'idle';
+  if (session.signatureCompleted) return 'signed';
 
   switch (session.status) {
     case BiometricSignatureStatus.Pending:
       return 'pending';
     case BiometricSignatureStatus.InProgress:
-    case BiometricSignatureStatus.InReview:
-      return 'inProgress';
+      return 'capturing';
     case BiometricSignatureStatus.Approved:
       return 'approved';
     case BiometricSignatureStatus.Declined:
       return 'declined';
     case BiometricSignatureStatus.Expired:
-    case BiometricSignatureStatus.Abandoned:
       return 'expired';
     default:
       return 'retry';
   }
 }
 
-/** Mensaje y tono de cada desenlace que obliga a empezar de nuevo. */
+/** Mensaje de cada desenlace que obliga a empezar de nuevo. */
 const RETRY_MESSAGES: Partial<Record<BiometricSignatureViewKind, string>> = {
   declined:
     'La verificación biométrica fue rechazada. Puedes intentarlo de nuevo con buena luz y el rostro descubierto.',
   expired:
-    'La sesión de verificación expiró antes de completarse. Inicia una nueva para firmar.',
+    'La sesión de verificación expiró o se abandonó antes de completarse. Inicia una nueva para firmar.',
   retry:
     'No se pudo completar la firma biométrica. Inténtalo de nuevo; si el problema continúa, contacta a soporte.',
 };
 
 export interface BiometricSigningProps {
-  /** Último estado conocido del intento; `null` si nunca se inició. */
+  /** Último intento conocido; `null` si nunca se inició. */
   session: BiometricSignatureSession | null;
   /** Primera carga del estado: todavía no se sabe si hay una sesión abierta. */
   isLoading: boolean;
@@ -76,13 +79,19 @@ export interface BiometricSigningProps {
   geoBlockedReason: string | null;
   isRequestingLocation: boolean;
   isStarting: boolean;
-  /** Pide la ubicación e inicia (o reinicia) la sesión con Didit. */
+  /** Pide la ubicación e inicia (o reinicia) la sesión con Didit. Sólo se llama con consentimiento. */
   onStart: () => void;
+  /**
+   * Qué validará Didit, para el texto del consentimiento: el rostro contra la identidad ya
+   * verificada (`identity`) o una identificación oficial más el rostro (`document`, invitados).
+   */
+  verificationScope: 'identity' | 'document';
 }
 
 /**
- * Acción y seguimiento de la firma biométrica: "Firmar con biometría", el QR de Didit mientras la
- * prueba está en curso, y el desenlace.
+ * Acción y seguimiento de la firma biométrica: consentimiento, "Firmar con biometría", el QR de
+ * Didit mientras la prueba está en curso, y el desenlace. Sirve al firmante con cuenta y al
+ * invitado.
  *
  * Esta pantalla nunca decide el resultado: lo que muestra sale del backend, que lo recibe por el
  * webhook de Didit. Volver de Didit al navegador no aprueba nada.
@@ -94,7 +103,10 @@ export default function BiometricSignaturePanel({
   isRequestingLocation,
   isStarting,
   onStart,
+  verificationScope,
 }: BiometricSigningProps) {
+  const consentId = useId();
+  const [consented, setConsented] = useState(false);
   const kind = toBiometricSignatureViewKind(session);
   const isBusy = isRequestingLocation || isStarting;
 
@@ -110,12 +122,26 @@ export default function BiometricSignaturePanel({
     );
   }
 
-  const startButton = (label: string) => (
-    <div className="flex flex-col gap-2">
+  const startBlock = (label: string) => (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id={consentId}
+          checked={consented}
+          onCheckedChange={(checked) => setConsented(checked === true)}
+          disabled={isBusy}
+        />
+        <Label htmlFor={consentId} className="text-xs leading-snug font-normal">
+          {verificationScope === 'identity'
+            ? 'Acepto que se capture mi rostro en vivo y se compare con mi identidad verificada para autorizar esta firma.'
+            : 'Acepto que se capture una identificación oficial y mi rostro en vivo, y que se comparen entre sí, para autorizar esta firma.'}{' '}
+          Los resultados se conservan como evidencia de la firma; las imágenes
+          no se guardan en esta plataforma.
+        </Label>
+      </div>
       <p className="text-xs text-muted-foreground">
-        Al continuar, solicitaremos tu ubicación para registrarla como parte de
-        la evidencia de esta firma, y te pediremos una prueba de vida con tu
-        rostro.
+        También solicitaremos tu ubicación para registrarla como parte de la
+        evidencia de esta firma.
       </p>
       {geoBlockedReason && (
         <div
@@ -129,7 +155,7 @@ export default function BiometricSignaturePanel({
       <Button
         type="button"
         className="w-full"
-        disabled={isBusy}
+        disabled={isBusy || !consented}
         onClick={onStart}
       >
         <ScanFace className="size-4" aria-hidden />
@@ -143,7 +169,7 @@ export default function BiometricSignaturePanel({
   );
 
   if (kind === 'idle') {
-    return startButton('Firmar con biometría');
+    return startBlock('Firmar con biometría');
   }
 
   if (kind === 'declined' || kind === 'expired' || kind === 'retry') {
@@ -155,8 +181,20 @@ export default function BiometricSignaturePanel({
         >
           {RETRY_MESSAGES[kind]}
         </p>
-        {startButton('Volver a intentar')}
+        {startBlock('Volver a intentar')}
       </div>
+    );
+  }
+
+  if (kind === 'signed') {
+    return (
+      <p
+        role="status"
+        className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400"
+      >
+        <CheckCircle2 className="size-4" aria-hidden />
+        Tu firma biométrica quedó registrada.
+      </p>
     );
   }
 
@@ -172,22 +210,20 @@ export default function BiometricSignaturePanel({
     );
   }
 
-  // Pendiente o en proceso.
+  // Pendiente o en captura.
   return (
     <div className="flex flex-col gap-3">
       <p role="status" className="text-sm font-medium">
         {kind === 'pending'
           ? 'Verificación biométrica pendiente'
-          : session?.status === BiometricSignatureStatus.InReview
-            ? 'Tu verificación está en revisión'
-            : 'Verificación biométrica en proceso'}
+          : 'Verificación biométrica en captura'}
       </p>
       {session?.url ? (
         <VerificationQrPanel url={session.url} />
       ) : (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
-          {session?.status === BiometricSignatureStatus.InReview
+          {kind === 'capturing'
             ? 'Estamos esperando el resultado. Esta pantalla se actualizará sola.'
             : 'Preparando la sesión de verificación...'}
         </p>

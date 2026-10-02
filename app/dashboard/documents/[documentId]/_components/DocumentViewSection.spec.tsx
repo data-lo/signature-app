@@ -1432,10 +1432,19 @@ describe('DocumentViewSection', () => {
       });
     });
 
+    it('sin consentimiento explícito no se puede iniciar', () => {
+      renderBiometricSigner(null);
+
+      expect(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      ).toBeDisabled();
+    });
+
     it('pide la ubicación y con ella inicia la sesión de Didit', async () => {
       const user = userEvent.setup();
       renderBiometricSigner(null);
 
+      await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
       await user.click(
         screen.getByRole('button', { name: /firmar con biometría/i }),
       );
@@ -1450,6 +1459,7 @@ describe('DocumentViewSection', () => {
       const user = userEvent.setup();
       renderBiometricSigner(null);
 
+      await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
       await user.click(
         screen.getByRole('button', { name: /firmar con biometría/i }),
       );
@@ -1465,7 +1475,7 @@ describe('DocumentViewSection', () => {
         biometricSession({ status: BiometricSignatureStatus.InProgress }),
       );
 
-      expect(screen.getByText(/en proceso/i)).toBeInTheDocument();
+      expect(screen.getByText(/en captura/i)).toBeInTheDocument();
       expect(
         screen.getByLabelText(/código qr para continuar la verificación/i),
       ).toBeInTheDocument();

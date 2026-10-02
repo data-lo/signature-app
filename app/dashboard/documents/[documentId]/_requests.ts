@@ -1,10 +1,10 @@
 import apiClient from '@/lib/axios';
+import type { BiometricSignatureSession } from '@/lib/biometric-signature';
 import {
   DocumentStatus,
   ParticipantRole,
   ParticipantStatus,
   SignatureType,
-  BiometricSignatureStatus,
 } from '@/lib/enums/document';
 
 export interface DocumentParticipant {
@@ -223,37 +223,22 @@ export async function confirmCancellationRequest(
   await apiClient.patch(`/api/v1/document/${documentId}/confirm-cancellation`);
 }
 
-/**
- * Sesión de firma biométrica tal como la devuelve el backend, al iniciarla y al consultarla.
- *
- * `url` es la página de Didit: se abre o se convierte en QR, y sólo viene mientras la sesión sigue
- * abierta y vigente. El veredicto nunca viaja aquí — llega al backend por webhook.
- */
-export interface BiometricSignatureSession {
-  attemptId: string;
-  status: BiometricSignatureStatus;
-  url: string | null;
-  expiresAt: string | null;
-  /** `true` si el backend devolvió una sesión que ya existía en vez de abrir otra. */
-  reused: boolean;
-  /** `true` cuando la firma del usuario ya quedó registrada. */
-  signatureCompleted: boolean;
-  /** `true` si con esa firma el documento quedó firmado por todos. */
-  documentCompleted: boolean;
-}
+export type { BiometricSignatureSession } from '@/lib/biometric-signature';
 
 /**
- * Inicia —o retoma, si ya hay una abierta— la firma biométrica del usuario con Didit.
+ * Inicia —o retoma, si ya hay una abierta— la firma biométrica del usuario autenticado
+ * (Biometric Authentication de Didit contra su identidad verificada).
  *
  * La ubicación se manda aquí porque la firma se registra después, desde el webhook de Didit,
- * cuando ya no hay navegador al que pedírsela.
+ * cuando ya no hay navegador al que pedírsela. `biometricConsent` sólo se manda en `true`: la
+ * pantalla no deja iniciar sin el consentimiento marcado.
  *
  * @param documentId - Documento a firmar.
  * @param geolocation - Ubicación del dispositivo, obligatoria como evidencia de la firma.
  * @returns La sesión con la URL de Didit.
  *
- * @throws {AxiosError} 400 si el documento no admite la firma, 403 si no es su turno, 502 si
- *   Didit no pudo crear la sesión.
+ * @throws {AxiosError} 400 si el documento no admite la firma, 403 si no es su turno o no tiene
+ *   identidad verificada, 422 si su identidad no tiene imagen del rostro, 502 si Didit falló.
  *
  * @example
  * ```ts
@@ -265,8 +250,8 @@ export async function startBiometricSignatureRequest(
   geolocation: SignDocumentGeolocation,
 ): Promise<BiometricSignatureSession> {
   const { data } = await apiClient.post<BiometricSignatureSession>(
-    `/api/v1/document/${documentId}/biometric-signature`,
-    { geolocation },
+    `/api/v1/documents/${documentId}/biometric-signature/session`,
+    { geolocation, biometricConsent: true },
   );
 
   return data;
@@ -289,7 +274,7 @@ export async function getBiometricSignatureRequest(
   documentId: string,
 ): Promise<BiometricSignatureSession | null> {
   const { data } = await apiClient.get<BiometricSignatureSession | ''>(
-    `/api/v1/document/${documentId}/biometric-signature`,
+    `/api/v1/documents/${documentId}/biometric-signature/session`,
   );
 
   // Nest responde `null` como cuerpo vacío: sin intento previo llega `''`, no `null`.

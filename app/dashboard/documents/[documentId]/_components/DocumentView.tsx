@@ -18,7 +18,7 @@ import DocumentPreviewPanel from './DocumentPreviewPanel';
 import DocumentSignaturePanel, {
   type DocumentSigningProps,
 } from './DocumentSignaturePanel';
-import type { BiometricSigningProps } from './BiometricSignaturePanel';
+import type { BiometricSigningProps } from '@/components/biometric-signature/BiometricSignaturePanel';
 import DocumentStatusNotices from './DocumentStatusNotices';
 import DocumentSummaryCard from './DocumentSummaryCard';
 import RejectDocumentForm from './RejectDocumentForm';

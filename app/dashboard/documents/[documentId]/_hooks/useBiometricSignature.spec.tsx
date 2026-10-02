@@ -9,8 +9,6 @@ import {
   type BiometricSignatureSession,
 } from '../_requests';
 import {
-  BIOMETRIC_POLL_INTERVAL_MS,
-  biometricPollInterval,
   biometricSignatureQueryKey,
   useBiometricSignature,
   useStartBiometricSignature,
@@ -47,47 +45,6 @@ function wrapperWith(queryClient: QueryClient) {
     );
   };
 }
-
-describe('biometricPollInterval', () => {
-  it.each([
-    BiometricSignatureStatus.Pending,
-    BiometricSignatureStatus.InProgress,
-    BiometricSignatureStatus.InReview,
-  ])('sondea mientras la sesión está %s', (status) => {
-    expect(biometricPollInterval(session({ status }))).toBe(
-      BIOMETRIC_POLL_INTERVAL_MS,
-    );
-  });
-
-  it('sigue sondeando con la biometría aprobada hasta que la firma queda registrada', () => {
-    expect(
-      biometricPollInterval(
-        session({ status: BiometricSignatureStatus.Approved }),
-      ),
-    ).toBe(BIOMETRIC_POLL_INTERVAL_MS);
-    expect(
-      biometricPollInterval(
-        session({
-          status: BiometricSignatureStatus.Approved,
-          signatureCompleted: true,
-        }),
-      ),
-    ).toBe(false);
-  });
-
-  it.each([
-    BiometricSignatureStatus.Declined,
-    BiometricSignatureStatus.Expired,
-    BiometricSignatureStatus.Abandoned,
-    BiometricSignatureStatus.Failed,
-  ])('no sondea en un desenlace (%s)', (status) => {
-    expect(biometricPollInterval(session({ status }))).toBe(false);
-  });
-
-  it('no sondea sin intento', () => {
-    expect(biometricPollInterval(null)).toBe(false);
-  });
-});
 
 describe('useBiometricSignature', () => {
   beforeEach(() => {

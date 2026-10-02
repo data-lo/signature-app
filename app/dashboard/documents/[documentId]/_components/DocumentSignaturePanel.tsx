@@ -7,7 +7,7 @@ import SignatureVerificationCard, {
 } from './SignatureVerificationCard';
 import BiometricSignaturePanel, {
   type BiometricSigningProps,
-} from './BiometricSignaturePanel';
+} from '@/components/biometric-signature/BiometricSignaturePanel';
 
 export interface DocumentSigningProps {
   /** Motivo por el que la ubicación no pudo obtenerse; bloquea la firma hasta corregirlo. */

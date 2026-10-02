@@ -9,8 +9,8 @@ import toast from 'react-hot-toast';
 import {
   useGeolocation,
   type GeolocationCoords,
-  type GeolocationErrorReason,
 } from '@/lib/hooks/useGeolocation';
+import { GEOLOCATION_ERROR_MESSAGES } from '@/lib/hooks/geolocation-error-messages';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { isSigningCredentialConfigured } from '@/lib/store/auth.slice';
 import { SignatureType } from '@/lib/enums/document';
@@ -36,13 +36,6 @@ import type { SignDocumentResponseData } from '../_requests';
 import { DOCUMENTS_SECTIONS } from '../../_config/sections';
 import DocumentView from './DocumentView';
 import type { AdvancedSignatureSubmitValues } from './AdvancedSignatureDialog';
-
-const GEOLOCATION_ERROR_MESSAGES: Record<GeolocationErrorReason, string> = {
-  unsupported: 'tu navegador no permite compartir ubicación aquí',
-  'permission-denied': 'no diste permiso de ubicación',
-  'position-unavailable': 'no se pudo determinar tu ubicación',
-  timeout: 'se agotó el tiempo de espera para obtener tu ubicación',
-};
 
 interface DocumentViewSectionProps {
   documentId: string;
@@ -321,6 +314,7 @@ export default function DocumentViewSection({
               isRequestingLocation: geoStatus === 'requesting',
               isStarting: startBiometricSignature.isPending,
               onStart: () => void handleStartBiometricSignature(),
+              verificationScope: 'identity',
             }
           : undefined
       }

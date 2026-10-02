@@ -4,29 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { BiometricSignatureStatus } from '@/lib/enums/document';
+import {
+  biometricPollInterval,
+  type BiometricGeolocation,
+} from '@/lib/biometric-signature';
 import {
   getBiometricSignatureRequest,
   startBiometricSignatureRequest,
-  type BiometricSignatureSession,
-  type SignDocumentGeolocation,
 } from '../_requests';
-
-/**
- * Cada cuánto se vuelve a preguntar mientras la prueba biométrica está en curso.
- *
- * El veredicto de Didit no llega al navegador: llega al backend por webhook. Sin este sondeo, el
- * firmante terminaría la prueba en el celular y se quedaría mirando el QR hasta recargar. Mismo
- * intervalo que la verificación de identidad.
- */
-export const BIOMETRIC_POLL_INTERVAL_MS = 5_000;
-
-/** Estados en los que la sesión de Didit todavía puede cambiar sola. */
-const IN_FLIGHT_STATUSES: readonly BiometricSignatureStatus[] = [
-  BiometricSignatureStatus.Pending,
-  BiometricSignatureStatus.InProgress,
-  BiometricSignatureStatus.InReview,
-];
 
 /**
  * Llave del estado biométrico. Lleva la cuenta activa, igual que el detalle: el backend autoriza
@@ -46,37 +31,6 @@ export function biometricSignatureQueryKey(
   activeAccountId: string | undefined,
 ) {
   return ['biometricSignature', documentId, activeAccountId] as const;
-}
-
-/**
- * Cada cuánto sondear según el último estado conocido, o `false` para no sondear.
- *
- * Se sondea mientras la sesión puede cambiar sola (pendiente, en curso o en revisión) y también
- * con la biometría ya aprobada pero la firma todavía sin registrar: el backend firma al recibir el
- * webhook y hay que enterarse de cuándo terminó. En un desenlace —firmado, rechazado, vencido—
- * seguir preguntando sería tráfico inútil.
- *
- * @param session - Último estado conocido; `null`/`undefined` si no hay intento.
- * @returns El intervalo en milisegundos, o `false`.
- *
- * @example
- * ```ts
- * biometricPollInterval({ status: 'IN_PROGRESS', signatureCompleted: false, … }); // 5000
- * ```
- */
-export function biometricPollInterval(
-  session: BiometricSignatureSession | null | undefined,
-): number | false {
-  if (!session || session.signatureCompleted) return false;
-
-  if (
-    IN_FLIGHT_STATUSES.includes(session.status) ||
-    session.status === BiometricSignatureStatus.Approved
-  ) {
-    return BIOMETRIC_POLL_INTERVAL_MS;
-  }
-
-  return false;
 }
 
 /**
@@ -134,7 +88,7 @@ export function useStartBiometricSignature(documentId: string) {
   const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
 
   return useMutation({
-    mutationFn: (geolocation: SignDocumentGeolocation) =>
+    mutationFn: (geolocation: BiometricGeolocation) =>
       startBiometricSignatureRequest(documentId, geolocation),
     onSuccess: (session) => {
       queryClient.setQueryData(

@@ -111,19 +111,18 @@ export enum SignatureType {
 
 /**
  * Espejo de BIOMETRIC_SIGNATURE_ATTEMPT_STATUS_ENUM
- * (signature-server/src/document/biometric/enums/biometric-signature-attempt-status.enum.ts).
+ * (signature-server/src/biometric-signature/enums/biometric-signature-attempt-status.enum.ts).
  *
  * Es el estado de la SESIÓN de Didit con la que el firmante autoriza su firma biométrica, no el de
  * la firma: mientras la prueba está en curso el firmante sigue pendiente, y la firma se registra
- * cuando el webhook de Didit trae la aprobación.
+ * cuando el webhook de Didit trae la aprobación. Didit "en revisión" llega como `IN_PROGRESS` y
+ * "abandonada" como `EXPIRED`: para el firmante se resuelven igual.
  */
 export enum BiometricSignatureStatus {
   Pending = 'PENDING',
   InProgress = 'IN_PROGRESS',
-  InReview = 'IN_REVIEW',
   Approved = 'APPROVED',
   Declined = 'DECLINED',
-  Abandoned = 'ABANDONED',
   Expired = 'EXPIRED',
   Failed = 'FAILED',
 }

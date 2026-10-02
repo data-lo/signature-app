@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { BiometricSignatureStatus } from '@/lib/enums/document';
-import type { BiometricSignatureSession } from '../_requests';
+import type { BiometricSignatureSession } from '@/lib/biometric-signature';
 import BiometricSignaturePanel, {
   toBiometricSignatureViewKind,
   type BiometricSigningProps,
@@ -30,6 +30,7 @@ function renderPanel(overrides: Partial<BiometricSigningProps> = {}) {
     isRequestingLocation: false,
     isStarting: false,
     onStart: jest.fn(),
+    verificationScope: 'identity',
     ...overrides,
   };
   render(<BiometricSignaturePanel {...props} />);
@@ -40,29 +41,49 @@ describe('toBiometricSignatureViewKind', () => {
   it.each([
     [null, 'idle'],
     [BiometricSignatureStatus.Pending, 'pending'],
-    [BiometricSignatureStatus.InProgress, 'inProgress'],
-    [BiometricSignatureStatus.InReview, 'inProgress'],
+    [BiometricSignatureStatus.InProgress, 'capturing'],
     [BiometricSignatureStatus.Approved, 'approved'],
     [BiometricSignatureStatus.Declined, 'declined'],
     [BiometricSignatureStatus.Expired, 'expired'],
-    [BiometricSignatureStatus.Abandoned, 'expired'],
     [BiometricSignatureStatus.Failed, 'retry'],
   ])('%s → %s', (status, expected) => {
     expect(
       toBiometricSignatureViewKind(status ? session({ status }) : null),
     ).toBe(expected);
   });
+
+  it('la firma registrada manda sobre el estado del intento', () => {
+    expect(
+      toBiometricSignatureViewKind(
+        session({
+          status: BiometricSignatureStatus.Approved,
+          signatureCompleted: true,
+        }),
+      ),
+    ).toBe('signed');
+  });
 });
 
 describe('BiometricSignaturePanel', () => {
-  it('sin sesión ofrece "Firmar con biometría"', async () => {
+  it('sin consentimiento no deja iniciar; con él, sí', async () => {
     const props = renderPanel();
+    const button = screen.getByRole('button', {
+      name: /firmar con biometría/i,
+    });
 
-    await userEvent.click(
-      screen.getByRole('button', { name: /firmar con biometría/i }),
-    );
+    expect(button).toBeDisabled();
+    await userEvent.click(screen.getByRole('checkbox', { name: /acepto/i }));
+    await userEvent.click(button);
 
     expect(props.onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('explica qué se compara según el tipo de firmante', () => {
+    renderPanel({ verificationScope: 'document' });
+
+    expect(
+      screen.getByRole('checkbox', { name: /identificación oficial/i }),
+    ).toBeInTheDocument();
   });
 
   it('pendiente: muestra el estado y el QR de Didit', () => {
@@ -76,24 +97,16 @@ describe('BiometricSignaturePanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('pendiente sin URL todavía: indica que se está preparando, sin QR', () => {
-    renderPanel({ session: session({ url: null }) });
-
-    expect(screen.getByText(/preparando la sesión/i)).toBeInTheDocument();
-    expect(
-      screen.queryByLabelText(/código qr para continuar la verificación/i),
-    ).not.toBeInTheDocument();
-  });
-
-  it('en revisión: avisa que se espera el resultado', () => {
+  it('en captura sin URL: avisa que espera el resultado', () => {
     renderPanel({
       session: session({
-        status: BiometricSignatureStatus.InReview,
+        status: BiometricSignatureStatus.InProgress,
         url: null,
       }),
     });
 
-    expect(screen.getByText(/está en revisión/i)).toBeInTheDocument();
+    expect(screen.getByText(/en captura/i)).toBeInTheDocument();
+    expect(screen.getByText(/esperando el resultado/i)).toBeInTheDocument();
   });
 
   it('aprobada: indica que se está registrando la firma, sin botones', () => {
@@ -108,6 +121,18 @@ describe('BiometricSignaturePanel', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('firmada: lo confirma', () => {
+    renderPanel({
+      session: session({
+        status: BiometricSignatureStatus.Approved,
+        url: null,
+        signatureCompleted: true,
+      }),
+    });
+
+    expect(screen.getByText(/quedó registrada/i)).toBeInTheDocument();
+  });
+
   it.each([
     [BiometricSignatureStatus.Declined, /fue rechazada/i],
     [BiometricSignatureStatus.Expired, /expiró/i],
@@ -116,6 +141,7 @@ describe('BiometricSignaturePanel', () => {
     const props = renderPanel({ session: session({ status, url: null }) });
 
     expect(screen.getByRole('alert')).toHaveTextContent(message);
+    await userEvent.click(screen.getByRole('checkbox', { name: /acepto/i }));
     await userEvent.click(
       screen.getByRole('button', { name: /volver a intentar/i }),
     );
