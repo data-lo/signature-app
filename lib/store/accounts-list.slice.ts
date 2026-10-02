@@ -34,6 +34,7 @@ export function toAccountListEntry(raw: AccountData): AccountListEntry {
       raw.organizationDetail?.displayName ??
       raw.organizationDetail?.name ??
       null,
+    organizationIndexDocuments: raw.organizationDetail?.indexDocuments ?? null,
     roleId: raw.roleId,
     status: raw.isActive ? 'ACTIVE' : 'INACTIVE',
   };
@@ -64,6 +65,15 @@ export const createAccountsListSlice: StateCreator<
               organizationName: name,
               organizationDisplayName: displayName,
             }
+          : entry,
+      ),
+    })),
+
+  setOrganizationIndexDocuments: (organizationId, indexDocuments) =>
+    set((state) => ({
+      accountsList: state.accountsList.map((entry) =>
+        entry.organizationId === organizationId
+          ? { ...entry, organizationIndexDocuments: indexDocuments }
           : entry,
       ),
     })),

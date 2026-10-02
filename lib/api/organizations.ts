@@ -20,6 +20,12 @@ export interface OrganizationProfile {
   address: string | null;
   domainAllowed: string | null;
   isActive: boolean;
+  /**
+   * Si los documentos de la organización pueden entrar a Búsqueda Inteligente. Lo edita la
+   * tarjeta "Búsqueda inteligente" de esta misma pantalla; las organizaciones nuevas nacen con él
+   * encendido.
+   */
+  indexDocuments: boolean;
 }
 
 /**
@@ -58,7 +64,8 @@ export async function getOrganizationRequest(
  * backend. Usa los mismos nombres que `OrganizationProfile`, así que se manda lo que se leyó.
  *
  * Todo es opcional: sólo se escribe lo que viaja. Los opcionales en `null` se borran; los dos
- * nombres no se pueden borrar.
+ * nombres no se pueden borrar. `indexDocuments` viaja solo, desde la tarjeta de Búsqueda
+ * Inteligente, y no admite `null`.
  */
 export type UpdateOrganizationPayload = Partial<
   Pick<
@@ -69,6 +76,7 @@ export type UpdateOrganizationPayload = Partial<
     | 'phoneNumber'
     | 'address'
     | 'domainAllowed'
+    | 'indexDocuments'
   >
 >;
 
