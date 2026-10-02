@@ -113,6 +113,8 @@ const STATUS_LABELS: Record<DocumentStatus, string> = {
 const SIGNATURE_TYPE_LABELS: Record<SignatureType, string> = {
   [SignatureType.Simple]: 'Simple',
   [SignatureType.Fiel]: 'E.Firma',
+  // Sólo para que el mapa siga cubriendo el enum: hoy ningún documento llega con este tipo.
+  [SignatureType.BIOMETRIC]: 'Biométrica',
 };
 
 /**

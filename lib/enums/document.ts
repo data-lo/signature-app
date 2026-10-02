@@ -101,4 +101,29 @@ export enum DocumentParticipation {
 export enum SignatureType {
   Simple = 'SIMPLE',
   Fiel = 'FIEL',
+  /**
+   * Firma biométrica. Clave en MAYÚSCULAS (a diferencia de sus vecinas) porque así lo pidió la
+   * historia "Agregar tipo de firma biométrica". El firmante la completa en Didit desde el detalle
+   * del documento ("Firmar con biometría"); el formulario de creación todavía no la ofrece.
+   */
+  BIOMETRIC = 'BIOMETRIC',
+}
+
+/**
+ * Espejo de BIOMETRIC_SIGNATURE_ATTEMPT_STATUS_ENUM
+ * (signature-server/src/document/biometric/enums/biometric-signature-attempt-status.enum.ts).
+ *
+ * Es el estado de la SESIÓN de Didit con la que el firmante autoriza su firma biométrica, no el de
+ * la firma: mientras la prueba está en curso el firmante sigue pendiente, y la firma se registra
+ * cuando el webhook de Didit trae la aprobación.
+ */
+export enum BiometricSignatureStatus {
+  Pending = 'PENDING',
+  InProgress = 'IN_PROGRESS',
+  InReview = 'IN_REVIEW',
+  Approved = 'APPROVED',
+  Declined = 'DECLINED',
+  Abandoned = 'ABANDONED',
+  Expired = 'EXPIRED',
+  Failed = 'FAILED',
 }

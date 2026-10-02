@@ -4,6 +4,7 @@ import {
   ParticipantRole,
   ParticipantStatus,
   SignatureType,
+  BiometricSignatureStatus,
 } from '@/lib/enums/document';
 
 export interface DocumentParticipant {
@@ -220,4 +221,77 @@ export async function confirmCancellationRequest(
   documentId: string,
 ): Promise<void> {
   await apiClient.patch(`/api/v1/document/${documentId}/confirm-cancellation`);
+}
+
+/**
+ * Sesión de firma biométrica tal como la devuelve el backend, al iniciarla y al consultarla.
+ *
+ * `url` es la página de Didit: se abre o se convierte en QR, y sólo viene mientras la sesión sigue
+ * abierta y vigente. El veredicto nunca viaja aquí — llega al backend por webhook.
+ */
+export interface BiometricSignatureSession {
+  attemptId: string;
+  status: BiometricSignatureStatus;
+  url: string | null;
+  expiresAt: string | null;
+  /** `true` si el backend devolvió una sesión que ya existía en vez de abrir otra. */
+  reused: boolean;
+  /** `true` cuando la firma del usuario ya quedó registrada. */
+  signatureCompleted: boolean;
+  /** `true` si con esa firma el documento quedó firmado por todos. */
+  documentCompleted: boolean;
+}
+
+/**
+ * Inicia —o retoma, si ya hay una abierta— la firma biométrica del usuario con Didit.
+ *
+ * La ubicación se manda aquí porque la firma se registra después, desde el webhook de Didit,
+ * cuando ya no hay navegador al que pedírsela.
+ *
+ * @param documentId - Documento a firmar.
+ * @param geolocation - Ubicación del dispositivo, obligatoria como evidencia de la firma.
+ * @returns La sesión con la URL de Didit.
+ *
+ * @throws {AxiosError} 400 si el documento no admite la firma, 403 si no es su turno, 502 si
+ *   Didit no pudo crear la sesión.
+ *
+ * @example
+ * ```ts
+ * const session = await startBiometricSignatureRequest('doc-1', { latitude: 19.4, longitude: -99.1 });
+ * ```
+ */
+export async function startBiometricSignatureRequest(
+  documentId: string,
+  geolocation: SignDocumentGeolocation,
+): Promise<BiometricSignatureSession> {
+  const { data } = await apiClient.post<BiometricSignatureSession>(
+    `/api/v1/document/${documentId}/biometric-signature`,
+    { geolocation },
+  );
+
+  return data;
+}
+
+/**
+ * Estado del último intento de firma biométrica del usuario sobre el documento.
+ *
+ * @param documentId - Documento consultado.
+ * @returns La sesión del último intento, o `null` si nunca inició una.
+ *
+ * @throws {AxiosError} 403 si el usuario no es firmante del documento.
+ *
+ * @example
+ * ```ts
+ * const session = await getBiometricSignatureRequest('doc-1');
+ * ```
+ */
+export async function getBiometricSignatureRequest(
+  documentId: string,
+): Promise<BiometricSignatureSession | null> {
+  const { data } = await apiClient.get<BiometricSignatureSession | ''>(
+    `/api/v1/document/${documentId}/biometric-signature`,
+  );
+
+  // Nest responde `null` como cuerpo vacío: sin intento previo llega `''`, no `null`.
+  return data || null;
 }

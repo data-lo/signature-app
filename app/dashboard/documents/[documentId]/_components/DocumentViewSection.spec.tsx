@@ -12,11 +12,16 @@ import { useRequestCancellation } from '../_hooks/useRequestCancellation';
 import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
 import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
 import { useVerifyCode } from '../_hooks/useVerifyCode';
+import {
+  useBiometricSignature,
+  useStartBiometricSignature,
+} from '../_hooks/useBiometricSignature';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import type { AuthUser } from '@/lib/store/types/auth-store.types';
-import type { DocumentDetail } from '../_requests';
+import type { BiometricSignatureSession, DocumentDetail } from '../_requests';
 import {
+  BiometricSignatureStatus,
   DocumentStatus,
   ParticipantRole,
   ParticipantStatus,
@@ -41,6 +46,7 @@ jest.mock('../_hooks/useRequestCancellation');
 jest.mock('../_hooks/useConfirmCancellation');
 jest.mock('../_hooks/useRequestVerificationCode');
 jest.mock('../_hooks/useVerifyCode');
+jest.mock('../_hooks/useBiometricSignature');
 jest.mock('../../_components/PdfPreview', () => ({
   __esModule: true,
   default: ({ file }: { file: string }) => <div>PDF preview: {file}</div>,
@@ -87,6 +93,8 @@ const mockedUseConfirmCancellation = useConfirmCancellation as jest.Mock;
 const mockedUseRequestVerificationCode =
   useRequestVerificationCode as jest.Mock;
 const mockedUseVerifyCode = useVerifyCode as jest.Mock;
+const mockedUseBiometricSignature = useBiometricSignature as jest.Mock;
+const mockedUseStartBiometricSignature = useStartBiometricSignature as jest.Mock;
 const mockedToast = toast as unknown as jest.Mock & {
   error: jest.Mock;
   success: jest.Mock;
@@ -213,6 +221,14 @@ describe('DocumentViewSection', () => {
       isPending: false,
     });
     mockedUseVerifyCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseBiometricSignature.mockReturnValue({
+      data: null,
+      isLoading: false,
+    });
+    mockedUseStartBiometricSignature.mockReturnValue({
       mutate: jest.fn(),
       isPending: false,
     });
@@ -1337,6 +1353,137 @@ describe('DocumentViewSection', () => {
       expect(
         screen.queryByText(/no se pudo cargar el documento/i),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('firma biométrica', () => {
+    const startMutate = jest.fn();
+
+    function biometricSession(
+      overrides: Partial<BiometricSignatureSession> = {},
+    ): BiometricSignatureSession {
+      return {
+        attemptId: 'attempt-1',
+        status: BiometricSignatureStatus.Pending,
+        url: 'https://verify.didit.me/session/abc',
+        expiresAt: null,
+        reused: false,
+        signatureCompleted: false,
+        documentCompleted: false,
+        ...overrides,
+      };
+    }
+
+    function renderBiometricSigner(session: BiometricSignatureSession | null) {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({
+          canSign: true,
+          canReject: true,
+          mySignatureType: SignatureType.BIOMETRIC,
+        }),
+        isLoading: false,
+        isError: false,
+      });
+      mockedUseBiometricSignature.mockReturnValue({
+        data: session,
+        isLoading: false,
+      });
+      return renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+    }
+
+    beforeEach(() => {
+      startMutate.mockReset();
+      mockedUseStartBiometricSignature.mockReturnValue({
+        mutate: startMutate,
+        isPending: false,
+      });
+    });
+
+    it('al firmante biométrico le ofrece "Firmar con biometría" en vez de "Continuar a firmar"', () => {
+      renderBiometricSigner(null);
+
+      expect(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /continuar a firmar/i }),
+      ).not.toBeInTheDocument();
+      expect(mockedUseBiometricSignature).toHaveBeenCalledWith('doc-1', {
+        enabled: true,
+      });
+    });
+
+    it('a un firmante de firma simple no le muestra la acción ni consulta Didit', () => {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({
+          canSign: true,
+          mySignatureType: SignatureType.Simple,
+        }),
+        isLoading: false,
+        isError: false,
+      });
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.queryByRole('button', { name: /firmar con biometría/i }),
+      ).not.toBeInTheDocument();
+      expect(mockedUseBiometricSignature).toHaveBeenCalledWith('doc-1', {
+        enabled: false,
+      });
+    });
+
+    it('pide la ubicación y con ella inicia la sesión de Didit', async () => {
+      const user = userEvent.setup();
+      renderBiometricSigner(null);
+
+      await user.click(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      );
+
+      await waitFor(() =>
+        expect(startMutate).toHaveBeenCalledWith(DEFAULT_COORDS),
+      );
+    });
+
+    it('sin ubicación no abre ninguna sesión', async () => {
+      mockGeolocationError(1);
+      const user = userEvent.setup();
+      renderBiometricSigner(null);
+
+      await user.click(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /no diste permiso de ubicación/i,
+      );
+      expect(startMutate).not.toHaveBeenCalled();
+    });
+
+    it('con una sesión abierta (p. ej. tras recargar) muestra el QR sin pedir otra', () => {
+      renderBiometricSigner(
+        biometricSession({ status: BiometricSignatureStatus.InProgress }),
+      );
+
+      expect(screen.getByText(/en proceso/i)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(/código qr para continuar la verificación/i),
+      ).toBeInTheDocument();
+      expect(startMutate).not.toHaveBeenCalled();
+    });
+
+    it('cuando el backend registra la firma, abre el acuse y vuelve a pedir el detalle', async () => {
+      renderBiometricSigner(
+        biometricSession({
+          status: BiometricSignatureStatus.Approved,
+          url: null,
+          signatureCompleted: true,
+          documentCompleted: true,
+        }),
+      );
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent(/documentos completados/i);
     });
   });
 });

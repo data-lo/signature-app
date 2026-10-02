@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import SignatureVerificationCard, {
   type SignatureVerificationProps,
 } from './SignatureVerificationCard';
+import BiometricSignaturePanel, {
+  type BiometricSigningProps,
+} from './BiometricSignaturePanel';
 
 export interface DocumentSigningProps {
   /** Motivo por el que la ubicación no pudo obtenerse; bloquea la firma hasta corregirlo. */
@@ -22,6 +25,11 @@ interface DocumentSignaturePanelProps {
   canReject: boolean;
   verification: SignatureVerificationProps;
   signing: DocumentSigningProps;
+  /**
+   * Sólo para un firmante con firma BIOMETRIC: reemplaza "Continuar a firmar" por el flujo de
+   * Didit. `undefined` para los demás tipos de firma.
+   */
+  biometric?: BiometricSigningProps;
   onRejectClick: () => void;
 }
 
@@ -52,6 +60,7 @@ export default function DocumentSignaturePanel({
   canReject,
   verification,
   signing,
+  biometric,
   onRejectClick,
 }: DocumentSignaturePanelProps) {
   return (
@@ -85,7 +94,15 @@ export default function DocumentSignaturePanel({
           <SignatureVerificationCard {...verification} />
         )}
 
-        {!requiresVerification && (
+        {/*
+          El código de verificación va ANTES también en la firma biométrica: el backend lo exige
+          para abrir la sesión de Didit, no sólo para registrar la firma.
+        */}
+        {!requiresVerification && biometric && (
+          <BiometricSignaturePanel {...biometric} />
+        )}
+
+        {!requiresVerification && !biometric && (
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted-foreground">
               Al confirmar, solicitaremos tu ubicación para registrarla como
