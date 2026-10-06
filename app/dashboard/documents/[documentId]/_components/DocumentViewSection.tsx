@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,8 +9,8 @@ import toast from 'react-hot-toast';
 import {
   useGeolocation,
   type GeolocationCoords,
-  type GeolocationErrorReason,
 } from '@/lib/hooks/useGeolocation';
+import { GEOLOCATION_ERROR_MESSAGES } from '@/lib/hooks/geolocation-error-messages';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { isSigningCredentialConfigured } from '@/lib/store/auth.slice';
 import { SignatureType } from '@/lib/enums/document';
@@ -24,6 +25,10 @@ import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode
 import { useVerifyCode } from '../_hooks/useVerifyCode';
 import { useShareDocumentLink } from '../_hooks/useShareDocumentLink';
 import {
+  useBiometricSignature,
+  useStartBiometricSignature,
+} from '../_hooks/useBiometricSignature';
+import {
   rejectDocumentSchema,
   type RejectDocumentFormValues,
 } from '../_schemas';
@@ -31,13 +36,6 @@ import type { SignDocumentResponseData } from '../_requests';
 import { DOCUMENTS_SECTIONS } from '../../_config/sections';
 import DocumentView from './DocumentView';
 import type { AdvancedSignatureSubmitValues } from './AdvancedSignatureDialog';
-
-const GEOLOCATION_ERROR_MESSAGES: Record<GeolocationErrorReason, string> = {
-  unsupported: 'tu navegador no permite compartir ubicación aquí',
-  'permission-denied': 'no diste permiso de ubicación',
-  'position-unavailable': 'no se pudo determinar tu ubicación',
-  timeout: 'se agotó el tiempo de espera para obtener tu ubicación',
-};
 
 interface DocumentViewSectionProps {
   documentId: string;
@@ -120,6 +118,21 @@ export default function DocumentViewSection({
     useRequestVerificationCode(documentId);
   const verifyCodeMutation = useVerifyCode(documentId);
   const shareLink = useShareDocumentLink(documentId);
+  const queryClient = useQueryClient();
+
+  /**
+   * Firmante con firma BIOMETRIC que todavía puede firmar: sólo a él se le muestra "Firmar con
+   * biometría" y sólo para él se consulta el estado de Didit.
+   */
+  const isBiometricSigner =
+    document?.mySignatureType === SignatureType.BIOMETRIC &&
+    Boolean(document?.canSign);
+  const biometricSignature = useBiometricSignature(documentId, {
+    enabled: isBiometricSigner,
+  });
+  const startBiometricSignature = useStartBiometricSignature(documentId);
+  /** Intento cuyo acuse ya se mostró: el sondeo puede traer la misma firma más de una vez. */
+  const acknowledgedBiometricAttemptRef = useRef<string | null>(null);
 
   const {
     register,
@@ -190,6 +203,17 @@ export default function DocumentViewSection({
     router.push(DOCUMENTS_SECTIONS.list.href);
   }
 
+  /**
+   * Firma biométrica: la ubicación se pide ANTES de abrir la sesión de Didit, igual que en las
+   * otras firmas, para que el firmante no haga la prueba de vida y se tope al final con el bloqueo.
+   */
+  async function handleStartBiometricSignature() {
+    const coords = await resolveRequiredLocation();
+    if (!coords) return;
+
+    startBiometricSignature.mutate(coords);
+  }
+
   function handleAdvancedSignatureSubmit(
     values: AdvancedSignatureSubmitValues,
   ) {
@@ -235,6 +259,31 @@ export default function DocumentViewSection({
     user != null &&
     !isSigningCredentialConfigured(user.signingCredentialStatus);
 
+  /**
+   * La firma biométrica se registra en el backend al llegar el webhook de Didit, no en respuesta a
+   * un clic: el sondeo es quien se entera. En ese momento se hace lo mismo que al terminar
+   * `useSignDocument` —refrescar el detalle, la URL del archivo y los listados— y se abre el mismo
+   * acuse de firma.
+   */
+  const biometricSession = biometricSignature.data;
+  useEffect(() => {
+    if (!biometricSession?.signatureCompleted) return;
+    if (acknowledgedBiometricAttemptRef.current === biometricSession.attemptId) {
+      return;
+    }
+
+    acknowledgedBiometricAttemptRef.current = biometricSession.attemptId;
+    setSignatureOutcome({
+      id: documentId,
+      documentCompleted: biometricSession.documentCompleted,
+    });
+    queryClient.invalidateQueries({ queryKey: ['documentDetail', documentId] });
+    queryClient.invalidateQueries({
+      queryKey: ['documentFileUrl', documentId],
+    });
+    queryClient.invalidateQueries({ queryKey: ['documents'] });
+  }, [biometricSession, documentId, queryClient]);
+
   // Alcance: solo firma simple. Bloquea también la lectura del documento (no solo
   // los botones de firma) porque el usuario puede llegar por URL directa (ej.
   // /documents/:id) sin haber pasado antes por una pantalla que ya lo avisara.
@@ -263,6 +312,19 @@ export default function DocumentViewSection({
         isSigning: signMutation.isPending,
         onSign: handleSignClick,
       }}
+      biometric={
+        isBiometricSigner
+          ? {
+              session: biometricSession ?? null,
+              isLoading: biometricSignature.isLoading,
+              geoBlockedReason,
+              isRequestingLocation: geoStatus === 'requesting',
+              isStarting: startBiometricSignature.isPending,
+              onStart: () => void handleStartBiometricSignature(),
+              verificationScope: 'identity',
+            }
+          : undefined
+      }
       verification={{
         codeRequested,
         codeEmailDelivered,

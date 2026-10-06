@@ -18,6 +18,7 @@ import DocumentPreviewPanel from './DocumentPreviewPanel';
 import DocumentSignaturePanel, {
   type DocumentSigningProps,
 } from './DocumentSignaturePanel';
+import type { BiometricSigningProps } from '@/components/biometric-signature/BiometricSignaturePanel';
 import DocumentStatusNotices from './DocumentStatusNotices';
 import DocumentSummaryCard from './DocumentSummaryCard';
 import RejectDocumentForm from './RejectDocumentForm';
@@ -53,6 +54,8 @@ export interface DocumentViewProps {
 
   needsSimpleSignatureSetup: boolean;
   signing: DocumentSigningProps;
+  /** Flujo de Didit; sólo para un firmante con firma BIOMETRIC (ver `DocumentSignaturePanel`). */
+  biometric?: BiometricSigningProps;
   verification: SignatureVerificationProps;
 
   reject: {
@@ -117,6 +120,7 @@ export default function DocumentView({
   file,
   needsSimpleSignatureSetup,
   signing,
+  biometric,
   verification,
   reject,
   share,
@@ -205,6 +209,7 @@ export default function DocumentView({
             canReject={document.canReject}
             verification={verification}
             signing={signing}
+            biometric={biometric}
             onRejectClick={reject.onOpenForm}
           />
         )}

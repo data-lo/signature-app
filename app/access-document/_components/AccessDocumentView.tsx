@@ -9,6 +9,7 @@ import {
   setPendingSignatureContext,
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
+import { checkGuestInvitationRequest } from '@/app/(public)/public/documents/[id]/biometric-signature/_requests';
 
 interface AccessDocumentViewProps {
   documentId: string | null;
@@ -28,6 +29,11 @@ interface AccessDocumentViewProps {
  * `findDetailForUser` vinculara la cuenta como efecto secundario de esa misma lectura (GET) — es
  * decir, el documento quedaba asociado/listado por una simple vista, no por una acción explícita
  * de sesión. Ahora la vinculación se dispara aquí mismo, de forma explícita, antes de redirigir.
+ *
+ * Firma biométrica sin cuenta: si no hay sesión y la invitación es de un firmante biométrico sin
+ * cuenta, no se manda a /login sino a la pantalla pública de firma del invitado, que valida la
+ * posesión del correo con un código. Ante cualquier duda (error de red, respuesta negativa) se cae
+ * al /login de siempre.
  */
 export default function AccessDocumentView({
   documentId,
@@ -46,12 +52,40 @@ export default function AccessDocumentView({
       email: email ?? '',
     });
 
-    if (!getAuthToken()) {
-      router.replace('/login');
-      return;
-    }
-
     let cancelled = false;
+
+    if (!getAuthToken()) {
+      (async () => {
+        let guestBiometric = false;
+        try {
+          guestBiometric = await checkGuestInvitationRequest(documentId, {
+            collaboratorId,
+            email: email ?? '',
+          });
+        } catch {
+          guestBiometric = false;
+        }
+        if (cancelled) return;
+
+        if (guestBiometric) {
+          // El invitado no pasa por /login: el contexto de vinculación no le sirve.
+          clearPendingSignatureContext();
+          const query = new URLSearchParams({
+            collabId: collaboratorId,
+            email: email ?? '',
+          });
+          router.replace(
+            `/public/documents/${documentId}/biometric-signature?${query.toString()}`,
+          );
+          return;
+        }
+        router.replace('/login');
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }
 
     (async () => {
       try {
