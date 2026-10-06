@@ -102,8 +102,15 @@ export default function DocumentViewSection({
     isLoading: isFileUrlLoading,
     isError: isFileUrlError,
     isFetching: isFileUrlFetching,
+    isStale: isFileUrlStale,
     refetch: refetchFileUrl,
   } = useDocumentFileUrl(documentId);
+  /**
+   * La URL en caché ya no sirve (entró en el margen de vencimiento o una mutación la invalidó) y
+   * está llegando la nueva. Mientras tanto el visor espera en vez de empezar a descargar el PDF
+   * con la vieja: la bajaría dos veces, o —si ya venció— mostraría un error que se arregla solo.
+   */
+  const isFileUrlRenewing = isFileUrlStale && isFileUrlFetching;
   const signMutation = useSignDocument(documentId);
   const { status: geoStatus, requestLocation } = useGeolocation();
   const rejectMutation = useRejectDocument(documentId);
@@ -243,8 +250,8 @@ export default function DocumentViewSection({
       loadError={documentError ? toDocumentLoadErrorKind(documentError) : null}
       document={document ?? null}
       file={{
-        url: fileUrl?.secureUrl ?? null,
-        isLoading: isFileUrlLoading,
+        url: isFileUrlRenewing ? null : (fileUrl?.secureUrl ?? null),
+        isLoading: isFileUrlLoading || isFileUrlRenewing,
         isError: isFileUrlError,
         isRetrying: isFileUrlFetching,
         onRetry: () => void refetchFileUrl(),
