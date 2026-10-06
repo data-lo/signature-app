@@ -17,7 +17,7 @@ import type {
  * documentos" el tipo es uno solo por documento, así que "firmas distintas" no es un estado
  * alcanzable. El backend rechaza el payload si este campo contradice a `documentData.signatureType`.
  */
-export type RequiresDifferentSignatures = 'SIMPLE' | 'FIEL';
+export type RequiresDifferentSignatures = 'SIMPLE' | 'FIEL' | 'BIOMETRIC';
 
 /** Forma exacta que espera el backend por cada ubicación de firma (ver SignaturePositionDto). */
 export interface SignaturePositionPayload {

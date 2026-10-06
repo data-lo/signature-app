@@ -5,6 +5,7 @@ import { FormSelect } from '@/components/form/form-select';
 import { FormCheckbox } from '@/components/form/form-checkbox';
 import SigningCredentialWarning from '@/components/signing/SigningCredentialWarning';
 import { useSigningCredential } from '@/lib/hooks/useSigningCredential';
+import { useCanPerform } from '@/lib/hooks/useBillingAccess';
 import {
   SIGNATURE_TYPE_DESCRIPTIONS,
   SIGNATURE_TYPE_OPTIONS,
@@ -28,9 +29,14 @@ const SIMPLE_SIGNATURE_WARNING =
  * firmante: al ser una sola decisión del documento, la combinación de tipos entre firmantes —un
  * tercer flujo mixto que ningún proceso de firma implementa— deja de ser expresable.
  *
- * Las dos opciones están siempre disponibles, incluso sin credencial configurada: elegir firma
+ * Simple y Avanzada están siempre disponibles, incluso sin credencial configurada: elegir firma
  * Simple es una decisión sobre cómo firmarán los participantes, no sobre lo que el creador puede
  * hacer hoy.
+ *
+ * Biométrica depende del plan (`graphSignatureBiometrics`) y no se ofrece si la cuenta activa no
+ * la tiene, ni mientras su estado comercial no ha llegado (`useCanPerform` responde `false`). El
+ * backend lo vuelve a comprobar al crear. Como Avanzada, deja elegir si se pide el código de
+ * seguridad.
  */
 export default function SignatureTypeField({
   control,
@@ -39,6 +45,10 @@ export default function SignatureTypeField({
 }) {
   const signatureType = useWatch({ control, name: 'signatureType' });
   const { isLoading, canSignWithSimpleSignature } = useSigningCredential();
+  const canUseBiometric = useCanPerform('graphSignatureBiometrics');
+  const options = canUseBiometric
+    ? SIGNATURE_TYPE_OPTIONS
+    : SIGNATURE_TYPE_OPTIONS.filter((option) => option.value !== 'BIOMETRIC');
 
   /**
    * Mientras el perfil no llega no se afirma nada: mostrar el aviso "por si acaso" se lo pondría
@@ -55,7 +65,7 @@ export default function SignatureTypeField({
         name="signatureType"
         id="signatureType"
         label="Tipo de firma"
-        options={SIGNATURE_TYPE_OPTIONS}
+        options={options}
         placeholder="Selecciona una opción"
         description={
           signatureType
@@ -69,7 +79,7 @@ export default function SignatureTypeField({
           actionLabel="Configura aquí."
         />
       )}
-      {signatureType === 'ADVANCED' && (
+      {(signatureType === 'ADVANCED' || signatureType === 'BIOMETRIC') && (
         <FormCheckbox
           control={control}
           name="requiresTwoFactorAuth"
