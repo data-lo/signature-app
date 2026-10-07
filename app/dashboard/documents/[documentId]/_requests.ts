@@ -1,4 +1,5 @@
 import apiClient from '@/lib/axios';
+import type { BiometricSignatureSession } from '@/lib/biometric-signature';
 import {
   DocumentStatus,
   ParticipantRole,
@@ -220,4 +221,62 @@ export async function confirmCancellationRequest(
   documentId: string,
 ): Promise<void> {
   await apiClient.patch(`/api/v1/document/${documentId}/confirm-cancellation`);
+}
+
+export type { BiometricSignatureSession } from '@/lib/biometric-signature';
+
+/**
+ * Inicia —o retoma, si ya hay una abierta— la firma biométrica del usuario autenticado
+ * (Biometric Authentication de Didit contra su identidad verificada).
+ *
+ * La ubicación se manda aquí porque la firma se registra después, desde el webhook de Didit,
+ * cuando ya no hay navegador al que pedírsela. `biometricConsent` sólo se manda en `true`: la
+ * pantalla no deja iniciar sin el consentimiento marcado.
+ *
+ * @param documentId - Documento a firmar.
+ * @param geolocation - Ubicación del dispositivo, obligatoria como evidencia de la firma.
+ * @returns La sesión con la URL de Didit.
+ *
+ * @throws {AxiosError} 400 si el documento no admite la firma, 403 si no es su turno o no tiene
+ *   identidad verificada, 422 si su identidad no tiene imagen del rostro, 502 si Didit falló.
+ *
+ * @example
+ * ```ts
+ * const session = await startBiometricSignatureRequest('doc-1', { latitude: 19.4, longitude: -99.1 });
+ * ```
+ */
+export async function startBiometricSignatureRequest(
+  documentId: string,
+  geolocation: SignDocumentGeolocation,
+): Promise<BiometricSignatureSession> {
+  const { data } = await apiClient.post<BiometricSignatureSession>(
+    `/api/v1/documents/${documentId}/biometric-signature/session`,
+    { geolocation, biometricConsent: true },
+  );
+
+  return data;
+}
+
+/**
+ * Estado del último intento de firma biométrica del usuario sobre el documento.
+ *
+ * @param documentId - Documento consultado.
+ * @returns La sesión del último intento, o `null` si nunca inició una.
+ *
+ * @throws {AxiosError} 403 si el usuario no es firmante del documento.
+ *
+ * @example
+ * ```ts
+ * const session = await getBiometricSignatureRequest('doc-1');
+ * ```
+ */
+export async function getBiometricSignatureRequest(
+  documentId: string,
+): Promise<BiometricSignatureSession | null> {
+  const { data } = await apiClient.get<BiometricSignatureSession | ''>(
+    `/api/v1/documents/${documentId}/biometric-signature/session`,
+  );
+
+  // Nest responde `null` como cuerpo vacío: sin intento previo llega `''`, no `null`.
+  return data || null;
 }

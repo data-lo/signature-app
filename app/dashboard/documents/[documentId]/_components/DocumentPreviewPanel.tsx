@@ -15,6 +15,7 @@ interface DocumentPreviewPanelProps {
   isLoading: boolean;
   isError: boolean;
   isRetrying: boolean;
+  /** Pide una URL nueva: sirve tanto si falló la URL como si falló la descarga del PDF con ella. */
   onRetry: () => void;
   /** Cubre el visor cuando la firma simple no está configurada (se llega por ruta directa). */
   isBlocked: boolean;
@@ -54,7 +55,7 @@ export default function DocumentPreviewPanel({
               </Button>
             </div>
           ) : (
-            <PdfPreview file={fileUrl} />
+            <PdfPreview file={fileUrl} onRefreshFile={onRetry} />
           )}
         </CardContent>
       </Card>
