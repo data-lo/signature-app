@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,10 +36,14 @@ import {
 } from '@/components/data-table/data-table-body-state';
 import { DataTableDate } from '@/components/data-table/data-table-date';
 import {
-  StatusDot,
   StatusIndicator,
   type StatusTone,
 } from '@/components/data-table/status-indicator';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import DocumentRowActions from './DocumentRowActions';
 import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
@@ -148,7 +153,36 @@ const STATUS_TONE: Record<DocumentStatus, StatusTone> = {
 };
 
 /** Columnas de la tabla; lo usan las filas de estado para ocupar todo el ancho. */
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 9;
+
+/**
+ * Consecutivo de un documento dentro del listado completo, contando desde 1.
+ *
+ * Es la columna "Índice" (historia "Ajustar columnas de la tabla de documentos"). El listado no
+ * trae un folio propio del documento, y el cambio es sólo de frontend, así que el índice es la
+ * posición de la fila en el orden que devuelve el backend, continua entre páginas: la primera
+ * fila de la página 2 con 10 por página es la 11, no otra vez la 1.
+ *
+ * @param page - Página actual, desde 1.
+ * @param pageSize - Documentos por página.
+ * @param rowIndex - Posición de la fila dentro de la página, desde 0.
+ * @returns El consecutivo de la fila en el listado.
+ *
+ * @throws Nada: es aritmética.
+ *
+ * @example
+ * ```ts
+ * documentRowIndex(2, 10, 0); // 11
+ * documentRowIndex(1, 25, 4); // 5
+ * ```
+ */
+export function documentRowIndex(
+  page: number,
+  pageSize: number,
+  rowIndex: number,
+): number {
+  return (Math.max(page, 1) - 1) * pageSize + rowIndex + 1;
+}
 
 /** Lo que dice la tabla cuando la consulta respondió sin documentos. */
 export const EMPTY_DOCUMENTS_MESSAGE = 'No hay documentos para mostrar.';
@@ -276,6 +310,7 @@ export default function DocumentsTable({
       <DataTableCard data-slot="documents-table-card">
         <Table aria-busy={bodyState === 'loading' || undefined}>
           <DataTableHeader>
+            <TableHead className="w-16">Índice</TableHead>
             <TableHead>
               <SortableHeader>Documento</SortableHeader>
             </TableHead>
@@ -308,7 +343,7 @@ export default function DocumentsTable({
                 {emptyState ?? EMPTY_DOCUMENTS_MESSAGE}
               </DataTableStateRow>
             )}
-            {visibleDocuments.map((doc) => {
+            {visibleDocuments.map((doc, rowIndex) => {
               const isDownloading =
                 downloadMutation.isPending &&
                 downloadMutation.variables === doc.id;
@@ -351,24 +386,25 @@ export default function DocumentsTable({
                   className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
                   onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
                 >
+                  <TableCell className="w-16 whitespace-nowrap tabular-nums text-muted-foreground">
+                    {documentRowIndex(page, pageSize, rowIndex)}
+                  </TableCell>
                   {/* Ancho fijo (`w-64 max-w-64`) en todas las resoluciones: el nombre se recorta
                     dentro de él en una sola línea y el completo va en el tooltip (ver
                     `DocumentFileName`), así la columna y la altura de la fila no dependen de lo
                     largo que sea. En pantallas angostas la tabla se desplaza en horizontal. */}
+                  {/* Sólo la información del archivo: el estatus ya tiene su propia columna, y el
+                    punto de color que lo repetía aquí se quitó (historia "Ajustar columnas de la
+                    tabla de documentos"). */}
                   <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <StatusDot tone={STATUS_TONE[doc.status]} />
-                      {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
-                        alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
-                        sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
-                        `tr` no es un control) sin dejar fuera al teclado. */}
-                      <span className="min-w-0 flex-1">
-                        <DocumentFileName
-                          fileName={doc.fileName}
-                          interactive={Boolean(onRowSelect)}
-                        />
-                      </span>
-                    </div>
+                    {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
+                      alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
+                      sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
+                      `tr` no es un control) sin dejar fuera al teclado. */}
+                    <DocumentFileName
+                      fileName={doc.fileName}
+                      interactive={Boolean(onRowSelect)}
+                    />
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
@@ -420,6 +456,27 @@ export default function DocumentsTable({
                       className="flex items-center justify-end gap-1"
                       onClick={(event) => event.stopPropagation()}
                     >
+                      {/* Visualizar es la acción explícita de abrir el documento: lleva al mismo
+                        detalle con visor que la fila, pero como un control con nombre propio
+                        ("Ver documento …"), visible sin descubrir que la fila es clicable. El
+                        `stopPropagation` de este contenedor evita que también lo active la fila. */}
+                      {onRowSelect && (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`Ver documento ${doc.fileName}`}
+                                onClick={() => onRowSelect(doc.id)}
+                              />
+                            }
+                          >
+                            <Eye className="size-4" />
+                          </TooltipTrigger>
+                          <TooltipContent>Ver documento</TooltipContent>
+                        </Tooltip>
+                      )}
                       <DocumentRowActions
                         isDownloading={isDownloading}
                         onDownload={() => downloadMutation.mutate(doc.id)}
