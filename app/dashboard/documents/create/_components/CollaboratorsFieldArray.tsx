@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   useController,
   useFieldArray,
   useWatch,
   type Control,
 } from 'react-hook-form';
-import { UserPlus, Eye } from 'lucide-react';
+import { BookUser, UserPlus, Eye } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import CollaboratorFormItem from './CollaboratorFormItem';
+import DirectoryContactsDialog from './DirectoryContactsDialog';
 import SortableCollaboratorItem from './SortableCollaboratorItem';
 import { resolveSelfSignerSync } from '../_mappers/self-signer.mapper';
 import {
@@ -54,6 +55,8 @@ export default function CollaboratorsFieldArray({
     name: 'collaborators',
   });
   const requiresOrder = useWatch({ control, name: 'requiresOrder' });
+  // Modal del Directorio: por ahora sólo se abre y se cierra, no agrega participantes.
+  const [isDirectoryOpen, setIsDirectoryOpen] = useState(false);
 
   // "Incluirme como firmante" se gobierna desde acá porque este componente es el dueño del
   // arreglo: es el único que puede dar de alta y de baja tarjetas sin desincronizar el
@@ -139,8 +142,22 @@ export default function CollaboratorsFieldArray({
             <Eye className="size-3.5" />
             Testigo
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsDirectoryOpen(true)}
+          >
+            <BookUser className="size-3.5" />
+            Directorio
+          </Button>
         </div>
       </div>
+
+      <DirectoryContactsDialog
+        open={isDirectoryOpen}
+        onOpenChange={setIsDirectoryOpen}
+      />
 
       {fields.length === 0 && (
         <p className="text-sm text-muted-foreground">
