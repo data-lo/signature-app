@@ -49,7 +49,10 @@ export async function createDocumentSignaturesRequest({
         ? ({ loaded, total }) => {
             // `total` falta cuando el navegador no conoce el tamaño del cuerpo: sin él no hay
             // porcentaje honesto y se deja el que se informó último.
-            if (total) onUploadProgress(Math.min(100, Math.round((loaded / total) * 100)));
+            if (total)
+              onUploadProgress(
+                Math.min(100, Math.round((loaded / total) * 100)),
+              );
           }
         : undefined,
     },
@@ -95,6 +98,49 @@ export async function getDocumentApproversRequest(): Promise<
     message: string;
     data: DocumentApprover[];
   }>('/api/v1/documents/approvers');
+
+  return data.data;
+}
+
+/**
+ * Un contacto del Directorio de la cuenta activa, tal como lo publica
+ * `GET /api/v1/directory-contacts`.
+ */
+export interface DirectoryContact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  /** Normalizado por el backend (recortado y en minúsculas). */
+  email: string;
+  /**
+   * Usuario de la plataforma vinculado; es lo que viaja como `linkedUserId` al elegirlo como
+   * colaborador. `null` si el contacto es externo: entonces se agrega como captura manual.
+   */
+  linkedUserId: string | null;
+}
+
+/**
+ * Busca contactos del Directorio de la cuenta activa (la del `X-Account-Id` que agrega
+ * `apiClient`) por fragmento del correo, sin distinguir mayúsculas.
+ *
+ * @param email - Fragmento del correo; el backend lo exige no vacío.
+ * @returns Los contactos que coinciden (hasta 25), por apellido y nombre.
+ *
+ * @throws {AxiosError} 400 si el fragmento está vacío; 403 si la cuenta activa no es del usuario.
+ *
+ * @example
+ * ```ts
+ * const contacts = await searchDirectoryContactsRequest('garcia');
+ * ```
+ */
+export async function searchDirectoryContactsRequest(
+  email: string,
+): Promise<DirectoryContact[]> {
+  const { data } = await apiClient.get<{
+    success: boolean;
+    message: string;
+    data: DirectoryContact[];
+  }>('/api/v1/directory-contacts', { params: { email } });
 
   return data.data;
 }
