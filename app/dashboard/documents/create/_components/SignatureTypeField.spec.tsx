@@ -1,10 +1,36 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 import SignatureTypeField from './SignatureTypeField';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { SigningCredentialStatus } from '@/lib/enums/identity';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 import type { AuthUser } from '@/lib/store/types/auth-store.types';
+import { buildBillingAccess } from '@/lib/api/billing.fixtures';
+import type { DocumentSignatureType } from '../_schemas';
+
+const ACCOUNT_ID = 'account-1';
+
+/** Deja en el store la cuenta activa con su estado comercial, como lo hace `useBillingAccess`. */
+function setBiometricPlan(graphSignatureBiometrics: boolean) {
+  useAuthStore.setState({
+    activeAccount: { id: ACCOUNT_ID } as never,
+    billingByAccountId: {
+      [ACCOUNT_ID]: buildBillingAccess({
+        actions: { graphSignatureBiometrics },
+      }),
+    },
+  });
+}
+
+/**
+ * Abre el selector con el teclado: jsdom no dispara los PointerEvent con los que @base-ui/react
+ * abre el Select con click (ver `form-select.spec.tsx`).
+ */
+async function openSelect(user: ReturnType<typeof userEvent.setup>) {
+  screen.getByRole('combobox').focus();
+  await user.keyboard('{Enter}');
+}
 
 const WARNING =
   'Para firmar documentos es necesario configurar tu identidad y firma.';
@@ -26,7 +52,7 @@ function buildUser(overrides: Partial<AuthUser> = {}): AuthUser {
 function Harness({
   signatureType,
 }: {
-  signatureType?: 'SIMPLE' | 'ADVANCED';
+  signatureType?: DocumentSignatureType;
 }) {
   const { control } = useForm<CreateDocumentSignaturesFormValues>({
     defaultValues: { signatureType } as never,
@@ -37,7 +63,11 @@ function Harness({
 
 describe('SignatureTypeField', () => {
   beforeEach(() => {
-    useAuthStore.setState({ user: null });
+    useAuthStore.setState({
+      user: null,
+      activeAccount: null,
+      billingByAccountId: {},
+    });
   });
 
   it('con firma Simple y credencial sin configurar, avisa y ofrece ir a configurarla', () => {
@@ -103,5 +133,77 @@ describe('SignatureTypeField', () => {
     render(<Harness signatureType="SIMPLE" />);
 
     expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
+  });
+
+  describe('firma biométrica', () => {
+    it('se ofrece junto a las demás cuando el plan incluye graphSignatureBiometrics', async () => {
+      const user = userEvent.setup();
+      setBiometricPlan(true);
+
+      render(<Harness />);
+      await openSelect(user);
+
+      expect(
+        await screen.findByRole('option', { name: 'Firma Biométrica' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('option', { name: 'Firma Grafo' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('option', {
+          name: 'Firma Electrónica Avanzada (e.firma)',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it('no se ofrece cuando el plan no la incluye, y las demás siguen', async () => {
+      const user = userEvent.setup();
+      setBiometricPlan(false);
+
+      render(<Harness />);
+      await openSelect(user);
+
+      expect(
+        await screen.findByRole('option', { name: 'Firma Grafo' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('option', { name: 'Firma Biométrica' }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** Ante la duda no se ofrece: el backend la rechazaría si el plan no la tuviera. */
+    it('no se ofrece mientras el estado comercial no ha llegado', async () => {
+      const user = userEvent.setup();
+
+      render(<Harness />);
+      await openSelect(user);
+
+      expect(
+        await screen.findByRole('option', { name: 'Firma Grafo' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('option', { name: 'Firma Biométrica' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('elegida, describe el flujo y ofrece el código de seguridad', () => {
+      setBiometricPlan(true);
+
+      render(<Harness signatureType="BIOMETRIC" />);
+
+      expect(
+        screen.getByText(/prueba de vida y reconocimiento facial/),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Código de seguridad')).toBeInTheDocument();
+    });
+
+    it('elegida, no muestra el aviso de la credencial de firma Grafo', () => {
+      useAuthStore.setState({ user: buildUser() });
+      setBiometricPlan(true);
+
+      render(<Harness signatureType="BIOMETRIC" />);
+
+      expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
+    });
   });
 });

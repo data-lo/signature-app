@@ -34,6 +34,7 @@ describe('toRequiresDifferentSignatures', () => {
   it('traduce el tipo del documento al vocabulario del backend', () => {
     expect(toRequiresDifferentSignatures('SIMPLE')).toBe('SIMPLE');
     expect(toRequiresDifferentSignatures('ADVANCED')).toBe('FIEL');
+    expect(toRequiresDifferentSignatures('BIOMETRIC')).toBe('BIOMETRIC');
   });
 });
 
@@ -98,6 +99,12 @@ describe('toCollaboratorPayload', () => {
       0,
       false,
     );
+
+    expect(payload.requiresTwoFactorAuth).toBe(false);
+  });
+
+  it('un documento BIOMETRIC aplica la configuración única de requiresTwoFactorAuth', () => {
+    const payload = toCollaboratorPayload(signer(), 'BIOMETRIC', 0, false);
 
     expect(payload.requiresTwoFactorAuth).toBe(false);
   });

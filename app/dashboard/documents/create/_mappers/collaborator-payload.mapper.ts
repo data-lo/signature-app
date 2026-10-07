@@ -18,18 +18,25 @@ import type {
  * Traduce el tipo de firma del documento al vocabulario del dominio del backend. Ya no se calcula
  * recorriendo a los firmantes (ni existe el resultado `MIX`): desde la historia "Selección de tipo
  * de firma al crear documentos" el tipo es una sola decisión del documento, así que esto es una
- * conversión de nombre, no una agregación.
+ * conversión de nombre, no una agregación. Sólo `ADVANCED` cambia de nombre (`FIEL`).
+ *
+ * @param signatureType - Tipo de firma elegido para el documento.
+ * @returns El mismo tipo con el vocabulario del dominio del backend.
+ *
+ * @example
+ * toRequiresDifferentSignatures('ADVANCED'); // 'FIEL'
+ * toRequiresDifferentSignatures('BIOMETRIC'); // 'BIOMETRIC'
  */
 export function toRequiresDifferentSignatures(
   signatureType: DocumentSignatureType,
 ): RequiresDifferentSignatures {
-  return signatureType === 'ADVANCED' ? 'FIEL' : 'SIMPLE';
+  return signatureType === 'ADVANCED' ? 'FIEL' : signatureType;
 }
 
 /**
  * Refuerza acá (no solo en el esquema de Zod) la regla de la historia: con firma simple siempre se
- * manda requiresTwoFactorAuth=true "oculto". En firma avanzada, la configuración única del
- * documento se aplica a todos los firmantes.
+ * manda requiresTwoFactorAuth=true "oculto". En firma avanzada y biométrica, la configuración
+ * única del documento se aplica a todos los firmantes.
  *
  * Un firmante nunca lleva `taxId`: el flujo avanzado obtiene ese dato del certificado de e.firma
  * al firmar (ver historia "Selección de tipo de firma al crear documentos"), y el simple nunca lo

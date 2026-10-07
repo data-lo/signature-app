@@ -1,13 +1,17 @@
 import { z } from 'zod';
 
 /**
- * Los dos únicos flujos de firma que admite un documento (ver historia "Selección de tipo de
- * firma al crear documentos"). Es una decisión del documento completo, no de cada firmante: antes
+ * Los flujos de firma que admite un documento (ver historia "Selección de tipo de firma al crear
+ * documentos"; `BIOMETRIC` desde "Mostrar firma biométrica en las opciones de tipo de firma"). Es una decisión del documento completo, no de cada firmante: antes
  * cada SIGNER traía su propio `signatureType` y la combinación producía un tercer flujo mixto
  * (`MIX`) que ningún proceso de firma implementa realmente — con el tipo acá arriba, esa
  * configuración inválida deja de existir por construcción.
  */
-export const DOCUMENT_SIGNATURE_TYPES = ['SIMPLE', 'ADVANCED'] as const;
+export const DOCUMENT_SIGNATURE_TYPES = [
+  'SIMPLE',
+  'ADVANCED',
+  'BIOMETRIC',
+] as const;
 
 export type DocumentSignatureType = (typeof DOCUMENT_SIGNATURE_TYPES)[number];
 
