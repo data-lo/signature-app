@@ -34,6 +34,20 @@ describe('hasPermission', () => {
   it('sin permisos no concede nada', () => {
     expect(hasPermission([], 'DOCUMENT.READ_OWN')).toBe(false);
   });
+
+  /**
+   * Cada acción del Directorio se muestra con su propio permiso: poder consultar contactos no
+   * habilita crear, editar ni archivar, y un MEMBER de fábrica no consulta el directorio.
+   */
+  it('decide cada acción del directorio por separado', () => {
+    const readOnly: PermissionKey[] = ['DIRECTORY.READ'];
+
+    expect(hasPermission(readOnly, 'DIRECTORY.READ')).toBe(true);
+    expect(hasPermission(readOnly, 'DIRECTORY.CREATE')).toBe(false);
+    expect(hasPermission(readOnly, 'DIRECTORY.UPDATE')).toBe(false);
+    expect(hasPermission(readOnly, 'DIRECTORY.DELETE')).toBe(false);
+    expect(hasPermission(MEMBER_PERMISSIONS, 'DIRECTORY.READ')).toBe(false);
+  });
 });
 
 describe('hasAnyPermission', () => {
