@@ -8,8 +8,18 @@ import {
   emptySigner,
   type CreateDocumentSignaturesFormValues,
 } from '../_schemas';
+import {
+  searchDirectoryContactsRequest,
+  type DirectoryContact,
+} from '../_requests';
 
 jest.mock('@/lib/hooks/useCurrentUser');
+jest.mock('../_requests', () => ({
+  ...jest.requireActual('../_requests'),
+  searchDirectoryContactsRequest: jest.fn(),
+}));
+
+const mockedSearchDirectory = searchDirectoryContactsRequest as jest.Mock;
 
 const mockedUseCurrentUser = useCurrentUser as jest.MockedFunction<
   typeof useCurrentUser
@@ -274,7 +284,7 @@ describe('CollaboratorsFieldArray · Directorio', () => {
     }
   });
 
-  it('el checkbox se marca y desmarca de forma visual', async () => {
+  it('el checkbox se marca y desmarca', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness signerCount={1} requiresOrder={false} />);
     const [checkbox] = addToDirectoryCheckboxes();
@@ -294,5 +304,79 @@ describe('CollaboratorsFieldArray · Directorio', () => {
 
     await waitFor(() => expect(selfCards()).toHaveLength(1));
     expect(addToDirectoryCheckboxes()).toHaveLength(0);
+  });
+});
+
+/**
+ * Historia "Enviar colaboradores desde Directorio mediante usuario vinculado al crear un
+ * documento": elegir un contacto en el modal agrega su tarjeta.
+ */
+describe('CollaboratorsFieldArray · elegir del Directorio', () => {
+  const ANA: DirectoryContact = {
+    id: 'contact-1',
+    firstName: 'Ana',
+    lastName: 'García',
+    email: 'ana@example.com',
+    linkedUserId: 'user-ana',
+  };
+
+  async function pickFromDirectory(
+    contact: DirectoryContact,
+    role: 'firmante' | 'testigo',
+  ) {
+    mockedSearchDirectory.mockResolvedValue([contact]);
+    const user = userEvent.setup();
+    renderWithProviders(<Harness signerCount={0} requiresOrder={false} />);
+
+    await user.click(screen.getByRole('button', { name: 'Directorio' }));
+    await user.type(
+      await screen.findByRole('searchbox', { name: /buscar contacto/i }),
+      'ana',
+    );
+    await user.click(
+      await screen.findByRole('button', {
+        name: new RegExp(`como ${role}`, 'i'),
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  }
+
+  it('un contacto con usuario vinculado se agrega como firmante del Directorio, en solo lectura', async () => {
+    await pickFromDirectory(ANA, 'firmante');
+
+    expect(
+      screen.getByText('Firmante', { selector: 'span' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Directorio', { selector: 'span' }),
+    ).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Ana')).toBeDisabled();
+    expect(screen.getByDisplayValue('ana@example.com')).toBeDisabled();
+    expect(
+      screen.queryByRole('checkbox', { name: /agregar al directorio/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('como testigo del Directorio no pide RFC', async () => {
+    await pickFromDirectory(ANA, 'testigo');
+
+    expect(
+      screen.getByText('Testigo', { selector: 'span' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/rfc/i)).not.toBeInTheDocument();
+  });
+
+  it('un contacto sin usuario vinculado se agrega como captura manual editable', async () => {
+    await pickFromDirectory({ ...ANA, linkedUserId: null }, 'testigo');
+
+    expect(
+      screen.queryByText('Directorio', { selector: 'span' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue('Ana')).toBeEnabled();
+    expect(
+      screen.getByRole('checkbox', { name: /agregar al directorio/i }),
+    ).not.toBeChecked();
   });
 });

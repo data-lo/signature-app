@@ -11,59 +11,111 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  DIRECTORY_PREVIEW_CONTACTS,
-  filterDirectoryPreviewContacts,
-  type DirectoryPreviewContact,
-} from '../_config/directory-preview.config';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { DirectoryContact } from '../_requests';
+import { useDirectoryContactSearch } from '../_hooks/useDirectoryContactSearch';
 
 interface DirectoryContactsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Contactos a mostrar; por defecto, los simulados de `directory-preview.config.ts`. */
-  contacts?: readonly DirectoryPreviewContact[];
-  /** Acción del botón "Firmante" de cada resultado. Sin conectar mientras el modal sea sólo visual. */
-  onSelectSigner?: (contact: DirectoryPreviewContact) => void;
-  /** Acción del botón "Testigo" de cada resultado. Sin conectar mientras el modal sea sólo visual. */
-  onSelectWitness?: (contact: DirectoryPreviewContact) => void;
+  /** El contacto elegido con el botón "Firmante" de su resultado. */
+  onSelectSigner: (contact: DirectoryContact) => void;
+  /** El contacto elegido con el botón "Testigo" de su resultado. */
+  onSelectWitness: (contact: DirectoryContact) => void;
 }
 
 /**
- * Modal del Directorio en el paso de participantes: buscador, resultados y, por cada contacto,
- * los botones para sumarlo como firmante o como testigo.
+ * Modal del Directorio en el paso de participantes: busca por correo en el Directorio de la cuenta
+ * activa (`GET /api/v1/directory-contacts`) y, por cada contacto, ofrece sumarlo como firmante o
+ * como testigo.
  *
- * Es SÓLO interfaz (historia "Crear componentes UI para selección y alta de contactos desde
- * Directorio"): no consulta la API ni agrega participantes. El buscador filtra en memoria los
- * contactos que recibe para enseñar los tres estados —sin búsqueda iniciada, con resultados y
- * sin resultados—, y los botones sólo llaman a `onSelectSigner`/`onSelectWitness` si alguien los
- * pasa. El texto escrito se limpia al cerrar el modal.
+ * Elegir un contacto cierra el modal y lo entrega a `onSelectSigner`/`onSelectWitness`; qué
+ * tarjeta se arma con él lo decide quien lo abre (`collaboratorFromDirectoryContact`). Un contacto
+ * sin usuario de la plataforma se marca como "Sin cuenta": se puede elegir igual, pero se agrega
+ * como captura manual porque no hay usuario al que el backend pueda resolver. El texto escrito se
+ * limpia al cerrar.
  *
- * @param props - Apertura del modal, contactos a mostrar y acciones opcionales por resultado.
+ * @param props - Apertura del modal y acciones por resultado.
  * @returns El modal del Directorio.
  *
- * @throws Nada: no hace peticiones ni valida datos.
+ * @throws Nada: los fallos de la búsqueda se muestran dentro del modal.
  *
  * @example
  * ```tsx
- * <DirectoryContactsDialog open={isOpen} onOpenChange={setIsOpen} />
+ * <DirectoryContactsDialog
+ *   open={isOpen}
+ *   onOpenChange={setIsOpen}
+ *   onSelectSigner={(contact) => append(collaboratorFromDirectoryContact(contact, 'SIGNER'))}
+ *   onSelectWitness={(contact) => append(collaboratorFromDirectoryContact(contact, 'WITNESS'))}
+ * />
  * ```
  */
 export default function DirectoryContactsDialog({
   open,
   onOpenChange,
-  contacts = DIRECTORY_PREVIEW_CONTACTS,
   onSelectSigner,
   onSelectWitness,
 }: DirectoryContactsDialogProps) {
-  const [query, setQuery] = useState('');
-  const hasQuery = query.trim() !== '';
-  const results = hasQuery
-    ? filterDirectoryPreviewContacts(contacts, query)
-    : [];
+  const [input, setInput] = useState('');
+  const { query, term } = useDirectoryContactSearch(input);
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) setQuery('');
+    if (!nextOpen) setInput('');
     onOpenChange(nextOpen);
+  }
+
+  function select(
+    contact: DirectoryContact,
+    onSelect: (contact: DirectoryContact) => void,
+  ) {
+    onSelect(contact);
+    handleOpenChange(false);
+  }
+
+  let results: ReactNode;
+  if (!term) {
+    results = (
+      <DirectoryEmptyState
+        icon={<BookUser className="size-6" />}
+        title="Busca en tu directorio"
+        description="Escribe parte del correo de un contacto para encontrarlo."
+      />
+    );
+  } else if (query.isPending) {
+    results = (
+      <div className="flex flex-col gap-3 py-2" aria-label="Buscando contactos">
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-5 w-44" />
+      </div>
+    );
+  } else if (query.isError) {
+    results = (
+      <p className="py-6 text-center text-sm text-destructive">
+        No pudimos consultar el directorio. Inténtalo de nuevo.
+      </p>
+    );
+  } else if (query.data.length === 0) {
+    results = (
+      <DirectoryEmptyState
+        icon={<SearchX className="size-6" />}
+        title="Sin resultados"
+        description="No encontramos contactos que coincidan con tu búsqueda."
+      />
+    );
+  } else {
+    results = (
+      <ul className="flex flex-col" aria-label="Resultados del directorio">
+        {query.data.map((contact) => (
+          <DirectoryContactRow
+            key={contact.id}
+            contact={contact}
+            onSelectSigner={() => select(contact, onSelectSigner)}
+            onSelectWitness={() => select(contact, onSelectWitness)}
+          />
+        ))}
+      </ul>
+    );
   }
 
   return (
@@ -81,58 +133,30 @@ export default function DirectoryContactsDialog({
           <Input
             className="pl-8"
             type="search"
-            aria-label="Buscar contacto por nombre o apellido"
-            placeholder="Buscar por nombre o apellido"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Buscar contacto por correo"
+            placeholder="Buscar por correo"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
           />
         </div>
 
-        <div className="max-h-80 min-h-40 overflow-y-auto">
-          {!hasQuery ? (
-            <DirectoryEmptyState
-              icon={<BookUser className="size-6" />}
-              title="Busca en tu directorio"
-              description="Escribe un nombre o apellido para ver tus contactos."
-            />
-          ) : results.length === 0 ? (
-            <DirectoryEmptyState
-              icon={<SearchX className="size-6" />}
-              title="Sin resultados"
-              description="No encontramos contactos que coincidan con tu búsqueda."
-            />
-          ) : (
-            <ul
-              className="flex flex-col"
-              aria-label="Resultados del directorio"
-            >
-              {results.map((contact) => (
-                <DirectoryContactRow
-                  key={contact.id}
-                  contact={contact}
-                  onSelectSigner={onSelectSigner}
-                  onSelectWitness={onSelectWitness}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
+        <div className="max-h-80 min-h-40 overflow-y-auto">{results}</div>
       </DialogContent>
     </Dialog>
   );
 }
 
 /**
- * Un resultado del Directorio: nombre y apellido, con las acciones Testigo y Firmante.
+ * Un resultado del Directorio: nombre, apellido y correo, con las acciones Testigo y Firmante.
  *
- * @param props - Contacto a pintar y acciones opcionales.
+ * @param props - Contacto a pintar y sus dos acciones.
  * @returns La fila del resultado.
  *
  * @throws Nada.
  *
  * @example
  * ```tsx
- * <DirectoryContactRow contact={{ id: '1', firstName: 'Ana', lastName: 'García' }} />
+ * <DirectoryContactRow contact={contact} onSelectSigner={…} onSelectWitness={…} />
  * ```
  */
 function DirectoryContactRow({
@@ -140,24 +164,28 @@ function DirectoryContactRow({
   onSelectSigner,
   onSelectWitness,
 }: {
-  contact: DirectoryPreviewContact;
-  onSelectSigner?: (contact: DirectoryPreviewContact) => void;
-  onSelectWitness?: (contact: DirectoryPreviewContact) => void;
+  contact: DirectoryContact;
+  onSelectSigner: () => void;
+  onSelectWitness: () => void;
 }) {
   const fullName = `${contact.firstName} ${contact.lastName}`;
 
   return (
     <li className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
-      <span className="min-w-0 truncate font-medium text-foreground">
-        {fullName}
-      </span>
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate font-medium text-foreground">{fullName}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {contact.email}
+          {!contact.linkedUserId && ' · Sin cuenta'}
+        </span>
+      </div>
       <div className="flex shrink-0 gap-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
           aria-label={`Agregar a ${fullName} como testigo`}
-          onClick={() => onSelectWitness?.(contact)}
+          onClick={onSelectWitness}
         >
           <Eye className="size-3.5" />
           Testigo
@@ -167,7 +195,7 @@ function DirectoryContactRow({
           variant="outline"
           size="sm"
           aria-label={`Agregar a ${fullName} como firmante`}
-          onClick={() => onSelectSigner?.(contact)}
+          onClick={onSelectSigner}
         >
           <UserPlus className="size-3.5" />
           Firmante

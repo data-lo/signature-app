@@ -29,6 +29,7 @@ import DirectoryContactsDialog from './DirectoryContactsDialog';
 import SortableCollaboratorItem from './SortableCollaboratorItem';
 import { resolveSelfSignerSync } from '../_mappers/self-signer.mapper';
 import {
+  collaboratorFromDirectoryContact,
   countSigners,
   emptySigner,
   emptyWitness,
@@ -55,7 +56,8 @@ export default function CollaboratorsFieldArray({
     name: 'collaborators',
   });
   const requiresOrder = useWatch({ control, name: 'requiresOrder' });
-  // Modal del Directorio: por ahora sólo se abre y se cierra, no agrega participantes.
+  // Modal del Directorio: el contacto elegido se agrega como una tarjeta más del arreglo (ver
+  // `collaboratorFromDirectoryContact` para cuándo nace como DIRECTORY y cuándo como MANUAL).
   const [isDirectoryOpen, setIsDirectoryOpen] = useState(false);
 
   // "Incluirme como firmante" se gobierna desde acá porque este componente es el dueño del
@@ -157,6 +159,12 @@ export default function CollaboratorsFieldArray({
       <DirectoryContactsDialog
         open={isDirectoryOpen}
         onOpenChange={setIsDirectoryOpen}
+        onSelectSigner={(contact) =>
+          append(collaboratorFromDirectoryContact(contact, 'SIGNER'))
+        }
+        onSelectWitness={(contact) =>
+          append(collaboratorFromDirectoryContact(contact, 'WITNESS'))
+        }
       />
 
       {fields.length === 0 && (

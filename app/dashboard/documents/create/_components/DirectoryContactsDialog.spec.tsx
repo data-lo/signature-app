@@ -1,94 +1,140 @@
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, screen, within } from '@/test-utils';
+import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DirectoryContactsDialog from './DirectoryContactsDialog';
-import type { DirectoryPreviewContact } from '../_config/directory-preview.config';
+import {
+  searchDirectoryContactsRequest,
+  type DirectoryContact,
+} from '../_requests';
 
-const CONTACTS: DirectoryPreviewContact[] = [
-  { id: '1', firstName: 'Ana', lastName: 'García López' },
-  { id: '2', firstName: 'Carlos', lastName: 'Hernández Ruiz' },
-];
+jest.mock('../_requests', () => ({
+  ...jest.requireActual('../_requests'),
+  searchDirectoryContactsRequest: jest.fn(),
+}));
 
-function renderDialog(
-  props: Partial<Parameters<typeof DirectoryContactsDialog>[0]> = {},
-) {
-  return renderWithProviders(
-    <DirectoryContactsDialog
-      open
-      onOpenChange={jest.fn()}
-      contacts={CONTACTS}
-      {...props}
-    />,
-  );
+const mockedSearch = searchDirectoryContactsRequest as jest.Mock;
+
+const ANA: DirectoryContact = {
+  id: 'contact-1',
+  firstName: 'Ana',
+  lastName: 'García López',
+  email: 'ana.garcia@example.com',
+  linkedUserId: 'user-ana',
+};
+const EXTERNAL: DirectoryContact = {
+  id: 'contact-2',
+  firstName: 'Carlos',
+  lastName: 'Hernández',
+  email: 'carlos@externo.mx',
+  linkedUserId: null,
+};
+
+function renderDialog() {
+  const props = {
+    onOpenChange: jest.fn(),
+    onSelectSigner: jest.fn(),
+    onSelectWitness: jest.fn(),
+  };
+  renderWithProviders(<DirectoryContactsDialog open {...props} />);
+  return props;
 }
 
 const searchbox = () =>
   screen.getByRole('searchbox', { name: /buscar contacto/i });
 
+const resultItems = () =>
+  within(
+    screen.getByRole('list', { name: /resultados del directorio/i }),
+  ).getAllByRole('listitem');
+
+beforeEach(() => {
+  mockedSearch.mockReset();
+  mockedSearch.mockResolvedValue([ANA, EXTERNAL]);
+});
+
 /**
- * El modal es sólo interfaz: lo que se prueba son sus estados visuales y que cada resultado
- * muestre nombre, apellido y sus dos acciones. No hay API ni alta de participantes.
+ * El modal consulta el Directorio de la cuenta activa (`GET /directory-contacts?email=`) y entrega
+ * el contacto elegido; qué tarjeta se arma con él se prueba en `CollaboratorsFieldArray.spec.tsx`.
  */
 describe('DirectoryContactsDialog', () => {
-  it('sin búsqueda iniciada muestra el buscador y la invitación a buscar, sin resultados', () => {
+  it('sin búsqueda iniciada muestra la invitación a buscar y no consulta nada', () => {
     renderDialog();
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(searchbox()).toHaveValue('');
     expect(screen.getByText('Busca en tu directorio')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('list', { name: /resultados del directorio/i }),
-    ).not.toBeInTheDocument();
+    expect(mockedSearch).not.toHaveBeenCalled();
   });
 
-  it('cada resultado muestra nombre y apellido con sus botones Testigo y Firmante', async () => {
+  it('busca por lo escrito, recortado, y lista nombre, apellido y correo con sus dos botones', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(searchbox(), '  garcia ');
+
+    await waitFor(() => expect(mockedSearch).toHaveBeenCalledWith('garcia'));
+    const [first] = await waitFor(resultItems);
+    expect(within(first).getByText('Ana García López')).toBeInTheDocument();
+    expect(
+      within(first).getByText('ana.garcia@example.com'),
+    ).toBeInTheDocument();
+    expect(
+      within(first).getByRole('button', { name: /como testigo/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(first).getByRole('button', { name: /como firmante/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('marca "Sin cuenta" al contacto sin usuario vinculado', async () => {
     const user = userEvent.setup();
     renderDialog();
 
     await user.type(searchbox(), 'a');
 
-    const items = within(
-      screen.getByRole('list', { name: /resultados del directorio/i }),
-    ).getAllByRole('listitem');
-    expect(items).toHaveLength(2);
-    expect(within(items[0]).getByText('Ana García López')).toBeInTheDocument();
-    expect(
-      within(items[0]).getByRole('button', { name: /como testigo/i }),
-    ).toHaveTextContent('Testigo');
-    expect(
-      within(items[0]).getByRole('button', { name: /como firmante/i }),
-    ).toHaveTextContent('Firmante');
-  });
-
-  it('filtra los contactos simulados sin distinguir acentos', async () => {
-    const user = userEvent.setup();
-    renderDialog();
-
-    await user.type(searchbox(), 'hernandez');
-
-    expect(screen.getByText('Carlos Hernández Ruiz')).toBeInTheDocument();
-    expect(screen.queryByText('Ana García López')).not.toBeInTheDocument();
+    const [, second] = await waitFor(resultItems);
+    expect(within(second).getByText(/sin cuenta/i)).toBeInTheDocument();
   });
 
   it('sin coincidencias muestra el estado vacío', async () => {
+    mockedSearch.mockResolvedValue([]);
     const user = userEvent.setup();
     renderDialog();
 
     await user.type(searchbox(), 'zzz');
 
-    expect(screen.getByText('Sin resultados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 
-  it('los botones de un resultado llaman a sus acciones si se pasan', async () => {
+  it('si la búsqueda falla, lo dice dentro del modal', async () => {
+    mockedSearch.mockRejectedValue(new Error('500'));
     const user = userEvent.setup();
-    const onSelectSigner = jest.fn();
-    const onSelectWitness = jest.fn();
-    renderDialog({ onSelectSigner, onSelectWitness });
+    renderDialog();
 
     await user.type(searchbox(), 'ana');
-    await user.click(screen.getByRole('button', { name: /como firmante/i }));
-    await user.click(screen.getByRole('button', { name: /como testigo/i }));
 
-    expect(onSelectSigner).toHaveBeenCalledWith(CONTACTS[0]);
-    expect(onSelectWitness).toHaveBeenCalledWith(CONTACTS[0]);
+    expect(
+      await screen.findByText(/no pudimos consultar el directorio/i),
+    ).toBeInTheDocument();
   });
+
+  it.each([
+    ['firmante', 'onSelectSigner'],
+    ['testigo', 'onSelectWitness'],
+  ] as const)(
+    'elegir como %s entrega el contacto y cierra el modal',
+    async (role, handler) => {
+      const user = userEvent.setup();
+      const props = renderDialog();
+
+      await user.type(searchbox(), 'ana');
+      const [first] = await waitFor(resultItems);
+      await user.click(
+        within(first).getByRole('button', {
+          name: new RegExp(`como ${role}`, 'i'),
+        }),
+      );
+
+      expect(props[handler]).toHaveBeenCalledWith(ANA);
+      expect(props.onOpenChange).toHaveBeenCalledWith(false);
+    },
+  );
 });
