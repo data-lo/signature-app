@@ -31,7 +31,11 @@ export type PermissionKey =
   | 'DOCUMENT.SEND_SIGNATURE_REQUEST'
   | 'DOCUMENT.SIGN_SELF'
   | 'DOCUMENT.APPROVE'
-  | 'DOCUMENT.CANCEL';
+  | 'DOCUMENT.CANCEL'
+  | 'DIRECTORY.READ'
+  | 'DIRECTORY.CREATE'
+  | 'DIRECTORY.UPDATE'
+  | 'DIRECTORY.DELETE';
 
 /**
  * Lo que la cuenta activa puede hacer, tal como lo resuelve el backend en
