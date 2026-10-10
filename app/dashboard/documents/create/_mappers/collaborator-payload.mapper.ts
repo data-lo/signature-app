@@ -1,6 +1,7 @@
-import type {
-  CollaboratorFormValues,
-  DocumentSignatureType,
+import {
+  isDirectoryCollaborator,
+  type CollaboratorFormValues,
+  type DocumentSignatureType,
 } from '../_schemas';
 import type {
   CollaboratorPayload,
@@ -48,22 +49,40 @@ export function toCollaboratorPayload(
   orderIndex = 0,
   requiresTwoFactorAuth = true,
 ): CollaboratorPayload {
+  /**
+   * Un colaborador del Directorio NO manda nombre, apellido, correo ni `addToDirectory` (historia
+   * "Enviar colaboradores desde Directorio mediante usuario vinculado al crear un documento"): el
+   * backend los resuelve desde `linkedUserId` y no confiaría en los que mandáramos. Uno manual sí
+   * los manda, con `addToDirectory` siempre explícito.
+   */
+  const identity =
+    isDirectoryCollaborator(collaborator) && collaborator.linkedUserId
+      ? {
+          source: 'DIRECTORY' as const,
+          linkedUserId: collaborator.linkedUserId,
+        }
+      : {
+          source: 'MANUAL' as const,
+          firstName: collaborator.firstName,
+          lastName: collaborator.lastName,
+          email: collaborator.email,
+          addToDirectory: collaborator.addToDirectory ?? false,
+        };
+
   if (collaborator.collaboratorType === 'WITNESS') {
-    return {
-      collaboratorType: 'WITNESS',
-      firstName: collaborator.firstName,
-      lastName: collaborator.lastName,
-      email: collaborator.email,
-      taxId: collaborator.taxId,
-      orderIndex,
-    };
+    return identity.source === 'DIRECTORY'
+      ? { ...identity, collaboratorType: 'WITNESS', orderIndex }
+      : {
+          ...identity,
+          collaboratorType: 'WITNESS',
+          taxId: collaborator.taxId,
+          orderIndex,
+        };
   }
 
   return {
+    ...identity,
     collaboratorType: 'SIGNER',
-    firstName: collaborator.firstName,
-    lastName: collaborator.lastName,
-    email: collaborator.email,
     signatures: collaborator.signatures.map((position) => ({
       signatureId: position.id,
       page: position.page,

@@ -27,6 +27,27 @@ const emailField = z
 const taxIdField = z.string().trim();
 
 /**
+ * Origen de la identidad del colaborador (historia "Enviar colaboradores desde Directorio
+ * mediante usuario vinculado al crear un documento"). `MANUAL`: capturado en la tarjeta.
+ * `DIRECTORY`: elegido del Directorio, con usuario vinculado; su nombre, apellido y correo se
+ * muestran en solo lectura y el backend los resuelve desde `linkedUserId`.
+ *
+ * Los tres campos son opcionales —ausentes valen `MANUAL`, sin usuario y sin agregar al
+ * Directorio— en vez de llevar `.default()`, por la misma razón que `signatures`: un `.default()`
+ * separa el tipo de entrada del de salida y rompe la inferencia de `zodResolver`.
+ */
+export const collaboratorSourceSchema = z.enum(['MANUAL', 'DIRECTORY']);
+export type CollaboratorSource = z.infer<typeof collaboratorSourceSchema>;
+
+const directoryFields = {
+  source: collaboratorSourceSchema.optional(),
+  /** `users.id` del usuario vinculado al contacto. Sólo con `source: 'DIRECTORY'`. */
+  linkedUserId: z.string().optional(),
+  /** Casilla "Agregar al directorio" de la tarjeta. Sólo cuenta para `MANUAL`. */
+  addToDirectory: z.boolean().optional(),
+};
+
+/**
  * Un firmante NO declara su propio tipo de firma ni su identificador fiscal (ver historia
  * "Selección de tipo de firma al crear documentos"): el tipo lo define el documento completo
  * (`signatureType` en `documentConfigurationSchema`) y el RFC del flujo avanzado se extrae del
@@ -47,6 +68,7 @@ export const signerSchema = z.object({
   // contra `CreateDocumentSignaturesFormValues`. Todo lugar que arma un SignerFormValues
   // (`emptySigner`, `buildSelfSigner`) ya manda `signatures` explícito.
   signatures: z.array(signaturePositionSchema),
+  ...directoryFields,
   // Marca al firmante que representa al usuario en sesión, agregado por "Incluirme como
   // firmante". Es lo que permite ubicarlo para quitarlo al desmarcar y no duplicarlo si la opción
   // se marca más de una vez (ver `_mappers/self-signer.mapper.ts`). No viaja al backend: el
@@ -65,6 +87,7 @@ export const witnessSchema = z.object({
   lastName: lastNameField,
   email: emailField,
   taxId: taxIdField,
+  ...directoryFields,
 });
 
 /** Firmantes y testigos viven en un solo arreglo, diferenciados por `collaboratorType`. */
@@ -85,6 +108,8 @@ export function emptySigner(): SignerFormValues {
     email: '',
     signatures: [],
     isSelf: false,
+    source: 'MANUAL',
+    addToDirectory: false,
   };
 }
 
@@ -95,7 +120,79 @@ export function emptyWitness(): WitnessFormValues {
     lastName: '',
     email: '',
     taxId: '',
+    source: 'MANUAL',
+    addToDirectory: false,
   };
+}
+
+/** Lo que el modal del Directorio necesita de un contacto para convertirlo en colaborador. */
+export interface DirectoryContactSelection {
+  firstName: string;
+  lastName: string;
+  email: string;
+  /** `null` si el contacto no tiene usuario de la plataforma vinculado. */
+  linkedUserId: string | null;
+}
+
+/**
+ * Convierte un contacto elegido en el Directorio en la tarjeta de firmante o testigo.
+ *
+ * Con usuario vinculado nace como `DIRECTORY`: la tarjeta muestra su nombre y correo en solo
+ * lectura y al enviar sólo viaja `linkedUserId`. Sin usuario vinculado no hay a quién resolver
+ * en el backend, así que nace como `MANUAL` con los datos del contacto ya capturados (editables)
+ * y sin "Agregar al directorio", porque ya está en él.
+ *
+ * @param contact - Contacto elegido.
+ * @param collaboratorType - Si se agrega como firmante o como testigo.
+ * @returns Los valores de la tarjeta, listos para `append`.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * collaboratorFromDirectoryContact(
+ *   { firstName: 'Ana', lastName: 'García', email: 'ana@example.com', linkedUserId: 'user-1' },
+ *   'SIGNER',
+ * ); // { collaboratorType: 'SIGNER', source: 'DIRECTORY', linkedUserId: 'user-1', … }
+ * ```
+ */
+export function collaboratorFromDirectoryContact(
+  contact: DirectoryContactSelection,
+  collaboratorType: CollaboratorFormValues['collaboratorType'],
+): CollaboratorFormValues {
+  const identity = {
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    email: contact.email,
+    addToDirectory: false,
+    ...(contact.linkedUserId
+      ? { source: 'DIRECTORY' as const, linkedUserId: contact.linkedUserId }
+      : { source: 'MANUAL' as const }),
+  };
+
+  return collaboratorType === 'SIGNER'
+    ? { ...emptySigner(), ...identity }
+    : { ...emptyWitness(), ...identity };
+}
+
+/**
+ * Es un colaborador elegido del Directorio con usuario vinculado: su identidad la resuelve el
+ * backend y en pantalla no se edita.
+ *
+ * @param collaborator - Colaborador del formulario.
+ * @returns `true` sólo con `source: 'DIRECTORY'`.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * isDirectoryCollaborator({ ...emptySigner(), source: 'DIRECTORY' }); // true
+ * ```
+ */
+export function isDirectoryCollaborator(
+  collaborator: Pick<CollaboratorFormValues, 'source'>,
+): boolean {
+  return collaborator.source === 'DIRECTORY';
 }
 
 /** Único criterio de "cuántos firmantes hay" — lo consultan las reglas de sección y la UI. */

@@ -29,17 +29,9 @@ export interface SignaturePositionPayload {
   heightRatio: number;
 }
 
-/**
- * Forma exacta que espera el backend por cada colaborador (campo `collaborators`). Sin
- * `signatureType`: lo define el documento entero (`DocumentDataPayload.signatureType`). `taxId`
- * solo viaja para WITNESS — a los firmantes ya no se les pide en ningún flujo.
- */
-export interface CollaboratorPayload {
+/** Lo que comparten los dos orígenes de colaborador en el payload. */
+interface CollaboratorPayloadBase {
   collaboratorType: 'SIGNER' | 'WITNESS';
-  firstName: string;
-  lastName: string;
-  email: string;
-  taxId?: string | null;
   signatures?: SignaturePositionPayload[];
   requiresTwoFactorAuth?: boolean;
   /**
@@ -49,6 +41,38 @@ export interface CollaboratorPayload {
    */
   orderIndex: number;
 }
+
+/**
+ * Colaborador elegido del Directorio con usuario vinculado: sólo viaja `linkedUserId`. Nombre,
+ * apellido y correo los resuelve el backend desde ese usuario, y `addToDirectory` no aplica.
+ */
+export interface DirectoryCollaboratorPayload extends CollaboratorPayloadBase {
+  source: 'DIRECTORY';
+  linkedUserId: string;
+}
+
+/**
+ * Colaborador capturado a mano (o elegido del Directorio sin usuario vinculado): viajan sus datos
+ * completos y si debe quedar en el Directorio. `taxId` solo viaja para WITNESS — a los firmantes
+ * ya no se les pide en ningún flujo.
+ */
+export interface ManualCollaboratorPayload extends CollaboratorPayloadBase {
+  source: 'MANUAL';
+  firstName: string;
+  lastName: string;
+  email: string;
+  addToDirectory: boolean;
+  taxId?: string | null;
+}
+
+/**
+ * Forma exacta que espera el backend por cada colaborador (campo `collaborators`), diferenciada
+ * por `source` (historia "Enviar colaboradores desde Directorio mediante usuario vinculado al
+ * crear un documento"). Sin `signatureType`: lo define el documento entero
+ * (`DocumentDataPayload.signatureType`).
+ */
+export type CollaboratorPayload =
+  DirectoryCollaboratorPayload | ManualCollaboratorPayload;
 
 /** Campo `documentData` del multipart (serializado como JSON dentro de un campo de texto). */
 export interface DocumentDataPayload {

@@ -1,9 +1,12 @@
 'use client';
 
+import { useId, useState } from 'react';
 import { useWatch, type Control } from 'react-hook-form';
 import { GripVertical, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FormInput } from '@/components/form/form-input';
+import { FormCheckbox } from '@/components/form/form-checkbox';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
@@ -12,6 +15,7 @@ import {
 } from '../_config/collaborator-fields.config';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 import type { DragHandleProps } from './SortableCollaboratorItem';
+import { FormToggleShell } from '@/components/form/form-field';
 
 interface CollaboratorFormItemProps {
   index: number;
@@ -55,12 +59,25 @@ export default function CollaboratorFormItem({
   orderIndex,
   dragHandleProps,
 }: CollaboratorFormItemProps) {
+  // `useId` y no el índice: al reordenar, el índice de una tarjeta cambia y la etiqueta quedaría
+  // apuntando al checkbox de otra.
+  const addToDirectoryId = useId();
   const collaboratorType = useWatch({
     control,
     name: `collaborators.${index}.collaboratorType`,
   });
+  const source = useWatch({
+    control,
+    name: `collaborators.${index}.source`,
+  });
   const isSigner = collaboratorType === 'SIGNER';
-  const showTaxId = collaboratorType === 'WITNESS';
+  // Elegido del Directorio con usuario vinculado: su identidad la resuelve el backend desde ese
+  // usuario, así que en pantalla se muestra en solo lectura y no lleva RFC ni "Agregar al
+  // directorio" (ya está en él). Ver historia "Enviar colaboradores desde Directorio mediante
+  // usuario vinculado al crear un documento".
+  const isFromDirectory = source === 'DIRECTORY';
+  const isReadOnly = isSelf || isFromDirectory;
+  const showTaxId = collaboratorType === 'WITNESS' && !isFromDirectory;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -93,15 +110,18 @@ export default function CollaboratorFormItem({
               Tú
             </span>
           )}
+          {isFromDirectory && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">
+              Directorio
+            </span>
+          )}
         </div>
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
           onClick={onRemove}
-          aria-label={
-            isSelf ? 'Quitarme como firmante' : 'Quitar participante'
-          }
+          aria-label={isSelf ? 'Quitarme como firmante' : 'Quitar participante'}
         >
           <X className="size-3.5" />
         </Button>
@@ -117,7 +137,7 @@ export default function CollaboratorFormItem({
             type={field.type}
             placeholder={field.placeholder}
             normalizeOnBlur={formatPersonName}
-            disabled={isSelf}
+            disabled={isReadOnly}
           />
         ))}
       </div>
@@ -128,7 +148,7 @@ export default function CollaboratorFormItem({
         label={COLLABORATOR_EMAIL_FIELD.label}
         type={COLLABORATOR_EMAIL_FIELD.type}
         placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
-        disabled={isSelf}
+        disabled={isReadOnly}
       />
 
       {showTaxId && (
@@ -141,6 +161,14 @@ export default function CollaboratorFormItem({
         />
       )}
 
+      {!isReadOnly && (
+        <FormCheckbox
+          control={control}
+          name={`collaborators.${index}.addToDirectory`}
+          id={addToDirectoryId}
+          label="Agregar al directorio"
+        />
+      )}
     </div>
   );
 }
