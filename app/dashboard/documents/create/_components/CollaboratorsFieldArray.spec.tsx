@@ -4,7 +4,10 @@ import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import CollaboratorsFieldArray from './CollaboratorsFieldArray';
 import IncludeMeAsSignerField from './IncludeMeAsSignerField';
-import { emptySigner, type CreateDocumentSignaturesFormValues } from '../_schemas';
+import {
+  emptySigner,
+  type CreateDocumentSignaturesFormValues,
+} from '../_schemas';
 
 jest.mock('@/lib/hooks/useCurrentUser');
 
@@ -225,5 +228,71 @@ describe('CollaboratorsFieldArray · "Incluirme como firmante"', () => {
 
     await waitFor(() => expect(includeMeCheckbox()).toBeChecked());
     expect(selfCards()).toHaveLength(0);
+  });
+});
+
+/**
+ * Historia "Crear componentes UI para selección y alta de contactos desde Directorio": sólo
+ * interfaz. El botón abre el modal y cada tarjeta capturada a mano trae su checkbox.
+ */
+describe('CollaboratorsFieldArray · Directorio', () => {
+  const addToDirectoryCheckboxes = () =>
+    screen.queryAllByRole('checkbox', { name: /agregar al directorio/i });
+
+  it('muestra el botón Directorio junto a Firmante y Testigo', () => {
+    renderWithProviders(<Harness signerCount={0} requiresOrder={false} />);
+
+    for (const name of ['Firmante', 'Testigo', 'Directorio']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('al hacer clic en Directorio abre el modal', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness signerCount={0} requiresOrder={false} />);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Directorio' }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.getByRole('searchbox', { name: /buscar contacto/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('cada tarjeta de firmante y de testigo trae "Agregar al directorio", sin marcar', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness signerCount={1} requiresOrder={false} />);
+
+    await user.click(screen.getByRole('button', { name: 'Testigo' }));
+
+    const checkboxes = addToDirectoryCheckboxes();
+    expect(checkboxes).toHaveLength(2);
+    for (const checkbox of checkboxes) {
+      expect(checkbox).not.toBeChecked();
+    }
+  });
+
+  it('el checkbox se marca y desmarca de forma visual', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness signerCount={1} requiresOrder={false} />);
+    const [checkbox] = addToDirectoryCheckboxes();
+
+    await user.click(checkbox);
+    expect(checkbox).toBeChecked();
+
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it('la tarjeta propia no trae el checkbox', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SelfSignerHarness />);
+
+    await user.click(includeMeCheckbox());
+
+    await waitFor(() => expect(selfCards()).toHaveLength(1));
+    expect(addToDirectoryCheckboxes()).toHaveLength(0);
   });
 });

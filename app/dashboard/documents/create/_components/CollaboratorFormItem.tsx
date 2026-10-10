@@ -1,9 +1,12 @@
 'use client';
 
+import { useId, useState } from 'react';
 import { useWatch, type Control } from 'react-hook-form';
 import { GripVertical, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FormInput } from '@/components/form/form-input';
+import { FormToggleShell } from '@/components/form/form-field';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
@@ -99,9 +102,7 @@ export default function CollaboratorFormItem({
           variant="ghost"
           size="icon-xs"
           onClick={onRemove}
-          aria-label={
-            isSelf ? 'Quitarme como firmante' : 'Quitar participante'
-          }
+          aria-label={isSelf ? 'Quitarme como firmante' : 'Quitar participante'}
         >
           <X className="size-3.5" />
         </Button>
@@ -141,6 +142,39 @@ export default function CollaboratorFormItem({
         />
       )}
 
+      {!isSelf && <AddToDirectoryCheckbox />}
     </div>
+  );
+}
+
+/**
+ * Checkbox "Agregar al directorio" de una tarjeta de firmante o testigo.
+ *
+ * Es sólo visual (historia "Crear componentes UI para selección y alta de contactos desde
+ * Directorio"): guarda su valor en estado local, no en el formulario, así que no viaja con el
+ * documento ni da de alta el contacto. La tarjeta propia no lo lleva: el usuario en sesión no se
+ * agrega a su propio directorio.
+ *
+ * @returns El checkbox con su etiqueta, con los estilos de `FormToggleShell`.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * <AddToDirectoryCheckbox />
+ * ```
+ */
+function AddToDirectoryCheckbox() {
+  const checkboxId = useId();
+  const [checked, setChecked] = useState(false);
+
+  return (
+    <FormToggleShell id={checkboxId} label="Agregar al directorio">
+      <Checkbox
+        id={checkboxId}
+        checked={checked}
+        onCheckedChange={(isChecked) => setChecked(isChecked)}
+      />
+    </FormToggleShell>
   );
 }
