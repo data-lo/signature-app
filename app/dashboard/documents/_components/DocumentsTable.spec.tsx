@@ -1,6 +1,7 @@
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsTable, {
+  documentRowIndex,
   EMPTY_DOCUMENTS_MESSAGE,
   type DocumentListItem,
 } from './DocumentsTable';
@@ -123,7 +124,7 @@ describe('DocumentsTable', () => {
   });
 
   describe('estructura de la tabla', () => {
-    it('renderiza las columnas en el orden Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
+    it('renderiza las columnas en el orden Índice / Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const headers = screen
@@ -131,6 +132,7 @@ describe('DocumentsTable', () => {
         .map((header) => header.textContent?.trim());
 
       expect(headers).toEqual([
+        'Índice',
         'Documento',
         'Creado por',
         'Participación',
@@ -140,6 +142,25 @@ describe('DocumentsTable', () => {
         'Tipo de firma',
         'Acciones',
       ]);
+    });
+
+    /**
+     * Historia "Ajustar columnas de la tabla de documentos": la columna Documento sólo lleva la
+     * información del archivo. El estatus se sigue viendo, en su propia columna.
+     */
+    it('la columna Documento ya no muestra el punto de color del estatus', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Rejected })]}
+        />,
+      );
+
+      const documentCell = dataCell('Documento');
+      expect(
+        documentCell.querySelector('[data-slot="status-dot"]'),
+      ).not.toBeInTheDocument();
+      expect(documentCell).toHaveTextContent('contrato.pdf');
+      expect(dataCell('Estatus')).toHaveTextContent('Rechazado');
     });
 
     it('muestra el RFC del creador rotulado y como texto secundario debajo de su nombre', () => {
@@ -412,7 +433,8 @@ describe('DocumentsTable', () => {
       const cell = screen.getByRole('cell', {
         name: 'No hay documentos para mostrar.',
       });
-      expect(cell).toHaveAttribute('colspan', '8');
+      // Las nueve columnas, contando "Índice".
+      expect(cell).toHaveAttribute('colspan', '9');
     });
 
     it('cargando, muestra el esqueleto, marca la tabla como ocupada y lo anuncia', () => {
@@ -1159,6 +1181,131 @@ describe('DocumentsTable', () => {
         ).toBeInTheDocument(),
       );
       expect(await navigator.clipboard.readText()).toBe(expectedUrl);
+    });
+  });
+
+  describe('índice', () => {
+    function indexCells(): string[] {
+      const headers = screen.getAllByRole('columnheader');
+      const column = headers.findIndex(
+        (header) => header.textContent?.trim() === 'Índice',
+      );
+      return screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[column].textContent!);
+    }
+
+    it('cada fila muestra su consecutivo desde 1 en la primera página', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1' }),
+            buildDoc({ id: 'doc-2' }),
+            buildDoc({ id: 'doc-3' }),
+          ]}
+        />,
+      );
+
+      expect(indexCells()).toEqual(['1', '2', '3']);
+    });
+
+    it('el consecutivo continúa entre páginas', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-11' }), buildDoc({ id: 'doc-12' })]}
+          page={2}
+          totalPages={3}
+          pageSize={10}
+        />,
+      );
+
+      expect(indexCells()).toEqual(['11', '12']);
+    });
+
+    it('documentRowIndex no baja de 1 aunque llegue una página inválida', () => {
+      expect(documentRowIndex(0, 10, 0)).toBe(1);
+      expect(documentRowIndex(3, 25, 4)).toBe(55);
+    });
+  });
+
+  describe('visualizar documento', () => {
+    it('cada fila tiene una acción "Ver documento" con el nombre de su archivo', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
+            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
+          ]}
+          onRowSelect={jest.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
+      ).toBeInTheDocument();
+    });
+
+    it('abre el documento de esa fila una sola vez (la fila no lo vuelve a abrir)', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
+            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
+          ]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
+      );
+
+      expect(onRowSelect).toHaveBeenCalledTimes(1);
+      expect(onRowSelect).toHaveBeenCalledWith('doc-2');
+    });
+
+    it('se puede activar con el teclado', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9' })]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      screen.getByRole('button', { name: 'Ver documento contrato.pdf' }).focus();
+      await user.keyboard('{Enter}');
+
+      expect(onRowSelect).toHaveBeenCalledTimes(1);
+      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+    });
+
+    it('muestra el tooltip "Ver documento" al pasar el cursor', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
+      );
+
+      await user.hover(
+        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
+      );
+
+      expect(await screen.findByText('Ver documento')).toBeInTheDocument();
+    });
+
+    it('no se ofrece si la vista no tiene a dónde abrir el documento', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(
+        screen.queryByRole('button', { name: /ver documento/i }),
+      ).not.toBeInTheDocument();
     });
   });
 });
