@@ -309,7 +309,12 @@ export default function DocumentsTable({
       <DataTableCard data-slot="documents-table-card">
         <Table aria-busy={bodyState === 'loading' || undefined}>
           <DataTableHeader>
-            <TableHead className="w-16">Índice</TableHead>
+            {/* El encabezado se ve como un gato, pero se sigue anunciando como "Índice": el emoji
+                queda fuera del árbol de accesibilidad y el nombre va en un texto `sr-only`. */}
+            <TableHead className="w-16" title="Índice">
+              <span aria-hidden="true">🐱</span>
+              <span className="sr-only">Índice</span>
+            </TableHead>
             <TableHead>
               <SortableHeader>Documento</SortableHeader>
             </TableHead>
