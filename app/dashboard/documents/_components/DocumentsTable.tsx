@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import {
+  ArrowDown,
   ArrowUp,
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -64,6 +66,12 @@ import {
   lastDocumentsPage,
   type DocumentsPageSize,
 } from '../_config/pagination';
+import {
+  DEFAULT_DOCUMENT_NAME_SORT,
+  nextDocumentNameSort,
+  sortDocumentsByName,
+  type DocumentNameSort,
+} from '../_config/sorting';
 
 export interface DocumentListItem {
   id: string;
@@ -242,12 +250,56 @@ export const ARCHIVE_DOCUMENT_PERMISSIONS: readonly PermissionKey[] = [
   'DOCUMENT.READ_ORGANIZATION',
 ];
 
-function SortableHeader({ children }: { children: React.ReactNode }) {
+/** Valor de `aria-sort` del encabezado según el estado del ordenamiento por nombre. */
+const ARIA_SORT: Record<DocumentNameSort, 'none' | 'ascending' | 'descending'> =
+  {
+    none: 'none',
+    asc: 'ascending',
+    desc: 'descending',
+  };
+
+/**
+ * Botón de ordenar dentro de un encabezado de columna.
+ *
+ * El nombre accesible es sólo el texto de la columna (los íconos van ocultos): el estado lo
+ * anuncia el `aria-sort` del `th` que lo contiene, como en el patrón de tabla ordenable de
+ * WAI-ARIA. El ícono cambia con el estado: doble flecha sin ordenar, flecha arriba ascendente y
+ * flecha abajo descendente.
+ *
+ * @param props.children - Texto del encabezado.
+ * @param props.sort - Estado actual del ordenamiento.
+ * @param props.onToggle - Se llama al pulsar el botón.
+ * @returns El botón del encabezado.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * <TableHead aria-sort={ARIA_SORT[sort]}>
+ *   <SortableHeader sort={sort} onToggle={toggle}>Documento</SortableHeader>
+ * </TableHead>
+ * ```
+ */
+function SortableHeader({
+  children,
+  sort,
+  onToggle,
+}: {
+  children: React.ReactNode;
+  sort: DocumentNameSort;
+  onToggle: () => void;
+}) {
+  const Icon =
+    sort === 'asc' ? ArrowUp : sort === 'desc' ? ArrowDown : ArrowUpDown;
   return (
-    <span className="flex items-center gap-1 cursor-pointer select-none">
+    <button
+      type="button"
+      onClick={onToggle}
+      className="-mx-1 flex items-center gap-1 rounded-sm px-1 select-none outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
       {children}
-      <ArrowUp className="size-3.5 text-muted-foreground" />
-    </span>
+      <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+    </button>
   );
 }
 
@@ -268,6 +320,14 @@ export default function DocumentsTable({
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
     useState<DocumentListItem | null>(null);
+  /**
+   * Ordenamiento local por nombre: desactivado al abrir y sólo sobre los documentos ya cargados
+   * (ver `../_config/sorting`). No viaja al backend; al cambiar de página se aplica igual a la
+   * página nueva.
+   */
+  const [nameSort, setNameSort] = useState<DocumentNameSort>(
+    DEFAULT_DOCUMENT_NAME_SORT,
+  );
   const downloadMutation = useDownloadDocument();
   const archiveMutation = useArchiveCompletedDocument();
   const restoreMutation = useRestoreArchivedDocument();
@@ -300,7 +360,8 @@ export default function DocumentsTable({
       : documents.length === 0
         ? 'empty'
         : 'rows';
-  const visibleDocuments = bodyState === 'rows' ? documents : [];
+  const visibleDocuments =
+    bodyState === 'rows' ? sortDocumentsByName(documents, nameSort) : [];
 
   return (
     <div className="flex-1 min-w-0">
@@ -310,8 +371,13 @@ export default function DocumentsTable({
         <Table aria-busy={bodyState === 'loading' || undefined}>
           <DataTableHeader>
             <TableHead className="w-16">Índice</TableHead>
-            <TableHead>
-              <SortableHeader>Documento</SortableHeader>
+            <TableHead aria-sort={ARIA_SORT[nameSort]}>
+              <SortableHeader
+                sort={nameSort}
+                onToggle={() => setNameSort(nextDocumentNameSort)}
+              >
+                Documento
+              </SortableHeader>
             </TableHead>
             <TableHead>Creado por</TableHead>
             <TableHead>Participación</TableHead>
