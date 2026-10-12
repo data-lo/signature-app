@@ -1,12 +1,9 @@
 'use client';
 
-import { useId, useState } from 'react';
 import { useWatch, type Control } from 'react-hook-form';
 import { GripVertical, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { FormInput } from '@/components/form/form-input';
-import { FormCheckbox } from '@/components/form/form-checkbox';
 import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
@@ -14,8 +11,8 @@ import {
   COLLABORATOR_TAX_ID_FIELD,
 } from '../_config/collaborator-fields.config';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
+import AddToDirectoryCheckbox from './AddToDirectoryCheckbox';
 import type { DragHandleProps } from './SortableCollaboratorItem';
-import { FormToggleShell } from '@/components/form/form-field';
 
 interface CollaboratorFormItemProps {
   index: number;
@@ -59,9 +56,6 @@ export default function CollaboratorFormItem({
   orderIndex,
   dragHandleProps,
 }: CollaboratorFormItemProps) {
-  // `useId` y no el índice: al reordenar, el índice de una tarjeta cambia y la etiqueta quedaría
-  // apuntando al checkbox de otra.
-  const addToDirectoryId = useId();
   const collaboratorType = useWatch({
     control,
     name: `collaborators.${index}.collaboratorType`,
@@ -162,12 +156,7 @@ export default function CollaboratorFormItem({
       )}
 
       {!isReadOnly && (
-        <FormCheckbox
-          control={control}
-          name={`collaborators.${index}.addToDirectory`}
-          id={addToDirectoryId}
-          label="Agregar al directorio"
-        />
+        <AddToDirectoryCheckbox control={control} index={index} />
       )}
     </div>
   );
