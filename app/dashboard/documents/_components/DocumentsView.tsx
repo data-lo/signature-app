@@ -181,7 +181,7 @@ export default function DocumentsView() {
           onChange={handleFiltersChange}
         />
       </div>
-      
+
       <p className="mb-3 text-sm text-primary">
         {isDefaultView ? 'Vista predeterminada: ' : 'Vista: '}
         {DOCUMENT_VIEW_LABELS[filters.view]}
@@ -212,8 +212,6 @@ export default function DocumentsView() {
         errorMessage={
           documentsQuery.isError ? DOCUMENTS_LOAD_ERROR_MESSAGE : undefined
         }
-        canArchiveRows={!filters.archived}
-        canRestoreRows={filters.archived}
         emptyState={
           // Sólo con respuesta: mientras carga, la lista también llega vacía.
           documentsQuery.isSuccess && filters.archived ? (

@@ -1,13 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import {
   ArrowUp,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,20 +36,7 @@ import {
   StatusIndicator,
   type StatusTone,
 } from '@/components/data-table/status-indicator';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import DocumentRowActions from './DocumentRowActions';
-import DocumentParticipantsDialog from './DocumentParticipantsDialog';
-import ShareDocumentDialog from './ShareDocumentDialog';
-import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
-import { useRestoreArchivedDocument } from '../_hooks/useRestoreArchivedDocument';
 import DocumentFileName from './DocumentFileName';
-import { usePermissions } from '@/lib/hooks/usePermissions';
-import type { PermissionKey } from '@/lib/authorization/authorization.types';
 import {
   DocumentParticipation,
   DocumentStatus,
@@ -219,28 +204,7 @@ interface DocumentsTableProps {
    * `EMPTY_DOCUMENTS_MESSAGE`. Nunca se pinta durante la carga ni con error: esos estados mandan.
    */
   emptyState?: React.ReactNode;
-  /**
-   * Si el menú de cada fila ofrece "Archivar". En `false` en la vista de archivados: todo lo que
-   * hay ahí ya está archivado, y ofrecerlo otra vez sólo movería la fecha.
-   */
-  canArchiveRows?: boolean;
-  /**
-   * Si el menú de cada fila ofrece "Recuperar". Sólo en la vista de archivados, que es donde
-   * están los documentos que se pueden devolver al listado.
-   */
-  canRestoreRows?: boolean;
 }
-
-/**
- * Permisos con los que se puede archivar: los mismos que dejan ver el documento, porque el
- * backend autoriza `POST /document/:id/archive` con `DOCUMENT + READ` y la misma Policy que el
- * detalle. Archivar sólo lo esconde de la bandeja de quien lo pide, así que no hace falta un
- * permiso más fuerte que el que ya lo pone en ella — y en ningún caso depende de quién lo creó.
- */
-export const ARCHIVE_DOCUMENT_PERMISSIONS: readonly PermissionKey[] = [
-  'DOCUMENT.READ_OWN',
-  'DOCUMENT.READ_ORGANIZATION',
-];
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -262,18 +226,7 @@ export default function DocumentsTable({
   isLoading = false,
   errorMessage,
   emptyState,
-  canArchiveRows = true,
-  canRestoreRows = false,
 }: DocumentsTableProps) {
-  const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
-  const [participantsDoc, setParticipantsDoc] =
-    useState<DocumentListItem | null>(null);
-  const downloadMutation = useDownloadDocument();
-  const archiveMutation = useArchiveCompletedDocument();
-  const restoreMutation = useRestoreArchivedDocument();
-  const { canAny } = usePermissions();
-  const canArchiveDocuments = canAny(ARCHIVE_DOCUMENT_PERMISSIONS);
-
   /**
    * Si hay página anterior o siguiente se deduce de dónde estamos: el endpoint unificado devuelve
    * `page` y `totalPages` y ya no manda `hasNextPage`/`hasPrevPage`. Eran dos campos que repetían
@@ -342,163 +295,83 @@ export default function DocumentsTable({
                 {emptyState ?? EMPTY_DOCUMENTS_MESSAGE}
               </DataTableStateRow>
             )}
-            {visibleDocuments.map((doc, rowIndex) => {
-              const isDownloading =
-                downloadMutation.isPending &&
-                downloadMutation.variables === doc.id;
-              const isArchiving =
-                archiveMutation.isPending &&
-                archiveMutation.variables === doc.id;
-              /**
-               * Sólo se archiva lo que ya está firmado por todos, que es lo único que el backend
-               * deja archivar.
-               *
-               * Antes esta condición tenía una mitad más —la sección tenía que ser "Completados"—
-               * porque la acción vivía únicamente en esa pantalla. Con la lista unificada ya no
-               * hay sección que consultar: la misma tabla muestra a la vez lo pendiente y lo
-               * firmado, así que el estatus de CADA documento es lo que decide sobre la fila.
-               *
-               * La otra mitad es el permiso de la cuenta activa (`ARCHIVE_DOCUMENT_PERMISSIONS`),
-               * nunca quién creó el documento: un administrador que ve los documentos de toda la
-               * organización puede archivar también los que no creó.
-               */
-              const canArchive =
-                canArchiveRows &&
-                canArchiveDocuments &&
-                doc.status === DocumentStatus.Signed;
-              /**
-               * Recuperar pide el mismo permiso que archivar y no mira el estatus: todo lo que
-               * aparece en "Archivados" se puede devolver al listado.
-               */
-              const canRestore = canRestoreRows && canArchiveDocuments;
-              const isRestoring =
-                restoreMutation.isPending &&
-                restoreMutation.variables === doc.id;
-
-              return (
-                <TableRow
-                  key={doc.id}
-                  // La fila entera es el camino al detalle del documento. `TableRow` ya resalta
-                  // en hover; el cursor de mano es lo que anuncia que además se puede activar.
-                  // Sobre blanco, el `hover:bg-muted/50` del componente casi no se distingue:
-                  // aquí se usa el tono completo.
-                  className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
-                  onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
-                >
-                  <TableCell className="w-16 whitespace-nowrap tabular-nums text-muted-foreground">
-                    {documentRowIndex(page, pageSize, rowIndex)}
-                  </TableCell>
-                  {/* Ancho fijo (`w-64 max-w-64`) en todas las resoluciones: el nombre se recorta
+            {visibleDocuments.map((doc, rowIndex) => (
+              <TableRow
+                key={doc.id}
+                // La fila entera es el camino al detalle del documento. `TableRow` ya resalta
+                // en hover; el cursor de mano es lo que anuncia que además se puede activar.
+                // Sobre blanco, el `hover:bg-muted/50` del componente casi no se distingue:
+                // aquí se usa el tono completo.
+                className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
+                onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
+              >
+                <TableCell className="w-16 whitespace-nowrap tabular-nums text-muted-foreground">
+                  {documentRowIndex(page, pageSize, rowIndex)}
+                </TableCell>
+                {/* Ancho fijo (`w-64 max-w-64`) en todas las resoluciones: el nombre se recorta
                     dentro de él en una sola línea y el completo va en el tooltip (ver
                     `DocumentFileName`), así la columna y la altura de la fila no dependen de lo
                     largo que sea. En pantallas angostas la tabla se desplaza en horizontal. */}
-                  {/* Sólo la información del archivo: el estatus ya tiene su propia columna, y el
+                {/* Sólo la información del archivo: el estatus ya tiene su propia columna, y el
                     punto de color que lo repetía aquí se quitó (historia "Ajustar columnas de la
                     tabla de documentos"). */}
-                  <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
-                    {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
+                <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
+                  {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
                       alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
                       sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
                       `tr` no es un control) sin dejar fuera al teclado. */}
-                    <DocumentFileName
-                      fileName={doc.fileName}
-                      interactive={Boolean(onRowSelect)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span>{doc.creator}</span>
-                      {doc.creatorRfc && (
-                        <span className="text-xs text-muted-foreground">
-                          RFC: {doc.creatorRfc}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {
-                      PARTICIPATION_LABELS[
-                        doc.participation ?? DocumentParticipation.Participant
-                      ]
-                    }
-                  </TableCell>
-                  <TableCell>
-                    <StatusIndicator
-                      tone={STATUS_TONE[doc.status]}
-                      label={STATUS_LABELS[doc.status]}
-                    />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <DataTableDate date={doc.createdAt} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <DataTableDate
-                      date={doc.signedAt}
-                      emptyLabel={UNSIGNED_DATE_LABEL}
-                    />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {doc.signatureType ? (
-                      SIGNATURE_TYPE_LABELS[doc.signatureType]
-                    ) : (
-                      // Documento anterior a que el tipo de firma se registrara: un guion dice
-                      // "no se sabe", que es la verdad; suponer "Simple" sería inventar.
-                      <span className="text-muted-foreground">—</span>
+                  <DocumentFileName
+                    fileName={doc.fileName}
+                    interactive={Boolean(onRowSelect)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span>{doc.creator}</span>
+                    {doc.creatorRfc && (
+                      <span className="text-xs text-muted-foreground">
+                        RFC: {doc.creatorRfc}
+                      </span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {/* Las acciones del menú operan sobre el documento o lo consultan en un
-                      modal, pero ninguna es una manera de abrirlo: el clic se detiene acá para
-                      que usarlas no navegue también al detalle. Incluye la activación por
-                      teclado del menú, que también emite un clic sobre el disparador. */}
-                    <div
-                      className="flex items-center justify-end gap-1"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {/* Visualizar es la acción explícita de abrir el documento: lleva al mismo
-                        detalle con visor que la fila, pero como un control con nombre propio
-                        ("Ver documento …"), visible sin descubrir que la fila es clicable. El
-                        `stopPropagation` de este contenedor evita que también lo active la fila. */}
-                      {onRowSelect && (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Ver documento ${doc.fileName}`}
-                                onClick={() => onRowSelect(doc.id)}
-                              />
-                            }
-                          >
-                            <Eye className="size-4" />
-                          </TooltipTrigger>
-                          <TooltipContent>Ver documento</TooltipContent>
-                        </Tooltip>
-                      )}
-                      <DocumentRowActions
-                        isDownloading={isDownloading}
-                        onDownload={() => downloadMutation.mutate(doc.id)}
-                        onViewParticipants={() => setParticipantsDoc(doc)}
-                        onShare={() => setShareDoc(doc)}
-                        onArchive={
-                          canArchive
-                            ? () => archiveMutation.mutate(doc.id)
-                            : undefined
-                        }
-                        isArchiving={isArchiving}
-                        onRestore={
-                          canRestore
-                            ? () => restoreMutation.mutate(doc.id)
-                            : undefined
-                        }
-                        isRestoring={isRestoring}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                  </div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {
+                    PARTICIPATION_LABELS[
+                      doc.participation ?? DocumentParticipation.Participant
+                    ]
+                  }
+                </TableCell>
+                <TableCell>
+                  <StatusIndicator
+                    tone={STATUS_TONE[doc.status]}
+                    label={STATUS_LABELS[doc.status]}
+                  />
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  <DataTableDate date={doc.createdAt} />
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  <DataTableDate
+                    date={doc.signedAt}
+                    emptyLabel={UNSIGNED_DATE_LABEL}
+                  />
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {doc.signatureType ? (
+                    SIGNATURE_TYPE_LABELS[doc.signatureType]
+                  ) : (
+                    // Documento anterior a que el tipo de firma se registrara: un guion dice
+                    // "no se sabe", que es la verdad; suponer "Simple" sería inventar.
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                {/* La columna Acciones se conserva, pero vacía: ni el ojo de "Ver documento" ni el
+                  menú de tres puntos (historia "Eliminar acciones de la tabla de documentos").
+                  Al detalle se sigue llegando con la fila. */}
+                <TableCell />
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
 
@@ -585,18 +458,6 @@ export default function DocumentsTable({
           </div>
         </div>
       </DataTableCard>
-
-      <ShareDocumentDialog
-        documentId={shareDoc?.id ?? null}
-        fileName={shareDoc?.fileName}
-        onOpenChange={(open) => !open && setShareDoc(null)}
-      />
-
-      <DocumentParticipantsDialog
-        documentId={participantsDoc?.id ?? null}
-        fileName={participantsDoc?.fileName}
-        onOpenChange={(open) => !open && setParticipantsDoc(null)}
-      />
     </div>
   );
 }

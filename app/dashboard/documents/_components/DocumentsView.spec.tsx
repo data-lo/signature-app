@@ -8,24 +8,6 @@ import { useState } from 'react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 
 jest.mock('../_hooks/useDocuments');
-const restoreMutate = jest.fn();
-jest.mock('../_hooks/useRestoreArchivedDocument', () => ({
-  useRestoreArchivedDocument: () => ({
-    mutate: restoreMutate,
-    isPending: false,
-    variables: undefined,
-  }),
-}));
-jest.mock('../_hooks/useDownloadDocument', () => ({
-  useDownloadDocument: () => ({
-    mutate: jest.fn(),
-    isPending: false,
-    variables: undefined,
-  }),
-}));
-jest.mock('../[documentId]/_hooks/useDocumentDetail', () => ({
-  useDocumentDetail: () => ({ data: undefined, isLoading: false }),
-}));
 
 const push = jest.fn();
 const searchParams = new URLSearchParams();
@@ -128,9 +110,13 @@ describe('DocumentsView', () => {
       within(panel).queryByRole('button', { name: /^aplicar$|^aceptar$/i }),
     ).not.toBeInTheDocument();
 
-    await user.click(within(panel).getByRole('button', { name: 'Creados por mí' }));
+    await user.click(
+      within(panel).getByRole('button', { name: 'Creados por mí' }),
+    );
 
-    await waitFor(() => expect(lastFilters().view).toBe(DocumentView.CreatedByMe));
+    await waitFor(() =>
+      expect(lastFilters().view).toBe(DocumentView.CreatedByMe),
+    );
   });
 
   /**
@@ -144,10 +130,9 @@ describe('DocumentsView', () => {
     await user.click(screen.getByRole('button', { name: /filtros/i }));
     const panel = await screen.findByRole('dialog');
 
-    expect(within(panel).getByRole('button', { name: 'Todos' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(
+      within(panel).getByRole('button', { name: 'Todos' }),
+    ).toHaveAttribute('aria-pressed', 'true');
     expect(
       within(panel).getByRole('button', { name: 'En espera de firma' }),
     ).toHaveAttribute('aria-pressed', 'false');
@@ -170,7 +155,9 @@ describe('DocumentsView', () => {
 
     await user.click(screen.getByRole('button', { name: /filtros/i }));
     const panel = await screen.findByRole('dialog');
-    await user.click(within(panel).getByRole('button', { name: 'En espera de firma' }));
+    await user.click(
+      within(panel).getByRole('button', { name: 'En espera de firma' }),
+    );
     await user.click(within(panel).getByRole('button', { name: 'Rechazado' }));
 
     await waitFor(() =>
@@ -192,7 +179,9 @@ describe('DocumentsView', () => {
 
     await user.click(screen.getByRole('button', { name: /filtros/i }));
     const panel = await screen.findByRole('dialog');
-    await user.click(within(panel).getByRole('button', { name: 'En espera de firma' }));
+    await user.click(
+      within(panel).getByRole('button', { name: 'En espera de firma' }),
+    );
     await user.keyboard('{Escape}');
 
     const chip = await screen.findByRole('button', {
@@ -338,123 +327,6 @@ describe('DocumentsView', () => {
       expect(
         screen.queryByText(/documentos archivados/i),
       ).not.toBeInTheDocument();
-    });
-
-    /** Lo que se lista ahí ya está archivado: ofrecer "Archivar" otra vez no tiene sentido. */
-    it('en la vista de archivados no ofrece "Archivar"', async () => {
-      respondWith([
-        {
-          id: 'doc-archivado',
-          fileName: 'contrato.pdf',
-          creator: 'Ana López',
-          totalPages: 1,
-          status: DocumentStatus.Signed,
-          createdAt: '2026-03-15T12:00:00.000Z',
-          signedAt: '2026-05-10T12:00:00.000Z',
-        },
-      ]);
-      const user = userEvent.setup();
-      renderWithProviders(<DocumentsView />);
-
-      const panel = await openPanel(user);
-      await user.click(
-        within(panel).getByRole('button', { name: 'Archivados' }),
-      );
-      await user.keyboard('{Escape}');
-
-      await user.click(
-        screen.getByRole('button', { name: /acciones del documento/i }),
-      );
-      const menu = await screen.findByRole('menu');
-
-      expect(
-        within(menu).getByRole('menuitem', { name: 'Descargar' }),
-      ).toBeInTheDocument();
-      expect(
-        within(menu).queryByRole('menuitem', { name: /archivar/i }),
-      ).not.toBeInTheDocument();
-    });
-
-    /**
-     * Recuperar es el camino de vuelta de "Archivar": vive en la vista de archivados y pide el mismo
-     * permiso de lectura que archivar.
-     */
-    describe('recuperar un documento archivado', () => {
-      const ARCHIVED_DOCUMENT = {
-        id: 'doc-archivado',
-        fileName: 'contrato.pdf',
-        creator: 'Ana López',
-        totalPages: 1,
-        status: DocumentStatus.Signed,
-        createdAt: '2026-03-15T12:00:00.000Z',
-        signedAt: '2026-05-10T12:00:00.000Z',
-      };
-
-      beforeEach(() => restoreMutate.mockReset());
-
-      async function openRowMenu(
-        user: ReturnType<typeof userEvent.setup>,
-        { archived }: { archived: boolean },
-      ) {
-        if (archived) {
-          const panel = await openPanel(user);
-          await user.click(
-            within(panel).getByRole('button', { name: 'Archivados' }),
-          );
-          await user.keyboard('{Escape}');
-        }
-        await user.click(
-          screen.getByRole('button', { name: /acciones del documento/i }),
-        );
-        return screen.findByRole('menu');
-      }
-
-      it('en la vista de archivados ofrece "Recuperar" y lo ejecuta sobre esa fila', async () => {
-        respondWith([ARCHIVED_DOCUMENT]);
-        const user = userEvent.setup();
-        renderWithProviders(<DocumentsView />, {
-          permissions: ['DOCUMENT.READ_OWN'],
-        });
-
-        const menu = await openRowMenu(user, { archived: true });
-        await user.click(
-          within(menu).getByRole('menuitem', { name: 'Recuperar' }),
-        );
-
-        expect(restoreMutate).toHaveBeenCalledWith('doc-archivado');
-        expect(
-          screen.queryByRole('menuitem', { name: 'Archivar' }),
-        ).not.toBeInTheDocument();
-      });
-
-      it('fuera de la vista de archivados no ofrece "Recuperar"', async () => {
-        respondWith([ARCHIVED_DOCUMENT]);
-        const user = userEvent.setup();
-        renderWithProviders(<DocumentsView />, {
-          permissions: ['DOCUMENT.READ_OWN'],
-        });
-
-        const menu = await openRowMenu(user, { archived: false });
-
-        expect(
-          within(menu).getByRole('menuitem', { name: 'Archivar' }),
-        ).toBeInTheDocument();
-        expect(
-          within(menu).queryByRole('menuitem', { name: 'Recuperar' }),
-        ).not.toBeInTheDocument();
-      });
-
-      it('sin permiso de lectura de documentos no ofrece "Recuperar"', async () => {
-        respondWith([ARCHIVED_DOCUMENT]);
-        const user = userEvent.setup();
-        renderWithProviders(<DocumentsView />);
-
-        const menu = await openRowMenu(user, { archived: true });
-
-        expect(
-          within(menu).queryByRole('menuitem', { name: 'Recuperar' }),
-        ).not.toBeInTheDocument();
-      });
     });
   });
 
@@ -716,9 +588,7 @@ describe('DocumentsView', () => {
       renderWithProviders(<DocumentsView />);
       await user.click(control('Página siguiente'));
 
-      screen
-        .getByRole('combobox', { name: 'Documentos por página' })
-        .focus();
+      screen.getByRole('combobox', { name: 'Documentos por página' }).focus();
       await user.keyboard('{Enter}');
       await user.click(await screen.findByRole('option', { name: '10' }));
 

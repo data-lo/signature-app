@@ -1,58 +1,11 @@
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
+import { renderWithProviders, screen, within } from '@/test-utils';
 import DocumentsTable, {
   documentRowIndex,
   EMPTY_DOCUMENTS_MESSAGE,
   type DocumentListItem,
 } from './DocumentsTable';
-import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
-import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
-import {
-  DocumentStatus,
-  ParticipantRole,
-  ParticipantStatus,
-  SignatureType,
-} from '@/lib/enums/document';
-
-jest.mock('../_hooks/useDownloadDocument');
-jest.mock('../_hooks/useArchiveCompletedDocument');
-jest.mock('../[documentId]/_hooks/useDocumentDetail');
-jest.mock('./PdfPreview', () => ({
-  __esModule: true,
-  default: () => <div>PDF preview</div>,
-}));
-jest.mock('react-hot-toast', () => ({
-  __esModule: true,
-  default: { success: jest.fn(), error: jest.fn() },
-}));
-
-const mockedUseDownloadDocument = useDownloadDocument as jest.Mock;
-const mockedUseArchiveCompletedDocument =
-  useArchiveCompletedDocument as jest.Mock;
-const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
-
-/** Detalle mínimo del documento: el modal de participantes solo lee `participants`. */
-function buildDetail(participants: unknown[] = []) {
-  return {
-    data: { id: 'doc-1', participants },
-    isLoading: false,
-    isError: false,
-  };
-}
-
-function buildParticipant(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'part-1',
-    userId: null,
-    email: 'juan.perez@empresa.com',
-    name: 'Juan Pérez',
-    role: ParticipantRole.Signer,
-    status: ParticipantStatus.Pending,
-    cancellationReason: null,
-    ...overrides,
-  };
-}
+import { DocumentStatus, SignatureType } from '@/lib/enums/document';
 
 function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
   return {
@@ -86,43 +39,7 @@ function dataCell(header: string): HTMLElement {
   return within(row).getAllByRole('cell')[columnIndex];
 }
 
-/** Abre el menú de tres puntos de la única fila renderizada y devuelve su contenido. */
-async function openRowMenu(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(
-    screen.getByRole('button', { name: /acciones del documento/i }),
-  );
-  return screen.findByRole('menu');
-}
-
-/**
- * Permisos de lectura con los que se ofrece "Archivar" (ver `ARCHIVE_DOCUMENT_PERMISSIONS`): los de
- * un OWNER o ADMIN de fábrica. Las pruebas que no los pasan renderizan sin permisos.
- */
-const DOCUMENT_READER_PERMISSIONS = [
-  'DOCUMENT.READ_OWN',
-  'DOCUMENT.READ_ORGANIZATION',
-] as const;
-
 describe('DocumentsTable', () => {
-  const downloadMutate = jest.fn();
-  const archiveMutate = jest.fn();
-
-  beforeEach(() => {
-    downloadMutate.mockReset();
-    archiveMutate.mockReset();
-    mockedUseArchiveCompletedDocument.mockReturnValue({
-      mutate: archiveMutate,
-      isPending: false,
-      variables: undefined,
-    });
-    mockedUseDownloadDocument.mockReturnValue({
-      mutate: downloadMutate,
-      isPending: false,
-      variables: undefined,
-    });
-    mockedUseDocumentDetail.mockReturnValue(buildDetail([buildParticipant()]));
-  });
-
   describe('estructura de la tabla', () => {
     it('renderiza las columnas en el orden Índice / Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
@@ -222,7 +139,10 @@ describe('DocumentsTable', () => {
       renderWithProviders(
         <DocumentsTable
           documents={[
-            buildDoc({ status: DocumentStatus.PendingSignature, signedAt: null }),
+            buildDoc({
+              status: DocumentStatus.PendingSignature,
+              signedAt: null,
+            }),
           ]}
         />,
       );
@@ -615,297 +535,11 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      screen
-        .getByRole('combobox', { name: 'Documentos por página' })
-        .focus();
+      screen.getByRole('combobox', { name: 'Documentos por página' }).focus();
       await user.keyboard('{Enter}');
       await user.click(await screen.findByRole('option', { name: '50' }));
 
       expect(onPageSizeChange).toHaveBeenCalledWith(50);
-    });
-  });
-
-  describe('menú de acciones', () => {
-    /**
-     * `buildDoc()` construye un documento ya firmado por todos, así que su menú incluye
-     * "Archivar"; ver el `describe('archivar')` para cuándo aparece y cuándo no.
-     */
-    it('concentra Descargar, Ver participantes, Compartir y Archivar en el menú de tres puntos', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu)
-          .getAllByRole('menuitem')
-          .map((item) => item.textContent?.trim()),
-      ).toEqual(['Descargar', 'Ver participantes', 'Compartir', 'Archivar']);
-    });
-
-    it('bug corregido: "Descargar" de un documento firmado dispara la descarga en vez de no hacer nada', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-        />,
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: /descargar/i }),
-      );
-
-      expect(downloadMutate).toHaveBeenCalledWith('doc-1');
-    });
-
-    it('muestra "Descargando..." y deshabilita la acción mientras la descarga de ese documento está en curso', async () => {
-      mockedUseDownloadDocument.mockReturnValue({
-        mutate: downloadMutate,
-        isPending: true,
-        variables: 'doc-1',
-      });
-      const user = userEvent.setup();
-      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).getByRole('menuitem', { name: /descargando/i }),
-      ).toHaveAttribute('data-disabled');
-    });
-
-    it('no deshabilita la descarga de un documento distinto al que está en curso', async () => {
-      mockedUseDownloadDocument.mockReturnValue({
-        mutate: downloadMutate,
-        isPending: true,
-        variables: 'otro-doc',
-      });
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc({ id: 'doc-1' })]} />,
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).getByRole('menuitem', { name: /^descargar/i }),
-      ).not.toHaveAttribute('data-disabled');
-    });
-
-    /**
-     * Historia "Hacer seleccionables las filas": firmar y ver detalle salieron del menú porque
-     * las dos abrían `/dashboard/documents/:id`, que es lo que ahora hace la fila.
-     */
-    it.each([/^firmar$/i, /ver detalle/i])(
-      'ya no ofrece %s en el menú',
-      async (name) => {
-        const user = userEvent.setup();
-        renderWithProviders(
-          <DocumentsTable
-            documents={[buildDoc({ status: DocumentStatus.PendingSignature })]}
-            onRowSelect={jest.fn()}
-          />,
-        );
-
-        const menu = await openRowMenu(user);
-
-        expect(
-          within(menu).queryByRole('menuitem', { name }),
-        ).not.toBeInTheDocument();
-      },
-    );
-
-    it('tampoco ofrece firmar como botón de texto en la fila', () => {
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.PendingSignature })]}
-          onRowSelect={jest.fn()}
-        />,
-      );
-
-      expect(
-        screen.queryByRole('button', { name: /^firmar$/i }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /acciones del documento/i }),
-      ).toBeInTheDocument();
-    });
-  });
-
-  /**
-   * Historia "Hacer seleccionables las filas en tablas de documentos": la fila entera es el
-   * camino al detalle, y las acciones que quedan no deben dispararlo.
-   */
-  /**
-   * Archivar es la única acción del menú que depende del documento y no sólo de la fila: se
-   * ofrece sobre lo que ya está firmado por todos, y sobre nada más.
-   *
-   * Antes dependía además de la sección —vivía sólo en "Completados"—, pero con la lista
-   * unificada la misma tabla muestra a la vez lo pendiente y lo firmado, así que el estatus de
-   * cada documento es lo único que queda por consultar.
-   */
-  describe('archivar', () => {
-    it('ofrece "Archivar" en un documento firmado por todos', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-        />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).getByRole('menuitem', { name: 'Archivar' }),
-      ).toBeInTheDocument();
-    });
-
-    it('archiva el documento de esa fila', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ id: 'doc-9', status: DocumentStatus.Signed })]}
-        />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: 'Archivar' }),
-      );
-
-      expect(archiveMutate).toHaveBeenCalledWith('doc-9');
-    });
-
-    /**
-     * El backend rechaza archivar cualquier cosa que no esté en `signed`, así que ofrecerlo sobre
-     * un documento cancelado sólo produciría un error que el usuario no puede evitar.
-     */
-    it.each([
-      DocumentStatus.PendingSignature,
-      DocumentStatus.Cancelled,
-      DocumentStatus.CancellationPending,
-      DocumentStatus.Rejected,
-    ])('no ofrece archivar un documento en estatus %s', async (status) => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc({ status })]} />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).queryByRole('menuitem', { name: /archivar/i }),
-      ).not.toBeInTheDocument();
-    });
-
-    it('muestra "Archivando..." y deshabilita la acción mientras ese documento se archiva', async () => {
-      mockedUseArchiveCompletedDocument.mockReturnValue({
-        mutate: archiveMutate,
-        isPending: true,
-        variables: 'doc-1',
-      });
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-        />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).getByRole('menuitem', { name: /archivando/i }),
-      ).toHaveAttribute('data-disabled');
-    });
-
-    /**
-     * El caso de la historia: el documento lo creó otra persona y quien mira no participa en
-     * él, pero su rol ve los documentos de toda la organización. La opción depende del permiso,
-     * no de quién creó el documento.
-     */
-    it('ofrece "Archivar" a quien no creó el documento si tiene DOCUMENT.READ_ORGANIZATION', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[
-            buildDoc({
-              id: 'doc-ajeno',
-              creator: 'Otra Persona',
-              status: DocumentStatus.Signed,
-            }),
-          ]}
-        />,
-        { permissions: ['DOCUMENT.READ_ORGANIZATION'] },
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: 'Archivar' }),
-      );
-
-      expect(archiveMutate).toHaveBeenCalledWith('doc-ajeno');
-    });
-
-    it('ofrece "Archivar" al creador con DOCUMENT.READ_OWN', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-        />,
-        { permissions: ['DOCUMENT.READ_OWN'] },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).getByRole('menuitem', { name: 'Archivar' }),
-      ).toBeInTheDocument();
-    });
-
-    /** Sin permiso de lectura no se ofrece, aunque el documento esté firmado. */
-    it('no ofrece "Archivar" sin permiso de lectura de documentos', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-        />,
-        { permissions: ['DOCUMENT.CREATE'] },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).queryByRole('menuitem', { name: /archivar/i }),
-      ).not.toBeInTheDocument();
-      expect(
-        within(menu).getByRole('menuitem', { name: 'Descargar' }),
-      ).toBeInTheDocument();
-    });
-
-    /** La vista de archivados apaga la acción: todo lo que lista ya está archivado. */
-    it('con canArchiveRows en false no ofrece "Archivar" ni en un documento firmado', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-          canArchiveRows={false}
-        />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).queryByRole('menuitem', { name: /archivar/i }),
-      ).not.toBeInTheDocument();
     });
   });
 
@@ -930,6 +564,10 @@ describe('DocumentsTable', () => {
     });
   });
 
+  /**
+   * Historia "Hacer seleccionables las filas en tablas de documentos": la fila entera es el
+   * camino al detalle del documento.
+   */
   describe('fila seleccionable', () => {
     /** La única fila de datos renderizada (la primera de `getAllByRole('row')` es el encabezado). */
     function dataRow(): HTMLElement {
@@ -1013,56 +651,6 @@ describe('DocumentsTable', () => {
       // Sin `onRowSelect` la fila es texto: el clic no rompe nada ni navega a ningún lado.
       await user.click(within(dataRow()).getByText('contrato.pdf'));
     });
-
-    it('descargar desde el menú no dispara la navegación de la fila', async () => {
-      const user = userEvent.setup();
-      const onRowSelect = jest.fn();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: /descargar/i }),
-      );
-
-      expect(downloadMutate).toHaveBeenCalledWith('doc-1');
-      expect(onRowSelect).not.toHaveBeenCalled();
-    });
-
-    it('compartir desde el menú no dispara la navegación de la fila', async () => {
-      const user = userEvent.setup();
-      const onRowSelect = jest.fn();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: /compartir/i }),
-      );
-
-      expect(
-        await screen.findByLabelText(/enlace público del documento/i),
-      ).toBeInTheDocument();
-      expect(onRowSelect).not.toHaveBeenCalled();
-    });
-
-    it('ver participantes desde el menú no dispara la navegación de la fila', async () => {
-      const user = userEvent.setup();
-      const onRowSelect = jest.fn();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
-      );
-
-      expect(await screen.findByRole('dialog')).toBeInTheDocument();
-      expect(onRowSelect).not.toHaveBeenCalled();
-    });
   });
 
   /**
@@ -1112,75 +700,7 @@ describe('DocumentsTable', () => {
       expect(within(row).getByText('contrato.pdf')).toBeInTheDocument();
       expect(within(row).getByText('Creador Uno')).toBeInTheDocument();
       expect(within(row).getByText('Firmado por todos')).toBeInTheDocument();
-      expect(
-        within(row).getByRole('button', { name: /acciones del documento/i }),
-      ).toBeInTheDocument();
-    });
-  });
-
-  /**
-   * Historia "Consultar participantes desde las acciones del documento": la tabla solo abre el
-   * modal con el documento de la fila; lo que se muestra dentro se prueba en
-   * DocumentParticipantsDialog.spec.
-   */
-  describe('ver participantes', () => {
-    it('abre el modal de participantes del documento de esa fila', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc({ id: 'doc-9' })]} />,
-      );
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
-      );
-
-      const dialog = await screen.findByRole('dialog');
-      expect(within(dialog).getByText('Participantes')).toBeInTheDocument();
-      expect(within(dialog).getByText('Juan Pérez')).toBeInTheDocument();
-      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
-        'doc-9',
-        expect.objectContaining({ enabled: true }),
-      );
-    });
-
-    /** Cerrado no consulta: el detalle solo se pide cuando alguien abre el modal. */
-    it('no consulta el detalle mientras el modal está cerrado', () => {
-      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
-
-      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
-        '',
-        expect.objectContaining({ enabled: false }),
-      );
-    });
-  });
-
-  describe('compartir', () => {
-    it('genera el enlace a la vista pública del documento y lo copia al portapapeles', async () => {
-      // `userEvent.setup()` instala su propio stub de `navigator.clipboard`, así que la copia se
-      // verifica leyendo de vuelta ese portapapeles en vez de espiar `writeText`.
-      const user = userEvent.setup();
-      const expectedUrl = `${window.location.origin}/public/documents/doc-1`;
-      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
-
-      const menu = await openRowMenu(user);
-      await user.click(
-        within(menu).getByRole('menuitem', { name: /compartir/i }),
-      );
-
-      const link = await screen.findByLabelText(
-        /enlace público del documento/i,
-      );
-      expect(link).toHaveValue(expectedUrl);
-
-      await user.click(screen.getByRole('button', { name: /copiar enlace/i }));
-
-      await waitFor(() =>
-        expect(
-          screen.getByRole('button', { name: /enlace copiado/i }),
-        ).toBeInTheDocument(),
-      );
-      expect(await navigator.clipboard.readText()).toBe(expectedUrl);
+      expect(within(row).getAllByRole('cell')).toHaveLength(9);
     });
   });
 
@@ -1229,82 +749,49 @@ describe('DocumentsTable', () => {
     });
   });
 
-  describe('visualizar documento', () => {
-    it('cada fila tiene una acción "Ver documento" con el nombre de su archivo', () => {
+  /**
+   * Historia "Eliminar acciones de la tabla de documentos": la columna Acciones se conserva,
+   * pero sus celdas quedan vacías: ni el ojo de "Ver documento" ni el menú de tres puntos.
+   */
+  describe('columna Acciones', () => {
+    it('sigue siendo la última columna de la tabla', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const headers = screen.getAllByRole('columnheader');
+      expect(headers.at(-1)).toHaveTextContent('Acciones');
+    });
+
+    it('deja vacía la celda de cada fila', () => {
       renderWithProviders(
         <DocumentsTable
-          documents={[
-            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
-            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
-          ]}
+          documents={[buildDoc({ id: 'doc-1' }), buildDoc({ id: 'doc-2' })]}
+          onRowSelect={jest.fn()}
+        />,
+      );
+
+      const actionCells = screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell').at(-1)!);
+      expect(actionCells).toHaveLength(2);
+      for (const cell of actionCells) {
+        expect(cell).toBeEmptyDOMElement();
+      }
+    });
+
+    it('no ofrece "Ver documento" ni el menú de acciones en ninguna fila', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-1' }), buildDoc({ id: 'doc-2' })]}
           onRowSelect={jest.fn()}
         />,
       );
 
       expect(
-        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
-      ).toBeInTheDocument();
-    });
-
-    it('abre el documento de esa fila una sola vez (la fila no lo vuelve a abrir)', async () => {
-      const user = userEvent.setup();
-      const onRowSelect = jest.fn();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[
-            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
-            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
-          ]}
-          onRowSelect={onRowSelect}
-        />,
-      );
-
-      await user.click(
-        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
-      );
-
-      expect(onRowSelect).toHaveBeenCalledTimes(1);
-      expect(onRowSelect).toHaveBeenCalledWith('doc-2');
-    });
-
-    it('se puede activar con el teclado', async () => {
-      const user = userEvent.setup();
-      const onRowSelect = jest.fn();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ id: 'doc-9' })]}
-          onRowSelect={onRowSelect}
-        />,
-      );
-
-      screen.getByRole('button', { name: 'Ver documento contrato.pdf' }).focus();
-      await user.keyboard('{Enter}');
-
-      expect(onRowSelect).toHaveBeenCalledTimes(1);
-      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
-    });
-
-    it('muestra el tooltip "Ver documento" al pasar el cursor', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
-      );
-
-      await user.hover(
-        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
-      );
-
-      expect(await screen.findByText('Ver documento')).toBeInTheDocument();
-    });
-
-    it('no se ofrece si la vista no tiene a dónde abrir el documento', () => {
-      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
-
-      expect(
         screen.queryByRole('button', { name: /ver documento/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /acciones del documento/i }),
       ).not.toBeInTheDocument();
     });
   });
