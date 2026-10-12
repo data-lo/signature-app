@@ -56,6 +56,8 @@ export interface DocumentViewProps {
   signing: DocumentSigningProps;
   /** Flujo de Didit; sólo para un firmante con firma BIOMETRIC (ver `DocumentSignaturePanel`). */
   biometric?: BiometricSigningProps;
+  /** El firmante biométrico intentó firmar sin identidad verificada (ver `DocumentSignaturePanel`). */
+  biometricIdentityRequired?: boolean;
   verification: SignatureVerificationProps;
 
   reject: {
@@ -121,6 +123,7 @@ export default function DocumentView({
   needsSimpleSignatureSetup,
   signing,
   biometric,
+  biometricIdentityRequired = false,
   verification,
   reject,
   share,
@@ -210,6 +213,7 @@ export default function DocumentView({
             verification={verification}
             signing={signing}
             biometric={biometric}
+            biometricIdentityRequired={biometricIdentityRequired}
             onRejectClick={reject.onOpenForm}
           />
         )}
