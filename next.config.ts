@@ -30,10 +30,6 @@ const nextConfig: NextConfig = {
     middlewareClientMaxBodySize: PROXY_MAX_BODY_BYTES,
     proxyTimeout: PROXY_TIMEOUT_MS,
   },
-  webpack: (config) => {
-    config.resolve.alias.canvas = false;
-    return config;
-  },
   /**
    * Las rutas del módulo de documentos cuando estaba partido en secciones.
    *

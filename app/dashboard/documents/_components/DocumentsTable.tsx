@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import {
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -49,6 +51,8 @@ import {
   type DocumentsPageSize,
 } from '../_config/pagination';
 import {
+  DEFAULT_DOCUMENT_NAME_SORT,
+  type DocumentNameSort,
   nextDocumentNameSort,
   sortDocumentsByName,
 } from '../_config/sorting';
@@ -209,7 +213,18 @@ interface DocumentsTableProps {
   emptyState?: React.ReactNode;
 }
 
-function SortableHeader({ children }: { children: React.ReactNode }) {
+const ARIA_SORT: Record<DocumentNameSort, 'none' | 'ascending' | 'descending'> = {
+  none: 'none',
+  asc: 'ascending',
+  desc: 'descending',
+};
+
+interface SortableHeaderProps {
+  children: React.ReactNode;
+  onToggle: () => void;
+}
+
+function SortableHeader({ children, onToggle }: SortableHeaderProps) {
   return (
     <button
       type="button"
@@ -217,7 +232,7 @@ function SortableHeader({ children }: { children: React.ReactNode }) {
       className="-mx-1 flex items-center gap-1 rounded-sm px-1 select-none outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       {children}
-      <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+      <ArrowUpDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
     </button>
   );
 }
@@ -234,6 +249,9 @@ export default function DocumentsTable({
   errorMessage,
   emptyState,
 }: DocumentsTableProps) {
+  const [nameSort, setNameSort] = useState<DocumentNameSort>(
+    DEFAULT_DOCUMENT_NAME_SORT,
+  );
   /**
    * Si hay página anterior o siguiente se deduce de dónde estamos: el endpoint unificado devuelve
    * `page` y `totalPages` y ya no manda `hasNextPage`/`hasPrevPage`. Eran dos campos que repetían
@@ -273,7 +291,6 @@ export default function DocumentsTable({
             <TableHead className="w-16">Índice</TableHead>
             <TableHead aria-sort={ARIA_SORT[nameSort]}>
               <SortableHeader
-                sort={nameSort}
                 onToggle={() => setNameSort(nextDocumentNameSort)}
               >
                 Documento
