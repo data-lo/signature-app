@@ -1,7 +1,9 @@
 'use client';
 
 import {
+  ArrowDown,
   ArrowUp,
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -49,6 +51,12 @@ import {
   lastDocumentsPage,
   type DocumentsPageSize,
 } from '../_config/pagination';
+import {
+  DEFAULT_DOCUMENT_NAME_SORT,
+  nextDocumentNameSort,
+  sortDocumentsByName,
+  type DocumentNameSort,
+} from '../_config/sorting';
 
 export interface DocumentListItem {
   id: string;
@@ -208,10 +216,14 @@ interface DocumentsTableProps {
 
 function SortableHeader({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex items-center gap-1 cursor-pointer select-none">
+    <button
+      type="button"
+      onClick={onToggle}
+      className="-mx-1 flex items-center gap-1 rounded-sm px-1 select-none outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
       {children}
-      <ArrowUp className="size-3.5 text-muted-foreground" />
-    </span>
+      <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+    </button>
   );
 }
 
@@ -253,7 +265,8 @@ export default function DocumentsTable({
       : documents.length === 0
         ? 'empty'
         : 'rows';
-  const visibleDocuments = bodyState === 'rows' ? documents : [];
+  const visibleDocuments =
+    bodyState === 'rows' ? sortDocumentsByName(documents, nameSort) : [];
 
   return (
     <div className="flex-1 min-w-0">
@@ -263,8 +276,13 @@ export default function DocumentsTable({
         <Table aria-busy={bodyState === 'loading' || undefined}>
           <DataTableHeader>
             <TableHead className="w-16">Índice</TableHead>
-            <TableHead>
-              <SortableHeader>Documento</SortableHeader>
+            <TableHead aria-sort={ARIA_SORT[nameSort]}>
+              <SortableHeader
+                sort={nameSort}
+                onToggle={() => setNameSort(nextDocumentNameSort)}
+              >
+                Documento
+              </SortableHeader>
             </TableHead>
             <TableHead>Creado por</TableHead>
             <TableHead>Participación</TableHead>

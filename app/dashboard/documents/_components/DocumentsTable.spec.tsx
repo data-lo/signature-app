@@ -44,11 +44,8 @@ describe('DocumentsTable', () => {
     it('renderiza las columnas en el orden Índice / Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
-      const headers = screen
-        .getAllByRole('columnheader')
-        .map((header) => header.textContent?.trim());
-
-      expect(headers).toEqual([
+      // Por nombre accesible: el de "Índice" se ve como un gato, pero se anuncia como "Índice".
+      const names = [
         'Índice',
         'Documento',
         'Creado por',
@@ -58,7 +55,23 @@ describe('DocumentsTable', () => {
         'Fecha de firma',
         'Tipo de firma',
         'Acciones',
-      ]);
+      ];
+
+      expect(screen.getAllByRole('columnheader')).toEqual(
+        names.map((name) => screen.getByRole('columnheader', { name })),
+      );
+    });
+
+    it('el encabezado del índice muestra un gato, oculto a los lectores de pantalla, y se anuncia como "Índice"', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const header = screen.getByRole('columnheader', { name: 'Índice' });
+      expect(within(header).getByText('🐱')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
+      expect(within(header).getByText('Índice')).toHaveClass('sr-only');
+      expect(screen.getAllByRole('columnheader')[0]).toBe(header);
     });
 
     /**
@@ -630,6 +643,8 @@ describe('DocumentsTable', () => {
         />,
       );
 
+      // El primer Tab cae en el botón de ordenar del encabezado Documento; el segundo, en la fila.
+      await user.tab();
       await user.tab();
       expect(
         screen.getByRole('button', { name: 'contrato.pdf' }),
@@ -707,8 +722,8 @@ describe('DocumentsTable', () => {
   describe('índice', () => {
     function indexCells(): string[] {
       const headers = screen.getAllByRole('columnheader');
-      const column = headers.findIndex(
-        (header) => header.textContent?.trim() === 'Índice',
+      const column = headers.indexOf(
+        screen.getByRole('columnheader', { name: 'Índice' }),
       );
       return screen
         .getAllByRole('row')
