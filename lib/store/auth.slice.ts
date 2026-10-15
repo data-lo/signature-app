@@ -19,6 +19,39 @@ export function isSigningCredentialConfigured(
   return status === SigningCredentialStatus.Configured;
 }
 
+/**
+ * Estados en los que la identidad del usuario ya quedó aprobada por Didit: los dos últimos del
+ * avance, con o sin la firma PNG registrada. La firma biométrica sólo necesita la identidad (el
+ * rostro se compara contra ella), no la rúbrica.
+ */
+const IDENTITY_VERIFIED_STATUSES: readonly SigningCredentialStatus[] = [
+  SigningCredentialStatus.SignaturePending,
+  SigningCredentialStatus.Configured,
+];
+
+/**
+ * Indica si el usuario ya tiene su identidad verificada.
+ *
+ * Es la condición previa de la firma biométrica: el backend compara el rostro capturado contra
+ * la identidad aprobada, y sin ella rechaza abrir la sesión de Didit.
+ *
+ * @param status - `signingCredentialStatus` del usuario; `undefined` si todavía no se conoce.
+ * @returns `true` si la identidad está aprobada; `false` en cualquier otro estado o si se desconoce.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * hasVerifiedIdentity(SigningCredentialStatus.SignaturePending); // true
+ * hasVerifiedIdentity(SigningCredentialStatus.IdentityVerificationRequired); // false
+ * ```
+ */
+export function hasVerifiedIdentity(
+  status: SigningCredentialStatus | undefined,
+): boolean {
+  return status !== undefined && IDENTITY_VERIFIED_STATUSES.includes(status);
+}
+
 export const createAuthSlice: StateCreator<AuthState, [], [], AuthSlice> = (
   set,
 ) => ({
@@ -46,7 +79,9 @@ export const createAuthSlice: StateCreator<AuthState, [], [], AuthSlice> = (
    */
   setPersonalConfigured: (value) =>
     set((state) =>
-      state.user ? { user: { ...state.user, personalConfigured: value } } : state,
+      state.user
+        ? { user: { ...state.user, personalConfigured: value } }
+        : state,
     ),
 
   logout: () =>

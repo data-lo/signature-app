@@ -2,6 +2,7 @@ import { useAuthStore } from './useAuthStore';
 import { buildBillingAccess } from '@/lib/api/billing.fixtures';
 import {
   derivePersonalConfigured,
+  hasVerifiedIdentity,
   isSigningCredentialConfigured,
 } from './auth.slice';
 import { SigningCredentialStatus } from '@/lib/enums/identity';
@@ -20,7 +21,8 @@ function buildProfile(overrides: Partial<CurrentUser> = {}): CurrentUser {
     secondaryEmail: null,
     rfc: null,
     signatureId: null,
-    signingCredentialStatus: SigningCredentialStatus.IdentityVerificationRequired,
+    signingCredentialStatus:
+      SigningCredentialStatus.IdentityVerificationRequired,
     ...overrides,
   };
 }
@@ -105,6 +107,31 @@ describe('isSigningCredentialConfigured', () => {
   /** Sin perfil hidratado no se afirma que falte nada: sólo que todavía no está configurada. */
   it('es false si todavia no se conoce el estado', () => {
     expect(isSigningCredentialConfigured(undefined)).toBe(false);
+  });
+});
+
+describe('hasVerifiedIdentity', () => {
+  it.each([
+    SigningCredentialStatus.SignaturePending,
+    SigningCredentialStatus.Configured,
+  ])('es true en %s: la identidad ya está aprobada', (status) => {
+    expect(hasVerifiedIdentity(status)).toBe(true);
+  });
+
+  it.each([
+    SigningCredentialStatus.IdentityVerificationRequired,
+    SigningCredentialStatus.IdentityVerificationPending,
+    SigningCredentialStatus.IdentityVerificationInProgress,
+    SigningCredentialStatus.IdentityVerificationInReview,
+    SigningCredentialStatus.IdentityVerificationRetryRequired,
+    SigningCredentialStatus.IdentityVerificationFailed,
+    SigningCredentialStatus.IdentityVerificationMaxAttemptsExceeded,
+  ])('es false en %s', (status) => {
+    expect(hasVerifiedIdentity(status)).toBe(false);
+  });
+
+  it('es false si todavía no se conoce el estado', () => {
+    expect(hasVerifiedIdentity(undefined)).toBe(false);
   });
 });
 
@@ -237,7 +264,10 @@ describe('useAuthStore', () => {
       useAuthStore.getState().setAccountsList([
         buildAccount({
           id: 'org-1',
-          organizationDetail: { name: 'Acme Corp S.A. de C.V.', displayName: 'Acme' },
+          organizationDetail: {
+            name: 'Acme Corp S.A. de C.V.',
+            displayName: 'Acme',
+          },
         }),
       ]);
 
@@ -246,10 +276,12 @@ describe('useAuthStore', () => {
     });
 
     it('setOrganizationIndexDocuments cambia sólo las cuentas de esa organización', () => {
-      useAuthStore.getState().setAccountsList([
-        buildAccount({ id: 'account-1', organizationId: 'org-1' }),
-        buildAccount({ id: 'account-2', organizationId: 'org-2' }),
-      ]);
+      useAuthStore
+        .getState()
+        .setAccountsList([
+          buildAccount({ id: 'account-1', organizationId: 'org-1' }),
+          buildAccount({ id: 'account-2', organizationId: 'org-2' }),
+        ]);
 
       useAuthStore.getState().setOrganizationIndexDocuments('org-1', false);
 
@@ -259,10 +291,12 @@ describe('useAuthStore', () => {
     });
 
     it('mapea roleId=null y status=INACTIVE cuando el backend los manda así', () => {
-      useAuthStore.getState().setAccountsList([
-        buildAccount({ id: 'org-1', type: 'ORGANIZATION', roleId: null }),
-        buildAccount({ id: 'org-2', type: 'ORGANIZATION', isActive: false }),
-      ]);
+      useAuthStore
+        .getState()
+        .setAccountsList([
+          buildAccount({ id: 'org-1', type: 'ORGANIZATION', roleId: null }),
+          buildAccount({ id: 'org-2', type: 'ORGANIZATION', isActive: false }),
+        ]);
 
       const [withoutRole, revoked] = useAuthStore.getState().accountsList;
       expect(withoutRole.roleId).toBeNull();
@@ -275,7 +309,11 @@ describe('useAuthStore', () => {
       useAuthStore
         .getState()
         .setAccountsList([
-          buildAccount({ id: 'personal-1', type: 'PERSONAL', organizationId: null }),
+          buildAccount({
+            id: 'personal-1',
+            type: 'PERSONAL',
+            organizationId: null,
+          }),
         ]);
 
       useAuthStore.getState().addAccount(buildAccount({ id: 'org-2' }));
@@ -378,9 +416,9 @@ describe('useAuthStore', () => {
       expect(useAuthStore.getState().billingByAccountId['account-1']).toEqual(
         PERSONAL,
       );
-      expect(
-        useAuthStore.getState().billingByAccountId['account-org'],
-      ).toEqual(ORGANIZACION);
+      expect(useAuthStore.getState().billingByAccountId['account-org']).toEqual(
+        ORGANIZACION,
+      );
     });
   });
 
@@ -403,5 +441,4 @@ describe('useAuthStore', () => {
       expect(useAuthStore.getState()).toMatchObject(RESET_STATE);
     });
   });
-
 });

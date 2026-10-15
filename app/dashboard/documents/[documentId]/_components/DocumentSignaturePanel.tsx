@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { ErrorAlert } from '@/components/ui/error-alert';
 import SignatureVerificationCard, {
   type SignatureVerificationProps,
 } from './SignatureVerificationCard';
@@ -30,8 +31,20 @@ interface DocumentSignaturePanelProps {
    * Didit. `undefined` para los demás tipos de firma.
    */
   biometric?: BiometricSigningProps;
+  /**
+   * El firmante biométrico intentó firmar sin haber verificado su identidad: se muestra el
+   * `ErrorAlert` con el camino a "Identidad y firma" y la sesión de Didit no se abre.
+   */
+  biometricIdentityRequired?: boolean;
   onRejectClick: () => void;
 }
+
+/** Título del aviso de firma biométrica sin identidad verificada. */
+export const BIOMETRIC_IDENTITY_REQUIRED_TITLE = 'Verifica tu identidad';
+
+/** Mensaje del aviso de firma biométrica sin identidad verificada. */
+export const BIOMETRIC_IDENTITY_REQUIRED_MESSAGE =
+  'Para firmar con biometría primero necesitas validar tu identidad. Valídala y vuelve a intentarlo.';
 
 function signButtonLabel({
   isRequestingLocation,
@@ -61,6 +74,7 @@ export default function DocumentSignaturePanel({
   verification,
   signing,
   biometric,
+  biometricIdentityRequired = false,
   onRejectClick,
 }: DocumentSignaturePanelProps) {
   return (
@@ -98,6 +112,23 @@ export default function DocumentSignaturePanel({
           El código de verificación va ANTES también en la firma biométrica: el backend lo exige
           para abrir la sesión de Didit, no sólo para registrar la firma.
         */}
+        {!requiresVerification && biometric && biometricIdentityRequired && (
+          <ErrorAlert
+            title={BIOMETRIC_IDENTITY_REQUIRED_TITLE}
+            message={
+              <>
+                <p>{BIOMETRIC_IDENTITY_REQUIRED_MESSAGE}</p>
+                <Link
+                  href="/dashboard/personal-documents/identity"
+                  className="font-medium underline underline-offset-3"
+                >
+                  Verificar mi identidad
+                </Link>
+              </>
+            }
+          />
+        )}
+
         {!requiresVerification && biometric && (
           <BiometricSignaturePanel {...biometric} />
         )}
@@ -129,7 +160,6 @@ export default function DocumentSignaturePanel({
             </Button>
           </div>
         )}
-
       </div>
 
       {/*
