@@ -235,7 +235,10 @@ describe('DocumentsTable', () => {
       renderWithProviders(
         <DocumentsTable
           documents={[
-            buildDoc({ status: DocumentStatus.PendingSignature, signedAt: null }),
+            buildDoc({
+              status: DocumentStatus.PendingSignature,
+              signedAt: null,
+            }),
           ]}
         />,
       );
@@ -628,9 +631,7 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      screen
-        .getByRole('combobox', { name: 'Documentos por página' })
-        .focus();
+      screen.getByRole('combobox', { name: 'Documentos por página' }).focus();
       await user.keyboard('{Enter}');
       await user.click(await screen.findByRole('option', { name: '50' }));
 
@@ -1005,6 +1006,8 @@ describe('DocumentsTable', () => {
         />,
       );
 
+      // El primer Tab cae en el botón de ordenar del encabezado Documento; el segundo, en la fila.
+      await user.tab();
       await user.tab();
       expect(
         screen.getByRole('button', { name: 'contrato.pdf' }),
@@ -1242,6 +1245,124 @@ describe('DocumentsTable', () => {
     });
   });
 
+  describe('ordenamiento por nombre', () => {
+    const docs = [
+      buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
+      buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
+      buildDoc({ id: 'doc-3', fileName: 'Bitácora.pdf' }),
+    ];
+
+    /** Nombres de la columna Documento, en el orden en que se ven las filas. */
+    function documentNames(): string[] {
+      return screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[1].textContent!.trim());
+    }
+
+    function documentHeader(): HTMLElement {
+      return screen.getByRole('columnheader', { name: 'Documento' });
+    }
+
+    it('la columna Documento tiene un botón para ordenar', () => {
+      renderWithProviders(<DocumentsTable documents={docs} />);
+
+      expect(
+        within(documentHeader()).getByRole('button', { name: 'Documento' }),
+      ).toBeInTheDocument();
+    });
+
+    it('arranca desactivado: respeta el orden del backend', () => {
+      renderWithProviders(<DocumentsTable documents={docs} />);
+
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'none');
+      expect(documentNames()).toEqual([
+        'contrato.pdf',
+        'anexo.pdf',
+        'Bitácora.pdf',
+      ]);
+    });
+
+    it('la primera activación ordena ascendente y la segunda descendente', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsTable documents={docs} />);
+      const button = within(documentHeader()).getByRole('button', {
+        name: 'Documento',
+      });
+
+      await user.click(button);
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'ascending');
+      expect(documentNames()).toEqual([
+        'anexo.pdf',
+        'Bitácora.pdf',
+        'contrato.pdf',
+      ]);
+
+      await user.click(button);
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'descending');
+      expect(documentNames()).toEqual([
+        'contrato.pdf',
+        'Bitácora.pdf',
+        'anexo.pdf',
+      ]);
+
+      await user.click(button);
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'ascending');
+    });
+
+    it('sólo reordena lo cargado: no pide páginas, no abre filas ni modifica la lista recibida', async () => {
+      const user = userEvent.setup();
+      const onPageChange = jest.fn();
+      const onRowSelect = jest.fn();
+      const received = [...docs];
+      renderWithProviders(
+        <DocumentsTable
+          documents={received}
+          page={1}
+          totalPages={3}
+          pageSize={10}
+          onPageChange={onPageChange}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      await user.click(
+        within(documentHeader()).getByRole('button', { name: 'Documento' }),
+      );
+
+      expect(onPageChange).not.toHaveBeenCalled();
+      expect(onRowSelect).not.toHaveBeenCalled();
+      expect(received.map((doc) => doc.id)).toEqual([
+        'doc-1',
+        'doc-2',
+        'doc-3',
+      ]);
+    });
+
+    it('el índice sigue siendo consecutivo con las filas ordenadas', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={docs}
+          page={2}
+          pageSize={10}
+          totalPages={2}
+        />,
+      );
+
+      await user.click(
+        within(documentHeader()).getByRole('button', { name: 'Documento' }),
+      );
+
+      expect(
+        screen
+          .getAllByRole('row')
+          .slice(1)
+          .map((row) => within(row).getAllByRole('cell')[0].textContent),
+      ).toEqual(['11', '12', '13']);
+    });
+  });
+
   describe('visualizar documento', () => {
     it('cada fila tiene una acción "Ver documento" con el nombre de su archivo', () => {
       renderWithProviders(
@@ -1293,7 +1414,9 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      screen.getByRole('button', { name: 'Ver documento contrato.pdf' }).focus();
+      screen
+        .getByRole('button', { name: 'Ver documento contrato.pdf' })
+        .focus();
       await user.keyboard('{Enter}');
 
       expect(onRowSelect).toHaveBeenCalledTimes(1);
