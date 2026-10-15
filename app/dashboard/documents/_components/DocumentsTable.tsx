@@ -1,9 +1,6 @@
 'use client';
 
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -52,10 +49,8 @@ import {
   type DocumentsPageSize,
 } from '../_config/pagination';
 import {
-  DEFAULT_DOCUMENT_NAME_SORT,
   nextDocumentNameSort,
   sortDocumentsByName,
-  type DocumentNameSort,
 } from '../_config/sorting';
 
 export interface DocumentListItem {
