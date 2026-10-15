@@ -9,7 +9,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,10 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DataTableCard } from '@/components/data-table/data-table-card';
-import {
-  DataTableActionsHead,
-  DataTableHeader,
-} from '@/components/data-table/data-table-header';
+import { DataTableHeader } from '@/components/data-table/data-table-header';
 import {
   DataTableLoadingRows,
   DataTableStateRow,
@@ -40,11 +36,6 @@ import {
   StatusIndicator,
   type StatusTone,
 } from '@/components/data-table/status-indicator';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import DocumentRowActions from './DocumentRowActions';
 import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
@@ -370,7 +361,7 @@ export default function DocumentsTable({
       <DataTableCard data-slot="documents-table-card">
         <Table aria-busy={bodyState === 'loading' || undefined}>
           <DataTableHeader>
-            <TableHead className="w-16">Índice</TableHead>
+            <TableHead className="w-16">#</TableHead>
             <TableHead aria-sort={ARIA_SORT[nameSort]}>
               <SortableHeader
                 sort={nameSort}
@@ -385,7 +376,7 @@ export default function DocumentsTable({
             <TableHead>Fecha de creación</TableHead>
             <TableHead>Fecha de firma</TableHead>
             <TableHead>Tipo de firma</TableHead>
-            <DataTableActionsHead />
+            <TableHead aria-label="Acciones" className="w-16" />
           </DataTableHeader>
           <TableBody>
             {bodyState === 'error' && (
@@ -521,27 +512,6 @@ export default function DocumentsTable({
                       className="flex items-center justify-end gap-1"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      {/* Visualizar es la acción explícita de abrir el documento: lleva al mismo
-                        detalle con visor que la fila, pero como un control con nombre propio
-                        ("Ver documento …"), visible sin descubrir que la fila es clicable. El
-                        `stopPropagation` de este contenedor evita que también lo active la fila. */}
-                      {onRowSelect && (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Ver documento ${doc.fileName}`}
-                                onClick={() => onRowSelect(doc.id)}
-                              />
-                            }
-                          >
-                            <Eye className="size-4" />
-                          </TooltipTrigger>
-                          <TooltipContent>Ver documento</TooltipContent>
-                        </Tooltip>
-                      )}
                       <DocumentRowActions
                         isDownloading={isDownloading}
                         onDownload={() => downloadMutation.mutate(doc.id)}
