@@ -16,6 +16,7 @@ import {
   useBiometricSignature,
   useStartBiometricSignature,
 } from '../_hooks/useBiometricSignature';
+import { useBiometricIdentityCheck } from '../_hooks/useBiometricIdentityCheck';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import type { AuthUser } from '@/lib/store/types/auth-store.types';
@@ -47,6 +48,7 @@ jest.mock('../_hooks/useConfirmCancellation');
 jest.mock('../_hooks/useRequestVerificationCode');
 jest.mock('../_hooks/useVerifyCode');
 jest.mock('../_hooks/useBiometricSignature');
+jest.mock('../_hooks/useBiometricIdentityCheck');
 jest.mock('../../_components/PdfPreview', () => ({
   __esModule: true,
   default: ({ file }: { file: string }) => <div>PDF preview: {file}</div>,
@@ -94,7 +96,9 @@ const mockedUseRequestVerificationCode =
   useRequestVerificationCode as jest.Mock;
 const mockedUseVerifyCode = useVerifyCode as jest.Mock;
 const mockedUseBiometricSignature = useBiometricSignature as jest.Mock;
-const mockedUseStartBiometricSignature = useStartBiometricSignature as jest.Mock;
+const mockedUseStartBiometricSignature =
+  useStartBiometricSignature as jest.Mock;
+const mockedUseBiometricIdentityCheck = useBiometricIdentityCheck as jest.Mock;
 const mockedToast = toast as unknown as jest.Mock & {
   error: jest.Mock;
   success: jest.Mock;
@@ -198,7 +202,11 @@ describe('DocumentViewSection', () => {
     mockedToast.success.mockClear();
     mockedCopyTextToClipboard.mockReset().mockResolvedValue(true);
     mockGeolocationSuccess();
-    useAuthStore.setState({ user: buildUser({ signingCredentialStatus: SigningCredentialStatus.Configured }) });
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus: SigningCredentialStatus.Configured,
+      }),
+    });
 
     mockedUseSignDocument.mockReturnValue({
       mutate: signMutate,
@@ -572,10 +580,12 @@ describe('DocumentViewSection', () => {
   });
 
   it('bug corregido: si el documento requiere firma simple y el usuario no la tiene configurada, deshabilita/atenúa la firma y muestra la leyenda explicativa', () => {
-    useAuthStore.setState({ user: buildUser({
-      signingCredentialStatus:
-        SigningCredentialStatus.IdentityVerificationRequired,
-    }) });
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -647,10 +657,12 @@ describe('DocumentViewSection', () => {
 
   it('bug corregido: sin firma configurada, la leyenda incluye un acceso HABILITADO para configurarla — al cerrar el modal la pantalla quedaba sin ninguna acción posible', async () => {
     const user = userEvent.setup();
-    useAuthStore.setState({ user: buildUser({
-      signingCredentialStatus:
-        SigningCredentialStatus.IdentityVerificationRequired,
-    }) });
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -677,10 +689,12 @@ describe('DocumentViewSection', () => {
   });
 
   it('bug corregido: al acceder por ruta directa sin firma simple configurada, bloquea el documento con un overlay y despliega un modal de alerta', () => {
-    useAuthStore.setState({ user: buildUser({
-      signingCredentialStatus:
-        SigningCredentialStatus.IdentityVerificationRequired,
-    }) });
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -705,10 +719,12 @@ describe('DocumentViewSection', () => {
   });
 
   it('no bloquea el documento ni abre el modal de firma cuando el documento no requiere firma simple', () => {
-    useAuthStore.setState({ user: buildUser({
-      signingCredentialStatus:
-        SigningCredentialStatus.IdentityVerificationRequired,
-    }) });
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -727,7 +743,11 @@ describe('DocumentViewSection', () => {
   });
 
   it('no muestra la leyenda de firma simple cuando el usuario ya la tiene configurada', () => {
-    useAuthStore.setState({ user: buildUser({ signingCredentialStatus: SigningCredentialStatus.Configured }) });
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus: SigningCredentialStatus.Configured,
+      }),
+    });
     mockedUseDocumentDetail.mockReturnValue({
       data: baseDocument({
         canSign: true,
@@ -976,7 +996,9 @@ describe('DocumentViewSection', () => {
     it('al cerrar, sigue con el comportamiento normal de la pantalla y vuelve al listado', async () => {
       const { user, dialog } = await sign(false);
 
-      await user.click(within(dialog).getByRole('button', { name: /^cerrar$/i }));
+      await user.click(
+        within(dialog).getByRole('button', { name: /^cerrar$/i }),
+      );
 
       expect(push).toHaveBeenCalledWith(DOCUMENTS_LIST);
       await waitFor(() =>
@@ -998,10 +1020,8 @@ describe('DocumentViewSection', () => {
 
     it('si la firma falla, no muestra ninguna confirmación', async () => {
       signMutate.mockImplementation(
-        (
-          _payload: unknown,
-          options?: { onError?: (error: Error) => void },
-        ) => options?.onError?.(new Error('500')),
+        (_payload: unknown, options?: { onError?: (error: Error) => void }) =>
+          options?.onError?.(new Error('500')),
       );
       mockedUseDocumentDetail.mockReturnValue({
         data: baseDocument({ canSign: true, canReject: true }),
@@ -1271,7 +1291,10 @@ describe('DocumentViewSection', () => {
 
     it('la acción está disponible aunque el documento siga pendiente de firma', () => {
       mockedUseDocumentDetail.mockReturnValue({
-        data: baseDocument({ status: DocumentStatus.PendingSignature, canSign: true }),
+        data: baseDocument({
+          status: DocumentStatus.PendingSignature,
+          canSign: true,
+        }),
         isLoading: false,
         isError: false,
       });
@@ -1358,6 +1381,8 @@ describe('DocumentViewSection', () => {
 
   describe('firma biométrica', () => {
     const startMutate = jest.fn();
+    /** Comprobación de identidad previa a Didit; por omisión, identidad verificada. */
+    const checkIdentity = jest.fn();
 
     function biometricSession(
       overrides: Partial<BiometricSignatureSession> = {},
@@ -1396,6 +1421,73 @@ describe('DocumentViewSection', () => {
       mockedUseStartBiometricSignature.mockReturnValue({
         mutate: startMutate,
         isPending: false,
+      });
+      checkIdentity.mockReset();
+      checkIdentity.mockResolvedValue(true);
+      mockedUseBiometricIdentityCheck.mockReturnValue(checkIdentity);
+    });
+
+    async function tryBiometricSignature(
+      user: ReturnType<typeof userEvent.setup>,
+    ) {
+      await user.click(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      );
+    }
+
+    /**
+     * Historia "Mostrar componente de Error al intentar firma biométrica sin validación de
+     * identidad": el aviso es el `ErrorAlert` de la aplicación, no un toast, y la sesión de Didit
+     * no se abre.
+     */
+    describe('sin identidad verificada', () => {
+      beforeEach(() => checkIdentity.mockResolvedValue(false));
+
+      it('muestra el ErrorAlert que pide validar la identidad, sin toast', async () => {
+        const user = userEvent.setup();
+        renderBiometricSigner(null);
+
+        await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+        await tryBiometricSignature(user);
+
+        const alert = await screen.findByRole('alert');
+        expect(alert).toHaveTextContent('Verifica tu identidad');
+        expect(alert).toHaveTextContent(
+          /primero necesitas validar tu identidad/i,
+        );
+        expect(
+          within(alert).getByRole('link', { name: /verificar mi identidad/i }),
+        ).toHaveAttribute('href', '/dashboard/personal-documents/identity');
+        expect(mockedToast.error).not.toHaveBeenCalled();
+      });
+
+      it('no pide la ubicación ni inicia la sesión de Didit', async () => {
+        const user = userEvent.setup();
+        renderBiometricSigner(null);
+
+        await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+        await tryBiometricSignature(user);
+
+        await screen.findByRole('alert');
+        expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+        expect(startMutate).not.toHaveBeenCalled();
+      });
+
+      it('tras validar la identidad, el siguiente intento quita el aviso y sigue con la firma', async () => {
+        const user = userEvent.setup();
+        renderBiometricSigner(null);
+
+        await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+        await tryBiometricSignature(user);
+        await screen.findByRole('alert');
+
+        checkIdentity.mockResolvedValue(true);
+        await tryBiometricSignature(user);
+
+        await waitFor(() =>
+          expect(startMutate).toHaveBeenCalledWith(DEFAULT_COORDS),
+        );
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       });
     });
 

@@ -28,6 +28,7 @@ import {
   useBiometricSignature,
   useStartBiometricSignature,
 } from '../_hooks/useBiometricSignature';
+import { useBiometricIdentityCheck } from '../_hooks/useBiometricIdentityCheck';
 import {
   rejectDocumentSchema,
   type RejectDocumentFormValues,
@@ -131,6 +132,16 @@ export default function DocumentViewSection({
     enabled: isBiometricSigner,
   });
   const startBiometricSignature = useStartBiometricSignature(documentId);
+  const checkBiometricIdentity = useBiometricIdentityCheck();
+  /**
+   * El firmante intentó la firma biométrica sin identidad verificada. Se avisa con el
+   * `ErrorAlert` del panel, no con un toast: el aviso tiene que quedarse a la vista con el camino
+   * para resolverlo, porque reintentar no sirve hasta validar la identidad.
+   */
+  const [biometricIdentityRequired, setBiometricIdentityRequired] =
+    useState(false);
+  const [isCheckingBiometricIdentity, setIsCheckingBiometricIdentity] =
+    useState(false);
   /** Intento cuyo acuse ya se mostró: el sondeo puede traer la misma firma más de una vez. */
   const acknowledgedBiometricAttemptRef = useRef<string | null>(null);
 
@@ -181,7 +192,10 @@ export default function DocumentViewSection({
       return;
     }
 
-    signMutation.mutate({ geolocation: coords }, { onSuccess: showSignatureReceipt });
+    signMutation.mutate(
+      { geolocation: coords },
+      { onSuccess: showSignatureReceipt },
+    );
   }
 
   /**
@@ -204,10 +218,21 @@ export default function DocumentViewSection({
   }
 
   /**
-   * Firma biométrica: la ubicación se pide ANTES de abrir la sesión de Didit, igual que en las
-   * otras firmas, para que el firmante no haga la prueba de vida y se tope al final con el bloqueo.
+   * Firma biométrica. Antes que nada se comprueba la identidad: sin ella el backend no abre la
+   * sesión, así que no tiene caso pedir la ubicación. Luego la ubicación se pide ANTES de abrir la
+   * sesión de Didit, igual que en las otras firmas, para que el firmante no haga la prueba de vida
+   * y se tope al final con el bloqueo.
+   *
+   * La comprobación se repite en cada intento: en cuanto la identidad queda validada, el siguiente
+   * clic quita el aviso y sigue con la firma normalmente.
    */
   async function handleStartBiometricSignature() {
+    setIsCheckingBiometricIdentity(true);
+    const identityVerified = await checkBiometricIdentity();
+    setIsCheckingBiometricIdentity(false);
+    setBiometricIdentityRequired(!identityVerified);
+    if (!identityVerified) return;
+
     const coords = await resolveRequiredLocation();
     if (!coords) return;
 
@@ -268,7 +293,9 @@ export default function DocumentViewSection({
   const biometricSession = biometricSignature.data;
   useEffect(() => {
     if (!biometricSession?.signatureCompleted) return;
-    if (acknowledgedBiometricAttemptRef.current === biometricSession.attemptId) {
+    if (
+      acknowledgedBiometricAttemptRef.current === biometricSession.attemptId
+    ) {
       return;
     }
 
@@ -319,12 +346,15 @@ export default function DocumentViewSection({
               isLoading: biometricSignature.isLoading,
               geoBlockedReason,
               isRequestingLocation: geoStatus === 'requesting',
-              isStarting: startBiometricSignature.isPending,
+              isStarting:
+                isCheckingBiometricIdentity ||
+                startBiometricSignature.isPending,
               onStart: () => void handleStartBiometricSignature(),
               verificationScope: 'identity',
             }
           : undefined
       }
+      biometricIdentityRequired={isBiometricSigner && biometricIdentityRequired}
       verification={{
         codeRequested,
         codeEmailDelivered,
