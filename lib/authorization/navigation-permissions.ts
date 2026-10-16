@@ -20,6 +20,16 @@ export const DASHBOARD_NAVIGATION = {
     href: '/dashboard/documents',
     anyPermissions: ['DOCUMENT.READ_OWN', 'DOCUMENT.READ_ORGANIZATION'],
   },
+  /**
+   * Una cuenta personal recibe los cuatro `DIRECTORY.*` desde el catálogo (no dependen de una
+   * organización), así que esta misma regla la deja entrar sin evaluar ningún rol; en una
+   * organización la entrada aparece sólo si el rol del miembro trae `DIRECTORY.READ`.
+   */
+  directory: {
+    label: 'Directorio',
+    href: '/dashboard/directory',
+    anyPermissions: ['DIRECTORY.READ'],
+  },
   plans: {
     label: 'Planes',
     href: '/dashboard/plans',
