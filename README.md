@@ -435,6 +435,19 @@ npm run dev     # levanta en modo desarrollo (Turbopack)
 
 Requiere `NEXT_PUBLIC_API_BASE_URL` apuntando al backend (`signature-server`) corriendo — ver el aviso de la sección 1/5 sobre el estado actual de `lib/axios.ts`/`next.config.ts` antes de asumir que esta variable se está usando de verdad.
 
+### Reporte de errores (GlitchTip)
+
+Los errores del navegador, de Server Components/SSR/rutas del servidor y del middleware se reportan a GlitchTip con `@sentry/nextjs` (GlitchTip habla el protocolo de Sentry). La configuración vive en `sentry.client.config.ts` (la carga `instrumentation-client.ts`), `sentry.server.config.ts` y `sentry.edge.config.ts` (las carga `instrumentation.ts` según el runtime), con las opciones comunes en `lib/sentry/sentry-options.ts`.
+
+| Variable | Dónde | Descripción |
+|---|---|---|
+| `NEXT_PUBLIC_SENTRY_DSN` | `.env.local` en local; **argumento de build** en los entornos desplegados | DSN del proyecto `signature-app` en GlitchTip (*Project settings → Client Keys (DSN)*). Sin ella el SDK queda deshabilitado: no reporta, pero la app funciona igual. |
+
+- **Es de build, no de arranque.** Como lleva el prefijo `NEXT_PUBLIC_`, Next la incrusta en el bundle (cliente y servidor) durante `next build`. En Docker se pasa con `docker build --build-arg NEXT_PUBLIC_SENTRY_DSN=...` (declarada como `ARG` en el stage de build del `Dockerfile`); definirla sólo al arrancar el contenedor no tiene efecto. El DSN de un proyecto de GlitchTip no es un secreto —el navegador lo necesita para enviar eventos—, por eso puede ir en el bundle.
+- **Privacidad.** El SDK no envía cookies, cuerpos de petición, query params ni los encabezados `Authorization`/`Cookie`/`Set-Cookie`, y un filtro final (`scrubSensitiveRequestData`) los vuelve a quitar de cada evento antes de transmitirlo.
+- **Trazas**: muestreo del 10 % en producción y completo en desarrollo, como transacciones clásicas (`traceLifecycle: 'static'`), que son las que GlitchTip procesa.
+- Sin source maps por ahora: las trazas de pila del navegador llegan minificadas.
+
 ### Tests
 
 ```bash
