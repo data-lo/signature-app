@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  BookUser,
   Building2,
   FileSignature,
   CreditCard,
@@ -109,6 +110,22 @@ export const NAV_GROUPS: NavGroup[] = [
         pathname === section.href || pathname.startsWith(`${section.href}/`),
       anyPermissions: DASHBOARD_NAVIGATION.documents.anyPermissions,
     })),
+  },
+  {
+    key: 'directory',
+    // Sin encabezado, como Documentos: es una sola entrada y "Directorio > Directorio" no
+    // informaría de nada. Sin `orgOnly`: la usan cuentas personales y organizaciones, y en estas
+    // la decide `DIRECTORY.READ`.
+    items: [
+      {
+        label: DASHBOARD_NAVIGATION.directory.label,
+        href: DASHBOARD_NAVIGATION.directory.href,
+        icon: BookUser,
+        isActive: (pathname) =>
+          pathname === DASHBOARD_NAVIGATION.directory.href,
+        anyPermissions: DASHBOARD_NAVIGATION.directory.anyPermissions,
+      },
+    ],
   },
   {
     key: 'payments',
