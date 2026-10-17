@@ -39,32 +39,62 @@ export interface SaveDirectoryContactValues {
 /** Ruta base del recurso. El directorio no viaja en la URL: lo resuelve el backend desde `X-Account-Id`. */
 const DIRECTORY_CONTACTS_PATH = '/api/v1/directory/contacts';
 
+/** Tope de la búsqueda libre; el mismo `MAX_SEARCH_LENGTH` de `ListDirectoryContactsDto`. */
+export const MAX_DIRECTORY_SEARCH_LENGTH = 200;
+
+/** Query de `GET /directory/contacts`. */
+export interface ListDirectoryContactsParams {
+  page: number;
+  limit: number;
+  /**
+   * Búsqueda libre por nombre, apellido, nombre completo, correo o RFC, sin distinguir
+   * mayúsculas. Vacía o ausente lista todo el directorio.
+   */
+  search?: string;
+}
+
 /**
- * Pide una página de contactos vigentes del directorio de la cuenta activa.
+ * Pide una página de contactos vigentes del directorio de la cuenta activa, filtrada
+ * opcionalmente por una búsqueda libre.
  *
  * La cuenta la pone `apiClient` en el header `X-Account-Id`; el backend resuelve con ella el
- * directorio (el personal o el de la organización) y exige `DIRECTORY.READ`.
+ * directorio (el personal o el de la organización) y exige `DIRECTORY.READ`. Una búsqueda vacía
+ * o de sólo espacios no viaja: mandar `search=` sería pedir lo mismo con otra URL.
  *
  * @param params.page - Página, base 1.
  * @param params.limit - Contactos por página (1 a 100).
- * @returns La página con sus contactos y la paginación; `items` vacío si no hay contactos.
+ * @param params.search - Texto a buscar; se recorta y se omite si queda vacío.
+ * @returns La página con sus contactos y la paginación; `items` vacío si nada coincide.
  *
- * @throws {AxiosError} 403 sin `DIRECTORY.READ`; 400 si la paginación está fuera de rango.
+ * @throws {AxiosError} 403 sin `DIRECTORY.READ`; 400 si la paginación está fuera de rango o la
+ *   búsqueda pasa de 200 caracteres.
  *
  * @example
  * ```ts
- * const { items, pagination } = await listDirectoryContactsRequest({ page: 1, limit: 25 });
+ * const { items, pagination } = await listDirectoryContactsRequest({
+ *   page: 1,
+ *   limit: 25,
+ *   search: 'garcia',
+ * });
  * ```
  */
-export async function listDirectoryContactsRequest(params: {
-  page: number;
-  limit: number;
-}): Promise<DirectoryContactsPage> {
+export async function listDirectoryContactsRequest({
+  page,
+  limit,
+  search,
+}: ListDirectoryContactsParams): Promise<DirectoryContactsPage> {
+  const trimmedSearch = search?.trim();
   const { data } = await apiClient.get<{
     success: boolean;
     message: string;
     data: DirectoryContactsPage;
-  }>(DIRECTORY_CONTACTS_PATH, { params });
+  }>(DIRECTORY_CONTACTS_PATH, {
+    params: {
+      page,
+      limit,
+      ...(trimmedSearch ? { search: trimmedSearch } : {}),
+    },
+  });
 
   return data.data;
 }

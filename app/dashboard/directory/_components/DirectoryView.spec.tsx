@@ -11,7 +11,10 @@ import {
   type DirectoryContact,
 } from '../_requests';
 import DirectoryView, { DIRECTORY_LOAD_ERROR_MESSAGE } from './DirectoryView';
-import { EMPTY_DIRECTORY_MESSAGE } from './DirectoryContactsTable';
+import {
+  EMPTY_DIRECTORY_MESSAGE,
+  noDirectoryMatchesMessage,
+} from './DirectoryContactsTable';
 
 jest.mock('../_requests');
 
@@ -44,7 +47,15 @@ const ALL_DIRECTORY_PERMISSIONS: PermissionKey[] = [
   'DIRECTORY.DELETE',
 ];
 
-function pageOf(items: DirectoryContact[]) {
+function pageOf(
+  items: DirectoryContact[],
+  pagination: Partial<{
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }> = {},
+) {
   return {
     items,
     pagination: {
@@ -52,6 +63,7 @@ function pageOf(items: DirectoryContact[]) {
       limit: 25,
       total: items.length,
       totalPages: items.length === 0 ? 0 : 1,
+      ...pagination,
     },
   };
 }
@@ -94,7 +106,11 @@ describe('DirectoryView', () => {
     );
     expect(row).toHaveTextContent('Ana García');
     expect(screen.getByText('Luis Pérez').closest('tr')).toHaveTextContent('2');
-    expect(mockedList).toHaveBeenCalledWith({ page: 1, limit: 25 });
+    expect(mockedList).toHaveBeenCalledWith({
+      page: 1,
+      limit: 25,
+      search: '',
+    });
   });
 
   it('dice que el directorio está vacío cuando no hay contactos', async () => {
@@ -280,5 +296,173 @@ describe('DirectoryView', () => {
     );
 
     expect(mockedDelete).not.toHaveBeenCalled();
+  });
+
+  describe('búsqueda', () => {
+    it('busca en el backend tras la pausa, desde la página 1', async () => {
+      const user = userEvent.setup();
+      renderView(['DIRECTORY.READ']);
+      await screen.findByText('Ana García');
+
+      mockedList.mockResolvedValue(pageOf([CONTACTS[0]]));
+      await user.type(
+        screen.getByRole('searchbox', { name: /buscar contactos/i }),
+        'garcia',
+      );
+
+      await waitFor(() =>
+        expect(mockedList).toHaveBeenLastCalledWith({
+          page: 1,
+          limit: 25,
+          search: 'garcia',
+        }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByText('Luis Pérez')).not.toBeInTheDocument(),
+      );
+      expect(screen.getByText('Ana García')).toBeInTheDocument();
+      // Una consulta por búsqueda aplicada, no una por tecla.
+      expect(
+        mockedList.mock.calls.filter(([params]) => params.search !== ''),
+      ).toHaveLength(1);
+    });
+
+    it('dice que nada coincide cuando la búsqueda no encuentra contactos', async () => {
+      const user = userEvent.setup();
+      renderView(['DIRECTORY.READ']);
+      await screen.findByText('Ana García');
+
+      mockedList.mockResolvedValue(pageOf([]));
+      await user.type(
+        screen.getByRole('searchbox', { name: /buscar contactos/i }),
+        'zzz',
+      );
+
+      expect(
+        await screen.findByText(noDirectoryMatchesMessage('zzz')),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('paginación', () => {
+    beforeEach(() => {
+      mockedList.mockImplementation(({ page, limit }) =>
+        Promise.resolve(
+          pageOf(page === 1 ? CONTACTS : [CONTACTS[0]], {
+            page,
+            limit,
+            total: 30,
+            totalPages: Math.ceil(30 / limit),
+          }),
+        ),
+      );
+    });
+
+    it('muestra el total y la página actual de las disponibles', async () => {
+      renderView(['DIRECTORY.READ']);
+
+      await screen.findByText('Ana García');
+
+      expect(screen.getByText(/30 contactos/)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          (_, element) =>
+            element?.getAttribute('data-slot') ===
+              'directory-table-page-indicator' &&
+            element.textContent === '1 de 2',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('pasa de página y numera las filas de forma continua', async () => {
+      const user = userEvent.setup();
+      renderView(['DIRECTORY.READ']);
+      await screen.findByText('Ana García');
+
+      await user.click(
+        screen.getByRole('button', { name: 'Página siguiente' }),
+      );
+
+      await waitFor(() =>
+        expect(mockedList).toHaveBeenLastCalledWith({
+          page: 2,
+          limit: 25,
+          search: '',
+        }),
+      );
+      const row = (await screen.findByText('Ana García')).closest('tr')!;
+      expect(row).toHaveTextContent('26');
+      expect(
+        screen.getByRole('button', { name: 'Página siguiente' }),
+      ).toBeDisabled();
+    });
+
+    it('cambiar los contactos por página vuelve a la página 1', async () => {
+      const user = userEvent.setup();
+      renderView(['DIRECTORY.READ']);
+      await screen.findByText('Ana García');
+      await user.click(
+        screen.getByRole('button', { name: 'Página siguiente' }),
+      );
+      await waitFor(() =>
+        expect(mockedList).toHaveBeenLastCalledWith(
+          expect.objectContaining({ page: 2 }),
+        ),
+      );
+
+      screen.getByRole('combobox', { name: 'Contactos por página' }).focus();
+      await user.keyboard('{Enter}');
+      await user.click(await screen.findByRole('option', { name: '10' }));
+
+      await waitFor(() =>
+        expect(mockedList).toHaveBeenLastCalledWith({
+          page: 1,
+          limit: 10,
+          search: '',
+        }),
+      );
+    });
+
+    it('al eliminar el único contacto de la última página, baja a la anterior', async () => {
+      const user = userEvent.setup();
+      mockedDelete.mockResolvedValue(undefined);
+      renderView(ALL_DIRECTORY_PERMISSIONS);
+      await screen.findByText('Ana García');
+      await user.click(
+        screen.getByRole('button', { name: 'Página siguiente' }),
+      );
+      await screen.findByText('26');
+
+      // Tras eliminarlo, el directorio cabe en una página y la 2 llega vacía.
+      mockedList.mockImplementation(({ page, limit }) =>
+        Promise.resolve(
+          pageOf(page === 1 ? CONTACTS.slice(1) : [], {
+            page,
+            limit,
+            total: 1,
+            totalPages: 1,
+          }),
+        ),
+      );
+      await openRowActions(user, 'Ana García');
+      await user.click(
+        await screen.findByRole('menuitem', { name: /eliminar/i }),
+      );
+      await user.click(
+        within(await screen.findByRole('dialog')).getByRole('button', {
+          name: 'Eliminar',
+        }),
+      );
+
+      expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
+      expect(mockedList).toHaveBeenLastCalledWith({
+        page: 1,
+        limit: 25,
+        search: '',
+      });
+      expect(
+        screen.queryByText(EMPTY_DIRECTORY_MESSAGE),
+      ).not.toBeInTheDocument();
+    });
   });
 });

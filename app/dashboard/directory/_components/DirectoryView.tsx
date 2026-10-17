@@ -1,17 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { DataTablePageHeader } from '@/components/data-table/data-table-page-header';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import type { DirectoryContact } from '../_requests';
+import {
+  MAX_DIRECTORY_SEARCH_LENGTH,
+  type DirectoryContact,
+} from '../_requests';
 import type { DirectoryContactFormValues } from '../_schemas';
 import {
-  DIRECTORY_CONTACTS_PAGE_SIZE,
+  DEFAULT_DIRECTORY_PAGE_SIZE,
+  DIRECTORY_SEARCH_DEBOUNCE_MS,
   useDirectoryContacts,
+  type DirectoryPageSize,
 } from '../_hooks/useDirectoryContacts';
 import {
   useCreateDirectoryContact,
@@ -36,8 +42,13 @@ interface FormDialogState {
 }
 
 /**
- * Pantalla "Directorio": la tabla de contactos de la cuenta activa, el alta, la edición y la
- * eliminación con confirmación.
+ * Pantalla "Directorio": la tabla de contactos de la cuenta activa con búsqueda y paginación, el
+ * alta, la edición y la eliminación con confirmación.
+ *
+ * La búsqueda (nombre, apellido, nombre completo, correo o RFC) la resuelve el backend sobre todo
+ * el directorio, no sobre la página visible. Lo tecleado se aplica tras una pausa de
+ * `DIRECTORY_SEARCH_DEBOUNCE_MS`, y aplicar una búsqueda o cambiar el tamaño de página vuelve a
+ * la página 1: la página en la que se estaba no significa nada en el resultado nuevo.
  *
  * Los permisos son los `DIRECTORY.*` del contexto de autorización, tanto para una cuenta
  * personal como para una organización. En una personal no se evalúa ningún rol: el backend le
@@ -69,6 +80,12 @@ export default function DirectoryView() {
   const canDelete = can('DIRECTORY.DELETE');
 
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<DirectoryPageSize>(
+    DEFAULT_DIRECTORY_PAGE_SIZE,
+  );
+  /** Lo que hay en el input; sólo baja a `search` (y a la consulta) tras la pausa. */
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [formDialog, setFormDialog] = useState<FormDialogState>({
     open: false,
     contact: null,
@@ -76,26 +93,55 @@ export default function DirectoryView() {
   const [deletingContact, setDeletingContact] =
     useState<DirectoryContact | null>(null);
 
-  const contactsQuery = useDirectoryContacts(accountId, page, canRead);
+  const contactsQuery = useDirectoryContacts({
+    accountId,
+    page,
+    limit: pageSize,
+    search,
+    enabled: canRead,
+  });
   const createContact = useCreateDirectoryContact(accountId);
   const updateContact = useUpdateDirectoryContact(accountId);
   const deleteContact = useDeleteDirectoryContact(accountId);
 
-  const totalPages = contactsQuery.data?.pagination.totalPages ?? 1;
+  /**
+   * Respuesta de la página o búsqueda anterior, conservada mientras llega la pedida (ver
+   * `useDirectoryContacts`). Sirve para que el pie sepa cuántas páginas hay; sus filas no se
+   * pintan, porque numerarían y mostrarían contactos que no son los de la página pedida.
+   */
+  const isShowingPreviousPage = contactsQuery.isPlaceholderData;
+  const pagination = contactsQuery.data?.pagination;
+  const totalPages = pagination?.totalPages ?? 1;
 
-  /** Otra cuenta, otro directorio: se vuelve a la primera página. */
+  /** Otra cuenta, otro directorio: se vuelve a la primera página y sin búsqueda. */
   useEffect(() => {
     setPage(1);
+    setSearchInput('');
+    setSearch('');
   }, [accountId]);
 
-  /**
-   * Al eliminar el último contacto de la última página, esa página deja de existir: se baja a la
-   * última que queda en vez de dejar la tabla vacía con contactos en páginas anteriores.
-   */
   useEffect(() => {
-    const lastPage = Math.max(1, totalPages);
-    if (page > lastPage) setPage(lastPage);
-  }, [page, totalPages]);
+    if (searchInput === search) return;
+
+    const timeout = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, DIRECTORY_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [searchInput, search]);
+
+  /**
+   * Con una respuesta definitiva, la página se corrige si ya no existe: pasa al eliminar el
+   * último contacto de la última página, cuando el refetch trae una página menos. Con la
+   * respuesta vieja (placeholder) no se corrige nada: su `totalPages` es el de otra consulta.
+   */
+  const lastPage = Math.max(1, totalPages);
+  const isPageOutOfRange =
+    pagination !== undefined && !isShowingPreviousPage && page > lastPage;
+
+  useEffect(() => {
+    if (isPageOutOfRange) setPage(lastPage);
+  }, [isPageOutOfRange, lastPage]);
 
   if (!canRead) {
     return (
@@ -124,6 +170,11 @@ export default function DirectoryView() {
     createContact.mutate(values, { onSuccess: closeFormDialog });
   }
 
+  function handlePageSizeChange(nextPageSize: DirectoryPageSize) {
+    setPageSize(nextPageSize);
+    setPage(1);
+  }
+
   function handleConfirmDelete(contactId: string) {
     deleteContact.mutate(contactId, {
       onSuccess: () => setDeletingContact(null),
@@ -147,17 +198,43 @@ export default function DirectoryView() {
         }
       />
 
+      <div className="relative">
+        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="pl-8"
+          type="search"
+          aria-label="Buscar contactos por nombre o correo"
+          placeholder="Buscar por nombre o correo"
+          maxLength={MAX_DIRECTORY_SEARCH_LENGTH}
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+        />
+      </div>
+
       <DirectoryContactsTable
-        contacts={contactsQuery.data?.items ?? []}
+        contacts={
+          isShowingPreviousPage || isPageOutOfRange
+            ? []
+            : (contactsQuery.data?.items ?? [])
+        }
+        // La página pedida y no la de la respuesta: mientras carga, el indicador ya dice a dónde
+        // se va.
         page={page}
-        pageSize={DIRECTORY_CONTACTS_PAGE_SIZE}
+        pageSize={pageSize}
         totalPages={totalPages}
+        total={pagination?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={handlePageSizeChange}
+        search={search}
         canUpdate={canUpdate}
         canDelete={canDelete}
         onEdit={(contact) => setFormDialog({ open: true, contact })}
         onDelete={setDeletingContact}
-        isLoading={contactsQuery.isLoading}
+        // `isPending` cubre la primera carga y cada búsqueda o tamaño nuevos (otra `queryKey` sin
+        // datos); el placeholder y la página fuera de rango tampoco son un resultado definitivo.
+        isLoading={
+          contactsQuery.isPending || isShowingPreviousPage || isPageOutOfRange
+        }
         errorMessage={
           contactsQuery.isError ? DIRECTORY_LOAD_ERROR_MESSAGE : undefined
         }
