@@ -6,6 +6,7 @@ import { DocumentStatus, DocumentView } from '@/lib/enums/document';
 import { act } from '@testing-library/react';
 import { useState } from 'react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
 
 jest.mock('../_hooks/useDocuments');
 const restoreMutate = jest.fn();
@@ -774,6 +775,213 @@ describe('DocumentsView', () => {
       expect(indicator()).toHaveTextContent('1 de 1');
       expect(control('Página siguiente')).toBeDisabled();
       expect(control('Última página')).toBeDisabled();
+    });
+  });
+
+  /**
+   * Historia "Personalizador de columnas en la tabla de Documentos": cada usuario elige qué
+   * columnas ver, la elección sobrevive a la recarga y la columna de acciones no se puede ocultar.
+   */
+  describe('personalizar columnas', () => {
+    const storageKey = 'documents-table-columns:user-1';
+
+    function headers() {
+      return screen
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent ?? '');
+    }
+
+    async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(
+        screen.getByRole('button', { name: /personalizar columnas/i }),
+      );
+      return screen.findByRole('menu');
+    }
+
+    beforeEach(() => {
+      window.localStorage.clear();
+      useAuthStore.setState({
+        user: {
+          id: 'user-1',
+          email: 'ana@example.com',
+          identificationNumber: 'LOPA800101',
+          name: 'Ana',
+          lastName: 'López',
+          signingCredentialStatus: SigningCredentialStatus.Configured,
+          personalConfigured: true,
+        },
+      });
+      mockedUseDocuments.mockReturnValue({
+        data: {
+          items: [
+            {
+              id: 'doc-1',
+              fileName: 'contrato.pdf',
+              creator: 'Ana López',
+              totalPages: 1,
+              status: DocumentStatus.PendingSignature,
+              createdAt: '2026-03-15T12:00:00.000Z',
+            },
+          ],
+          pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+        },
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        isPlaceholderData: false,
+      });
+    });
+
+    afterEach(() => {
+      useAuthStore.setState({ user: null });
+    });
+
+    it('muestra todas las columnas marcadas, con "Documento" fija y sin la de acciones', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const menu = await openMenu(user);
+      const options = within(menu).getAllByRole('menuitemcheckbox');
+
+      expect(options.map((option) => option.textContent)).toEqual([
+        'Índice',
+        'DocumentoSiempre visible',
+        'Creado por',
+        'Participación',
+        'Estatus',
+        'Fecha de creación',
+        'Fecha de firma',
+        'Tipo de firma',
+      ]);
+      options.forEach((option) =>
+        expect(option).toHaveAttribute('aria-checked', 'true'),
+      );
+      expect(
+        within(menu).getByRole('menuitemcheckbox', { name: /documento/i }),
+      ).toHaveAttribute('aria-disabled', 'true');
+      expect(
+        within(menu).queryByRole('menuitemcheckbox', { name: /acciones/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('oculta y vuelve a mostrar una columna en su posición, sin cerrar el menú', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      const menu = await openMenu(user);
+      const creator = within(menu).getByRole('menuitemcheckbox', {
+        name: 'Creado por',
+      });
+
+      await user.click(creator);
+
+      expect(headers()).not.toContain('Creado por');
+      expect(creator).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      // La fila sigue pintando una celda por encabezado.
+      const row = screen.getByText('contrato.pdf').closest('tr')!;
+      expect(within(row).getAllByRole('cell')).toHaveLength(headers().length);
+
+      await user.click(creator);
+
+      expect(headers().slice(0, 3)).toEqual(['#', 'Documento', 'Creado por']);
+    });
+
+    it('la columna de acciones sigue aunque se oculten todas las demás', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      const menu = await openMenu(user);
+
+      for (const option of within(menu).getAllByRole('menuitemcheckbox')) {
+        if (option.getAttribute('aria-disabled') !== 'true') {
+          await user.click(option);
+        }
+      }
+
+      expect(headers()).toEqual(['Documento', '']);
+      expect(
+        screen.getByRole('columnheader', { name: 'Acciones' }),
+      ).toBeInTheDocument();
+    });
+
+    it('guarda la preferencia por usuario y la restaura al recargar', async () => {
+      const user = userEvent.setup();
+      const { unmount } = renderWithProviders(<DocumentsView />);
+      const menu = await openMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitemcheckbox', { name: 'Fecha de firma' }),
+      );
+
+      expect(JSON.parse(window.localStorage.getItem(storageKey)!)).not.toContain(
+        'signedAt',
+      );
+
+      unmount();
+      renderWithProviders(<DocumentsView />);
+
+      expect(headers()).not.toContain('Fecha de firma');
+      expect(headers()).toContain('Fecha de creación');
+    });
+
+    it('con una preferencia ilegible abre con la configuración predeterminada', () => {
+      window.localStorage.setItem(storageKey, '{roto');
+      renderWithProviders(<DocumentsView />);
+
+      expect(headers()).toContain('Fecha de firma');
+      expect(headers()).toHaveLength(9);
+    });
+
+    it('"Restablecer columnas" vuelve a la configuración predeterminada', async () => {
+      window.localStorage.setItem(storageKey, '["document"]');
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      expect(headers()).toEqual(['Documento', '']);
+
+      const menu = await openMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /restablecer columnas/i }),
+      );
+
+      expect(headers()).toHaveLength(9);
+      expect(window.localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    it('se maneja con teclado', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      screen.getByRole('button', { name: /personalizar columnas/i }).focus();
+
+      await user.keyboard('{Enter}');
+      const menu = await screen.findByRole('menu');
+      const index = within(menu).getByRole('menuitemcheckbox', {
+        name: 'Índice',
+      });
+      await waitFor(() => expect(index).toHaveFocus());
+      await user.keyboard(' ');
+
+      expect(index).toHaveAttribute('aria-checked', 'false');
+      expect(headers()).not.toContain('#');
+    });
+
+    it('mantiene los estados de carga y vacío ocupando todo el ancho', () => {
+      window.localStorage.setItem(storageKey, '["document","status"]');
+      mockedUseDocuments.mockReturnValue({
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 25, total: 0, totalPages: 0 },
+        },
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        isPlaceholderData: false,
+      });
+      renderWithProviders(<DocumentsView />);
+
+      const emptyCell = screen
+        .getByText('No hay documentos para mostrar.')
+        .closest('td')!;
+      expect(emptyCell).toHaveAttribute('colspan', '3');
     });
   });
 });

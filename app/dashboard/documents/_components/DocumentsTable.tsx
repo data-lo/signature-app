@@ -63,6 +63,11 @@ import {
   sortDocumentsByName,
   type DocumentNameSort,
 } from '../_config/sorting';
+import {
+  DEFAULT_VISIBLE_DOCUMENT_COLUMNS,
+  normalizeVisibleDocumentColumns,
+  type DocumentColumnId,
+} from '../_config/columns';
 
 export interface DocumentListItem {
   id: string;
@@ -150,9 +155,6 @@ const STATUS_TONE: Record<DocumentStatus, StatusTone> = {
   [DocumentStatus.Cancelled]: 'neutral',
 };
 
-/** Columnas de la tabla; lo usan las filas de estado para ocupar todo el ancho. */
-const COLUMN_COUNT = 9;
-
 /**
  * Consecutivo de un documento dentro del listado completo, contando desde 1.
  *
@@ -228,6 +230,12 @@ interface DocumentsTableProps {
    * están los documentos que se pueden devolver al listado.
    */
   canRestoreRows?: boolean;
+  /**
+   * Columnas que el usuario eligió ver (ver "Personalizar columnas"). Ausente, se muestran todas.
+   * Se pintan siempre en el orden de la tabla, y la columna de acciones va siempre al final:
+   * no es configurable.
+   */
+  visibleColumns?: readonly DocumentColumnId[];
 }
 
 /**
@@ -307,7 +315,16 @@ export default function DocumentsTable({
   emptyState,
   canArchiveRows = true,
   canRestoreRows = false,
+  visibleColumns = DEFAULT_VISIBLE_DOCUMENT_COLUMNS,
 }: DocumentsTableProps) {
+  /** Normalizada para que "Documento" no pueda faltar aunque el llamador la omita. */
+  const shownColumns = new Set(normalizeVisibleDocumentColumns(visibleColumns));
+  const isShown = (columnId: DocumentColumnId) => shownColumns.has(columnId);
+  /**
+   * Columnas pintadas, más la de acciones. Lo usan las filas de carga, vacía y error para ocupar
+   * todo el ancho con cualquier combinación de columnas visibles.
+   */
+  const columnCount = shownColumns.size + 1;
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
     useState<DocumentListItem | null>(null);
@@ -361,27 +378,29 @@ export default function DocumentsTable({
       <DataTableCard data-slot="documents-table-card">
         <Table aria-busy={bodyState === 'loading' || undefined}>
           <DataTableHeader>
-            <TableHead className="w-16">#</TableHead>
-            <TableHead aria-sort={ARIA_SORT[nameSort]}>
-              <SortableHeader
-                sort={nameSort}
-                onToggle={() => setNameSort(nextDocumentNameSort)}
-              >
-                Documento
-              </SortableHeader>
-            </TableHead>
-            <TableHead>Creado por</TableHead>
-            <TableHead>Participación</TableHead>
-            <TableHead>Estatus</TableHead>
-            <TableHead>Fecha de creación</TableHead>
-            <TableHead>Fecha de firma</TableHead>
-            <TableHead>Tipo de firma</TableHead>
+            {isShown('index') && <TableHead className="w-16">#</TableHead>}
+            {isShown('document') && (
+              <TableHead aria-sort={ARIA_SORT[nameSort]}>
+                <SortableHeader
+                  sort={nameSort}
+                  onToggle={() => setNameSort(nextDocumentNameSort)}
+                >
+                  Documento
+                </SortableHeader>
+              </TableHead>
+            )}
+            {isShown('creator') && <TableHead>Creado por</TableHead>}
+            {isShown('participation') && <TableHead>Participación</TableHead>}
+            {isShown('status') && <TableHead>Estatus</TableHead>}
+            {isShown('createdAt') && <TableHead>Fecha de creación</TableHead>}
+            {isShown('signedAt') && <TableHead>Fecha de firma</TableHead>}
+            {isShown('signatureType') && <TableHead>Tipo de firma</TableHead>}
             <TableHead aria-label="Acciones" className="w-16" />
           </DataTableHeader>
           <TableBody>
             {bodyState === 'error' && (
               <DataTableStateRow
-                columnCount={COLUMN_COUNT}
+                columnCount={columnCount}
                 className="text-destructive"
               >
                 <span role="alert">{errorMessage}</span>
@@ -389,13 +408,13 @@ export default function DocumentsTable({
             )}
             {bodyState === 'loading' && (
               <DataTableLoadingRows
-                columnCount={COLUMN_COUNT}
+                columnCount={columnCount}
                 label="Cargando documentos"
                 rowSlot="documents-loading-row"
               />
             )}
             {bodyState === 'empty' && (
-              <DataTableStateRow columnCount={COLUMN_COUNT}>
+              <DataTableStateRow columnCount={columnCount}>
                 {emptyState ?? EMPTY_DOCUMENTS_MESSAGE}
               </DataTableStateRow>
             )}
@@ -442,9 +461,11 @@ export default function DocumentsTable({
                   className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
                   onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
                 >
-                  <TableCell className="w-16 whitespace-nowrap tabular-nums text-muted-foreground">
-                    {documentRowIndex(page, pageSize, rowIndex)}
-                  </TableCell>
+                  {isShown('index') && (
+                    <TableCell className="w-16 whitespace-nowrap tabular-nums text-muted-foreground">
+                      {documentRowIndex(page, pageSize, rowIndex)}
+                    </TableCell>
+                  )}
                   {/* Ancho fijo (`w-64 max-w-64`) en todas las resoluciones: el nombre se recorta
                     dentro de él en una sola línea y el completo va en el tooltip (ver
                     `DocumentFileName`), así la columna y la altura de la fila no dependen de lo
@@ -452,57 +473,73 @@ export default function DocumentsTable({
                   {/* Sólo la información del archivo: el estatus ya tiene su propia columna, y el
                     punto de color que lo repetía aquí se quitó (historia "Ajustar columnas de la
                     tabla de documentos"). */}
-                  <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
-                    {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
-                      alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
-                      sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
-                      `tr` no es un control) sin dejar fuera al teclado. */}
-                    <DocumentFileName
-                      fileName={doc.fileName}
-                      interactive={Boolean(onRowSelect)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span>{doc.creator}</span>
-                      {doc.creatorRfc && (
-                        <span className="text-xs text-muted-foreground">
-                          RFC: {doc.creatorRfc}
-                        </span>
+                  {/* "Documento" no se puede ocultar (ver `../_config/columns`), así que el botón
+                    del nombre —el acceso por teclado a la fila— siempre está. */}
+                  {isShown('document') && (
+                    <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
+                      {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
+                        alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
+                        sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
+                        `tr` no es un control) sin dejar fuera al teclado. */}
+                      <DocumentFileName
+                        fileName={doc.fileName}
+                        interactive={Boolean(onRowSelect)}
+                      />
+                    </TableCell>
+                  )}
+                  {isShown('creator') && (
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span>{doc.creator}</span>
+                        {doc.creatorRfc && (
+                          <span className="text-xs text-muted-foreground">
+                            RFC: {doc.creatorRfc}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                  {isShown('participation') && (
+                    <TableCell className="whitespace-nowrap">
+                      {
+                        PARTICIPATION_LABELS[
+                          doc.participation ?? DocumentParticipation.Participant
+                        ]
+                      }
+                    </TableCell>
+                  )}
+                  {isShown('status') && (
+                    <TableCell>
+                      <StatusIndicator
+                        tone={STATUS_TONE[doc.status]}
+                        label={STATUS_LABELS[doc.status]}
+                      />
+                    </TableCell>
+                  )}
+                  {isShown('createdAt') && (
+                    <TableCell className="whitespace-nowrap">
+                      <DataTableDate date={doc.createdAt} />
+                    </TableCell>
+                  )}
+                  {isShown('signedAt') && (
+                    <TableCell className="whitespace-nowrap">
+                      <DataTableDate
+                        date={doc.signedAt}
+                        emptyLabel={UNSIGNED_DATE_LABEL}
+                      />
+                    </TableCell>
+                  )}
+                  {isShown('signatureType') && (
+                    <TableCell className="whitespace-nowrap">
+                      {doc.signatureType ? (
+                        SIGNATURE_TYPE_LABELS[doc.signatureType]
+                      ) : (
+                        // Documento anterior a que el tipo de firma se registrara: un guion dice
+                        // "no se sabe", que es la verdad; suponer "Simple" sería inventar.
+                        <span className="text-muted-foreground">—</span>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {
-                      PARTICIPATION_LABELS[
-                        doc.participation ?? DocumentParticipation.Participant
-                      ]
-                    }
-                  </TableCell>
-                  <TableCell>
-                    <StatusIndicator
-                      tone={STATUS_TONE[doc.status]}
-                      label={STATUS_LABELS[doc.status]}
-                    />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <DataTableDate date={doc.createdAt} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <DataTableDate
-                      date={doc.signedAt}
-                      emptyLabel={UNSIGNED_DATE_LABEL}
-                    />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {doc.signatureType ? (
-                      SIGNATURE_TYPE_LABELS[doc.signatureType]
-                    ) : (
-                      // Documento anterior a que el tipo de firma se registrara: un guion dice
-                      // "no se sabe", que es la verdad; suponer "Simple" sería inventar.
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  )}
                   <TableCell>
                     {/* Las acciones del menú operan sobre el documento o lo consultan en un
                       modal, pero ninguna es una manera de abrirlo: el clic se detiene acá para
