@@ -15,6 +15,11 @@ COPY . .
 ARG BACKEND_API_URL
 ENV BACKEND_API_URL=$BACKEND_API_URL
 
+# DSN de GlitchTip. Va en el build y no en el runtime: Next incrusta las `NEXT_PUBLIC_*` en el
+# bundle durante `npm run build`. Sin él, la imagen se construye igual con el reporte apagado.
+ARG NEXT_PUBLIC_SENTRY_DSN
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build

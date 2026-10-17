@@ -26,6 +26,14 @@ const PROXY_TIMEOUT_MS = 120_000;
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  /**
+   * `@sentry/node` (lo usa `@sentry/nextjs` en el servidor) se carga desde `node_modules` en vez
+   * de empaquetarse. Empaquetado, Turbopack emite un chunk `[externals]_node:inspector_….js` por
+   * sus integraciones de ANR y variables locales, y en Windows ese `:` convierte el nombre en un
+   * flujo alternativo de NTFS: `next build` falla al copiarlo a `standalone` (`EINVAL copyfile`).
+   * El file tracing de `standalone` sigue incluyendo el paquete, así que la imagen no cambia.
+   */
+  serverExternalPackages: ['@sentry/node'],
   experimental: {
     middlewareClientMaxBodySize: PROXY_MAX_BODY_BYTES,
     proxyTimeout: PROXY_TIMEOUT_MS,
