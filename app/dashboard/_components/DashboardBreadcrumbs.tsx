@@ -100,6 +100,8 @@ const STATIC_CRUMBS: Record<string, Crumb[]> = {
     },
     { label: 'Identidad y firma' },
   ],
+  // Entrada propia del menú, sin grupo padre: igual que el listado de documentos.
+  '/dashboard/directory': [{ label: 'Directorio' }],
   '/dashboard/plans': [GROUP_CRUMB.payments, { label: 'Planes' }],
   '/dashboard/subscriptions': [
     GROUP_CRUMB.payments,
