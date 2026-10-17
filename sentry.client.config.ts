@@ -1,6 +1,11 @@
 import * as Sentry from '@sentry/nextjs';
 
 import { buildSentryOptions } from '@/lib/sentry/sentry-options';
+import {
+  scrubUploadTransaction,
+  shouldCreateSpanForUploadRequest,
+  uploadAwareTracesSampler,
+} from '@/lib/observability/upload-metrics';
 
 /**
  * Sentry (GlitchTip) en el navegador.
@@ -13,8 +18,22 @@ import { buildSentryOptions } from '@/lib/sentry/sentry-options';
  *
  * Los errores no controlados (`window.onerror`, promesas rechazadas sin `catch`) los captura la
  * integración por omisión del SDK; no hace falta registrar nada más.
+ *
+ * Carga de documentos (ver `lib/observability/upload-metrics.ts`): cada carga es una transacción
+ * propia que se muestrea siempre (`tracesSampler`); el span `http.client` automático de ese
+ * endpoint se apaga para no medir la misma petición dos veces, y la transacción sale sin página,
+ * breadcrumbs ni contexto del dispositivo (`scrubUploadTransaction`).
  */
+const options = buildSentryOptions();
+
 Sentry.init({
-  ...buildSentryOptions(),
-  integrations: [Sentry.browserTracingIntegration()],
+  ...options,
+  tracesSampler: uploadAwareTracesSampler(options.tracesSampleRate),
+  integrations: [
+    Sentry.browserTracingIntegration({
+      shouldCreateSpanForRequest: shouldCreateSpanForUploadRequest,
+    }),
+  ],
+  beforeSendTransaction: (event) =>
+    scrubUploadTransaction(options.beforeSendTransaction(event)),
 });
