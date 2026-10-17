@@ -1,4 +1,5 @@
 import { saveBlobAsFile } from './save-blob-as-file';
+import { logSafeError, logSafeSummary } from '@/lib/observability/safe-log';
 
 /**
  * Descarga el XML de auditoría del documento, que el backend arma en el momento del clic.
@@ -29,25 +30,18 @@ export async function downloadAuditXml(
   try {
     response = await fetch(url, { headers: { Accept: 'application/xml' } });
   } catch (error) {
-    console.error('[XML de auditoría] Error de red al descargar', {
-      url,
-      error,
-    });
+    logSafeError('[XML de auditoría] Error de red al descargar', error);
     throw new AuditXmlDownloadError(
       'No se pudo conectar para obtener el XML de auditoría. Revisa tu conexión e inténtalo de nuevo.',
     );
   }
 
   if (!response.ok) {
-    const responseBody =
-      typeof response.text === 'function'
-        ? await response.text().catch(() => null)
-        : null;
-    console.error('[XML de auditoría] El backend rechazó la descarga', {
-      url,
+    // Sólo el estado: la URL lleva el id del documento y el cuerpo del error, lo que diga el
+    // backend. El detalle queda en los logs del backend.
+    logSafeSummary('[XML de auditoría] El backend rechazó la descarga', {
+      name: 'HttpError',
       status: response.status,
-      statusText: response.statusText,
-      responseBody,
     });
     throw new AuditXmlDownloadError(errorMessage(response.status));
   }

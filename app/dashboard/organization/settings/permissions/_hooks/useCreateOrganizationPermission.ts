@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { createOrganizationPermissionRequest } from '@/lib/api/organization-permissions';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 export function useCreateOrganizationPermission(organizationId: string | null) {
   const queryClient = useQueryClient();
@@ -18,7 +19,7 @@ export function useCreateOrganizationPermission(organizationId: string | null) {
       });
     },
     onError: (error) => {
-      console.error('[organization-permissions] falló crear el permiso:', error);
+      logSafeError('[organization-permissions] falló crear el permiso', error);
       toast.error(
         getErrorMessage(
           error,

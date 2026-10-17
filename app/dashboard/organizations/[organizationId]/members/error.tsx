@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 interface OrganizationMembersErrorProps {
   error: Error & { digest?: string };
@@ -40,11 +41,11 @@ export default function OrganizationMembersError({
 }: OrganizationMembersErrorProps) {
   useEffect(() => {
     /*
-      Mismo mecanismo que el resto del frontend (ver la pantalla de planes): el detalle va a la
-      consola y nunca a la pantalla. Puede traer rutas internas del backend o el mensaje crudo de
-      un proveedor, que no ayudan a quien está mirando y sí dicen de más.
+      Mismo mecanismo que el resto del frontend (ver la pantalla de planes): el error completo no
+      va ni a la pantalla ni a la consola, sólo su resumen. Puede traer rutas internas del backend
+      o el mensaje crudo de un proveedor, que no ayudan a quien está mirando y sí dicen de más.
     */
-    console.error('[organization-members] error boundary', error);
+    logSafeError('[organization-members] error boundary', error);
   }, [error]);
 
   return (

@@ -5,6 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
 import { describePaymentsError } from './_errors';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 interface PlansErrorProps {
   error: Error & { digest?: string };
@@ -29,9 +30,9 @@ export default function PlansError({ error, reset }: PlansErrorProps) {
   const { title, description, canRetry, status } = describePaymentsError(error);
 
   useEffect(() => {
-    // El detalle va a la consola, no a la pantalla: puede traer rutas internas o datos del
-    // proveedor que no le sirven al usuario.
-    console.error('[plans] error boundary', error);
+    // Ni en pantalla ni en consola va el error completo: puede traer rutas internas o datos del
+    // proveedor. Sólo su resumen (tipo y `digest`, que enlaza con el log del servidor).
+    logSafeError('[plans] error boundary', error);
   }, [error]);
 
   return (

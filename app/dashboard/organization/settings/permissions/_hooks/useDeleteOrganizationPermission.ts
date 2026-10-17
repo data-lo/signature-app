@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { deleteOrganizationPermissionRequest } from '@/lib/api/organization-permissions';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 export function useDeleteOrganizationPermission(organizationId: string | null) {
   const queryClient = useQueryClient();
@@ -21,8 +22,8 @@ export function useDeleteOrganizationPermission(organizationId: string | null) {
       });
     },
     onError: (error) => {
-      console.error(
-        '[organization-permissions] falló eliminar el permiso:',
+      logSafeError(
+        '[organization-permissions] falló eliminar el permiso',
         error,
       );
       toast.error(

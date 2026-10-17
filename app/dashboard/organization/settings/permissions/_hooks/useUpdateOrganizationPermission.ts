@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/lib/error-handler';
 import { updateOrganizationPermissionRequest } from '@/lib/api/organization-permissions';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 export function useUpdateOrganizationPermission(organizationId: string | null) {
   const queryClient = useQueryClient();
@@ -28,8 +29,8 @@ export function useUpdateOrganizationPermission(organizationId: string | null) {
       });
     },
     onError: (error) => {
-      console.error(
-        '[organization-permissions] falló actualizar el permiso:',
+      logSafeError(
+        '[organization-permissions] falló actualizar el permiso',
         error,
       );
       toast.error(

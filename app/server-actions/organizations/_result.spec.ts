@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { BackendRequestError } from '@/lib/server/backend-request';
 import { toFailedResult } from './_result';
 
@@ -63,14 +66,22 @@ describe('toFailedResult', () => {
     expect(result).toEqual({ ok: false, message: 'respaldo' });
   });
 
-  it('deja el detalle completo en el log del servidor', () => {
-    const error = new BackendRequestError(500, 'interno');
+  /**
+   * Historia "Eliminar logs HTTP sensibles del navegador": al log del servidor va el resumen
+   * (tipo y estado), no el objeto con el mensaje del backend, que el SDK de Node también
+   * convertiría en breadcrumb para GlitchTip.
+   */
+  it('deja en el log del servidor sólo el resumen del fallo', () => {
+    const error = new BackendRequestError(500, 'interno: ana@example.com');
 
     toFailedResult(error, 'respaldo');
 
     expect(console.error).toHaveBeenCalledWith(
-      '[organization-members] falló la mutación:',
-      error,
+      '[organization-members] falló la mutación',
+      { name: 'BackendRequestError', status: 500 },
+    );
+    expect(JSON.stringify((console.error as jest.Mock).mock.calls)).not.toMatch(
+      /interno|ana@example/,
     );
   });
 });

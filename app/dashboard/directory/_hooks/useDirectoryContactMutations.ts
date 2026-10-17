@@ -11,6 +11,7 @@ import {
   type SaveDirectoryContactValues,
 } from '../_requests';
 import { directoryContactsQueryKey } from './useDirectoryContacts';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 /**
  * Alta de un contacto en el Directorio de la cuenta activa.
@@ -40,7 +41,7 @@ export function useCreateDirectoryContact(accountId: string | null) {
       });
     },
     onError: (error) => {
-      console.error('[directory] falló crear el contacto:', error);
+      logSafeError('[directory] falló crear el contacto', error);
       toast.error(
         getErrorMessage(
           error,
@@ -81,7 +82,7 @@ export function useUpdateDirectoryContact(accountId: string | null) {
       });
     },
     onError: (error) => {
-      console.error('[directory] falló actualizar el contacto:', error);
+      logSafeError('[directory] falló actualizar el contacto', error);
       toast.error(
         getErrorMessage(
           error,
@@ -118,7 +119,7 @@ export function useDeleteDirectoryContact(accountId: string | null) {
       });
     },
     onError: (error) => {
-      console.error('[directory] falló eliminar el contacto:', error);
+      logSafeError('[directory] falló eliminar el contacto', error);
       toast.error(
         getErrorMessage(
           error,

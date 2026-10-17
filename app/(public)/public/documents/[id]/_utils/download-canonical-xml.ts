@@ -13,6 +13,7 @@
  */
 
 import { saveBlobAsFile } from './save-blob-as-file';
+import { logSafeError, logSafeSummary } from '@/lib/observability/safe-log';
 
 /** Lo que el llamador muestra al usuario cuando la descarga no se puede completar. */
 export class CanonicalXmlDownloadError extends Error {}
@@ -26,22 +27,18 @@ export async function downloadCanonicalXml(
   try {
     response = await fetch(url, { headers: { Accept: 'application/xml' } });
   } catch (error) {
-    console.error('[XML canónico] Error de red al descargar', { url, error });
+    logSafeError('[XML canónico] Error de red al descargar', error);
     throw new CanonicalXmlDownloadError(
       'No se pudo conectar para obtener el XML canónico. Revisa tu conexión e inténtalo de nuevo.',
     );
   }
 
   if (!response.ok) {
-    const responseBody =
-      typeof response.text === 'function'
-        ? await response.text().catch(() => null)
-        : null;
-    console.error('[XML canónico] El backend rechazó la descarga', {
-      url,
+    // Sólo el estado: la URL lleva el id del documento y el cuerpo del error, lo que diga el
+    // backend. El detalle queda en los logs del backend.
+    logSafeSummary('[XML canónico] El backend rechazó la descarga', {
+      name: 'HttpError',
       status: response.status,
-      statusText: response.statusText,
-      responseBody,
     });
     /**
      * 404 es el caso esperado y frecuente: el documento no tiene constancia, o la tiene sin cadena

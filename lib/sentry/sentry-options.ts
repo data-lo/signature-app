@@ -1,4 +1,9 @@
-import type { Event } from '@sentry/nextjs';
+import type { ErrorEvent, Event } from '@sentry/nextjs';
+
+import {
+  redactEvent,
+  scrubBreadcrumb,
+} from '@/lib/observability/sensitive-data';
 
 /**
  * Encabezados que nunca deben salir hacia GlitchTip, en minúsculas.
@@ -71,6 +76,11 @@ export function scrubSensitiveRequestData<T extends Event>(event: T): T {
  *   params, variables locales y `user.*`) y los encabezados se piden con lista de exclusión.
  *   `beforeSend`/`beforeSendTransaction` vuelven a limpiar el evento ya armado
  *   (`scrubSensitiveRequestData`).
+ * - **Segunda barrera**: `beforeBreadcrumb` descarta los argumentos de los breadcrumbs de consola
+ *   (un `AxiosError` impreso traería la config con el `Authorization` y los cuerpos) y redacta el
+ *   resto; `beforeSend` redacta mensajes, excepciones, breadcrumbs y `extra` (ver
+ *   `lib/observability/sensitive-data.ts`). La primera es no registrar esos datos
+ *   (`lib/observability/safe-log.ts`).
  *
  * @returns Las opciones compartidas; cada runtime agrega encima las suyas.
  *
@@ -99,7 +109,9 @@ export function buildSentryOptions() {
       urlQueryParams: false,
       stackFrameVariables: false,
     },
-    beforeSend: scrubSensitiveRequestData,
+    beforeBreadcrumb: scrubBreadcrumb,
+    beforeSend: (event: ErrorEvent) =>
+      redactEvent(scrubSensitiveRequestData(event)),
     beforeSendTransaction: scrubSensitiveRequestData,
   };
 }

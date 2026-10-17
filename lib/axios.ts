@@ -3,12 +3,19 @@
 import axios from 'axios';
 import { getAuthToken, clearAuthToken } from './cookies';
 import { useAuthStore } from './store/useAuthStore';
+import { markApiRequestStart } from './observability/api-request';
+import {
+  buildSafeHttpLog,
+  reportSafeHttpLog,
+} from './observability/safe-log';
 
 const apiClient = axios.create({
   baseURL: '/api',
 });
 
 apiClient.interceptors.request.use((config) => {
+  markApiRequestStart(config);
+
   const token = getAuthToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -26,24 +33,25 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
+  // Antes se imprimían `response.data` y `error.response.data`: datos de usuarios, documentos y
+  // firmas que, vía la integración de consola de Sentry, acababan en GlitchTip. Ahora sólo sale
+  // el log seguro (método, ruta normalizada, estado, duración y categoría del fallo).
   (response) => {
-    console.log('[API Success]', {
-      method: response.config.method?.toUpperCase(),
-      url: response.config.url,
+    const log = buildSafeHttpLog({
+      config: response.config,
       status: response.status,
-      data: response.data
     });
-    
+    if (log) reportSafeHttpLog(log);
+
     return response;
   },
   (error) => {
-    console.error('[API Error]', {
-      method: error.config?.method?.toUpperCase(),
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.message,
-      data: error.response?.data
+    const log = buildSafeHttpLog({
+      config: error?.config,
+      status: error?.response?.status,
+      error,
     });
+    if (log) reportSafeHttpLog(log);
 
     if (error.response?.status === 401) {
       console.warn('[API Auth] Redirigiendo a /login por error 401 Unauthenticated');
