@@ -359,9 +359,28 @@ export default function DocumentsTable({
       {/* La tabla vive dentro de una tarjeta blanca (`bg-card`) con borde y encabezado gris, y la
           paginación va en su pie (ver `DataTableCard`, que comparten Miembros y Roles). */}
       <DataTableCard data-slot="documents-table-card">
-        <Table aria-busy={bodyState === 'loading' || undefined}>
+        {/*
+          Una grilla explícita evita que una celda con texto largo (nombre, RFC o estatus) le
+          quite espacio de forma impredecible a las demás. El ancho mínimo conserva columnas
+          legibles; por debajo de él, el contenedor de `Table` ofrece desplazamiento horizontal.
+        */}
+        <Table
+          aria-busy={bodyState === 'loading' || undefined}
+          className="min-w-[1200px] table-fixed [&_[data-slot=table-head]]:!h-12 [&_[data-slot=table-head]]:!px-3 [&_[data-slot=table-cell]]:!px-3 [&_[data-slot=table-cell]]:!py-3"
+        >
+          <colgroup>
+            <col className="w-[2%]" />
+            <col className="w-[19%]" />
+            <col className="w-[14%]" />
+            <col className="w-[12%]" />
+            <col className="w-[15%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[7%]" />
+            <col className="w-[5%]" />
+          </colgroup>
           <DataTableHeader>
-            <TableHead className="w-16">#</TableHead>
+            <TableHead></TableHead>
             <TableHead aria-sort={ARIA_SORT[nameSort]}>
               <SortableHeader
                 sort={nameSort}
@@ -376,7 +395,7 @@ export default function DocumentsTable({
             <TableHead>Fecha de creación</TableHead>
             <TableHead>Fecha de firma</TableHead>
             <TableHead>Tipo de firma</TableHead>
-            <TableHead aria-label="Acciones" className="w-16" />
+            <TableHead aria-label="Acciones" className="text-right" />
           </DataTableHeader>
           <TableBody>
             {bodyState === 'error' && (
@@ -442,17 +461,13 @@ export default function DocumentsTable({
                   className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
                   onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
                 >
-                  <TableCell className="w-16 whitespace-nowrap tabular-nums text-muted-foreground">
+                  <TableCell className="tabular-nums text-muted-foreground">
                     {documentRowIndex(page, pageSize, rowIndex)}
                   </TableCell>
-                  {/* Ancho fijo (`w-64 max-w-64`) en todas las resoluciones: el nombre se recorta
-                    dentro de él en una sola línea y el completo va en el tooltip (ver
-                    `DocumentFileName`), así la columna y la altura de la fila no dependen de lo
-                    largo que sea. En pantallas angostas la tabla se desplaza en horizontal. */}
                   {/* Sólo la información del archivo: el estatus ya tiene su propia columna, y el
                     punto de color que lo repetía aquí se quitó (historia "Ajustar columnas de la
                     tabla de documentos"). */}
-                  <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
+                  <TableCell className="text-emerald-700 dark:text-emerald-400">
                     {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
                       alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
                       sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
@@ -464,9 +479,9 @@ export default function DocumentsTable({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span>{doc.creator}</span>
+                      <span className="truncate">{doc.creator}</span>
                       {doc.creatorRfc && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="truncate text-xs text-muted-foreground">
                           RFC: {doc.creatorRfc}
                         </span>
                       )}

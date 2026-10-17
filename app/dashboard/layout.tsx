@@ -4,7 +4,7 @@ import { PermissionProvider } from '@/components/authorization/PermissionProvide
 import { getAuthorizationContext } from '@/lib/authorization/get-authorization-context.server';
 
 import ActiveAccountBridge from './_components/ActiveAccountBridge';
-import AuthorizationUnavailableView from './_components/AuthorizationUnavailableView';
+import AuthorizationUnavailableView from './_components/authorization-unavailable-view';
 import DashboardShell from './_components/DashboardShell';
 
 /**

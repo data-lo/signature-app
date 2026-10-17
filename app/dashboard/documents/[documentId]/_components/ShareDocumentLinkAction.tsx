@@ -11,6 +11,8 @@ interface ShareDocumentLinkActionProps {
   publicUrl: string | null;
   onShare: () => void;
   onDismissFallback: () => void;
+  /** Versión secundaria para acompañar la acción principal de firma. */
+  compact?: boolean;
 }
 
 const LABELS: Record<ShareLinkStatus, string> = {
@@ -32,13 +34,21 @@ export default function ShareDocumentLinkAction({
   publicUrl,
   onShare,
   onDismissFallback,
+  compact = false,
 }: ShareDocumentLinkActionProps) {
+  const label =
+    compact && status === 'idle' ? 'Copiar enlace' : LABELS[status];
+
   return (
     <div className="flex flex-col gap-2">
       <Button
         type="button"
-        variant="outline"
-        className="w-full"
+        variant={compact ? 'ghost' : 'outline'}
+        className={
+          compact
+            ? 'w-full text-primary hover:bg-primary/10 hover:text-primary'
+            : 'w-full'
+        }
         disabled={status === 'copying'}
         onClick={onShare}
       >
@@ -49,7 +59,7 @@ export default function ShareDocumentLinkAction({
         ) : (
           <Link2 className="size-4" />
         )}
-        {LABELS[status]}
+        {label}
       </Button>
 
       {status === 'error' && publicUrl && (

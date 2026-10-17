@@ -31,7 +31,7 @@ export default function DocumentPreviewPanel({
   isBlocked,
 }: DocumentPreviewPanelProps) {
   return (
-    <div className="relative h-[75vh]">
+    <div className="relative h-[75vh] lg:h-[calc(100vh-3rem)]">
       <Card className="h-full overflow-hidden p-0">
         <CardContent className="h-full p-0">
           {isLoading ? (

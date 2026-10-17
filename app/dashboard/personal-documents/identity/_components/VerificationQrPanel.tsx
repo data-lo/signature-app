@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 interface VerificationQrPanelProps {
   /** URL hospedada de Didit: es lo que codifica el QR y lo que abre el botón. */
   url: string;
+  /** La firma usa una jerarquía de acción centrada; identidad conserva su disposición existente. */
+  layout?: 'default' | 'signing';
 }
 
 /**
@@ -58,7 +60,10 @@ function isOpenableUrl(url: string): boolean {
  * La URL se sigue sin mostrar como texto. Se codifica y se enlaza, pero un renglón con la URL
  * cruda no le dice nada a nadie y llenaba la tarjeta.
  */
-export default function VerificationQrPanel({ url }: VerificationQrPanelProps) {
+export default function VerificationQrPanel({
+  url,
+  layout = 'default',
+}: VerificationQrPanelProps) {
   /**
    * Estado seguro: sin un enlace utilizable no se dibuja ni el QR ni el botón.
    *
@@ -76,9 +81,17 @@ export default function VerificationQrPanel({ url }: VerificationQrPanelProps) {
     );
   }
 
+  const isSigningLayout = layout === 'signing';
+
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm">
+    <div
+      className={
+        isSigningLayout
+          ? 'flex flex-col items-center gap-5 text-center'
+          : 'flex flex-col gap-4'
+      }
+    >
+      <p className={isSigningLayout ? 'text-sm text-muted-foreground' : 'text-sm'}>
         Escanea el código QR para iniciar el proceso de verificación, o ábrela
         en este dispositivo.
       </p>
@@ -97,11 +110,11 @@ export default function VerificationQrPanel({ url }: VerificationQrPanelProps) {
         </div>
       </div>
 
-      {/* Al final de la sección y alineado a la derecha, como el resto de acciones de la app. */}
-      <div className="flex justify-end">
+      <div className={isSigningLayout ? 'flex w-full' : 'flex justify-end'}>
         <Button
           variant="default"
-          size="sm"
+          size={isSigningLayout ? 'lg' : 'sm'}
+          className={isSigningLayout ? 'w-full' : undefined}
           /**
            * Un enlace de verdad y no un `onClick` con `window.open`: se puede abrir en otra
            * pestaña con el clic central, se copia con el menú contextual y los lectores de

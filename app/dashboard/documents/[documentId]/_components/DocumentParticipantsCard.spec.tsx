@@ -20,7 +20,9 @@ function buildParticipant(
 
 /** Fila del participante con ese nombre: su estatus y su rol viven dentro de ella. */
 function participantRow(name: string): HTMLElement {
-  return screen.getByText(name).closest('div.flex-col') as HTMLElement;
+  return screen
+    .getByText(name)
+    .closest('[data-slot="participant"]') as HTMLElement;
 }
 
 /**
@@ -43,7 +45,7 @@ describe('DocumentParticipantsCard', () => {
 
     const row = participantRow('Testigo Uno');
     expect(within(row).getByText('Pendiente')).toBeInTheDocument();
-    expect(within(row).getByText('Testigo')).toBeInTheDocument();
+    expect(row).toHaveTextContent('Testigo');
   });
 
   it('muestra "Notificado" para un testigo al que ya se le envió el aviso', () => {
