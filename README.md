@@ -442,11 +442,23 @@ Los errores del navegador, de Server Components/SSR/rutas del servidor y del mid
 | Variable | Dónde | Descripción |
 |---|---|---|
 | `NEXT_PUBLIC_SENTRY_DSN` | `.env.local` en local; **argumento de build** en los entornos desplegados | DSN del proyecto `signature-app` en GlitchTip (*Project settings → Client Keys (DSN)*). Sin ella el SDK queda deshabilitado: no reporta, pero la app funciona igual. |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Argumento de build (opcional) | `environment` de cada evento. Sin ella se usa `NODE_ENV`; hace falta en el despliegue de `development`, que se construye con `NODE_ENV=production`. |
+| `NEXT_PUBLIC_GIT_COMMIT_SHA` | Argumento de build (opcional; el pipeline pasa `github.sha`) | Commit del build: el `release` sale como `signature-app@<sha>`. Sin ella los eventos van sin release. |
 
 - **Es de build, no de arranque.** Como lleva el prefijo `NEXT_PUBLIC_`, Next la incrusta en el bundle (cliente y servidor) durante `next build`. En Docker se pasa con `docker build --build-arg NEXT_PUBLIC_SENTRY_DSN=...` (declarada como `ARG` en el stage de build del `Dockerfile`); definirla sólo al arrancar el contenedor no tiene efecto. El DSN de un proyecto de GlitchTip no es un secreto —el navegador lo necesita para enviar eventos—, por eso puede ir en el bundle.
 - **Privacidad.** El SDK no envía cookies, cuerpos de petición, query params ni los encabezados `Authorization`/`Cookie`/`Set-Cookie`, y un filtro final (`scrubSensitiveRequestData`) los vuelve a quitar de cada evento antes de transmitirlo.
 - **Trazas**: muestreo del 10 % en producción y completo en desarrollo, como transacciones clásicas (`traceLifecycle: 'static'`), que son las que GlitchTip procesa.
+- **Rutas sin ids**: las transacciones del navegador se nombran con la ruta normalizada (`/dashboard/documents/[documentId]`, ver `lib/observability/normalize-route.ts`) y su URL va sin query ni fragmento. Al agregar una página, sumarla a `APP_ROUTE_TEMPLATES`: su spec falla si falta.
 - Sin source maps por ahora: las trazas de pila del navegador llegan minificadas.
+
+#### Core Web Vitals
+
+`components/observability/WebVitalsReporter.tsx` (montado una vez en `app/providers.tsx`) toma LCP, INP, CLS, FCP y TTFB con `useReportWebVitals` y manda cada medición como una transacción de GlitchTip:
+
+- **Nombre** = ruta normalizada; **op** = `web.vital.lcp`, `web.vital.inp`, … GlitchTip agrupa por ambos, así que en *Performance* cada ruta tiene su serie por métrica. La **duración** de la transacción es el valor de la métrica en ms (CLS va ×1000: 0.1 se ve como 100 ms); el valor real va además en la medición (`measurements.lcp`, …) y en la etiqueta `web_vital.rating` (`good` / `needs-improvement` / `poor`, umbrales oficiales de web.dev).
+- **Vínculo con la carga de página**: comparte `trace_id` con la transacción `pageload` y cuelga de ella, y **hereda su muestreo** (el mismo 10 % de las trazas en producción): una carga no muestreada no reporta ninguna métrica.
+- **Datos**: sólo métrica, valor, clasificación, ruta, ambiente y release. Sin URL, query, user agent, usuario ni cuenta.
+- **Alertas**: las transacciones no abren incidencias. Para vigilar degradaciones conviene mirar la tendencia de cada ruta (p. ej. la duración de `web.vital.lcp` subiendo varios días), no una medición suelta.
 
 ### Tests
 

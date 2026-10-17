@@ -3,6 +3,7 @@ import type { ErrorEvent } from '@sentry/nextjs';
 import {
   buildSentryOptions,
   PRODUCTION_TRACES_SAMPLE_RATE,
+  RELEASE_NAME_PREFIX,
   scrubSensitiveRequestData,
 } from './sentry-options';
 
@@ -30,6 +31,14 @@ describe('scrubSensitiveRequestData', () => {
       url: 'https://app.example.com/dashboard',
       headers: { 'user-agent': 'jest' },
     });
+  });
+
+  it('quita query y fragmento de la URL', () => {
+    const event = scrubSensitiveRequestData(
+      errorEvent({ url: 'https://app.example.com/join?token=secreto#paso-2' }),
+    );
+
+    expect(event.request?.url).toBe('https://app.example.com/join');
   });
 
   it('deja intacto un evento sin petición', () => {
@@ -82,6 +91,30 @@ describe('buildSentryOptions', () => {
     expect(dataCollection.httpHeaders.request.deny).toEqual(
       expect.arrayContaining(['authorization', 'cookie']),
     );
+  });
+
+  it('etiqueta ambiente y release desde las variables de build', () => {
+    withEnv({
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: 'development',
+      NEXT_PUBLIC_GIT_COMMIT_SHA: 'abc123',
+      NODE_ENV: 'production',
+    });
+
+    expect(buildSentryOptions()).toMatchObject({
+      environment: 'development',
+      release: `${RELEASE_NAME_PREFIX}abc123`,
+    });
+  });
+
+  it('sin variables usa NODE_ENV como ambiente y no inventa release', () => {
+    withEnv({
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: undefined,
+      NEXT_PUBLIC_GIT_COMMIT_SHA: undefined,
+      NODE_ENV: 'production',
+    });
+
+    expect(buildSentryOptions().environment).toBe('production');
+    expect(buildSentryOptions().release).toBeUndefined();
   });
 
   it('limpia el evento en beforeSend', () => {

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from 'next-themes';
+import WebVitalsReporter from '@/components/observability/WebVitalsReporter';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -28,6 +29,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <QueryClientProvider client={queryClient}>
+        {/* Una sola vez para toda la app (rutas públicas y autenticadas); no pinta nada. */}
+        <WebVitalsReporter />
         {children}
         <Toaster position="top-center" />
       </QueryClientProvider>
