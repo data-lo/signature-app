@@ -334,9 +334,10 @@ describe('apiClient', () => {
     expect(breadcrumbs).toEqual([
       expect.objectContaining({
         category: 'api.request',
+        // Lo deja `recordApiResponse` (ver `./api-request`): el log seguro sólo va a consola.
         data: expect.objectContaining({
           route: '/api/v1/users/me',
-          status: 200,
+          status_class: '2xx',
         }),
       }),
     ]);
