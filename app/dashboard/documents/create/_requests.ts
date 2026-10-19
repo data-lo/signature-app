@@ -1,4 +1,9 @@
 import apiClient from '@/lib/axios';
+import {
+  DOCUMENT_UPLOAD_PATH,
+  measureDocumentUpload,
+  toSignatureMode,
+} from '@/lib/observability/upload-metrics';
 import type { CreateDocumentSignaturesRequest } from './_interfaces/create-document-signatures-request.interface';
 import type {
   CreatedDocumentSignatures,
@@ -13,6 +18,10 @@ import type {
  *
  * Informa el avance de la subida con `onUploadProgress`: con documentos de varios MB la subida
  * tarda lo suficiente como para que un botón que sólo dice "Enviando…" parezca colgado.
+ *
+ * Se mide con `measureDocumentUpload`: una sola señal al terminar (duración, rango de tamaño,
+ * resultado y categoría del fallo), sin datos del archivo ni de los firmantes. No cambia la
+ * petición, su resultado, sus errores ni el avance que ve el usuario.
  *
  * @param request - Archivo, configuración, colaboradores y, opcionalmente, el callback de avance.
  * @returns El documento creado con sus firmas.
@@ -41,21 +50,29 @@ export async function createDocumentSignaturesRequest({
   formData.append('collaborators', JSON.stringify(collaborators));
   formData.append('requiresDifferentSignatures', requiresDifferentSignatures);
 
-  const { data } = await apiClient.post<CreateDocumentSignaturesResponse>(
-    '/api/v1/documents/signatures',
-    formData,
+  const { data } = await measureDocumentUpload(
     {
-      onUploadProgress: onUploadProgress
-        ? ({ loaded, total }) => {
-            // `total` falta cuando el navegador no conoce el tamaño del cuerpo: sin él no hay
-            // porcentaje honesto y se deja el que se informó último.
-            if (total)
-              onUploadProgress(
-                Math.min(100, Math.round((loaded / total) * 100)),
-              );
-          }
-        : undefined,
+      fileSizeBytes: file.size,
+      hasCollaborators: collaborators.length > 0,
+      signatureMode: toSignatureMode(documentData.signatureType),
     },
+    () =>
+      apiClient.post<CreateDocumentSignaturesResponse>(
+        DOCUMENT_UPLOAD_PATH,
+        formData,
+        {
+          onUploadProgress: onUploadProgress
+            ? ({ loaded, total }) => {
+                // `total` falta cuando el navegador no conoce el tamaño del cuerpo: sin él no hay
+                // porcentaje honesto y se deja el que se informó último.
+                if (total)
+                  onUploadProgress(
+                    Math.min(100, Math.round((loaded / total) * 100)),
+                  );
+              }
+            : undefined,
+        },
+      ),
   );
 
   return data.data;

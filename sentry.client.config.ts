@@ -2,10 +2,10 @@ import * as Sentry from '@sentry/nextjs';
 
 import { buildSentryOptions } from '@/lib/sentry/sentry-options';
 import {
-  filterApiErrorEvent,
-  releaseRequestSpan,
-  trackRequestSpan,
-} from '@/lib/observability/api-request';
+  scrubUploadTransaction,
+  shouldCreateSpanForUploadRequest,
+  uploadAwareTracesSampler,
+} from '@/lib/observability/upload-metrics';
 
 /**
  * Sentry (GlitchTip) en el navegador.
@@ -19,30 +19,21 @@ import {
  * Los errores no controlados (`window.onerror`, promesas rechazadas sin `catch`) los captura la
  * integración por omisión del SDK; no hace falta registrar nada más.
  *
- * Peticiones a la API (ver `lib/observability/api-request.ts`):
- * - El SDK sigue creando el span `http.client` de cada XHR; `onRequestSpanStart`/`End` lo
- *   entregan para que los interceptores de `apiClient` lo completen con la ruta normalizada y el
- *   resultado, en vez de crear un span duplicado.
- * - El breadcrumb `xhr` del SDK se apaga: lleva la URL completa con query (y, en las descargas de
- *   MinIO, la firma de la URL prefirmada). Para `/api/*` lo sustituye el breadcrumb
- *   `api.request`, que sólo lleva método, ruta normalizada, clase de estado, duración y resultado.
- * - `beforeSend` descarta el `AxiosError` crudo que llegue como excepción no controlada: el fallo
- *   ya se registró clasificado. Lo que queda pasa por el `beforeSend` compartido (limpieza de la
- *   petición y redacción de datos sensibles, ver `lib/sentry/sentry-options.ts`).
+ * Carga de documentos (ver `lib/observability/upload-metrics.ts`): cada carga es una transacción
+ * propia que se muestrea siempre (`tracesSampler`); el span `http.client` automático de ese
+ * endpoint se apaga para no medir la misma petición dos veces, y la transacción sale sin página,
+ * breadcrumbs ni contexto del dispositivo (`scrubUploadTransaction`).
  */
-const sharedOptions = buildSentryOptions();
+const options = buildSentryOptions();
 
 Sentry.init({
-  ...sharedOptions,
+  ...options,
+  tracesSampler: uploadAwareTracesSampler(options.tracesSampleRate),
   integrations: [
     Sentry.browserTracingIntegration({
-      onRequestSpanStart: trackRequestSpan,
-      onRequestSpanEnd: releaseRequestSpan,
+      shouldCreateSpanForRequest: shouldCreateSpanForUploadRequest,
     }),
-    Sentry.breadcrumbsIntegration({ xhr: false }),
   ],
-  beforeSend: (event, hint) => {
-    const kept = filterApiErrorEvent(event, hint);
-    return kept && sharedOptions.beforeSend(kept);
-  },
+  beforeSendTransaction: (event) =>
+    scrubUploadTransaction(options.beforeSendTransaction(event)),
 });
