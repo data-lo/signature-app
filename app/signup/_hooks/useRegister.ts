@@ -7,6 +7,7 @@ import { getErrorMessage } from '@/lib/error-handler';
 import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
 import { acceptInvitationRequest } from '@/lib/api/organization-invitations';
 import { registerRequest, type RegisterRequestValues } from '../_requests';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 interface UseRegisterOptions {
   /**
@@ -58,7 +59,7 @@ export function useRegister({ onError }: UseRegisterOptions = {}) {
       router.push('/signup/verify');
     },
     onError: (error) => {
-      console.error('[register] falló la creación de cuenta:', error);
+      logSafeError('[register] falló la creación de cuenta', error);
       toast.error(
         getErrorMessage(
           error,
@@ -92,8 +93,8 @@ async function acceptInvitationAfterRegister(
   try {
     await acceptInvitationRequest(invitationToken, rfc);
   } catch (error) {
-    console.error(
-      '[register] la cuenta se creó, pero no se pudo aplicar la invitación:',
+    logSafeError(
+      '[register] la cuenta se creó, pero no se pudo aplicar la invitación',
       error,
     );
     toast.error(

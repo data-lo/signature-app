@@ -16,6 +16,7 @@ import { setPendingRegistrationContext } from '@/lib/pending-registration-contex
 import { resendOtpRequest } from '@/app/signup/_requests';
 import { loginRequest } from '../_requests';
 import type { LoginFormValues } from '../_schemas';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 export function useLogin() {
   const router = useRouter();
@@ -50,10 +51,7 @@ export function useLogin() {
             `/api/v1/document/${pendingContext.documentId}/link-collaborator`,
           );
         } catch (error) {
-          console.error(
-            '[login] no se pudo vincular la cuenta al documento pendiente:',
-            error,
-          );
+          logSafeError('[login] no se pudo vincular la cuenta al documento pendiente', error);
         }
         clearPendingSignatureContext();
         window.location.href = `/dashboard/documents/${pendingContext.documentId}`;
@@ -63,7 +61,7 @@ export function useLogin() {
       window.location.href = '/dashboard/documents/create';
     },
     onError: async (error, variables) => {
-      console.error('[login] falló el inicio de sesión:', error);
+      logSafeError('[login] falló el inicio de sesión', error);
 
       // Una pre-cuenta (isEmailVerified:false) responde 403 en vez de 401 (ver
       // AuthService.login) — en vez de un error genérico, se le reenvía un OTP y se le manda a
@@ -80,10 +78,7 @@ export function useLogin() {
           router.push('/signup/verify');
           return;
         } catch (resendError) {
-          console.error(
-            '[login] no se pudo reenviar el OTP tras el 403 de correo no verificado:',
-            resendError,
-          );
+          logSafeError('[login] no se pudo reenviar el OTP tras el 403 de correo no verificado', resendError);
         }
       }
 

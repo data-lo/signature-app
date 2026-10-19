@@ -5,6 +5,7 @@ import { getOrganizationMembersAction } from '@/app/server-actions/organizations
 import type { OrganizationMember } from '@/lib/api/organization-members';
 import MembersManager from './MembersManager';
 import MembersEmptyState from './MembersEmptyState';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 interface MembersSectionProps {
   organizationId: string;
@@ -59,10 +60,7 @@ export default async function MembersSection({
       );
     }
 
-    console.error(
-      '[organization-members] falló la carga en el servidor de la sección:',
-      error,
-    );
+    logSafeError('[organization-members] falló la carga en el servidor de la sección', error);
     throw error;
   }
 
