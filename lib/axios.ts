@@ -13,6 +13,14 @@ const apiClient = axios.create({
   baseURL: '/api',
 });
 
+/**
+ * Bitácora de consola sólo en desarrollo, y sin cuerpos: la integración de consola de Sentry
+ * convierte cada `console.*` en un breadcrumb que viaja a GlitchTip, y el `data` de las
+ * respuestas lleva datos personales y documentos. La observabilidad real va por
+ * `recordApiResponse`/`recordApiError` (ver `./observability/api-request`).
+ */
+const logToConsole = process.env.NODE_ENV === 'development';
+
 apiClient.interceptors.request.use((config) => {
   markApiRequestStart(config);
 

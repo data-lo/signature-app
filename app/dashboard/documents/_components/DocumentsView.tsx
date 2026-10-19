@@ -11,7 +11,9 @@ import { DataTablePageHeader } from '@/components/data-table/data-table-page-hea
 import DocumentsTable from './DocumentsTable';
 import DocumentsFilterButton from './DocumentsFilterButton';
 import DocumentsFilterChips from './DocumentsFilterChips';
+import DocumentsColumnsMenu from './DocumentsColumnsMenu';
 import { useDocuments } from '../_hooks/useDocuments';
+import { useDocumentColumnsPreference } from '../_hooks/useDocumentColumnsPreference';
 import { useDocumentsListState } from '../_hooks/useDocumentsListState';
 import {
   activeFilterChips,
@@ -104,6 +106,7 @@ export default function DocumentsView() {
     syncWithTotalPages,
     handleFiltersChange,
   } = useDocumentsListState();
+  const columnsPreference = useDocumentColumnsPreference();
 
   /**
    * Lo tecleado se guarda aparte de los filtros y sólo baja a ellos tras la pausa. Si el input
@@ -180,6 +183,12 @@ export default function DocumentsView() {
           filters={filters}
           onChange={handleFiltersChange}
         />
+        <DocumentsColumnsMenu
+          visibleColumns={columnsPreference.visibleColumns}
+          onColumnVisibilityChange={columnsPreference.setColumnVisibility}
+          onReset={columnsPreference.resetColumns}
+          isDefault={columnsPreference.isDefault}
+        />
       </div>
       
       <p className="mb-3 text-sm text-primary">
@@ -214,6 +223,7 @@ export default function DocumentsView() {
         }
         canArchiveRows={!filters.archived}
         canRestoreRows={filters.archived}
+        visibleColumns={columnsPreference.visibleColumns}
         emptyState={
           // Sólo con respuesta: mientras carga, la lista también llega vacía.
           documentsQuery.isSuccess && filters.archived ? (
