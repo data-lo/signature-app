@@ -8,6 +8,7 @@ import {
   updateOrganizationRoleRequest,
   type SaveOrganizationRoleValues,
 } from '@/lib/api/organization-roles';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 export function useUpdateOrganizationRole(organizationId: string | null) {
   const queryClient = useQueryClient();
@@ -28,7 +29,7 @@ export function useUpdateOrganizationRole(organizationId: string | null) {
       });
     },
     onError: (error) => {
-      console.error('[organization-roles] falló actualizar el rol:', error);
+      logSafeError('[organization-roles] falló actualizar el rol', error);
       toast.error(
         getErrorMessage(
           error,

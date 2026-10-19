@@ -10,6 +10,7 @@ import {
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
 import { checkGuestInvitationRequest } from '@/app/(public)/public/documents/[id]/biometric-signature/_requests';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 interface AccessDocumentViewProps {
   documentId: string | null;
@@ -91,10 +92,7 @@ export default function AccessDocumentView({
       try {
         await apiClient.patch(`/api/v1/document/${documentId}/link-collaborator`);
       } catch (error) {
-        console.error(
-          '[access-document] no se pudo vincular la cuenta al documento:',
-          error,
-        );
+        logSafeError('[access-document] no se pudo vincular la cuenta al documento', error);
       } finally {
         if (!cancelled) {
           clearPendingSignatureContext();

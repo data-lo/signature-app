@@ -8,6 +8,7 @@ import {
   createOrganizationRoleRequest,
   type SaveOrganizationRoleValues,
 } from '@/lib/api/organization-roles';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 export function useCreateOrganizationRole(organizationId: string | null) {
   const queryClient = useQueryClient();
@@ -22,7 +23,7 @@ export function useCreateOrganizationRole(organizationId: string | null) {
       });
     },
     onError: (error) => {
-      console.error('[organization-roles] falló crear el rol:', error);
+      logSafeError('[organization-roles] falló crear el rol', error);
       toast.error(
         getErrorMessage(
           error,

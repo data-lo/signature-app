@@ -11,6 +11,7 @@ import {
   backendRequest,
   BackendRequestError,
 } from '@/lib/server/backend-request';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 /**
  * Resultado del cambio de cuenta.
@@ -59,10 +60,7 @@ export async function switchActiveAccountAction(
       { activeAccountId: accountId },
     );
   } catch (error) {
-    console.error(
-      '[switch-active-account] no se pudo cambiar de cuenta:',
-      error,
-    );
+    logSafeError('[switch-active-account] no se pudo cambiar de cuenta', error);
 
     if (error instanceof BackendRequestError && error.status === 403) {
       /**

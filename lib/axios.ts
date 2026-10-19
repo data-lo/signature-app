@@ -8,18 +8,15 @@ import {
   recordApiError,
   recordApiResponse,
 } from './observability/api-request';
+import {
+  buildSafeHttpLog,
+  isConsoleLoggingEnabled,
+  reportSafeHttpLog,
+} from './observability/safe-log';
 
 const apiClient = axios.create({
   baseURL: '/api',
 });
-
-/**
- * Bitácora de consola sólo en desarrollo, y sin cuerpos: la integración de consola de Sentry
- * convierte cada `console.*` en un breadcrumb que viaja a GlitchTip, y el `data` de las
- * respuestas lleva datos personales y documentos. La observabilidad real va por
- * `recordApiResponse`/`recordApiError` (ver `./observability/api-request`).
- */
-const logToConsole = process.env.NODE_ENV === 'development';
 
 apiClient.interceptors.request.use((config) => {
   markApiRequestStart(config);
@@ -41,28 +38,33 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
+  // Antes se imprimían `response.data` y `error.response.data`: datos de usuarios, documentos y
+  // firmas que, vía la integración de consola de Sentry, acababan en GlitchTip. Ahora:
+  // - `recordApiResponse`/`recordApiError` dejan el breadcrumb `api.request`, completan el span
+  //   del SDK y envían el evento de los fallos que conviene vigilar.
+  // - El log seguro (método, ruta normalizada, estado, duración y categoría del fallo) sólo va a
+  //   la consola en desarrollo: en producción su breadcrumb repetiría el de `recordApi*`.
   (response) => {
     recordApiResponse(response);
-    if (logToConsole) {
-      console.log('[API Success]', {
-        method: response.config.method?.toUpperCase(),
-        url: response.config.url,
+    if (isConsoleLoggingEnabled()) {
+      const log = buildSafeHttpLog({
+        config: response.config,
         status: response.status,
       });
+      if (log) reportSafeHttpLog(log);
     }
 
     return response;
   },
   (error) => {
-    const record = recordApiError(error);
-    if (logToConsole) {
-      console.error('[API Error]', {
-        method: error.config?.method?.toUpperCase(),
-        url: error.config?.url,
-        status: error.response?.status,
-        failure: record?.failure_category,
-        message: error.message,
+    recordApiError(error);
+    if (isConsoleLoggingEnabled()) {
+      const log = buildSafeHttpLog({
+        config: error?.config,
+        status: error?.response?.status,
+        error,
       });
+      if (log) reportSafeHttpLog(log);
     }
 
     if (error.response?.status === 401) {

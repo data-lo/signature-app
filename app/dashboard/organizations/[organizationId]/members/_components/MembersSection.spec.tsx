@@ -125,6 +125,9 @@ describe('MembersSection', () => {
       MembersSection({ organizationId: 'org-1' }),
     ).rejects.toMatchObject({ status: 500 });
 
-    expect(console.error).toHaveBeenCalled();
+    // El mensaje del backend no llega a la consola: sólo el resumen (ver `logSafeError`).
+    expect(JSON.stringify((console.error as jest.Mock).mock.calls)).not.toMatch(
+      /interno/,
+    );
   });
 });

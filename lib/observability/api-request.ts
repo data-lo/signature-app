@@ -17,6 +17,9 @@ import { isAxiosError, isCancel } from 'axios';
  * **Qué sale.** Sólo `ApiRequestRecord`: método, ruta normalizada, clase de estado, duración,
  * resultado y, en los fallos, su categoría. Nunca cuerpos, headers, query params, ni el
  * `AxiosError` (que lleva la config con el `Authorization` y el cuerpo de la respuesta).
+ *
+ * La parte pura (normalizar, clasificar y medir) también la usan los logs seguros de
+ * `./safe-log.ts`.
  */
 
 export type ApiOutcome = 'success' | 'failure';
@@ -482,7 +485,7 @@ export function reportApiRequest(
  * elapsedSince(response.config); // 1840.2
  * ```
  */
-function elapsedSince(
+export function elapsedSince(
   config: object | undefined,
   now: number = performance.now(),
 ): number {

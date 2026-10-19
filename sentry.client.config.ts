@@ -1,9 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 
-import {
-  buildSentryOptions,
-  scrubSensitiveRequestData,
-} from '@/lib/sentry/sentry-options';
+import { buildSentryOptions } from '@/lib/sentry/sentry-options';
 import {
   filterApiErrorEvent,
   releaseRequestSpan,
@@ -30,10 +27,13 @@ import {
  *   MinIO, la firma de la URL prefirmada). Para `/api/*` lo sustituye el breadcrumb
  *   `api.request`, que sólo lleva método, ruta normalizada, clase de estado, duración y resultado.
  * - `beforeSend` descarta el `AxiosError` crudo que llegue como excepción no controlada: el fallo
- *   ya se registró clasificado.
+ *   ya se registró clasificado. Lo que queda pasa por el `beforeSend` compartido (limpieza de la
+ *   petición y redacción de datos sensibles, ver `lib/sentry/sentry-options.ts`).
  */
+const sharedOptions = buildSentryOptions();
+
 Sentry.init({
-  ...buildSentryOptions(),
+  ...sharedOptions,
   integrations: [
     Sentry.browserTracingIntegration({
       onRequestSpanStart: trackRequestSpan,
@@ -43,6 +43,6 @@ Sentry.init({
   ],
   beforeSend: (event, hint) => {
     const kept = filterApiErrorEvent(event, hint);
-    return kept && scrubSensitiveRequestData(kept);
+    return kept && sharedOptions.beforeSend(kept);
   },
 });
