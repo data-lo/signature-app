@@ -10,6 +10,7 @@ import {
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
 import { checkGuestInvitationRequest } from '@/app/(public)/public/documents/[id]/biometric-signature/_requests';
+import { checkGuestAdvancedInvitationRequest } from '@/app/(public)/public/documents/[id]/advanced-signature/_requests';
 import { logSafeError } from '@/lib/observability/safe-log';
 
 interface AccessDocumentViewProps {
@@ -35,6 +36,10 @@ interface AccessDocumentViewProps {
  * cuenta, no se manda a /login sino a la pantalla pública de firma del invitado, que valida la
  * posesión del correo con un código. Ante cualquier duda (error de red, respuesta negativa) se cae
  * al /login de siempre.
+ *
+ * Firma Avanzada (e.firma) de un invitado sin cuenta vinculada: igual, va a su pantalla pública,
+ * donde elige entre "Tengo una cuenta" (vuelve a /login con el contexto guardado) y "Firmar sin
+ * cuenta" (código al correo). Las dos consultas corren a la vez; una invitación es de un solo tipo.
  */
 export default function AccessDocumentView({
   documentId,
@@ -57,26 +62,34 @@ export default function AccessDocumentView({
 
     if (!getAuthToken()) {
       (async () => {
-        let guestBiometric = false;
-        try {
-          guestBiometric = await checkGuestInvitationRequest(documentId, {
-            collaboratorId,
-            email: email ?? '',
-          });
-        } catch {
-          guestBiometric = false;
-        }
+        const invitation = { collaboratorId, email: email ?? '' };
+        // Ante cualquier error, `false`: se cae al /login de siempre.
+        const [guestBiometric, guestAdvanced] = await Promise.all([
+          checkGuestInvitationRequest(documentId, invitation).catch(
+            () => false,
+          ),
+          checkGuestAdvancedInvitationRequest(documentId, invitation).catch(
+            () => false,
+          ),
+        ]);
         if (cancelled) return;
 
-        if (guestBiometric) {
-          // El invitado no pasa por /login: el contexto de vinculación no le sirve.
+        const guestRoute = guestBiometric
+          ? 'biometric-signature'
+          : guestAdvanced
+            ? 'advanced-signature'
+            : null;
+
+        if (guestRoute) {
+          // El invitado no pasa por /login: el contexto de vinculación no le sirve. Si en la
+          // Firma Avanzada elige "Tengo una cuenta", esa pantalla lo vuelve a guardar.
           clearPendingSignatureContext();
           const query = new URLSearchParams({
             collabId: collaboratorId,
             email: email ?? '',
           });
           router.replace(
-            `/public/documents/${documentId}/biometric-signature?${query.toString()}`,
+            `/public/documents/${documentId}/${guestRoute}?${query.toString()}`,
           );
           return;
         }
