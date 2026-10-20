@@ -10,6 +10,7 @@ import { FieldGroup, FieldError } from '@/components/ui/field';
 import { TextField } from '@/components/form/text-field';
 import { getErrorMessage } from '@/lib/error-handler';
 import { setAuthToken } from '@/lib/cookies';
+import { resolvePublicSigningDestination } from '@/lib/public-signing-context';
 import {
   getPendingRegistrationContext,
   setPendingRegistrationContext,
@@ -62,7 +63,11 @@ export default function VerifyOtpForm() {
       const result = await verifyOtpRequest(context.email, values.code);
       clearPendingRegistrationContext();
       setAuthToken(result.token);
-      window.location.href = '/dashboard/documents/create';
+      // Si se registró desde una invitación de firma, se vincula y vuelve a ese documento (o a la
+      // pantalla pública si el backend no confirma la vinculación).
+      window.location.href =
+        (await resolvePublicSigningDestination()) ??
+        '/dashboard/documents/create';
     } catch (error) {
       setVerifyError(
         getErrorMessage(

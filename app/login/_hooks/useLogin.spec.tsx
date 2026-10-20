@@ -11,11 +11,13 @@ import {
 } from '@/lib/pending-signature-context';
 import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
 import { resendOtpRequest } from '@/app/signup/_requests';
+import { resolvePublicSigningDestination } from '@/lib/public-signing-context';
 
 jest.mock('../_requests');
 jest.mock('@/lib/cookies');
 jest.mock('@/lib/axios');
 jest.mock('@/lib/pending-signature-context');
+jest.mock('@/lib/public-signing-context');
 jest.mock('@/lib/pending-registration-context');
 jest.mock('@/app/signup/_requests');
 jest.mock('react-hot-toast', () => ({
@@ -38,6 +40,8 @@ const mockedClearPendingSignatureContext =
 const mockedSetPendingRegistrationContext =
   setPendingRegistrationContext as jest.Mock;
 const mockedResendOtpRequest = resendOtpRequest as jest.Mock;
+const mockedResolvePublicSigningDestination =
+  resolvePublicSigningDestination as jest.Mock;
 
 function wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({
@@ -63,7 +67,32 @@ describe('useLogin', () => {
     mockedClearPendingSignatureContext.mockReset();
     mockedSetPendingRegistrationContext.mockReset();
     mockedResendOtpRequest.mockReset();
+    mockedResolvePublicSigningDestination.mockReset().mockResolvedValue(null);
     push.mockReset();
+  });
+
+  it('con invitación de la pantalla pública: resuelve la vinculación por invitación y no usa el contexto anterior', async () => {
+    mockedLoginRequest.mockResolvedValue({ token: 'jwt-1', user: {} });
+    mockedResolvePublicSigningDestination.mockResolvedValue(
+      '/dashboard/documents/doc-1',
+    );
+    mockedGetPendingSignatureContext.mockReturnValue({
+      documentId: 'doc-9',
+      collaboratorId: 'collab-9',
+      email: 'a@a.com',
+    });
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    act(() => {
+      result.current.mutate({ email: 'a@a.com', password: 'secret' });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockedSetAuthToken).toHaveBeenCalledWith('jwt-1');
+    expect(mockedResolvePublicSigningDestination).toHaveBeenCalled();
+    // La vinculación la hizo `resolvePublicSigningDestination`; la del contexto anterior no corre.
+    expect(mockedApiClientPatch).not.toHaveBeenCalled();
   });
 
   it('sin contexto pendiente: guarda el token y redirige a /dashboard/documents/create', async () => {

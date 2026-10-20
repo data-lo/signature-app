@@ -24,7 +24,11 @@ const base = (documentId: string) =>
 /** Datos de la invitación que trae el enlace del correo. Por sí solos no dan acceso. */
 export interface GuestInvitation {
   collaboratorId: string;
-  email: string;
+  /**
+   * Correo del enlace, si la URL lo trae. Opcional: la invitación la identifica el colaborador, y
+   * de regreso del login la pantalla pública ya no lo tiene (no se guarda). Nunca autoriza nada.
+   */
+  email?: string;
 }
 
 /** Acceso de invitado ya canjeado: token y vencimiento (ISO). */

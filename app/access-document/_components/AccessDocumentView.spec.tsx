@@ -3,13 +3,13 @@ import AccessDocumentView from './AccessDocumentView';
 import { getAuthToken } from '@/lib/cookies';
 import { getPendingSignatureContext } from '@/lib/pending-signature-context';
 import apiClient from '@/lib/axios';
-import { checkGuestInvitationRequest } from '@/app/(public)/public/documents/[id]/biometric-signature/_requests';
+import { AxiosError, type AxiosResponse } from 'axios';
+import { getPublicSigningInvitationRequest } from '@/app/(public)/public/documents/[id]/sign/_requests';
 
 jest.mock('@/lib/cookies');
-jest.mock(
-  '@/app/(public)/public/documents/[id]/biometric-signature/_requests',
-  () => ({ checkGuestInvitationRequest: jest.fn() }),
-);
+jest.mock('@/app/(public)/public/documents/[id]/sign/_requests', () => ({
+  getPublicSigningInvitationRequest: jest.fn(),
+}));
 jest.mock('@/lib/axios', () => ({
   __esModule: true,
   default: { patch: jest.fn() },
@@ -22,7 +22,13 @@ jest.mock('next/navigation', () => ({
 
 const mockedGetAuthToken = getAuthToken as jest.Mock;
 const mockedPatch = apiClient.patch as jest.Mock;
-const mockedCheckGuestInvitation = checkGuestInvitationRequest as jest.Mock;
+const mockedGetInvitation = getPublicSigningInvitationRequest as jest.Mock;
+
+const notFound = () =>
+  new AxiosError('404', '404', undefined, undefined, {
+    status: 404,
+    data: {},
+  } as AxiosResponse);
 
 describe('AccessDocumentView', () => {
   beforeEach(() => {
@@ -30,8 +36,8 @@ describe('AccessDocumentView', () => {
     mockedGetAuthToken.mockReset();
     mockedPatch.mockReset();
     mockedPatch.mockResolvedValue({ data: {} });
-    // Por defecto la invitación no es de un invitado biométrico: el flujo de siempre.
-    mockedCheckGuestInvitation.mockReset().mockResolvedValue(false);
+    // Por defecto el enlace no es de un firmante (testigo, revisor): el flujo de siempre.
+    mockedGetInvitation.mockReset().mockRejectedValue(notFound());
     localStorage.clear();
   });
 
@@ -108,62 +114,57 @@ describe('AccessDocumentView', () => {
     expect(mockedPatch).not.toHaveBeenCalled();
   });
 
-  describe('firma biométrica sin cuenta', () => {
-    it('sin sesión y con invitación de invitado biométrico, va a la firma pública sin pasar por /login', async () => {
-      mockedGetAuthToken.mockReturnValue(null);
-      mockedCheckGuestInvitation.mockResolvedValue(true);
+  it('si la validación falla por red, cae al /login de siempre', async () => {
+    mockedGetAuthToken.mockReturnValue(null);
+    mockedGetInvitation.mockRejectedValue(new Error('network'));
 
-      renderWithProviders(
-        <AccessDocumentView
-          documentId="doc-1"
-          collaboratorId="collab-1"
-          email="ana@correo.mx"
-        />,
-      );
+    renderWithProviders(
+      <AccessDocumentView
+        documentId="doc-1"
+        collaboratorId="collab-1"
+        email="ana@correo.mx"
+      />,
+    );
 
-      await waitFor(() =>
-        expect(replace).toHaveBeenCalledWith(
-          '/public/documents/doc-1/biometric-signature?collabId=collab-1&email=ana%40correo.mx',
-        ),
-      );
-      expect(mockedCheckGuestInvitation).toHaveBeenCalledWith('doc-1', {
-        collaboratorId: 'collab-1',
-        email: 'ana@correo.mx',
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+  });
+
+  describe('invitación de firmante', () => {
+    beforeEach(() => {
+      mockedGetInvitation.mockResolvedValue({
+        documentName: 'contrato.pdf',
+        maskedEmail: 'a***@correo.mx',
+        signatureType: 'BIOMETRIC',
+        availableForSigning: true,
+        guestSigningAllowed: true,
       });
-      expect(replace).not.toHaveBeenCalledWith('/login');
-      expect(getPendingSignatureContext()).toBeNull();
     });
 
-    it('si la consulta falla, cae al /login de siempre', async () => {
-      mockedGetAuthToken.mockReturnValue(null);
-      mockedCheckGuestInvitation.mockRejectedValue(new Error('network'));
+    it.each([
+      ['sin sesión', null],
+      ['con sesión', 'token-1'],
+    ])(
+      '%s: va a la pantalla pública de firma, que decide; aquí no vincula ni guarda contexto',
+      async (_case, token) => {
+        mockedGetAuthToken.mockReturnValue(token);
 
-      renderWithProviders(
-        <AccessDocumentView
-          documentId="doc-1"
-          collaboratorId="collab-1"
-          email="ana@correo.mx"
-        />,
-      );
+        renderWithProviders(
+          <AccessDocumentView
+            documentId="doc-1"
+            collaboratorId="collab-1"
+            email="ana@correo.mx"
+          />,
+        );
 
-      await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
-    });
-
-    it('con sesión no consulta nada: vincula la cuenta como siempre', async () => {
-      mockedGetAuthToken.mockReturnValue('token-1');
-
-      renderWithProviders(
-        <AccessDocumentView
-          documentId="doc-1"
-          collaboratorId="collab-1"
-          email="ana@correo.mx"
-        />,
-      );
-
-      await waitFor(() =>
-        expect(replace).toHaveBeenCalledWith('/dashboard/documents/doc-1'),
-      );
-      expect(mockedCheckGuestInvitation).not.toHaveBeenCalled();
-    });
+        await waitFor(() =>
+          expect(replace).toHaveBeenCalledWith(
+            '/public/documents/doc-1/sign?collabId=collab-1&email=ana%40correo.mx',
+          ),
+        );
+        expect(mockedGetInvitation).toHaveBeenCalledWith('doc-1', 'collab-1');
+        expect(mockedPatch).not.toHaveBeenCalled();
+        expect(getPendingSignatureContext()).toBeNull();
+      },
+    );
   });
 });

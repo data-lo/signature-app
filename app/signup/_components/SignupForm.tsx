@@ -13,6 +13,7 @@ import {
   type TurnstileWidgetHandle,
 } from '@/components/form/turnstile-widget';
 import { getPendingSignatureContext } from '@/lib/pending-signature-context';
+import { getPublicSigningContext } from '@/lib/public-signing-context';
 import { getErrorMessage } from '@/lib/error-handler';
 import { registerSchema, type RegisterFormValues } from '../_schemas';
 import { useRegister } from '../_hooks/useRegister';
@@ -59,6 +60,10 @@ export default function SignupForm({
     const context = getPendingSignatureContext();
     if (context?.email) {
       setValue('email', context.email);
+      setHasPendingSignature(true);
+    }
+    // La invitación de la pantalla pública no guarda el correo: sólo se avisa, sin prellenar.
+    if (getPublicSigningContext()) {
       setHasPendingSignature(true);
     }
   }, [setValue]);

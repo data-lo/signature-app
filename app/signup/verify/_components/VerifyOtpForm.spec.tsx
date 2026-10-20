@@ -12,10 +12,12 @@ import {
   updatePreRegistrationRequest,
 } from '../../_requests';
 import { setAuthToken } from '@/lib/cookies';
+import { resolvePublicSigningDestination } from '@/lib/public-signing-context';
 
 jest.mock('@/lib/pending-registration-context');
 jest.mock('../../_requests');
 jest.mock('@/lib/cookies');
+jest.mock('@/lib/public-signing-context');
 
 const replace = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -33,6 +35,8 @@ const mockedResendOtpRequest = resendOtpRequest as jest.Mock;
 const mockedUpdatePreRegistrationRequest =
   updatePreRegistrationRequest as jest.Mock;
 const mockedSetAuthToken = setAuthToken as jest.Mock;
+const mockedResolvePublicSigningDestination =
+  resolvePublicSigningDestination as jest.Mock;
 
 describe('VerifyOtpForm', () => {
   beforeEach(() => {
@@ -48,6 +52,7 @@ describe('VerifyOtpForm', () => {
     mockedResendOtpRequest.mockReset();
     mockedUpdatePreRegistrationRequest.mockReset();
     mockedSetAuthToken.mockReset();
+    mockedResolvePublicSigningDestination.mockReset().mockResolvedValue(null);
   });
 
   it('sin contexto pendiente, redirige a /signup en vez de mostrar el formulario', () => {
@@ -114,6 +119,28 @@ describe('VerifyOtpForm', () => {
     );
     expect(mockedSetAuthToken).toHaveBeenCalledWith('jwt-1');
     expect(mockedClearPendingRegistrationContext).toHaveBeenCalled();
+  });
+
+  it('si se registró desde una invitación de firma, resuelve la vinculación después de guardar el token', async () => {
+    mockedVerifyOtpRequest.mockResolvedValue({
+      user: { id: 'user-1' },
+      token: 'jwt-1',
+    });
+    mockedResolvePublicSigningDestination.mockResolvedValue(
+      '/dashboard/documents/doc-1',
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<VerifyOtpForm />);
+
+    await user.type(screen.getByLabelText(/código de verificación/i), '123456');
+    await user.click(screen.getByRole('button', { name: /^verificar$/i }));
+
+    await waitFor(() =>
+      expect(mockedResolvePublicSigningDestination).toHaveBeenCalled(),
+    );
+    expect(mockedSetAuthToken.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedResolvePublicSigningDestination.mock.invocationCallOrder[0],
+    );
   });
 
   it('muestra el error del backend si el código es inválido', async () => {

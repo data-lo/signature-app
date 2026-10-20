@@ -18,6 +18,11 @@ interface GuestAccessCodeStepProps {
   onVerified: (access: GuestAccess) => void;
   /** Aviso a mostrar arriba (p. ej. "tu acceso venció"), o `null`. */
   notice: string | null;
+  /**
+   * Correo invitado ya enmascarado por el backend. Tiene prioridad sobre el de la URL, que puede
+   * faltar.
+   */
+  maskedEmail?: string;
 }
 
 /**
@@ -49,7 +54,13 @@ export default function GuestAccessCodeStep({
   invitation,
   onVerified,
   notice,
+  maskedEmail,
 }: GuestAccessCodeStepProps) {
+  const destination =
+    maskedEmail ??
+    (invitation.email
+      ? maskEmail(invitation.email)
+      : 'tu correo de invitación');
   const [code, setCode] = useState('');
   const [sent, setSent] = useState(false);
   const [emailDelivered, setEmailDelivered] = useState(true);
@@ -79,7 +90,7 @@ export default function GuestAccessCodeStep({
       <p className="text-sm">
         Para firmar sin crear una cuenta, confirma que recibiste esta
         invitación. Enviaremos un código de 6 dígitos a{' '}
-        <span className="font-medium">{maskEmail(invitation.email)}</span>.
+        <span className="font-medium">{destination}</span>.
       </p>
 
       {!sent ? (

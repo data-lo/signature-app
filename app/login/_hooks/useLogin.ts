@@ -12,6 +12,7 @@ import {
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
 import { getPendingSignatureCaptureToken } from '@/lib/pending-signature-capture';
+import { resolvePublicSigningDestination } from '@/lib/public-signing-context';
 import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
 import { resendOtpRequest } from '@/app/signup/_requests';
 import { loginRequest } from '../_requests';
@@ -41,6 +42,18 @@ export function useLogin() {
        */
       if (getPendingSignatureCaptureToken()) {
         window.location.href = '/signature-capture';
+        return;
+      }
+
+      /**
+       * Invitación de la pantalla pública de firma: se vincula ESA invitación y sólo se abre el
+       * dashboard si el backend lo confirma; si la cuenta no corresponde, se vuelve a la pantalla
+       * pública, que lo explica. Va antes del contexto anterior (localStorage), que queda para los
+       * enlaces de testigos y revisores.
+       */
+      const publicSigningDestination = await resolvePublicSigningDestination();
+      if (publicSigningDestination) {
+        window.location.href = publicSigningDestination;
         return;
       }
 

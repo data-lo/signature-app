@@ -14,7 +14,7 @@ import {
   verifyGuestAccessCodeRequest,
 } from '../_requests';
 import { guestAccessStorageKey } from '../_hooks/useGuestAccess';
-import GuestBiometricSignatureView from './GuestBiometricSignatureView';
+import PublicBiometricSigningFlow from './PublicBiometricSigningFlow';
 import { maskEmail } from './GuestAccessCodeStep';
 
 jest.mock('../_requests');
@@ -60,7 +60,7 @@ function mockGeolocation() {
   });
 }
 
-describe('GuestBiometricSignatureView', () => {
+describe('PublicBiometricSigningFlow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     sessionStorage.clear();
@@ -94,10 +94,7 @@ describe('GuestBiometricSignatureView', () => {
   it('pide validar el correo antes de mostrar nada del documento, sin pedir cuenta', async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <GuestBiometricSignatureView
-        documentId="doc-1"
-        invitation={INVITATION}
-      />,
+      <PublicBiometricSigningFlow documentId="doc-1" invitation={INVITATION} />,
     );
 
     expect(await screen.findByText(/a•••@correo\.mx/)).toBeInTheDocument();
@@ -130,7 +127,7 @@ describe('GuestBiometricSignatureView', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(
-      <GuestBiometricSignatureView documentId="doc-1" invitation={null} />,
+      <PublicBiometricSigningFlow documentId="doc-1" invitation={null} />,
     );
 
     await user.click(await screen.findByRole('checkbox', { name: /acepto/i }));
@@ -159,10 +156,7 @@ describe('GuestBiometricSignatureView', () => {
     mockedGetSession.mockRejectedValue(unauthorized());
 
     renderWithProviders(
-      <GuestBiometricSignatureView
-        documentId="doc-1"
-        invitation={INVITATION}
-      />,
+      <PublicBiometricSigningFlow documentId="doc-1" invitation={INVITATION} />,
     );
 
     expect(await screen.findByText(/tu acceso venció/i)).toBeInTheDocument();
@@ -194,7 +188,7 @@ describe('GuestBiometricSignatureView', () => {
     });
 
     renderWithProviders(
-      <GuestBiometricSignatureView documentId="doc-1" invitation={null} />,
+      <PublicBiometricSigningFlow documentId="doc-1" invitation={null} />,
     );
 
     expect(await screen.findByText(/quedó registrada/i)).toBeInTheDocument();
@@ -203,7 +197,7 @@ describe('GuestBiometricSignatureView', () => {
 
   it('sin invitación ni acceso guardado, explica cómo volver', async () => {
     renderWithProviders(
-      <GuestBiometricSignatureView documentId="doc-1" invitation={null} />,
+      <PublicBiometricSigningFlow documentId="doc-1" invitation={null} />,
     );
 
     expect(await screen.findByText(/enlace inválido/i)).toBeInTheDocument();
