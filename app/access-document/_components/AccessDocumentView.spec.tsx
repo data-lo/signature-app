@@ -3,13 +3,13 @@ import AccessDocumentView from './AccessDocumentView';
 import { getAuthToken } from '@/lib/cookies';
 import { getPendingSignatureContext } from '@/lib/pending-signature-context';
 import apiClient from '@/lib/axios';
-import { checkGuestInvitationRequest } from '@/app/(public)/public/documents/[id]/biometric-signature/_requests';
+import { SignatureType } from '@/lib/enums/document';
+import { getPublicSigningMethodRequest } from '@/app/(public)/public/documents/[id]/sign/_requests';
 
 jest.mock('@/lib/cookies');
-jest.mock(
-  '@/app/(public)/public/documents/[id]/biometric-signature/_requests',
-  () => ({ checkGuestInvitationRequest: jest.fn() }),
-);
+jest.mock('@/app/(public)/public/documents/[id]/sign/_requests', () => ({
+  getPublicSigningMethodRequest: jest.fn(),
+}));
 jest.mock('@/lib/axios', () => ({
   __esModule: true,
   default: { patch: jest.fn() },
@@ -22,7 +22,7 @@ jest.mock('next/navigation', () => ({
 
 const mockedGetAuthToken = getAuthToken as jest.Mock;
 const mockedPatch = apiClient.patch as jest.Mock;
-const mockedCheckGuestInvitation = checkGuestInvitationRequest as jest.Mock;
+const mockedGetSigningMethod = getPublicSigningMethodRequest as jest.Mock;
 
 describe('AccessDocumentView', () => {
   beforeEach(() => {
@@ -30,8 +30,8 @@ describe('AccessDocumentView', () => {
     mockedGetAuthToken.mockReset();
     mockedPatch.mockReset();
     mockedPatch.mockResolvedValue({ data: {} });
-    // Por defecto la invitación no es de un invitado biométrico: el flujo de siempre.
-    mockedCheckGuestInvitation.mockReset().mockResolvedValue(false);
+    // Por defecto la invitación no se firma en la pantalla pública: el flujo de siempre.
+    mockedGetSigningMethod.mockReset().mockResolvedValue(null);
     localStorage.clear();
   });
 
@@ -108,10 +108,29 @@ describe('AccessDocumentView', () => {
     expect(mockedPatch).not.toHaveBeenCalled();
   });
 
+  it('sin sesión y con invitación FIEL sin cuenta, va a la MISMA pantalla pública de firma', async () => {
+    mockedGetAuthToken.mockReturnValue(null);
+    mockedGetSigningMethod.mockResolvedValue(SignatureType.Fiel);
+
+    renderWithProviders(
+      <AccessDocumentView
+        documentId="doc-1"
+        collaboratorId="collab-1"
+        email="ana@correo.mx"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(
+        '/public/documents/doc-1/sign?collabId=collab-1&email=ana%40correo.mx',
+      ),
+    );
+  });
+
   describe('firma biométrica sin cuenta', () => {
     it('sin sesión y con invitación de invitado biométrico, va a la firma pública sin pasar por /login', async () => {
       mockedGetAuthToken.mockReturnValue(null);
-      mockedCheckGuestInvitation.mockResolvedValue(true);
+      mockedGetSigningMethod.mockResolvedValue(SignatureType.BIOMETRIC);
 
       renderWithProviders(
         <AccessDocumentView
@@ -123,10 +142,10 @@ describe('AccessDocumentView', () => {
 
       await waitFor(() =>
         expect(replace).toHaveBeenCalledWith(
-          '/public/documents/doc-1/biometric-signature?collabId=collab-1&email=ana%40correo.mx',
+          '/public/documents/doc-1/sign?collabId=collab-1&email=ana%40correo.mx',
         ),
       );
-      expect(mockedCheckGuestInvitation).toHaveBeenCalledWith('doc-1', {
+      expect(mockedGetSigningMethod).toHaveBeenCalledWith('doc-1', {
         collaboratorId: 'collab-1',
         email: 'ana@correo.mx',
       });
@@ -136,7 +155,7 @@ describe('AccessDocumentView', () => {
 
     it('si la consulta falla, cae al /login de siempre', async () => {
       mockedGetAuthToken.mockReturnValue(null);
-      mockedCheckGuestInvitation.mockRejectedValue(new Error('network'));
+      mockedGetSigningMethod.mockRejectedValue(new Error('network'));
 
       renderWithProviders(
         <AccessDocumentView
@@ -163,7 +182,7 @@ describe('AccessDocumentView', () => {
       await waitFor(() =>
         expect(replace).toHaveBeenCalledWith('/dashboard/documents/doc-1'),
       );
-      expect(mockedCheckGuestInvitation).not.toHaveBeenCalled();
+      expect(mockedGetSigningMethod).not.toHaveBeenCalled();
     });
   });
 });

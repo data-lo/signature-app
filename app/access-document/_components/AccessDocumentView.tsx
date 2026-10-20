@@ -9,7 +9,10 @@ import {
   setPendingSignatureContext,
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
-import { checkGuestInvitationRequest } from '@/app/(public)/public/documents/[id]/biometric-signature/_requests';
+import {
+  getPublicSigningMethodRequest,
+  type PublicSigningType,
+} from '@/app/(public)/public/documents/[id]/sign/_requests';
 import { logSafeError } from '@/lib/observability/safe-log';
 
 interface AccessDocumentViewProps {
@@ -31,10 +34,11 @@ interface AccessDocumentViewProps {
  * decir, el documento quedaba asociado/listado por una simple vista, no por una acción explícita
  * de sesión. Ahora la vinculación se dispara aquí mismo, de forma explícita, antes de redirigir.
  *
- * Firma biométrica sin cuenta: si no hay sesión y la invitación es de un firmante biométrico sin
- * cuenta, no se manda a /login sino a la pantalla pública de firma del invitado, que valida la
- * posesión del correo con un código. Ante cualquier duda (error de red, respuesta negativa) se cae
- * al /login de siempre.
+ * Firma de invitado sin cuenta: si no hay sesión y el backend dice que la invitación se firma en la
+ * pantalla pública (biometría o Firma Avanzada de un firmante sin cuenta), no se manda a /login
+ * sino a `/public/documents/:id/sign`, la misma URL para cualquier tipo: esa pantalla monta el
+ * flujo del tipo que exige el documento. Ante cualquier duda (error de red, respuesta negativa) se
+ * cae al /login de siempre.
  */
 export default function AccessDocumentView({
   documentId,
@@ -57,18 +61,18 @@ export default function AccessDocumentView({
 
     if (!getAuthToken()) {
       (async () => {
-        let guestBiometric = false;
+        let signatureType: PublicSigningType | null = null;
         try {
-          guestBiometric = await checkGuestInvitationRequest(documentId, {
+          signatureType = await getPublicSigningMethodRequest(documentId, {
             collaboratorId,
             email: email ?? '',
           });
         } catch {
-          guestBiometric = false;
+          signatureType = null;
         }
         if (cancelled) return;
 
-        if (guestBiometric) {
+        if (signatureType) {
           // El invitado no pasa por /login: el contexto de vinculación no le sirve.
           clearPendingSignatureContext();
           const query = new URLSearchParams({
@@ -76,7 +80,7 @@ export default function AccessDocumentView({
             email: email ?? '',
           });
           router.replace(
-            `/public/documents/${documentId}/biometric-signature?${query.toString()}`,
+            `/public/documents/${documentId}/sign?${query.toString()}`,
           );
           return;
         }

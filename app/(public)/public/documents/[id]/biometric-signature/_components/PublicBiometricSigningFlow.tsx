@@ -27,7 +27,7 @@ const PublicPdfViewer = dynamic(
 const EXPIRED_ACCESS_NOTICE =
   'Tu acceso venció. Solicita un nuevo código para continuar con la firma.';
 
-interface GuestBiometricSignatureViewProps {
+interface PublicBiometricSigningFlowProps {
   documentId: string;
   /** Colaborador y correo del enlace de invitación; `null` si el enlace llegó incompleto. */
   invitation: GuestInvitation | null;
@@ -44,10 +44,10 @@ interface GuestBiometricSignatureViewProps {
  *
  * Un acceso vencido (401) no manda a iniciar sesión: vuelve al paso 1.
  */
-export default function GuestBiometricSignatureView({
+export default function PublicBiometricSigningFlow({
   documentId,
   invitation,
-}: GuestBiometricSignatureViewProps) {
+}: PublicBiometricSigningFlowProps) {
   const { access, loaded, save, clear } = useGuestAccess(documentId);
   const [notice, setNotice] = useState<string | null>(null);
   const [geoBlockedReason, setGeoBlockedReason] = useState<string | null>(null);
