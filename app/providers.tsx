@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from 'next-themes';
 
+import { WebVitalsReporter } from '@/components/observability/WebVitalsReporter';
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -28,6 +30,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <QueryClientProvider client={queryClient}>
+        <WebVitalsReporter />
         {children}
         <Toaster position="top-center" />
       </QueryClientProvider>
