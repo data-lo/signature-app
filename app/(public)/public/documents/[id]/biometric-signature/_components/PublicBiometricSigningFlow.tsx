@@ -31,6 +31,8 @@ interface PublicBiometricSigningFlowProps {
   documentId: string;
   /** Colaborador y correo del enlace de invitación; `null` si el enlace llegó incompleto. */
   invitation: GuestInvitation | null;
+  /** Correo invitado enmascarado por el backend, para el paso del código. */
+  maskedEmail?: string;
 }
 
 /**
@@ -47,6 +49,7 @@ interface PublicBiometricSigningFlowProps {
 export default function PublicBiometricSigningFlow({
   documentId,
   invitation,
+  maskedEmail,
 }: PublicBiometricSigningFlowProps) {
   const { access, loaded, save, clear } = useGuestAccess(documentId);
   const [notice, setNotice] = useState<string | null>(null);
@@ -120,6 +123,7 @@ export default function PublicBiometricSigningFlow({
             documentId={documentId}
             invitation={invitation}
             notice={notice}
+            maskedEmail={maskedEmail}
             onVerified={(next) => {
               setNotice(null);
               save(next);

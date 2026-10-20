@@ -9,10 +9,7 @@ import {
   setPendingSignatureContext,
   clearPendingSignatureContext,
 } from '@/lib/pending-signature-context';
-import {
-  getPublicSigningMethodRequest,
-  type PublicSigningType,
-} from '@/app/(public)/public/documents/[id]/sign/_requests';
+import { getPublicSigningInvitationRequest } from '@/app/(public)/public/documents/[id]/sign/_requests';
 import { logSafeError } from '@/lib/observability/safe-log';
 
 interface AccessDocumentViewProps {
@@ -34,11 +31,10 @@ interface AccessDocumentViewProps {
  * decir, el documento quedaba asociado/listado por una simple vista, no por una acción explícita
  * de sesión. Ahora la vinculación se dispara aquí mismo, de forma explícita, antes de redirigir.
  *
- * Firma de invitado sin cuenta: si no hay sesión y el backend dice que la invitación se firma en la
- * pantalla pública (biometría o Firma Avanzada de un firmante sin cuenta), no se manda a /login
- * sino a `/public/documents/:id/sign`, la misma URL para cualquier tipo: esa pantalla monta el
- * flujo del tipo que exige el documento. Ante cualquier duda (error de red, respuesta negativa) se
- * cae al /login de siempre.
+ * Firmantes: si el backend valida la invitación como de un FIRMANTE, se manda siempre a
+ * `/public/documents/:id/sign` —con o sin sesión—, que decide entre la cuenta y continuar sin ella
+ * (ver `PublicInvitationEntry`). Lo de arriba (contexto en localStorage, /login, vinculación por
+ * correo) queda para los demás enlaces: testigos y revisores, o cuando la validación falla por red.
  */
 export default function AccessDocumentView({
   documentId,
@@ -51,48 +47,40 @@ export default function AccessDocumentView({
   useEffect(() => {
     if (!documentId || !collaboratorId) return;
 
-    setPendingSignatureContext({
-      documentId,
-      collaboratorId,
-      email: email ?? '',
-    });
-
     let cancelled = false;
 
-    if (!getAuthToken()) {
-      (async () => {
-        let signatureType: PublicSigningType | null = null;
-        try {
-          signatureType = await getPublicSigningMethodRequest(documentId, {
-            collaboratorId,
-            email: email ?? '',
-          });
-        } catch {
-          signatureType = null;
-        }
-        if (cancelled) return;
-
-        if (signatureType) {
-          // El invitado no pasa por /login: el contexto de vinculación no le sirve.
-          clearPendingSignatureContext();
-          const query = new URLSearchParams({
-            collabId: collaboratorId,
-            email: email ?? '',
-          });
-          router.replace(
-            `/public/documents/${documentId}/sign?${query.toString()}`,
-          );
-          return;
-        }
-        router.replace('/login');
-      })();
-
-      return () => {
-        cancelled = true;
-      };
-    }
-
     (async () => {
+      // Firmantes: todo se decide en la pantalla pública de firma, con o sin sesión. Ahí se valida
+      // la invitación, se pide la vinculación al backend y se ofrece continuar sin cuenta.
+      let isSignerInvitation = false;
+      try {
+        await getPublicSigningInvitationRequest(documentId, collaboratorId);
+        isSignerInvitation = true;
+      } catch {
+        // 404 (testigo, revisor) o error de red: el camino de siempre.
+      }
+      if (cancelled) return;
+
+      if (isSignerInvitation) {
+        const query = new URLSearchParams({ collabId: collaboratorId });
+        if (email) query.set('email', email);
+        router.replace(
+          `/public/documents/${documentId}/sign?${query.toString()}`,
+        );
+        return;
+      }
+
+      setPendingSignatureContext({
+        documentId,
+        collaboratorId,
+        email: email ?? '',
+      });
+
+      if (!getAuthToken()) {
+        router.replace('/login');
+        return;
+      }
+
       try {
         await apiClient.patch(`/api/v1/document/${documentId}/link-collaborator`);
       } catch (error) {

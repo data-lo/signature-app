@@ -1,4 +1,4 @@
-import PublicSigningMethodRouter from './_components/PublicSigningMethodRouter';
+import PublicInvitationEntry from './_components/PublicInvitationEntry';
 
 interface PublicSigningPageProps {
   params: Promise<{ id: string }>;
@@ -6,10 +6,11 @@ interface PublicSigningPageProps {
 }
 
 /**
- * Pantalla pública de firma para invitados, una sola para todos los tipos de firma: el tipo lo
- * resuelve el backend y `PublicSigningMethodRouter` monta el flujo que le corresponde. Se llega
- * desde el enlace del correo (vía `/access-document`) o de regreso de Didit. Queda fuera del
- * middleware de sesión, como todo `/public/*`.
+ * Pantalla pública de firma para invitados, una sola para todos los tipos de firma.
+ * `PublicInvitationEntry` valida la invitación y resuelve si el firmante sigue con su cuenta o sin
+ * ella; el tipo de firma lo decide el backend y `PublicSigningMethodRouter` monta su flujo. Se
+ * llega desde el enlace del correo (vía `/access-document`), de regreso del login o de Didit.
+ * Queda fuera del middleware de sesión, como todo `/public/*`.
  *
  * @param props.params - `id` del documento.
  * @param props.searchParams - `collabId` y `email` de la invitación.
@@ -29,11 +30,10 @@ export default async function PublicSigningPage({
 
   return (
     <main className="min-h-screen bg-muted p-4 sm:p-8">
-      <PublicSigningMethodRouter
+      <PublicInvitationEntry
         documentId={id}
-        invitation={
-          collabId && email ? { collaboratorId: collabId, email } : null
-        }
+        collaboratorId={collabId ?? null}
+        email={email ?? null}
       />
     </main>
   );

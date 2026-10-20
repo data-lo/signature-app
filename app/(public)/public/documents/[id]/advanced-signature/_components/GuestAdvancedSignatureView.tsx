@@ -99,7 +99,11 @@ export default function GuestAdvancedSignatureView({
     if (!invitation) return;
 
     if (!getAuthToken()) {
-      setPendingSignatureContext({ documentId, ...invitation });
+      setPendingSignatureContext({
+        documentId,
+        collaboratorId: invitation.collaboratorId,
+        email: invitation.email ?? '',
+      });
       router.push('/login');
       return;
     }

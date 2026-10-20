@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { setPendingSignatureContext } from '@/lib/pending-signature-context';
+import { setPublicSigningContext } from '@/lib/public-signing-context';
 import type { GuestInvitation } from '../../biometric-signature/_requests';
 
 interface PublicAdvancedSigningFlowProps {
@@ -17,7 +17,8 @@ interface PublicAdvancedSigningFlowProps {
  *
  * Por ahora el invitado llega aquí con su tipo de firma ya resuelto y sólo puede continuar desde
  * una cuenta: guarda el contexto de la invitación y va a `/login`, que vincula la cuenta al entrar y
- * lo lleva al documento, donde firma por el flujo privado de siempre. Los pasos públicos —código al
+ * lo lleva al documento, donde firma por el flujo privado de siempre. Mientras el backend no admita
+ * FIEL sin cuenta (`guestSigningAllowed`), `PublicInvitationEntry` no llega a montarlo. Los pasos públicos —código al
  * correo, visor del documento y formulario `.cer` + `.key` + contraseña— se montan en este mismo
  * componente, sin cambiar de ruta.
  */
@@ -28,7 +29,7 @@ export default function PublicAdvancedSigningFlow({
   const router = useRouter();
 
   function continueWithAccount() {
-    setPendingSignatureContext({ documentId, ...invitation });
+    setPublicSigningContext(documentId, invitation.collaboratorId);
     router.push('/login');
   }
 

@@ -55,8 +55,12 @@ export default function GuestAdvancedAccessCodeStep({
     <div className="flex flex-col gap-4">
       <p className="text-sm">
         Enviaremos un código de 6 dígitos a{' '}
-        <span className="font-medium">{maskEmail(invitation.email)}</span> para
-        confirmar que recibiste esta invitación.
+        <span className="font-medium">
+          {invitation.email
+            ? maskEmail(invitation.email)
+            : 'tu correo de invitación'}
+        </span>{' '}
+        para confirmar que recibiste esta invitación.
       </p>
 
       {!sent ? (
