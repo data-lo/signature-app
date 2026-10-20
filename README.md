@@ -442,10 +442,13 @@ Los errores del navegador, de Server Components/SSR/rutas del servidor y del mid
 | Variable | Dónde | Descripción |
 |---|---|---|
 | `NEXT_PUBLIC_SENTRY_DSN` | `.env.local` en local; **argumento de build** en los entornos desplegados | DSN del proyecto `signature-app` en GlitchTip (*Project settings → Client Keys (DSN)*). Sin ella el SDK queda deshabilitado: no reporta, pero la app funciona igual. |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Igual que el DSN | Ambiente de los eventos (`production`, `staging`, …). Sin ella se usa `NODE_ENV`. |
+| `NEXT_PUBLIC_SENTRY_RELEASE` | Igual que el DSN | Release de los eventos, p. ej. `signature-app@<sha del commit>`. Sin ella los eventos salen sin release. |
 
 - **Es de build, no de arranque.** Como lleva el prefijo `NEXT_PUBLIC_`, Next la incrusta en el bundle (cliente y servidor) durante `next build`. En Docker se pasa con `docker build --build-arg NEXT_PUBLIC_SENTRY_DSN=...` (declarada como `ARG` en el stage de build del `Dockerfile`); definirla sólo al arrancar el contenedor no tiene efecto. El DSN de un proyecto de GlitchTip no es un secreto —el navegador lo necesita para enviar eventos—, por eso puede ir en el bundle.
 - **Privacidad.** El SDK no envía cookies, cuerpos de petición, query params ni los encabezados `Authorization`/`Cookie`/`Set-Cookie`, y un filtro final (`scrubSensitiveRequestData`) los vuelve a quitar de cada evento antes de transmitirlo.
 - **Trazas**: muestreo del 10 % en producción y completo en desarrollo, como transacciones clásicas (`traceLifecycle: 'static'`), que son las que GlitchTip procesa.
+- **Web Vitals** (`components/observability/WebVitalsReporter.tsx`, montado en `app/providers.tsx`; lógica en `lib/observability/web-vitals.ts`): `LCP`, `INP` y `CLS`, más `FCP` y `TTFB` como auxiliares, de cada carga de página vía `useReportWebVitals`. Cada métrica sale como una transacción `web_vital:<ruta normalizada>` con `op` `web_vital.<métrica>`, hija del `pageload` de esa carga (misma traza); en las de tiempo la duración es el valor, y lleva las etiquetas `metric`, `rating` (`good`/`needs-improvement`/`poor`, umbrales de web.dev) y `route`. Se reporta sólo si el `pageload` se muestreó (misma política que las trazas). La ruta se normaliza contra la lista cerrada `ROUTE_TEMPLATES` (`/dashboard/documents/[documentId]`, `/public/documents/[id]/sign`, …; lo que no case sale como `/[unmatched]`) y la transacción se envía sin URL, query, ids, user agent, breadcrumbs ni contextos del dispositivo. Al agregar una pantalla hay que sumarla a `ROUTE_TEMPLATES` (una prueba lo exige).
 - Sin source maps por ahora: las trazas de pila del navegador llegan minificadas.
 
 ### Tests

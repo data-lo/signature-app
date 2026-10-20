@@ -23,6 +23,66 @@ export const SENSITIVE_HEADER_NAMES: readonly string[] = [
 export const PRODUCTION_TRACES_SAMPLE_RATE = 0.1;
 
 /**
+ * Tasa de muestreo de las trazas: `PRODUCTION_TRACES_SAMPLE_RATE` en producción y completa en
+ * desarrollo. Es la política única: las trazas estándar y los Web Vitals
+ * (`lib/observability/web-vitals.ts`) la leen de aquí.
+ *
+ * @returns La tasa, entre 0 y 1.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * resolveTracesSampleRate(); // 0.1 con NODE_ENV=production
+ * ```
+ */
+export function resolveTracesSampleRate(): number {
+  return process.env.NODE_ENV === 'production'
+    ? PRODUCTION_TRACES_SAMPLE_RATE
+    : 1;
+}
+
+/**
+ * Ambiente de los eventos: `NEXT_PUBLIC_SENTRY_ENVIRONMENT` si está, y si no `NODE_ENV`, que es
+ * lo mismo que el SDK usaría por su cuenta en el navegador.
+ *
+ * @returns El ambiente (`production`, `development`, `staging`, …).
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * resolveSentryEnvironment(); // 'staging' con NEXT_PUBLIC_SENTRY_ENVIRONMENT=staging
+ * ```
+ */
+export function resolveSentryEnvironment(): string {
+  return (
+    process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
+    process.env.NODE_ENV ||
+    'development'
+  );
+}
+
+/**
+ * Release de los eventos, desde `NEXT_PUBLIC_SENTRY_RELEASE` (p. ej. `signature-app@<sha>`).
+ *
+ * Sin el plugin de build de Sentry nada inyecta el release, así que se pasa como argumento de
+ * build igual que el DSN. Sin la variable los eventos salen sin release, como hasta ahora.
+ *
+ * @returns El release, o `undefined`.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * resolveSentryRelease(); // 'signature-app@3f2a9c1'
+ * ```
+ */
+export function resolveSentryRelease(): string | undefined {
+  return process.env.NEXT_PUBLIC_SENTRY_RELEASE || undefined;
+}
+
+/**
  * Quita cookies y encabezados de autorización de un evento antes de transmitirlo.
  *
  * Es la segunda barrera: `dataCollection` (ver `buildSentryOptions`) ya le dice al SDK que no los
@@ -67,7 +127,10 @@ export function scrubSensitiveRequestData<T extends Event>(event: T): T {
  *   deshabilitado (`enabled: false`): un entorno sin la variable no reporta, pero tampoco falla.
  *   Lleva `NEXT_PUBLIC_` porque el navegador también lo necesita, y Next lo incrusta en el bundle
  *   en tiempo de build (ver README, sección de variables de entorno).
- * - **Trazas** al `PRODUCTION_TRACES_SAMPLE_RATE` en producción y completas en desarrollo.
+ * - **Ambiente y release** desde `NEXT_PUBLIC_SENTRY_ENVIRONMENT` y `NEXT_PUBLIC_SENTRY_RELEASE`
+ *   (`resolveSentryEnvironment`, `resolveSentryRelease`).
+ * - **Trazas** al `PRODUCTION_TRACES_SAMPLE_RATE` en producción y completas en desarrollo
+ *   (`resolveTracesSampleRate`).
  *   `traceLifecycle: 'static'` envía las transacciones clásicas, que son las que GlitchTip
  *   ingiere; el modo por omisión de la v11 (`'stream'`) manda spans sueltos que GlitchTip no
  *   procesa.
@@ -95,8 +158,9 @@ export function buildSentryOptions() {
   return {
     dsn,
     enabled: Boolean(dsn),
-    tracesSampleRate:
-      process.env.NODE_ENV === 'production' ? PRODUCTION_TRACES_SAMPLE_RATE : 1,
+    environment: resolveSentryEnvironment(),
+    release: resolveSentryRelease(),
+    tracesSampleRate: resolveTracesSampleRate(),
     traceLifecycle: 'static' as const,
     dataCollection: {
       userInfo: false,
