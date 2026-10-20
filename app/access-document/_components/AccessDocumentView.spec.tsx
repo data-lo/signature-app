@@ -185,4 +185,62 @@ describe('AccessDocumentView', () => {
       expect(mockedGetSigningMethod).not.toHaveBeenCalled();
     });
   });
+
+  describe('Firma Avanzada de invitado', () => {
+    it('sin sesión y con invitación FIEL sin cuenta, va a la pantalla de Firma Avanzada', async () => {
+      mockedGetAuthToken.mockReturnValue(null);
+      mockedCheckAdvancedInvitation.mockResolvedValue(true);
+
+      renderWithProviders(
+        <AccessDocumentView
+          documentId="doc-1"
+          collaboratorId="collab-1"
+          email="ana@correo.mx"
+        />,
+      );
+
+      await waitFor(() =>
+        expect(replace).toHaveBeenCalledWith(
+          '/public/documents/doc-1/advanced-signature?collabId=collab-1&email=ana%40correo.mx',
+        ),
+      );
+      expect(mockedCheckAdvancedInvitation).toHaveBeenCalledWith('doc-1', {
+        collaboratorId: 'collab-1',
+        email: 'ana@correo.mx',
+      });
+      expect(replace).not.toHaveBeenCalledWith('/login');
+    });
+
+    it('si la consulta de Firma Avanzada falla, cae al /login de siempre', async () => {
+      mockedGetAuthToken.mockReturnValue(null);
+      mockedCheckAdvancedInvitation.mockRejectedValue(new Error('network'));
+
+      renderWithProviders(
+        <AccessDocumentView
+          documentId="doc-1"
+          collaboratorId="collab-1"
+          email="ana@correo.mx"
+        />,
+      );
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    });
+
+    it('con sesión no consulta: vincula la cuenta y lleva al dashboard', async () => {
+      mockedGetAuthToken.mockReturnValue('token-1');
+
+      renderWithProviders(
+        <AccessDocumentView
+          documentId="doc-1"
+          collaboratorId="collab-1"
+          email="ana@correo.mx"
+        />,
+      );
+
+      await waitFor(() =>
+        expect(replace).toHaveBeenCalledWith('/dashboard/documents/doc-1'),
+      );
+      expect(mockedCheckAdvancedInvitation).not.toHaveBeenCalled();
+    });
+  });
 });
