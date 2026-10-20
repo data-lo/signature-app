@@ -3,6 +3,7 @@ import type { ErrorEvent } from '@sentry/nextjs';
 import {
   buildSentryOptions,
   PRODUCTION_TRACES_SAMPLE_RATE,
+  resolveTracesSampleRate,
   scrubSensitiveRequestData,
 } from './sentry-options';
 
@@ -72,6 +73,40 @@ describe('buildSentryOptions', () => {
       PRODUCTION_TRACES_SAMPLE_RATE,
     );
     expect(PRODUCTION_TRACES_SAMPLE_RATE).toBeLessThanOrEqual(0.1);
+  });
+
+  it('la tasa de las trazas sale de resolveTracesSampleRate', () => {
+    withEnv({ NODE_ENV: 'production' });
+    expect(buildSentryOptions().tracesSampleRate).toBe(
+      resolveTracesSampleRate(),
+    );
+
+    withEnv({ NODE_ENV: 'development' });
+    expect(resolveTracesSampleRate()).toBe(1);
+  });
+
+  it('toma ambiente y release de las variables públicas', () => {
+    withEnv({
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: 'staging',
+      NEXT_PUBLIC_SENTRY_RELEASE: 'signature-app@3f2a9c1',
+    });
+
+    expect(buildSentryOptions()).toMatchObject({
+      environment: 'staging',
+      release: 'signature-app@3f2a9c1',
+    });
+  });
+
+  it('sin variables, el ambiente es NODE_ENV y no hay release', () => {
+    withEnv({
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: undefined,
+      NEXT_PUBLIC_SENTRY_RELEASE: undefined,
+    });
+
+    expect(buildSentryOptions().environment).toBe('production');
+    expect(buildSentryOptions().release).toBeUndefined();
   });
 
   it('no recoge cookies, cuerpos ni encabezados de autorización', () => {
