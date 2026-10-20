@@ -1,40 +1,40 @@
-import GuestBiometricSignatureView from './_components/GuestBiometricSignatureView';
+import { redirect } from 'next/navigation';
 
-interface GuestBiometricSignaturePageProps {
+interface LegacyBiometricSignaturePageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ collabId?: string; email?: string }>;
 }
 
 /**
- * Pantalla pública de firma biométrica para invitados sin cuenta. Se llega desde el enlace del
- * correo (vía `/access-document`), que trae el colaborador y el correo de la invitación. Queda
- * fuera del middleware de sesión, como todo `/public/*`: el invitado no inicia sesión, valida un
- * código enviado a su correo.
+ * Ruta anterior de la firma biométrica del invitado. La pantalla pública de firma es ahora una sola,
+ * `/public/documents/:id/sign`, que resuelve el tipo de firma del documento; ésta sólo redirige.
+ *
+ * No se elimina porque todavía llegan aquí enlaces viejos: sesiones de Didit abiertas antes del
+ * cambio, cuyo callback apunta a esta URL, y pestañas o marcadores de invitados. La query
+ * (`collabId`, `email`) se conserva; el acceso de invitado guardado en `sessionStorage` sigue
+ * siendo el mismo, así que el invitado retoma donde iba.
  *
  * @param props.params - `id` del documento.
- * @param props.searchParams - `collabId` y `email` de la invitación.
- * @returns La vista de firma del invitado.
+ * @param props.searchParams - `collabId` y `email` de la invitación, si venían.
+ * @returns Nunca: redirige.
  *
  * @example
  * ```tsx
- * // /public/documents/doc-1/biometric-signature?collabId=c-1&email=ana%40correo.mx
+ * // /public/documents/doc-1/biometric-signature?collabId=c-1 → /public/documents/doc-1/sign?collabId=c-1
  * ```
  */
-export default async function GuestBiometricSignaturePage({
+export default async function LegacyBiometricSignaturePage({
   params,
   searchParams,
-}: GuestBiometricSignaturePageProps) {
+}: LegacyBiometricSignaturePageProps) {
   const { id } = await params;
   const { collabId, email } = await searchParams;
 
-  return (
-    <main className="min-h-screen bg-muted p-4 sm:p-8">
-      <GuestBiometricSignatureView
-        documentId={id}
-        invitation={
-          collabId && email ? { collaboratorId: collabId, email } : null
-        }
-      />
-    </main>
-  );
+  const query = new URLSearchParams();
+  if (collabId) query.set('collabId', collabId);
+  if (email) query.set('email', email);
+  const search = query.toString();
+  const suffix = search ? `?${search}` : '';
+
+  redirect(`/public/documents/${id}/sign${suffix}`);
 }
