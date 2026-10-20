@@ -6,6 +6,10 @@ import {
   shouldCreateSpanForUploadRequest,
   uploadAwareTracesSampler,
 } from '@/lib/observability/upload-metrics';
+import {
+  scrubWebVitalTransaction,
+  webVitalAwareTracesSampler,
+} from '@/lib/observability/web-vitals';
 
 /**
  * Sentry (GlitchTip) en el navegador.
@@ -23,17 +27,25 @@ import {
  * propia que se muestrea siempre (`tracesSampler`); el span `http.client` automático de ese
  * endpoint se apaga para no medir la misma petición dos veces, y la transacción sale sin página,
  * breadcrumbs ni contexto del dispositivo (`scrubUploadTransaction`).
+ *
+ * Web Vitals (ver `lib/observability/web-vitals.ts`): `WebVitalsReporter` ya decidió el muestreo
+ * con la misma tasa, así que el sampler no las vuelve a sortear, y salen sólo con la señal
+ * (`scrubWebVitalTransaction`).
  */
 const options = buildSentryOptions();
 
 Sentry.init({
   ...options,
-  tracesSampler: uploadAwareTracesSampler(options.tracesSampleRate),
+  tracesSampler: webVitalAwareTracesSampler(
+    uploadAwareTracesSampler(options.tracesSampleRate),
+  ),
   integrations: [
     Sentry.browserTracingIntegration({
       shouldCreateSpanForRequest: shouldCreateSpanForUploadRequest,
     }),
   ],
   beforeSendTransaction: (event) =>
-    scrubUploadTransaction(options.beforeSendTransaction(event)),
+    scrubWebVitalTransaction(
+      scrubUploadTransaction(options.beforeSendTransaction(event)),
+    ),
 });
