@@ -36,7 +36,15 @@ export interface SaveDirectoryContactValues {
   email: string;
 }
 
-/** Ruta base del recurso. El directorio no viaja en la URL: lo resuelve el backend desde `X-Account-Id`. */
+/**
+ * Ruta base del recurso. El directorio no viaja en la URL: lo resuelve el backend desde `X-Account-Id`.
+ *
+ * A diferencia de casi toda la API, `DirectoryController` responde el recurso tal cual, **sin**
+ * el sobre `{ success, message, data }`: la página es `{ items, pagination }` y el alta o la
+ * edición, el contacto. Leer `data.data` aquí devolvía `undefined` y la pantalla mostraba
+ * "No pudimos cargar el directorio" con la petición en 200 (bug "No carga la información del
+ * Directorio"). `/directory-contacts`, que usa la creación de documentos, sí trae el sobre.
+ */
 const DIRECTORY_CONTACTS_PATH = '/api/v1/directory/contacts';
 
 /** Tope de la búsqueda libre; el mismo `MAX_SEARCH_LENGTH` de `ListDirectoryContactsDto`. */
@@ -84,19 +92,18 @@ export async function listDirectoryContactsRequest({
   search,
 }: ListDirectoryContactsParams): Promise<DirectoryContactsPage> {
   const trimmedSearch = search?.trim();
-  const { data } = await apiClient.get<{
-    success: boolean;
-    message: string;
-    data: DirectoryContactsPage;
-  }>(DIRECTORY_CONTACTS_PATH, {
-    params: {
-      page,
-      limit,
-      ...(trimmedSearch ? { search: trimmedSearch } : {}),
+  const { data } = await apiClient.get<DirectoryContactsPage>(
+    DIRECTORY_CONTACTS_PATH,
+    {
+      params: {
+        page,
+        limit,
+        ...(trimmedSearch ? { search: trimmedSearch } : {}),
+      },
     },
-  });
+  );
 
-  return data.data;
+  return data;
 }
 
 /**
@@ -118,13 +125,12 @@ export async function listDirectoryContactsRequest({
 export async function createDirectoryContactRequest(
   values: SaveDirectoryContactValues,
 ): Promise<DirectoryContact> {
-  const { data } = await apiClient.post<{
-    success: boolean;
-    message: string;
-    data: DirectoryContact;
-  }>(DIRECTORY_CONTACTS_PATH, values);
+  const { data } = await apiClient.post<DirectoryContact>(
+    DIRECTORY_CONTACTS_PATH,
+    values,
+  );
 
-  return data.data;
+  return data;
 }
 
 /**
@@ -146,13 +152,12 @@ export async function updateDirectoryContactRequest(
   contactId: string,
   values: Partial<SaveDirectoryContactValues>,
 ): Promise<DirectoryContact> {
-  const { data } = await apiClient.patch<{
-    success: boolean;
-    message: string;
-    data: DirectoryContact;
-  }>(`${DIRECTORY_CONTACTS_PATH}/${contactId}`, values);
+  const { data } = await apiClient.patch<DirectoryContact>(
+    `${DIRECTORY_CONTACTS_PATH}/${contactId}`,
+    values,
+  );
 
-  return data.data;
+  return data;
 }
 
 /**
