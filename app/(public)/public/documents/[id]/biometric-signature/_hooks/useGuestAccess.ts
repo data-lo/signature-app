@@ -3,19 +3,28 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GuestAccess } from '../_requests';
 
+/** Prefijo por omisión: el acceso de la firma biométrica. */
+const DEFAULT_STORAGE_PREFIX = 'biometric-guest-access';
+
 /**
  * Llave del acceso de invitado de un documento en `sessionStorage`.
  *
  * @param documentId - Documento.
+ * @param prefix - Flujo al que pertenece el acceso. Cada flujo guarda el suyo: el token biométrico
+ *   no sirve en la Firma Avanzada ni al revés.
  * @returns La llave.
  *
  * @example
  * ```ts
  * guestAccessStorageKey('doc-1'); // 'biometric-guest-access:doc-1'
+ * guestAccessStorageKey('doc-1', 'advanced-guest-access'); // 'advanced-guest-access:doc-1'
  * ```
  */
-export function guestAccessStorageKey(documentId: string): string {
-  return `biometric-guest-access:${documentId}`;
+export function guestAccessStorageKey(
+  documentId: string,
+  prefix: string = DEFAULT_STORAGE_PREFIX,
+): string {
+  return `${prefix}:${documentId}`;
 }
 
 /**
@@ -23,6 +32,7 @@ export function guestAccessStorageKey(documentId: string): string {
  *
  * @param documentId - Documento.
  * @param now - Instante de referencia; por defecto, el actual.
+ * @param prefix - Flujo al que pertenece el acceso (ver `guestAccessStorageKey`).
  * @returns El acceso, o `null` si no hay, venció o el almacenamiento no está disponible.
  *
  * @example
@@ -33,10 +43,11 @@ export function guestAccessStorageKey(documentId: string): string {
 export function readStoredGuestAccess(
   documentId: string,
   now: number = Date.now(),
+  prefix: string = DEFAULT_STORAGE_PREFIX,
 ): GuestAccess | null {
   try {
     const raw = window.sessionStorage.getItem(
-      guestAccessStorageKey(documentId),
+      guestAccessStorageKey(documentId, prefix),
     );
     if (!raw) return null;
     const access = JSON.parse(raw) as GuestAccess;
@@ -55,47 +66,55 @@ export function readStoredGuestAccess(
  * disponible (modo privado estricto), el acceso vive sólo en memoria.
  *
  * @param documentId - Documento.
+ * @param prefix - Flujo al que pertenece el acceso (ver `guestAccessStorageKey`); por omisión, el
+ *   biométrico.
  * @returns El acceso vigente (o `null`), si ya se leyó el almacenamiento (`loaded`), y las funciones
  *   para guardarlo al canjear el código y olvidarlo cuando el backend lo rechaza.
  *
  * @example
  * ```ts
  * const { access, loaded, save, clear } = useGuestAccess('doc-1');
+ * const advanced = useGuestAccess('doc-1', 'advanced-guest-access');
  * ```
  */
-export function useGuestAccess(documentId: string) {
+export function useGuestAccess(
+  documentId: string,
+  prefix: string = DEFAULT_STORAGE_PREFIX,
+) {
   const [access, setAccess] = useState<GuestAccess | null>(null);
   // `false` hasta leer `sessionStorage`: antes de eso no se sabe si hay acceso.
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setAccess(readStoredGuestAccess(documentId));
+    setAccess(readStoredGuestAccess(documentId, Date.now(), prefix));
     setLoaded(true);
-  }, [documentId]);
+  }, [documentId, prefix]);
 
   const save = useCallback(
     (next: GuestAccess) => {
       setAccess(next);
       try {
         window.sessionStorage.setItem(
-          guestAccessStorageKey(documentId),
+          guestAccessStorageKey(documentId, prefix),
           JSON.stringify(next),
         );
       } catch {
         // Sin almacenamiento: el acceso se queda sólo en memoria.
       }
     },
-    [documentId],
+    [documentId, prefix],
   );
 
   const clear = useCallback(() => {
     setAccess(null);
     try {
-      window.sessionStorage.removeItem(guestAccessStorageKey(documentId));
+      window.sessionStorage.removeItem(
+        guestAccessStorageKey(documentId, prefix),
+      );
     } catch {
       // Nada que borrar.
     }
-  }, [documentId]);
+  }, [documentId, prefix]);
 
   return { access, loaded, save, clear };
 }
