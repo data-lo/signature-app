@@ -15,6 +15,18 @@ COPY . .
 ARG BACKEND_URL
 ENV BACKEND_URL=$BACKEND_URL
 
+# DSN de GlitchTip. Va en el build y no en el runtime: Next incrusta las `NEXT_PUBLIC_*` en el
+# bundle durante `npm run build`. Sin él, la imagen se construye igual con el reporte apagado.
+ARG NEXT_PUBLIC_SENTRY_DSN
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+
+# Ambiente y release de los eventos (p. ej. `production` y `signature-app@<sha>`). También de
+# build, por la misma razón. Sin ellos el ambiente es `NODE_ENV` y los eventos van sin release.
+ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT
+ENV NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT
+ARG NEXT_PUBLIC_SENTRY_RELEASE
+ENV NEXT_PUBLIC_SENTRY_RELEASE=$NEXT_PUBLIC_SENTRY_RELEASE
+
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build

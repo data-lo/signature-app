@@ -15,6 +15,7 @@ import {
   TERMINAL_CAPTURE_STATUSES,
   type SignatureCaptureSession,
 } from '@/lib/api/signature-capture';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 /**
  * Hooks de la captura de firma dibujada.
@@ -160,7 +161,7 @@ export function useCancelSignatureCaptureSession() {
      * error por una acción que ya dio por terminada.
      */
     onError: (error) => {
-      console.error('[captura de firma] no se pudo cancelar la sesión:', error);
+      logSafeError('[captura de firma] no se pudo cancelar la sesión', error);
     },
   });
 }

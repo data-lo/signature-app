@@ -55,13 +55,13 @@ describe('visibleNavGroups', () => {
   it('a una cuenta personal le muestra todo menos la configuración de organización', () => {
     expect(
       visibleKeys({ accountType: 'PERSONAL', lockedWithoutPlan: false }),
-    ).toEqual(['documents', 'payments', 'settings']);
+    ).toEqual(['documents', 'directory', 'payments', 'settings']);
   });
 
   it('a una organización con plan le muestra también su configuración', () => {
     expect(
       visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: false }),
-    ).toEqual(['documents', 'payments', 'settings', 'organization']);
+    ).toEqual(['documents', 'directory', 'payments', 'settings', 'organization']);
   });
 
   /**
@@ -114,6 +114,69 @@ describe('grupo de documentos', () => {
     expect(isActive(DOCUMENTS_SECTIONS.create.href)).toBe(true);
     expect(isActive('/dashboard/documents/doc-1')).toBe(true);
     expect(isActive('/dashboard/plans')).toBe(false);
+  });
+});
+
+describe('grupo del directorio', () => {
+  /**
+   * Los permisos con los que el backend resuelve una cuenta personal: todo lo que no exige
+   * organización (ver `PERSONAL_ACCOUNT_PERMISSION_KEYS` en signature-server), con los cuatro
+   * `DIRECTORY.*` incluidos.
+   */
+  const PERSONAL_PERMISSIONS: PermissionKey[] = [
+    'BILLING.READ',
+    'BILLING.MANAGE',
+    'DOCUMENT.CREATE',
+    'DOCUMENT.READ_OWN',
+    'DOCUMENT.SIGN_SELF',
+    'DIRECTORY.READ',
+    'DIRECTORY.CREATE',
+    'DIRECTORY.UPDATE',
+    'DIRECTORY.DELETE',
+  ];
+
+  it('aparece para una cuenta personal', () => {
+    expect(
+      visibleKeys({
+        accountType: 'PERSONAL',
+        lockedWithoutPlan: false,
+        permissions: PERSONAL_PERMISSIONS,
+      }),
+    ).toContain('directory');
+  });
+
+  it('en una organización sólo aparece con DIRECTORY.READ', () => {
+    expect(
+      visibleKeys({
+        accountType: 'ORGANIZATION',
+        lockedWithoutPlan: false,
+        permissions: ['DOCUMENT.READ_OWN', 'DIRECTORY.READ'],
+      }),
+    ).toContain('directory');
+    expect(
+      visibleKeys({
+        accountType: 'ORGANIZATION',
+        lockedWithoutPlan: false,
+        permissions: [
+          'DOCUMENT.READ_OWN',
+          'DIRECTORY.CREATE',
+          'DIRECTORY.UPDATE',
+          'DIRECTORY.DELETE',
+        ],
+      }),
+    ).not.toContain('directory');
+  });
+
+  it('lleva a /dashboard/directory y se marca activa en esa ruta', () => {
+    const [item] = NAV_GROUPS.find((group) => group.key === 'directory')!
+      .items;
+
+    expect(item).toMatchObject({
+      label: 'Directorio',
+      href: '/dashboard/directory',
+    });
+    expect(item.isActive('/dashboard/directory')).toBe(true);
+    expect(item.isActive('/dashboard/documents')).toBe(false);
   });
 });
 

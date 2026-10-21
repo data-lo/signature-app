@@ -1,4 +1,5 @@
 import { BackendRequestError } from '@/lib/server/backend-request';
+import { logSafeError } from '@/lib/observability/safe-log';
 
 /**
  * Resultado de una mutación hecha con un Server Action.
@@ -41,8 +42,9 @@ export function toFailedResult(
   error: unknown,
   fallback: string,
 ): ActionResult {
-  // El detalle completo va al log del servidor, nunca al navegador.
-  console.error('[organization-members] falló la mutación:', error);
+  // Al log del servidor va sólo el resumen (tipo y estado), nunca el mensaje del backend; y al
+  // navegador, nada.
+  logSafeError('[organization-members] falló la mutación', error);
 
   if (
     error instanceof BackendRequestError &&
