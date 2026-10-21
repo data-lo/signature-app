@@ -36,6 +36,8 @@ jobs:
           no-cache: false
           build-args: |
             BACKEND_API_URL=${{ secrets.BACKEND_API_URL }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ secrets.NEXT_PUBLIC_SENTRY_ENVIRONMENT }}
           tags: |
             dataloplatforms/signature-app:latest
             dataloplatforms/signature-app:${{ github.sha }}
