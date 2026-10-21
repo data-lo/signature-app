@@ -4,9 +4,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { KeyRound, Loader2, LogIn, LogOut } from 'lucide-react';
+import {
+  Fingerprint,
+  KeyRound,
+  Loader2,
+  LogIn,
+  LogOut,
+  ShieldCheck,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ErrorAlert } from '@/components/ui/error-alert';
 import { getAuthToken } from '@/lib/cookies';
 import { useLogout } from '@/lib/hooks/useLogout';
 import {
@@ -101,6 +109,34 @@ function Pending({ text }: { text: string }) {
       {text}
     </p>
   );
+}
+
+/** Contenido de la tarjeta para el único método de firma que exige el documento. */
+function getGuestSigningDetails(signatureType: SignatureType | null) {
+  if (signatureType === SignatureType.BIOMETRIC) {
+    return {
+      Icon: Fingerprint,
+      title: 'Firma biométrica',
+      description:
+        'Este tipo de firma fue definido al crear el documento. Tu identidad se validará durante el proceso.',
+      action: 'Firmar sin cuenta',
+      securityMessage: 'Tu identidad se validará durante el proceso.',
+    };
+  }
+
+  if (signatureType === SignatureType.Fiel) {
+    return {
+      Icon: KeyRound,
+      title: 'Firma electrónica avanzada',
+      description:
+        'Este documento requiere tu e.firma (FIEL). Ten a la mano tus archivos .cer, .key y la contraseña.',
+      action: 'Firmar con e.firma',
+      securityMessage:
+        'Tus archivos se utilizan únicamente para realizar esta firma.',
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -227,12 +263,11 @@ export default function PublicInvitationEntry({
       );
     }
     return (
-      <EntryCard title="Invitación inválida">
-        <p className="text-sm text-muted-foreground">
-          Abre esta página desde el enlace del correo de invitación. Si vienes
-          de la verificación, regresa a la pestaña en la que la iniciaste.
-        </p>
-      </EntryCard>
+      <ErrorAlert
+        className="mx-auto w-full max-w-md"
+        title="Invitación inválida"
+        message="Abre esta página desde el enlace completo del correo de invitación. Si vienes de la verificación, regresa a la pestaña en la que la iniciaste."
+      />
     );
   }
 
@@ -242,12 +277,11 @@ export default function PublicInvitationEntry({
 
   if (invalidInvitation) {
     return (
-      <EntryCard title="Invitación inválida">
-        <p className="text-sm text-muted-foreground">
-          Este enlace de firma no es válido. Verifica que lo abriste completo
-          desde el correo de invitación.
-        </p>
-      </EntryCard>
+      <ErrorAlert
+        className="mx-auto w-full max-w-md"
+        title="Invitación inválida"
+        message="Este enlace de firma no es válido. Verifica que lo abriste completo desde el correo de invitación."
+      />
     );
   }
 
@@ -306,14 +340,28 @@ export default function PublicInvitationEntry({
     return <Pending text="Cuenta vinculada. Redirigiendo a tu panel..." />;
   }
 
-  const guestButton = invitation.guestSigningAllowed && (
-    <div className="flex flex-col gap-1">
-      <Button type="button" variant="outline" onClick={continueAsGuest}>
-        <KeyRound className="size-4" aria-hidden />
-        Continuar sin cuenta
+  const guestSigningDetails = invitation.guestSigningAllowed
+    ? getGuestSigningDetails(invitation.signatureType)
+    : null;
+  const guestButton = guestSigningDetails && (
+    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <guestSigningDetails.Icon className="size-5" aria-hidden />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold">{guestSigningDetails.title}</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {guestSigningDetails.description}
+          </p>
+        </div>
+      </div>
+      <Button type="button" onClick={continueAsGuest}>
+        {guestSigningDetails.action}
       </Button>
-      <p className="text-xs text-muted-foreground">
-        Validarás un código enviado a tu correo y continuarás con tu firma.
+      <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <ShieldCheck className="size-3.5" aria-hidden />
+        {guestSigningDetails.securityMessage}
       </p>
     </div>
   );
@@ -356,14 +404,18 @@ export default function PublicInvitationEntry({
   }
 
   return (
-    <EntryCard title={`Vas a firmar: ${invitation.documentName}`}>
+    <EntryCard title="Firma este documento">
+      <p className="text-sm font-medium">Vas a firmar: {invitation.documentName}</p>
       <p className="text-sm text-muted-foreground">
         Invitación enviada a{' '}
         <span className="font-medium">{invitation.maskedEmail}</span>
       </p>
-      <p className="text-sm font-medium">¿Ya tienes una cuenta en Firmalo?</p>
+      {guestButton}
+      <div className="flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+        ¿Ya tienes una cuenta?
+      </div>
       <div className="flex flex-col gap-1">
-        <Button type="button" onClick={goToLogin}>
+        <Button type="button" variant="outline" onClick={goToLogin}>
           <LogIn className="size-4" aria-hidden />
           Iniciar sesión
         </Button>
@@ -371,7 +423,6 @@ export default function PublicInvitationEntry({
           Firmarás desde tu panel privado.
         </p>
       </div>
-      {guestButton}
     </EntryCard>
   );
 }
