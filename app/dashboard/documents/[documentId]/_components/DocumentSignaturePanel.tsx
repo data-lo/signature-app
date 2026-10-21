@@ -9,6 +9,8 @@ import SignatureVerificationCard, {
 import BiometricSignaturePanel, {
   type BiometricSigningProps,
 } from '@/components/biometric-signature/BiometricSignaturePanel';
+import ShareDocumentLinkAction from './ShareDocumentLinkAction';
+import type { ShareLinkStatus } from '../_hooks/useShareDocumentLink';
 
 export interface DocumentSigningProps {
   /** Motivo por el que la ubicación no pudo obtenerse; bloquea la firma hasta corregirlo. */
@@ -37,6 +39,13 @@ interface DocumentSignaturePanelProps {
    */
   biometricIdentityRequired?: boolean;
   onRejectClick: () => void;
+  /** Acción secundaria: acompaña la firma para mantener el flujo en un único panel. */
+  share: {
+    status: ShareLinkStatus;
+    publicUrl: string | null;
+    onShare: () => void;
+    onDismissFallback: () => void;
+  };
 }
 
 /** Título del aviso de firma biométrica sin identidad verificada. */
@@ -76,9 +85,13 @@ export default function DocumentSignaturePanel({
   biometric,
   biometricIdentityRequired = false,
   onRejectClick,
+  share,
 }: DocumentSignaturePanelProps) {
   return (
-    <div className="flex flex-col gap-2">
+    <section
+      aria-label="Acciones de firma"
+      className="flex flex-col gap-4 rounded-xl bg-card p-4"
+    >
       {needsSimpleSignatureSetup && (
         <div className="flex flex-col items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
           <p>
@@ -100,8 +113,8 @@ export default function DocumentSignaturePanel({
         aria-disabled={needsSimpleSignatureSetup}
         className={
           needsSimpleSignatureSetup
-            ? 'pointer-events-none flex flex-col gap-2 opacity-50 select-none'
-            : 'flex flex-col gap-2'
+            ? 'pointer-events-none flex flex-col gap-3 opacity-50 select-none'
+            : 'flex flex-col gap-3'
         }
       >
         {requiresVerification && (
@@ -162,6 +175,8 @@ export default function DocumentSignaturePanel({
         )}
       </div>
 
+      <ShareDocumentLinkAction {...share} compact />
+
       {/*
         "Rechazar documento" vive FUERA del bloque inerte, y fuera también del bloque que exige
         la verificación confirmada.
@@ -173,15 +188,17 @@ export default function DocumentSignaturePanel({
         para siempre una respuesta que esa persona no podía dar.
       */}
       {canReject && (
-        <Button
-          type="button"
-          variant="ghost"
-          className="w-full"
-          onClick={onRejectClick}
-        >
-          Rechazar documento
-        </Button>
+        <div className="border-t border-border pt-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-destructive/50 text-destructive hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={onRejectClick}
+          >
+            Rechazar documento
+          </Button>
+        </div>
       )}
-    </div>
+    </section>
   );
 }

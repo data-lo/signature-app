@@ -1,8 +1,8 @@
 /**
  * Cómo llega el navegador a la API. El cliente NO apunta al backend directamente: usa la ruta
- * same-origin `/api`, que el rewrite de `next.config.ts` reenvía al backend (`BACKEND_API_URL`).
+ * same-origin `/api`, que el rewrite de `next.config.ts` reenvía al backend (`BACKEND_URL`).
  * Así no hay CORS ni hace falta exponer el backend públicamente — y es lo que sostienen el
- * Dockerfile y el workflow de despliegue, que inyectan `BACKEND_API_URL` como build arg y secret.
+ * Dockerfile y el workflow de despliegue, que inyectan `BACKEND_URL` como build arg y secret.
  *
  * Las dos mitades tienen que existir a la vez: `baseURL` sin el rewrite deja al navegador pidiendo
  * `/api/...` al propio Next, que responde 404; y el rewrite sin `baseURL` no lo usa nadie. Cada
@@ -21,15 +21,15 @@
  * que dejó de existir.
  */
 describe('apiClient', () => {
-  const originalBackendUrl = process.env.BACKEND_API_URL;
+  const originalBackendUrl = process.env.BACKEND_URL;
 
   afterEach(() => {
     // `process.env` es del proceso, no del archivo: sin restaurarlo, el valor de prueba se
     // filtraría a los demás specs que corren en el mismo worker.
     if (originalBackendUrl === undefined) {
-      delete process.env.BACKEND_API_URL;
+      delete process.env.BACKEND_URL;
     } else {
-      process.env.BACKEND_API_URL = originalBackendUrl;
+      process.env.BACKEND_URL = originalBackendUrl;
     }
     jest.resetModules();
   });
@@ -59,7 +59,7 @@ describe('apiClient', () => {
    * `/api/v1/api/v1/...` significaría que el prefijo quedó además dentro del `@Controller()`.
    */
   it('una ruta versionada llega al backend con /api/v1 una sola vez', async () => {
-    process.env.BACKEND_API_URL = 'http://api-de-prueba:3000';
+    process.env.BACKEND_URL = 'http://api-de-prueba:3000';
     jest.resetModules();
 
     const { default: apiClient } = await import('./axios');
@@ -80,8 +80,8 @@ describe('apiClient', () => {
     expect(enElBackend).toBe('http://api-de-prueba:3000/api/v1/auth/login');
   });
 
-  it('el destino del rewrite sale de BACKEND_API_URL', async () => {
-    process.env.BACKEND_API_URL = 'http://api-de-prueba:3000';
+  it('el destino del rewrite sale de BACKEND_URL', async () => {
+    process.env.BACKEND_URL = 'http://api-de-prueba:3000';
     jest.resetModules();
 
     const { default: nextConfig } = await import('../next.config');

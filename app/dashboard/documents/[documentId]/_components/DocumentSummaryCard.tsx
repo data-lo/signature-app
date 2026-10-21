@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FileText } from 'lucide-react';
 
 interface DocumentSummaryCardProps {
   fileName: string;
@@ -11,16 +11,19 @@ export default function DocumentSummaryCard({
   creator,
 }: DocumentSummaryCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{fileName}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
-        <p>
+    <div className="flex items-start gap-3 p-4">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <FileText className="size-4" aria-hidden />
+      </div>
+      <div className="min-w-0 space-y-1">
+        <p className="truncate text-sm font-medium text-foreground" title={fileName}>
+          {fileName}
+        </p>
+        <p className="text-xs text-muted-foreground">
           Solicitado por{' '}
           <span className="font-medium text-foreground">{creator}</span>
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

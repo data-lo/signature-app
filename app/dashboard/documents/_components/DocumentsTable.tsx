@@ -376,7 +376,26 @@ export default function DocumentsTable({
       {/* La tabla vive dentro de una tarjeta blanca (`bg-card`) con borde y encabezado gris, y la
           paginación va en su pie (ver `DataTableCard`, que comparten Miembros y Roles). */}
       <DataTableCard data-slot="documents-table-card">
-        <Table aria-busy={bodyState === 'loading' || undefined}>
+        {/*
+          Una grilla explícita evita que una celda con texto largo (nombre, RFC o estatus) le
+          quite espacio de forma impredecible a las demás. El ancho mínimo conserva columnas
+          legibles; por debajo de él, el contenedor de `Table` ofrece desplazamiento horizontal.
+        */}
+        <Table
+          aria-busy={bodyState === 'loading' || undefined}
+          className="min-w-[1200px] table-fixed [&_[data-slot=table-head]]:!h-12 [&_[data-slot=table-head]]:!px-3 [&_[data-slot=table-cell]]:!px-3 [&_[data-slot=table-cell]]:!py-3"
+        >
+          <colgroup>
+            <col className="w-[2%]" />
+            <col className="w-[19%]" />
+            <col className="w-[14%]" />
+            <col className="w-[12%]" />
+            <col className="w-[15%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[7%]" />
+            <col className="w-[5%]" />
+          </colgroup>
           <DataTableHeader>
             {isShown('index') && <TableHead className="w-16">#</TableHead>}
             {isShown('document') && (

@@ -12,8 +12,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ARG BACKEND_API_URL
-ENV BACKEND_API_URL=$BACKEND_API_URL
+ARG BACKEND_URL
+ENV BACKEND_URL=$BACKEND_URL
 
 # DSN de GlitchTip. Va en el build y no en el runtime: Next incrusta las `NEXT_PUBLIC_*` en el
 # bundle durante `npm run build`. Sin él, la imagen se construye igual con el reporte apagado.
@@ -35,8 +35,10 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+ARG BACKEND_URL
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV BACKEND_URL=$BACKEND_URL
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs

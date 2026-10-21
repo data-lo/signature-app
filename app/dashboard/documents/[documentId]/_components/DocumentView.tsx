@@ -4,6 +4,7 @@ import type { FormEventHandler } from 'react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import PageContainer from '@/app/dashboard/_components/PageContainer';
 import type { DocumentDetail } from '../_requests';
 import type { DocumentLoadErrorKind } from '../_errors';
@@ -182,14 +183,21 @@ export default function DocumentView({
   }
 
   return (
-    <PageContainer className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
-      <div className="flex flex-col gap-4">
-        <DocumentSummaryCard
-          fileName={document.fileName}
-          creator={document.creator}
-        />
-
-        <DocumentParticipantsCard participants={document.participants} />
+    <PageContainer className="grid grid-cols-1 gap-6 lg:grid-cols-[390px_minmax(0,1fr)] lg:items-start">
+      {/**
+       * En escritorio este panel se mantiene visible al revisar el PDF. Así la acción de firma no
+       * se pierde al navegar un documento largo; en móvil vuelve a ser una columna normal.
+       */}
+      <aside className="flex flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+        <Card size="sm" className="gap-0 py-0 ring-0">
+          <DocumentSummaryCard
+            fileName={document.fileName}
+            creator={document.creator}
+          />
+          <div className="border-t border-border">
+            <DocumentParticipantsCard participants={document.participants} />
+          </div>
+        </Card>
 
         {/*
           Va antes del panel de firma y no después porque, cuando aparece, es LO ÚNICO que se
@@ -215,6 +223,7 @@ export default function DocumentView({
             biometric={biometric}
             biometricIdentityRequired={biometricIdentityRequired}
             onRejectClick={reject.onOpenForm}
+            share={share}
           />
         )}
 
@@ -255,13 +264,15 @@ export default function DocumentView({
           </Button>
         )}
 
-        <ShareDocumentLinkAction
-          status={share.status}
-          publicUrl={share.publicUrl}
-          onShare={share.onShare}
-          onDismissFallback={share.onDismissFallback}
-        />
-      </div>
+        {(!document.canSign || reject.isFormOpen) && (
+          <ShareDocumentLinkAction
+            status={share.status}
+            publicUrl={share.publicUrl}
+            onShare={share.onShare}
+            onDismissFallback={share.onDismissFallback}
+          />
+        )}
+      </aside>
 
       <DocumentPreviewPanel
         fileUrl={file.url}
