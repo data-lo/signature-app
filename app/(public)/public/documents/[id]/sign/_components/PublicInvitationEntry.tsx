@@ -5,12 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import {
-  Fingerprint,
-  KeyRound,
   Loader2,
   LogIn,
   LogOut,
-  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -109,34 +106,6 @@ function Pending({ text }: { text: string }) {
       {text}
     </p>
   );
-}
-
-/** Contenido de la tarjeta para el único método de firma que exige el documento. */
-function getGuestSigningDetails(signatureType: SignatureType | null) {
-  if (signatureType === SignatureType.BIOMETRIC) {
-    return {
-      Icon: Fingerprint,
-      title: 'Firma biométrica',
-      description:
-        'Este tipo de firma fue definido al crear el documento. Tu identidad se validará durante el proceso.',
-      action: 'Firmar sin cuenta',
-      securityMessage: 'Tu identidad se validará durante el proceso.',
-    };
-  }
-
-  if (signatureType === SignatureType.Fiel) {
-    return {
-      Icon: KeyRound,
-      title: 'Firma electrónica avanzada',
-      description:
-        'Este documento requiere tu e.firma (FIEL). Ten a la mano tus archivos .cer, .key y la contraseña.',
-      action: 'Firmar con e.firma',
-      securityMessage:
-        'Tus archivos se utilizan únicamente para realizar esta firma.',
-    };
-  }
-
-  return null;
 }
 
 /**
@@ -243,6 +212,18 @@ export default function PublicInvitationEntry({
 
   function continueAsGuest() {
     clearPublicSigningContext();
+
+    // La e.firma pública conserva su flujo propio (OTP, visor y archivos .cer/.key).
+    // La referencia del colaborador sigue viajando desde el enlace de correo.
+    if (invitation?.signatureType === SignatureType.Fiel && reference) {
+      const query = new URLSearchParams({ collabId: reference });
+      if (email) query.set('email', email);
+      router.push(
+        `/public/documents/${documentId}/advanced-signature?${query.toString()}`,
+      );
+      return;
+    }
+
     setChoice('guest');
   }
 
@@ -340,30 +321,10 @@ export default function PublicInvitationEntry({
     return <Pending text="Cuenta vinculada. Redirigiendo a tu panel..." />;
   }
 
-  const guestSigningDetails = invitation.guestSigningAllowed
-    ? getGuestSigningDetails(invitation.signatureType)
-    : null;
-  const guestButton = guestSigningDetails && (
-    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <guestSigningDetails.Icon className="size-5" aria-hidden />
-        </div>
-        <div className="space-y-1">
-          <p className="text-sm font-semibold">{guestSigningDetails.title}</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {guestSigningDetails.description}
-          </p>
-        </div>
-      </div>
-      <Button type="button" onClick={continueAsGuest}>
-        {guestSigningDetails.action}
-      </Button>
-      <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-        <ShieldCheck className="size-3.5" aria-hidden />
-        {guestSigningDetails.securityMessage}
-      </p>
-    </div>
+  const guestButton = invitation.guestSigningAllowed && (
+    <Button type="button" onClick={continueAsGuest}>
+      Continuar sin cuenta
+    </Button>
   );
 
   if (sessionStep === 'error') {
