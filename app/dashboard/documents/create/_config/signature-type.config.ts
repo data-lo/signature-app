@@ -24,13 +24,11 @@ export const SIGNATURE_TYPE_DESCRIPTIONS: Record<DocumentSignatureType, string> 
       'Al firmar, cada firmante confirmará su identidad con una prueba de vida y reconocimiento facial desde su celular.',
   };
 
-/**
- * Todas las opciones, en el orden en que se ofrecen. `SignatureTypeField` retira `BIOMETRIC` cuando
- * el plan de la cuenta activa no incluye `graphSignatureBiometrics`.
- */
+/** Tipos de firma disponibles al crear documentos nuevos. */
 export const SIGNATURE_TYPE_OPTIONS: {
   value: DocumentSignatureType;
   label: string;
-}[] = (
-  Object.keys(SIGNATURE_TYPE_LABELS) as DocumentSignatureType[]
-).map((value) => ({ value, label: SIGNATURE_TYPE_LABELS[value] }));
+}[] = (['SIMPLE', 'ADVANCED'] as const).map((value) => ({
+  value,
+  label: SIGNATURE_TYPE_LABELS[value],
+}));
