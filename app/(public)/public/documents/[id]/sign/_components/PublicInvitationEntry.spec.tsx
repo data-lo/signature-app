@@ -99,7 +99,7 @@ describe('PublicInvitationEntry', () => {
         screen.getByRole('button', { name: /iniciar sesión/i }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: /firmar sin cuenta/i }),
+        screen.getByRole('button', { name: /continuar sin cuenta/i }),
       ).toBeInTheDocument();
       expect(mockedGetInvitation).toHaveBeenCalledWith('doc-1', 'c-1');
       expect(mockedLink).not.toHaveBeenCalled();
@@ -127,13 +127,13 @@ describe('PublicInvitationEntry', () => {
       expect(mockedLink).not.toHaveBeenCalled();
     });
 
-    it('firmar sin cuenta: no vincula y entra al flujo del tipo del documento', async () => {
+    it('continuar sin cuenta: no vincula y entra al flujo biométrico', async () => {
       setPublicSigningContext('doc-1', 'c-1');
       const user = userEvent.setup();
       renderEntry();
 
       await user.click(
-        await screen.findByRole('button', { name: /firmar sin cuenta/i }),
+        await screen.findByRole('button', { name: /continuar sin cuenta/i }),
       );
 
       expect(
@@ -146,23 +146,25 @@ describe('PublicInvitationEntry', () => {
       expect(getPublicSigningContext()).toBeNull();
     });
 
-    it('muestra los requisitos de e.firma cuando el documento exige FIEL', async () => {
+    it('para FIEL muestra continuar sin cuenta y abre su flujo público', async () => {
       mockedGetInvitation.mockResolvedValue({
         ...INVITATION,
         signatureType: SignatureType.Fiel,
       });
+      const user = userEvent.setup();
       renderEntry();
 
       expect(
-        await screen.findByText(/firma electrónica avanzada/i),
+        await screen.findByRole('button', { name: /continuar sin cuenta/i }),
       ).toBeInTheDocument();
-      expect(screen.getByText(/archivos .cer, .key/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /firmar con e.firma/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole('button', { name: /firmar sin cuenta/i }),
-      ).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar sin cuenta/i }),
+      );
+
+      expect(push).toHaveBeenCalledWith(
+        '/public/documents/doc-1/advanced-signature?collabId=c-1&email=ana%40empresa.com',
+      );
     });
 
     it('si la invitación no admite firmar sin cuenta, sólo ofrece iniciar sesión', async () => {
@@ -177,7 +179,7 @@ describe('PublicInvitationEntry', () => {
         await screen.findByRole('button', { name: /iniciar sesión/i }),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: /firmar sin cuenta/i }),
+        screen.queryByRole('button', { name: /continuar sin cuenta/i }),
       ).not.toBeInTheDocument();
     });
   });
@@ -217,7 +219,7 @@ describe('PublicInvitationEntry', () => {
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: /firmar sin cuenta/i }),
+        screen.getByRole('button', { name: /continuar sin cuenta/i }),
       ).toBeInTheDocument();
     });
 
