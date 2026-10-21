@@ -29,7 +29,7 @@ export default async function PublicSigningPage({
   const { collabId, email } = await searchParams;
 
   return (
-    <main className="min-h-screen bg-muted p-4 sm:p-8">
+    <main className="flex min-h-screen items-center justify-center bg-muted p-4 sm:p-8">
       <PublicInvitationEntry
         documentId={id}
         collaboratorId={collabId ?? null}
