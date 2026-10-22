@@ -12,8 +12,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ARG BACKEND_URL
-ENV BACKEND_URL=$BACKEND_URL
+# URL que Next usa al generar el rewrite /api/* durante `next build`.
+ARG BACKEND_URL_BUILD
+ENV BACKEND_URL_BUILD=$BACKEND_URL_BUILD
 
 # DSN de GlitchTip. Va en el build y no en el runtime: Next incrusta las `NEXT_PUBLIC_*` en el
 # bundle durante `npm run build`. Sin él, la imagen se construye igual con el reporte apagado.
@@ -35,10 +36,11 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-ARG BACKEND_URL
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV BACKEND_URL=$BACKEND_URL
+
+# BACKEND_URL_RUNTIME no se hornea en la imagen. Dokploy/Compose debe inyectarla al crear el
+# contenedor; las Server Actions la leen directamente de process.env.
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
