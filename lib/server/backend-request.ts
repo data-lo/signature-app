@@ -8,7 +8,7 @@ import { TOKEN_COOKIE_NAME } from '@/lib/cookies';
  * el servidor no hay ningún proxy de por medio. La variable no lleva el prefijo `NEXT_PUBLIC_`, y
  * por eso no queda incrustada en el bundle del cliente durante `next build`.
  */
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://backend:4000';
+const BACKEND_URL = process.env.BACKEND_URL_RUNTIME ?? 'http://backend:4000';
 
 /**
  * Prefijo global del backend, el que aplica `applyGlobalApiPrefix` en signature-server. Se
