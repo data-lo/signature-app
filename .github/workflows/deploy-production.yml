@@ -1,0 +1,136 @@
+name: Deploy production
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión existente a desplegar (por ejemplo, v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: dataloplatforms/signature-app
+
+jobs:
+  validate:
+    name: Validate release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.version || github.ref }}
+
+      - name: Validate the version and its source branch
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='${{ inputs.version || github.ref_name }}'
+
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "La versión debe tener el formato vMAJOR.MINOR.PATCH (ejemplo: v1.4.0)." >&2
+            exit 1
+          fi
+
+          git fetch origin main --depth=1
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "El release debe apuntar a un commit que ya está en main." >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test release
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test -- --runInBand --no-watchman
+
+      - name: Build application
+        run: npm run build
+
+  deploy:
+    name: Build, publish and deploy
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and publish the release image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            BACKEND_URL_BUILD=${{ secrets.BACKEND_URL_BUILD }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=production
+            NEXT_PUBLIC_SENTRY_RELEASE=signature-app@${{ needs.validate.outputs.version }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }}
+            ${{ env.IMAGE_NAME }}:sha-${{ needs.validate.outputs.sha }}
+            ${{ env.IMAGE_NAME }}:production
+          labels: |
+            org.opencontainers.image.revision=${{ needs.validate.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+
+      - name: Trigger Dokploy deployment
+        env:
+          DOKPLOY_DEPLOY_WEBHOOK: ${{ secrets.DOKPLOY_PRODUCTION_DEPLOY_WEBHOOK }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$DOKPLOY_DEPLOY_WEBHOOK" ]]; then
+            echo "Falta el secret DOKPLOY_PRODUCTION_DEPLOY_WEBHOOK en el Environment production." >&2
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --request POST "$DOKPLOY_DEPLOY_WEBHOOK"
