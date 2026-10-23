@@ -8,7 +8,11 @@
  *
  * El módulo de documentos NO está acá: tiene su propia configuración en
  * `documents/_config/sections.ts`, donde el nombre viene acompañado de ruta e icono porque esa
- * entrada sí es una pantalla. Estos tres son agrupadores sin página propia.
+ * entrada sí es una pantalla. Éstos son agrupadores sin página propia.
+ *
+ * `management` ("Gestión") agrupa Documentos y Directorio sólo en el menú lateral. No es primer
+ * nivel de sus breadcrumbs: las dos entradas son pantallas propias y su breadcrumb empieza por
+ * ellas mismas (ver `DashboardBreadcrumbs`).
  *
  * @example
  * ```ts
@@ -16,6 +20,7 @@
  * ```
  */
 export const NAV_GROUP_LABELS = {
+  management: 'Gestión',
   payments: 'Pagos',
   settings: 'Configuración',
   organization: 'Organización',
