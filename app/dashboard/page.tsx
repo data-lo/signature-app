@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
+import { DEFAULT_AUTHENTICATED_ROUTE } from '@/lib/auth-redirect';
 
-/** Vista por defecto del dashboard: /dashboard consolida en /dashboard/documents/create. */
+/** Vista por defecto del dashboard: /dashboard consolida en el dashboard de documentos. */
 export default function DashboardPage() {
-  redirect('/dashboard/documents/create');
+  redirect(DEFAULT_AUTHENTICATED_ROUTE);
 }

@@ -11,6 +11,7 @@ import { TextField } from '@/components/form/text-field';
 import { getErrorMessage } from '@/lib/error-handler';
 import { setAuthToken } from '@/lib/cookies';
 import { resolvePublicSigningDestination } from '@/lib/public-signing-context';
+import { DEFAULT_AUTHENTICATED_ROUTE } from '@/lib/auth-redirect';
 import {
   getPendingRegistrationContext,
   setPendingRegistrationContext,
@@ -67,7 +68,7 @@ export default function VerifyOtpForm() {
       // pantalla pública si el backend no confirma la vinculación).
       window.location.href =
         (await resolvePublicSigningDestination()) ??
-        '/dashboard/documents/create';
+        DEFAULT_AUTHENTICATED_ROUTE;
     } catch (error) {
       setVerifyError(
         getErrorMessage(
