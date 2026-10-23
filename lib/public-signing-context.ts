@@ -161,7 +161,7 @@ export async function linkInvitationRequest(
  * @example
  * ```ts
  * const destination = await resolvePublicSigningDestination();
- * window.location.href = destination ?? '/dashboard/documents/create';
+ * window.location.href = destination ?? DEFAULT_AUTHENTICATED_ROUTE;
  * ```
  */
 export async function resolvePublicSigningDestination(): Promise<

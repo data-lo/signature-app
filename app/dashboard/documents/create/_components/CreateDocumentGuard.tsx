@@ -3,7 +3,8 @@
 import CreateDocumentView from './CreateDocumentView';
 
 /**
- * /dashboard/documents/create es la ruta por defecto del dashboard.
+ * /dashboard/documents/create: alta de documentos. Ya no es la ruta por defecto del dashboard
+ * (lo es la bandeja, ver `DEFAULT_AUTHENTICATED_ROUTE`); se entra desde el botón de Documentos.
  *
  * Ya no bloquea nada. Antes esta pantalla se renderizaba inerte (`pointer-events-none`, opacidad
  * reducida) mientras el usuario no hubiera terminado su onboarding, con un banner encima

@@ -4,11 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import {
-  Loader2,
-  LogIn,
-  LogOut,
-} from 'lucide-react';
+import { Loader2, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorAlert } from '@/components/ui/error-alert';
@@ -32,7 +28,7 @@ interface PublicInvitationEntryProps {
   documentId: string;
   /** `collabId` del enlace del correo, si la URL lo trae. */
   collaboratorId: string | null;
-  /** `email` del enlace, si la URL lo trae. Sólo se reenvía al flujo biométrico; nunca autoriza. */
+  /** `email` del enlace, si la URL lo trae. Sólo se reenvía a los flujos sin cuenta; nunca autoriza. */
   email: string | null;
 }
 
@@ -212,18 +208,6 @@ export default function PublicInvitationEntry({
 
   function continueAsGuest() {
     clearPublicSigningContext();
-
-    // La e.firma pública conserva su flujo propio (OTP, visor y archivos .cer/.key).
-    // La referencia del colaborador sigue viajando desde el enlace de correo.
-    if (invitation?.signatureType === SignatureType.Fiel && reference) {
-      const query = new URLSearchParams({ collabId: reference });
-      if (email) query.set('email', email);
-      router.push(
-        `/public/documents/${documentId}/advanced-signature?${query.toString()}`,
-      );
-      return;
-    }
-
     setChoice('guest');
   }
 
@@ -366,7 +350,9 @@ export default function PublicInvitationEntry({
 
   return (
     <EntryCard title="Firma este documento">
-      <p className="text-sm font-medium">Vas a firmar: {invitation.documentName}</p>
+      <p className="text-sm font-medium">
+        Vas a firmar: {invitation.documentName}
+      </p>
       <p className="text-sm text-muted-foreground">
         Invitación enviada a{' '}
         <span className="font-medium">{invitation.maskedEmail}</span>

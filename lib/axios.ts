@@ -3,6 +3,7 @@
 import axios from 'axios';
 import { getAuthToken, clearAuthToken } from './cookies';
 import { useAuthStore } from './store/useAuthStore';
+import { buildLoginPath } from './auth-redirect';
 import {
   markApiRequestStart,
   recordApiError,
@@ -74,7 +75,11 @@ apiClient.interceptors.response.use(
         typeof window !== 'undefined' &&
         window.location.pathname !== '/login'
       ) {
-        window.location.href = '/login';
+        // Sesión expirada o revocada a media navegación: tras volver a iniciar sesión, el
+        // usuario regresa a la pantalla en la que estaba.
+        window.location.href = buildLoginPath(
+          `${window.location.pathname}${window.location.search}`,
+        );
       }
     }
     return Promise.reject(error);

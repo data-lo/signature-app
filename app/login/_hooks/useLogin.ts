@@ -13,6 +13,7 @@ import {
 } from '@/lib/pending-signature-context';
 import { getPendingSignatureCaptureToken } from '@/lib/pending-signature-capture';
 import { resolvePublicSigningDestination } from '@/lib/public-signing-context';
+import { resolvePostLoginDestination } from '@/lib/auth-redirect';
 import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
 import { resendOtpRequest } from '@/app/signup/_requests';
 import { loginRequest } from '../_requests';
@@ -30,7 +31,7 @@ export function useLogin() {
       // Ver historia "Notificación por Email para Firma Simple y Vinculación de Cuenta": si el
       // usuario llegó desde /access-document y tuvo que iniciar sesión (Casos B/C — Registro
       // redirige a /login antes de vincular), se vincula su accountId al Collaborator pendiente
-      // y se le manda directo al documento en vez de /dashboard/documents/create. Best-effort:
+      // y se le manda directo al documento en vez del dashboard de documentos. Best-effort:
       // si la vinculación falla, igual se le manda al documento — sign() reintenta la
       // vinculación por email al firmar (Caso A), así que el usuario nunca queda atascado.
       /**
@@ -71,7 +72,9 @@ export function useLogin() {
         return;
       }
 
-      window.location.href = '/dashboard/documents/create';
+      // Sin un flujo pendiente: la ruta protegida que pidió antes de iniciar sesión
+      // (`?returnTo=`, validada como ruta interna) o el dashboard de documentos.
+      window.location.href = resolvePostLoginDestination(window.location.search);
     },
     onError: async (error, variables) => {
       logSafeError('[login] falló el inicio de sesión', error);
