@@ -22,7 +22,8 @@ interface PublicSigningMethodRouterProps {
  *
  * - `BIOMETRIC` → `PublicBiometricSigningFlow` (código al correo, consentimiento y ubicación,
  *   Didit, estado de la firma).
- * - `FIEL` → `PublicAdvancedSigningFlow`.
+ * - `FIEL` → `PublicAdvancedSigningFlow` (código al correo, visor del documento y firma con
+ *   `.cer` + `.key` + contraseña).
  * - Cualquier otro → nada: `PublicInvitationEntry` no ofrece continuar sin cuenta en ese caso.
  *
  * @param props - Documento, invitación, tipo de firma y correo enmascarado.
@@ -54,6 +55,7 @@ export default function PublicSigningMethodRouter({
       <PublicAdvancedSigningFlow
         documentId={documentId}
         invitation={invitation}
+        maskedEmail={maskedEmail}
       />
     );
   }
