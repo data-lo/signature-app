@@ -17,7 +17,7 @@ function withToken(token: string | undefined) {
  * carga `.env.local`: fijar aquí el host de desarrollo haría fallar la prueba por el entorno en
  * lugar de por la ruta, que es lo que de verdad verifica.
  */
-const EXPECTED_BASE = process.env.BACKEND_API_URL ?? 'http://backend:3000';
+const EXPECTED_BASE = process.env.BACKEND_URL_RUNTIME ?? 'http://backend:4000';
 
 function jsonResponse(body: unknown, status = 200) {
   return {

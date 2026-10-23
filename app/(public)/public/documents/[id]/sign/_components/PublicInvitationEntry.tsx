@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { KeyRound, Loader2, LogIn, LogOut } from 'lucide-react';
+import { Loader2, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ErrorAlert } from '@/components/ui/error-alert';
 import { getAuthToken } from '@/lib/cookies';
 import { useLogout } from '@/lib/hooks/useLogout';
 import {
@@ -27,7 +28,7 @@ interface PublicInvitationEntryProps {
   documentId: string;
   /** `collabId` del enlace del correo, si la URL lo trae. */
   collaboratorId: string | null;
-  /** `email` del enlace, si la URL lo trae. Sólo se reenvía al flujo biométrico; nunca autoriza. */
+  /** `email` del enlace, si la URL lo trae. Sólo se reenvía a los flujos sin cuenta; nunca autoriza. */
   email: string | null;
 }
 
@@ -227,12 +228,11 @@ export default function PublicInvitationEntry({
       );
     }
     return (
-      <EntryCard title="Invitación inválida">
-        <p className="text-sm text-muted-foreground">
-          Abre esta página desde el enlace del correo de invitación. Si vienes
-          de la verificación, regresa a la pestaña en la que la iniciaste.
-        </p>
-      </EntryCard>
+      <ErrorAlert
+        className="mx-auto w-full max-w-md"
+        title="Invitación inválida"
+        message="Abre esta página desde el enlace completo del correo de invitación. Si vienes de la verificación, regresa a la pestaña en la que la iniciaste."
+      />
     );
   }
 
@@ -242,12 +242,11 @@ export default function PublicInvitationEntry({
 
   if (invalidInvitation) {
     return (
-      <EntryCard title="Invitación inválida">
-        <p className="text-sm text-muted-foreground">
-          Este enlace de firma no es válido. Verifica que lo abriste completo
-          desde el correo de invitación.
-        </p>
-      </EntryCard>
+      <ErrorAlert
+        className="mx-auto w-full max-w-md"
+        title="Invitación inválida"
+        message="Este enlace de firma no es válido. Verifica que lo abriste completo desde el correo de invitación."
+      />
     );
   }
 
@@ -307,15 +306,9 @@ export default function PublicInvitationEntry({
   }
 
   const guestButton = invitation.guestSigningAllowed && (
-    <div className="flex flex-col gap-1">
-      <Button type="button" variant="outline" onClick={continueAsGuest}>
-        <KeyRound className="size-4" aria-hidden />
-        Continuar sin cuenta
-      </Button>
-      <p className="text-xs text-muted-foreground">
-        Validarás un código enviado a tu correo y continuarás con tu firma.
-      </p>
-    </div>
+    <Button type="button" onClick={continueAsGuest}>
+      Continuar sin cuenta
+    </Button>
   );
 
   if (sessionStep === 'error') {
@@ -356,14 +349,20 @@ export default function PublicInvitationEntry({
   }
 
   return (
-    <EntryCard title={`Vas a firmar: ${invitation.documentName}`}>
+    <EntryCard title="Firma este documento">
+      <p className="text-sm font-medium">
+        Vas a firmar: {invitation.documentName}
+      </p>
       <p className="text-sm text-muted-foreground">
         Invitación enviada a{' '}
         <span className="font-medium">{invitation.maskedEmail}</span>
       </p>
-      <p className="text-sm font-medium">¿Ya tienes una cuenta en Firmalo?</p>
+      {guestButton}
+      <div className="flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+        ¿Ya tienes una cuenta?
+      </div>
       <div className="flex flex-col gap-1">
-        <Button type="button" onClick={goToLogin}>
+        <Button type="button" variant="outline" onClick={goToLogin}>
           <LogIn className="size-4" aria-hidden />
           Iniciar sesión
         </Button>
@@ -371,7 +370,6 @@ export default function PublicInvitationEntry({
           Firmarás desde tu panel privado.
         </p>
       </div>
-      {guestButton}
     </EntryCard>
   );
 }

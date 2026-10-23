@@ -76,10 +76,9 @@ export interface NavGroup {
   /** Identidad estable del grupo; también sirve de `key` cuando no lleva encabezado. */
   key: string;
   /**
-   * Encabezado del grupo, de `NAV_GROUP_LABELS` para que diga exactamente lo mismo que el primer
-   * nivel del breadcrumb de sus pantallas. Opcional: el de documentos no lo lleva porque su
-   * entrada principal se llama igual, y "Documentos > Documentos" es un nivel que no informa de
-   * nada.
+   * Encabezado del grupo, de `NAV_GROUP_LABELS` para que diga exactamente lo mismo en el menú y,
+   * en Pagos, Configuración y Organización, en el primer nivel del breadcrumb de sus pantallas.
+   * Opcional: un grupo sin encabezado se pinta como entradas sueltas.
    */
   label?: string;
   items: NavItem[];
@@ -94,34 +93,38 @@ export interface NavGroup {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    key: 'documents',
-    // Nombres y rutas salen de la configuración compartida del módulo, la misma que usa
-    // DashboardBreadcrumbs. Una sola entrada: el módulo entero se representa con "Documentos".
-    // El alta dejó de ser una entrada hermana —se entra por el botón de la propia pantalla— y
-    // por eso no está en DOCUMENTS_NAV_SECTIONS.
-    items: DOCUMENTS_NAV_SECTIONS.map((section) => ({
-      label: section.label,
-      href: section.href,
-      icon: section.icon,
-      // La entrada marca todo su sub-árbol, no sólo su propia ruta: el alta y el detalle de un
-      // documento son pantallas del módulo, y dejar "Documentos" apagado mientras se está
-      // dentro de él haría parecer que se salió de la sección.
-      isActive: (pathname: string) =>
-        pathname === section.href || pathname.startsWith(`${section.href}/`),
-      anyPermissions: DASHBOARD_NAVIGATION.documents.anyPermissions,
-    })),
-  },
-  {
-    key: 'directory',
-    // Sin encabezado, como Documentos: es una sola entrada y "Directorio > Directorio" no
-    // informaría de nada. Sin `orgOnly`: la usan cuentas personales y organizaciones, y en estas
-    // la decide `DIRECTORY.READ`.
+    /**
+     * Gestión: lo operativo del día a día, Documentos y Directorio, bajo un encabezado como el de
+     * Pagos y Configuración. Antes eran dos grupos sin encabezado, uno por entrada.
+     *
+     * Cada entrada conserva su permiso: el grupo sólo desaparece si el rol no ve ninguna de las
+     * dos. Sin `orgOnly` (las usan cuentas personales y organizaciones) y sin
+     * `availableWithoutPlan` (una organización sin plan no las ve, como antes).
+     */
+    key: 'management',
+    label: NAV_GROUP_LABELS.management,
     items: [
+      // Nombres y rutas salen de la configuración compartida del módulo, la misma que usa
+      // DashboardBreadcrumbs. Una sola entrada: el módulo entero se representa con "Documentos".
+      // El alta dejó de ser una entrada hermana —se entra por el botón de la propia pantalla— y
+      // por eso no está en DOCUMENTS_NAV_SECTIONS.
+      ...DOCUMENTS_NAV_SECTIONS.map((section) => ({
+        label: section.label,
+        href: section.href,
+        icon: section.icon,
+        // La entrada marca todo su sub-árbol, no sólo su propia ruta: el alta y el detalle de un
+        // documento son pantallas del módulo, y dejar "Documentos" apagado mientras se está
+        // dentro de él haría parecer que se salió de la sección.
+        isActive: (pathname: string) =>
+          pathname === section.href || pathname.startsWith(`${section.href}/`),
+        anyPermissions: DASHBOARD_NAVIGATION.documents.anyPermissions,
+      })),
+      // En organizaciones la decide `DIRECTORY.READ`.
       {
         label: DASHBOARD_NAVIGATION.directory.label,
         href: DASHBOARD_NAVIGATION.directory.href,
         icon: BookUser,
-        isActive: (pathname) =>
+        isActive: (pathname: string) =>
           pathname === DASHBOARD_NAVIGATION.directory.href,
         anyPermissions: DASHBOARD_NAVIGATION.directory.anyPermissions,
       },
@@ -242,7 +245,7 @@ export const NAV_GROUPS: NavGroup[] = [
  *   accountType: 'ORGANIZATION',
  *   lockedWithoutPlan: false,
  *   permissions: ['DOCUMENT.READ_OWN'],
- * }); // sólo Documentos
+ * }); // sólo Gestión, con Documentos
  * ```
  */
 export function visibleNavGroups(

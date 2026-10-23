@@ -59,7 +59,14 @@ const DOCUMENTS_CRUMBS: Record<string, Crumb[]> = {
  * nivel o quedarse donde ya está—. Se pintan atenuados, que es lo que el componente hace con un
  * `Crumb` sin `href` que no sea el último.
  */
-const GROUP_CRUMB: Record<keyof typeof NAV_GROUP_LABELS, Crumb> = {
+/**
+ * Gestión queda fuera: agrupa Documentos y Directorio en el menú, pero las dos son pantallas
+ * propias y su breadcrumb empieza por ellas ("Documentos / Crear documento"), como antes.
+ */
+const GROUP_CRUMB: Record<
+  Exclude<keyof typeof NAV_GROUP_LABELS, 'management'>,
+  Crumb
+> = {
   payments: { label: NAV_GROUP_LABELS.payments },
   settings: { label: NAV_GROUP_LABELS.settings },
   organization: { label: NAV_GROUP_LABELS.organization },

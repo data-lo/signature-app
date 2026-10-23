@@ -154,6 +154,7 @@ export default function BiometricSignaturePanel({
       )}
       <Button
         type="button"
+        size="lg"
         className="w-full"
         disabled={isBusy || !consented}
         onClick={onStart}
@@ -212,16 +213,19 @@ export default function BiometricSignaturePanel({
 
   // Pendiente o en captura.
   return (
-    <div className="flex flex-col gap-3">
-      <p role="status" className="text-sm font-medium">
-        {kind === 'pending'
-          ? 'Verificación biométrica pendiente'
-          : 'Verificación biométrica en captura'}
-      </p>
+    <div className="flex flex-col gap-5">
+      <div className="space-y-1 text-center">
+        <p className="text-xs font-medium tracking-wide text-amber-700 uppercase dark:text-amber-300">
+          Paso 1 de 1
+        </p>
+        <p role="status" className="text-xl font-semibold tracking-tight">
+          Verifica tu identidad
+        </p>
+      </div>
       {session?.url ? (
-        <VerificationQrPanel url={session.url} />
+        <VerificationQrPanel url={session.url} layout="signing" />
       ) : (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           {kind === 'capturing'
             ? 'Estamos esperando el resultado. Esta pantalla se actualizará sola.'

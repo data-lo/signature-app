@@ -12,6 +12,7 @@ import {
 import { setPendingRegistrationContext } from '@/lib/pending-registration-context';
 import { resendOtpRequest } from '@/app/signup/_requests';
 import { resolvePublicSigningDestination } from '@/lib/public-signing-context';
+import { resolvePostLoginDestination } from '@/lib/auth-redirect';
 
 jest.mock('../_requests');
 jest.mock('@/lib/cookies');
@@ -20,6 +21,12 @@ jest.mock('@/lib/pending-signature-context');
 jest.mock('@/lib/public-signing-context');
 jest.mock('@/lib/pending-registration-context');
 jest.mock('@/app/signup/_requests');
+jest.mock('@/lib/auth-redirect', () => ({
+  ...jest.requireActual('@/lib/auth-redirect'),
+  resolvePostLoginDestination: jest.fn(
+    jest.requireActual('@/lib/auth-redirect').resolvePostLoginDestination,
+  ),
+}));
 jest.mock('react-hot-toast', () => ({
   __esModule: true,
   default: { success: jest.fn(), error: jest.fn() },
@@ -42,6 +49,8 @@ const mockedSetPendingRegistrationContext =
 const mockedResendOtpRequest = resendOtpRequest as jest.Mock;
 const mockedResolvePublicSigningDestination =
   resolvePublicSigningDestination as jest.Mock;
+const mockedResolvePostLoginDestination =
+  resolvePostLoginDestination as jest.Mock;
 
 function wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({
@@ -69,6 +78,8 @@ describe('useLogin', () => {
     mockedResendOtpRequest.mockReset();
     mockedResolvePublicSigningDestination.mockReset().mockResolvedValue(null);
     push.mockReset();
+    mockedResolvePostLoginDestination.mockClear();
+    window.history.pushState({}, '', '/login');
   });
 
   it('con invitación de la pantalla pública: resuelve la vinculación por invitación y no usa el contexto anterior', async () => {
@@ -95,7 +106,7 @@ describe('useLogin', () => {
     expect(mockedApiClientPatch).not.toHaveBeenCalled();
   });
 
-  it('sin contexto pendiente: guarda el token y redirige a /dashboard/documents/create', async () => {
+  it('sin contexto pendiente ni ruta previa: guarda el token y va al dashboard de documentos', async () => {
     mockedLoginRequest.mockResolvedValue({ token: 'jwt-1', user: {} });
     const { result } = renderHook(() => useLogin(), { wrapper });
 
@@ -108,6 +119,47 @@ describe('useLogin', () => {
     expect(mockedSetAuthToken).toHaveBeenCalledWith('jwt-1');
     expect(mockedApiClientPatch).not.toHaveBeenCalled();
     expect(mockedClearPendingSignatureContext).not.toHaveBeenCalled();
+    expect(mockedResolvePostLoginDestination).toHaveBeenCalledWith('');
+    expect(mockedResolvePostLoginDestination).toHaveReturnedWith(
+      '/dashboard/documents',
+    );
+  });
+
+  it('con una ruta protegida previa (?returnTo=), vuelve a ella', async () => {
+    window.history.pushState(
+      {},
+      '',
+      '/login?returnTo=%2Fdashboard%2Fdocuments%2Fdoc-7',
+    );
+    mockedLoginRequest.mockResolvedValue({ token: 'jwt-1', user: {} });
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    act(() => {
+      result.current.mutate({ email: 'a@a.com', password: 'secret' });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockedResolvePostLoginDestination).toHaveReturnedWith(
+      '/dashboard/documents/doc-7',
+    );
+  });
+
+  it('un flujo pendiente (invitación de firma) tiene prioridad sobre la ruta previa', async () => {
+    window.history.pushState({}, '', '/login?returnTo=%2Fdashboard%2Fplans');
+    mockedResolvePublicSigningDestination.mockResolvedValue(
+      '/dashboard/documents/doc-1',
+    );
+    mockedLoginRequest.mockResolvedValue({ token: 'jwt-1', user: {} });
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    act(() => {
+      result.current.mutate({ email: 'a@a.com', password: 'secret' });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockedResolvePostLoginDestination).not.toHaveBeenCalled();
   });
 
   it('con contexto pendiente: vincula la cuenta al documento, limpia el contexto y redirige al documento', async () => {

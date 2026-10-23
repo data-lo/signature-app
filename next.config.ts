@@ -82,7 +82,11 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    const backendUrl = process.env.BACKEND_API_URL || 'http://backend:3000';
+    // Este valor se resuelve al compilar la aplicación: Next incorpora los rewrites en el
+    // resultado de `next build`. La URL para llamadas hechas por Server Actions se configura
+    // independientemente con BACKEND_URL_RUNTIME.
+    const backendUrl =
+      process.env.BACKEND_URL_BUILD || 'https://signature.api.data-lo.online';
 
     return [
       {

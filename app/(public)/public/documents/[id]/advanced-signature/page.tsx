@@ -1,40 +1,41 @@
-import GuestAdvancedSignatureView from './_components/GuestAdvancedSignatureView';
+import { redirect } from 'next/navigation';
 
-interface GuestAdvancedSignaturePageProps {
+interface LegacyAdvancedSignaturePageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ collabId?: string; email?: string }>;
 }
 
 /**
- * Pantalla pública de Firma Electrónica Avanzada para invitados. Se llega desde el enlace del
- * correo (vía `/access-document`), que trae el colaborador y el correo de la invitación. Queda
- * fuera del middleware de sesión, como todo `/public/*`: el invitado elige entre firmar desde su
- * cuenta o sin cuenta, validando un código enviado a su correo.
+ * Ruta anterior de la Firma Avanzada (e.firma) del invitado. La pantalla pública de firma es una
+ * sola, `/public/documents/:id/sign`: valida la invitación, ofrece iniciar sesión o continuar sin
+ * cuenta y monta `PublicAdvancedSigningFlow` para los firmantes FIEL. Ésta sólo redirige, igual que
+ * `/biometric-signature`.
+ *
+ * Se conserva por los enlaces que ya circulan (pestañas y marcadores de invitados). La query
+ * (`collabId`, `email`) se conserva; el acceso de invitado guardado en `sessionStorage` es el mismo,
+ * así que quien ya había validado su código retoma la firma al elegir "Continuar sin cuenta".
  *
  * @param props.params - `id` del documento.
- * @param props.searchParams - `collabId` y `email` de la invitación.
- * @returns La vista de firma del invitado.
+ * @param props.searchParams - `collabId` y `email` de la invitación, si venían.
+ * @returns Nunca: redirige.
  *
  * @example
  * ```tsx
- * // /public/documents/doc-1/advanced-signature?collabId=c-1&email=ana%40correo.mx
+ * // /public/documents/doc-1/advanced-signature?collabId=c-1 → /public/documents/doc-1/sign?collabId=c-1
  * ```
  */
-export default async function GuestAdvancedSignaturePage({
+export default async function LegacyAdvancedSignaturePage({
   params,
   searchParams,
-}: GuestAdvancedSignaturePageProps) {
+}: LegacyAdvancedSignaturePageProps) {
   const { id } = await params;
   const { collabId, email } = await searchParams;
 
-  return (
-    <main className="min-h-screen bg-muted p-4 sm:p-8">
-      <GuestAdvancedSignatureView
-        documentId={id}
-        invitation={
-          collabId && email ? { collaboratorId: collabId, email } : null
-        }
-      />
-    </main>
-  );
+  const query = new URLSearchParams();
+  if (collabId) query.set('collabId', collabId);
+  if (email) query.set('email', email);
+  const search = query.toString();
+  const suffix = search ? `?${search}` : '';
+
+  redirect(`/public/documents/${id}/sign${suffix}`);
 }

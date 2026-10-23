@@ -1,3 +1,4 @@
+import { BookUser } from 'lucide-react';
 import { NAV_GROUPS, visibleNavGroups } from './AppSidebar';
 import { DOCUMENTS_SECTIONS } from '@/app/dashboard/documents/_config/sections';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
@@ -38,7 +39,7 @@ const ALL_PERMISSIONS: PermissionKey[] = [
  * @returns Las claves de los grupos visibles, en orden.
  *
  * @example
- * visibleKeys({ accountType: 'PERSONAL', lockedWithoutPlan: false }); // ['documents', 'payments', 'settings']
+ * visibleKeys({ accountType: 'PERSONAL', lockedWithoutPlan: false }); // ['management', 'payments', 'settings']
  */
 function visibleKeys(
   options: Omit<Parameters<typeof visibleNavGroups>[1], 'permissions'> & {
@@ -51,17 +52,40 @@ function visibleKeys(
   }).map((group) => group.key);
 }
 
+/**
+ * Rótulos de las entradas visibles de un grupo, para comprobar entradas sueltas dentro de Gestión.
+ *
+ * @param groupKey - Grupo a inspeccionar.
+ * @param options - Igual que en `visibleKeys`.
+ * @returns Los rótulos visibles del grupo, en orden; vacío si el grupo no se pinta.
+ *
+ * @example
+ * visibleItemLabels('management', { accountType: 'PERSONAL', lockedWithoutPlan: false }); // ['Documentos', 'Directorio']
+ */
+function visibleItemLabels(
+  groupKey: string,
+  options: Omit<Parameters<typeof visibleNavGroups>[1], 'permissions'> & {
+    permissions?: readonly PermissionKey[];
+  },
+) {
+  return (
+    visibleNavGroups(NAV_GROUPS, { permissions: ALL_PERMISSIONS, ...options })
+      .find((group) => group.key === groupKey)
+      ?.items.map((item) => item.label) ?? []
+  );
+}
+
 describe('visibleNavGroups', () => {
   it('a una cuenta personal le muestra todo menos la configuración de organización', () => {
     expect(
       visibleKeys({ accountType: 'PERSONAL', lockedWithoutPlan: false }),
-    ).toEqual(['documents', 'directory', 'payments', 'settings']);
+    ).toEqual(['management', 'payments', 'settings']);
   });
 
   it('a una organización con plan le muestra también su configuración', () => {
     expect(
       visibleKeys({ accountType: 'ORGANIZATION', lockedWithoutPlan: false }),
-    ).toEqual(['documents', 'directory', 'payments', 'settings', 'organization']);
+    ).toEqual(['management', 'payments', 'settings', 'organization']);
   });
 
   /**
@@ -89,35 +113,91 @@ describe('visibleNavGroups', () => {
   });
 });
 
-describe('grupo de documentos', () => {
+/** El grupo Gestión, tal como lo declara el menú. */
+const management = () =>
+  NAV_GROUPS.find((group) => group.key === 'management')!;
+
+describe('sección Gestión', () => {
+  it('es el primer grupo, con el rótulo "Gestión", y agrupa Documentos y Directorio en ese orden', () => {
+    expect(NAV_GROUPS[0]).toBe(management());
+    expect(management().label).toBe('Gestión');
+    expect(management().items.map((item) => item.label)).toEqual([
+      'Documentos',
+      'Directorio',
+    ]);
+  });
+
+  /** Pagos y Configuración no cambian: mismos rótulos, mismas entradas, mismo orden relativo. */
+  it('Pagos y Configuración conservan su estructura y su posición tras Gestión', () => {
+    expect(
+      NAV_GROUPS.map((group) => [
+        group.key,
+        group.label,
+        group.items.map((item) => item.label),
+      ]),
+    ).toEqual([
+      ['management', 'Gestión', ['Documentos', 'Directorio']],
+      ['payments', 'Pagos', ['Planes', 'Suscripciones']],
+      [
+        'settings',
+        'Configuración',
+        ['Información personal', 'Identidad y firma'],
+      ],
+      [
+        'organization',
+        'Organización',
+        [
+          'Información de la organización',
+          'Administrar miembros',
+          'Roles y permisos',
+        ],
+      ],
+    ]);
+  });
+
+  it('se esconde entero si el rol no ve ni Documentos ni Directorio', () => {
+    expect(
+      visibleKeys({
+        accountType: 'ORGANIZATION',
+        lockedWithoutPlan: false,
+        permissions: ['BILLING.READ'],
+      }),
+    ).toEqual(['payments', 'settings']);
+  });
+});
+
+describe('entrada Documentos', () => {
   /**
    * El alta dejó de ser una entrada del menú: se llega a ella por el botón de la pantalla de
    * Documentos. Sin esta prueba, reponerla en `DOCUMENTS_NAV_SECTIONS` volvería a partir el
    * módulo en dos entradas hermanas sin que nada avisara.
    */
-  it('deja una sola entrada, la del listado', () => {
-    const documents = NAV_GROUPS.find((group) => group.key === 'documents');
+  it('deja una sola entrada del módulo, la del listado, con su icono', () => {
+    const documentItems = management().items.filter((item) =>
+      item.href.startsWith(DOCUMENTS_SECTIONS.list.href),
+    );
 
-    expect(documents?.items).toHaveLength(1);
-    expect(documents?.items[0]).toMatchObject({
+    expect(documentItems).toHaveLength(1);
+    expect(documentItems[0]).toMatchObject({
       label: DOCUMENTS_SECTIONS.list.label,
       href: DOCUMENTS_SECTIONS.list.href,
+      icon: DOCUMENTS_SECTIONS.list.icon,
     });
   });
 
   /** El alta y el detalle son pantallas del módulo: la entrada sigue marcada estando en ellas. */
   it('marca la entrada como activa en las rutas hijas del módulo', () => {
-    const isActive = NAV_GROUPS.find((group) => group.key === 'documents')!
-      .items[0].isActive;
+    const isActive = management().items[0].isActive;
 
     expect(isActive(DOCUMENTS_SECTIONS.list.href)).toBe(true);
     expect(isActive(DOCUMENTS_SECTIONS.create.href)).toBe(true);
     expect(isActive('/dashboard/documents/doc-1')).toBe(true);
     expect(isActive('/dashboard/plans')).toBe(false);
+    expect(isActive('/dashboard/directory')).toBe(false);
   });
 });
 
-describe('grupo del directorio', () => {
+describe('entrada Directorio', () => {
   /**
    * Los permisos con los que el backend resuelve una cuenta personal: todo lo que no exige
    * organización (ver `PERSONAL_ACCOUNT_PERMISSION_KEYS` en signature-server), con los cuatro
@@ -135,26 +215,26 @@ describe('grupo del directorio', () => {
     'DIRECTORY.DELETE',
   ];
 
-  it('aparece para una cuenta personal', () => {
+  it('aparece bajo Gestión para una cuenta personal', () => {
     expect(
-      visibleKeys({
+      visibleItemLabels('management', {
         accountType: 'PERSONAL',
         lockedWithoutPlan: false,
         permissions: PERSONAL_PERMISSIONS,
       }),
-    ).toContain('directory');
+    ).toEqual(['Documentos', 'Directorio']);
   });
 
-  it('en una organización sólo aparece con DIRECTORY.READ', () => {
+  it('en una organización sólo aparece con DIRECTORY.READ; Documentos sigue por su cuenta', () => {
     expect(
-      visibleKeys({
+      visibleItemLabels('management', {
         accountType: 'ORGANIZATION',
         lockedWithoutPlan: false,
         permissions: ['DOCUMENT.READ_OWN', 'DIRECTORY.READ'],
       }),
-    ).toContain('directory');
+    ).toEqual(['Documentos', 'Directorio']);
     expect(
-      visibleKeys({
+      visibleItemLabels('management', {
         accountType: 'ORGANIZATION',
         lockedWithoutPlan: false,
         permissions: [
@@ -164,16 +244,26 @@ describe('grupo del directorio', () => {
           'DIRECTORY.DELETE',
         ],
       }),
-    ).not.toContain('directory');
+    ).toEqual(['Documentos']);
   });
 
-  it('lleva a /dashboard/directory y se marca activa en esa ruta', () => {
-    const [item] = NAV_GROUPS.find((group) => group.key === 'directory')!
-      .items;
+  it('sólo con DIRECTORY.READ, Gestión queda con Directorio', () => {
+    expect(
+      visibleItemLabels('management', {
+        accountType: 'ORGANIZATION',
+        lockedWithoutPlan: false,
+        permissions: ['DIRECTORY.READ'],
+      }),
+    ).toEqual(['Directorio']);
+  });
+
+  it('lleva a /dashboard/directory con su icono y se marca activa en esa ruta', () => {
+    const item = management().items[1];
 
     expect(item).toMatchObject({
       label: 'Directorio',
       href: '/dashboard/directory',
+      icon: BookUser,
     });
     expect(item.isActive('/dashboard/directory')).toBe(true);
     expect(item.isActive('/dashboard/documents')).toBe(false);
@@ -236,7 +326,7 @@ describe('filtrado por permisos', () => {
         lockedWithoutPlan: false,
         permissions: ['DOCUMENT.READ_OWN', 'MEMBER.READ', 'ROLE.READ'],
       }),
-    ).toEqual(['documents', 'settings', 'organization']);
+    ).toEqual(['management', 'settings', 'organization']);
   });
 
   it('muestra Documentos tanto con READ_OWN como con READ_ORGANIZATION', () => {
@@ -250,7 +340,7 @@ describe('filtrado por permisos', () => {
           lockedWithoutPlan: false,
           permissions: [permission],
         }),
-      ).toContain('documents');
+      ).toContain('management');
     }
   });
 
@@ -264,9 +354,13 @@ describe('filtrado por permisos', () => {
       visibleKeys({
         accountType: 'ORGANIZATION',
         lockedWithoutPlan: false,
-        permissions: ['DOCUMENT.CREATE', 'DOCUMENT.READ_OWN', 'DOCUMENT.SIGN_SELF'],
+        permissions: [
+          'DOCUMENT.CREATE',
+          'DOCUMENT.READ_OWN',
+          'DOCUMENT.SIGN_SELF',
+        ],
       }),
-    ).toEqual(['documents', 'settings']);
+    ).toEqual(['management', 'settings']);
   });
 
   /**

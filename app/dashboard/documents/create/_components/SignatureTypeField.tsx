@@ -5,7 +5,6 @@ import { FormSelect } from '@/components/form/form-select';
 import { FormCheckbox } from '@/components/form/form-checkbox';
 import SigningCredentialWarning from '@/components/signing/SigningCredentialWarning';
 import { useSigningCredential } from '@/lib/hooks/useSigningCredential';
-import { useCanPerform } from '@/lib/hooks/useBillingAccess';
 import {
   SIGNATURE_TYPE_DESCRIPTIONS,
   SIGNATURE_TYPE_OPTIONS,
@@ -33,10 +32,8 @@ const SIMPLE_SIGNATURE_WARNING =
  * Simple es una decisión sobre cómo firmarán los participantes, no sobre lo que el creador puede
  * hacer hoy.
  *
- * Biométrica depende del plan (`graphSignatureBiometrics`) y no se ofrece si la cuenta activa no
- * la tiene, ni mientras su estado comercial no ha llegado (`useCanPerform` responde `false`). El
- * backend lo vuelve a comprobar al crear. Como Avanzada, deja elegir si se pide el código de
- * seguridad.
+ * Biométrica no se ofrece al crear documentos nuevos. Como Avanzada, deja elegir si se pide el
+ * código de seguridad.
  */
 export default function SignatureTypeField({
   control,
@@ -45,10 +42,6 @@ export default function SignatureTypeField({
 }) {
   const signatureType = useWatch({ control, name: 'signatureType' });
   const { isLoading, canSignWithSimpleSignature } = useSigningCredential();
-  const canUseBiometric = useCanPerform('graphSignatureBiometrics');
-  const options = canUseBiometric
-    ? SIGNATURE_TYPE_OPTIONS
-    : SIGNATURE_TYPE_OPTIONS.filter((option) => option.value !== 'BIOMETRIC');
 
   /**
    * Mientras el perfil no llega no se afirma nada: mostrar el aviso "por si acaso" se lo pondría
@@ -65,7 +58,7 @@ export default function SignatureTypeField({
         name="signatureType"
         id="signatureType"
         label="Tipo de firma"
-        options={options}
+        options={SIGNATURE_TYPE_OPTIONS}
         placeholder="Selecciona una opción"
         description={
           signatureType

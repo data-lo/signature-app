@@ -15,6 +15,8 @@ import {
 interface GuestAdvancedAccessCodeStepProps {
   documentId: string;
   invitation: GuestInvitation;
+  /** Correo enmascarado por el backend; si no viene, se enmascara el del enlace. */
+  maskedEmail?: string;
   /** Acceso canjeado: quien monta este paso lo guarda y avanza. */
   onVerified: (access: GuestAccess) => void;
 }
@@ -30,6 +32,7 @@ interface GuestAdvancedAccessCodeStepProps {
 export default function GuestAdvancedAccessCodeStep({
   documentId,
   invitation,
+  maskedEmail,
   onVerified,
 }: GuestAdvancedAccessCodeStepProps) {
   const [code, setCode] = useState('');
@@ -41,6 +44,11 @@ export default function GuestAdvancedAccessCodeStep({
     invitation,
     onVerified,
   );
+  const destination =
+    maskedEmail ??
+    (invitation.email
+      ? maskEmail(invitation.email)
+      : 'tu correo de invitación');
 
   function sendCode() {
     request.mutate(undefined, {
@@ -55,12 +63,8 @@ export default function GuestAdvancedAccessCodeStep({
     <div className="flex flex-col gap-4">
       <p className="text-sm">
         Enviaremos un código de 6 dígitos a{' '}
-        <span className="font-medium">
-          {invitation.email
-            ? maskEmail(invitation.email)
-            : 'tu correo de invitación'}
-        </span>{' '}
-        para confirmar que recibiste esta invitación.
+        <span className="font-medium">{destination}</span> para confirmar que
+        recibiste esta invitación.
       </p>
 
       {!sent ? (
@@ -76,7 +80,12 @@ export default function GuestAdvancedAccessCodeStep({
             verify.mutate(code.trim());
           }}
         >
-          {!emailDelivered && (
+          {emailDelivered ? (
+            <p role="status" className="text-xs text-muted-foreground">
+              Te enviamos el código a {destination}. Revisa también tu carpeta
+              de correo no deseado.
+            </p>
+          ) : (
             <p role="alert" className="text-xs text-destructive">
               El código se generó, pero no pudimos enviar el correo. Solicita
               otro en unos momentos.

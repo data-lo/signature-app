@@ -20,6 +20,7 @@ import PublicInvitationEntry, {
 
 jest.mock('../_requests');
 jest.mock('../../biometric-signature/_requests');
+jest.mock('../../advanced-signature/_requests');
 jest.mock('@/lib/cookies');
 jest.mock('@/lib/public-signing-context', () => ({
   ...jest.requireActual('@/lib/public-signing-context'),
@@ -85,16 +86,14 @@ describe('PublicInvitationEntry', () => {
   });
 
   describe('sin sesión', () => {
-    it('valida la invitación y ofrece iniciar sesión o continuar sin cuenta', async () => {
+    it('valida la invitación y muestra el flujo biométrico sin permitir elegir el tipo de firma', async () => {
       renderEntry();
 
       expect(
         await screen.findByText('Vas a firmar: contrato.pdf'),
       ).toBeInTheDocument();
       expect(screen.getByText('a***@empresa.com')).toBeInTheDocument();
-      expect(
-        screen.getByText(/¿ya tienes una cuenta en firmalo\?/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/¿ya tienes una cuenta\?/i)).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: /iniciar sesión/i }),
       ).toBeInTheDocument();
@@ -127,7 +126,7 @@ describe('PublicInvitationEntry', () => {
       expect(mockedLink).not.toHaveBeenCalled();
     });
 
-    it('continuar sin cuenta: no vincula y entra al flujo del tipo del documento', async () => {
+    it('continuar sin cuenta: no vincula y entra al flujo biométrico', async () => {
       setPublicSigningContext('doc-1', 'c-1');
       const user = userEvent.setup();
       renderEntry();
@@ -144,6 +143,34 @@ describe('PublicInvitationEntry', () => {
       ).toBeInTheDocument();
       expect(mockedLink).not.toHaveBeenCalled();
       expect(getPublicSigningContext()).toBeNull();
+    });
+
+    it('para FIEL muestra continuar sin cuenta y abre la Firma Avanzada sin cuenta en la misma pantalla', async () => {
+      mockedGetInvitation.mockResolvedValue({
+        ...INVITATION,
+        signatureType: SignatureType.Fiel,
+      });
+      const user = userEvent.setup();
+      renderEntry();
+
+      await user.click(
+        await screen.findByRole('button', { name: /continuar sin cuenta/i }),
+      );
+
+      expect(
+        await screen.findByText(/firma electrónica avanzada sin cuenta/i),
+      ).toBeInTheDocument();
+      // El correo que se muestra es el que enmascaró el backend.
+      expect(screen.getByText('a***@empresa.com')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /enviar código/i }),
+      ).toBeInTheDocument();
+      // Ya no sale de `/sign`: ni otra ruta ni una segunda elección de cuenta.
+      expect(push).not.toHaveBeenCalled();
+      expect(
+        screen.queryByRole('button', { name: /tengo una cuenta/i }),
+      ).not.toBeInTheDocument();
+      expect(mockedLink).not.toHaveBeenCalled();
     });
 
     it('si la invitación no admite firmar sin cuenta, sólo ofrece iniciar sesión', async () => {

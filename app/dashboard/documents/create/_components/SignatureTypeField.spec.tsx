@@ -136,7 +136,7 @@ describe('SignatureTypeField', () => {
   });
 
   describe('firma biométrica', () => {
-    it('se ofrece junto a las demás cuando el plan incluye graphSignatureBiometrics', async () => {
+    it('no se ofrece al crear, incluso cuando el plan incluye biometría', async () => {
       const user = userEvent.setup();
       setBiometricPlan(true);
 
@@ -144,8 +144,8 @@ describe('SignatureTypeField', () => {
       await openSelect(user);
 
       expect(
-        await screen.findByRole('option', { name: 'Firma Biométrica' }),
-      ).toBeInTheDocument();
+        screen.queryByRole('option', { name: 'Firma Biométrica' }),
+      ).not.toBeInTheDocument();
       expect(
         screen.getByRole('option', { name: 'Firma Grafo' }),
       ).toBeInTheDocument();
@@ -156,54 +156,5 @@ describe('SignatureTypeField', () => {
       ).toBeInTheDocument();
     });
 
-    it('no se ofrece cuando el plan no la incluye, y las demás siguen', async () => {
-      const user = userEvent.setup();
-      setBiometricPlan(false);
-
-      render(<Harness />);
-      await openSelect(user);
-
-      expect(
-        await screen.findByRole('option', { name: 'Firma Grafo' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole('option', { name: 'Firma Biométrica' }),
-      ).not.toBeInTheDocument();
-    });
-
-    /** Ante la duda no se ofrece: el backend la rechazaría si el plan no la tuviera. */
-    it('no se ofrece mientras el estado comercial no ha llegado', async () => {
-      const user = userEvent.setup();
-
-      render(<Harness />);
-      await openSelect(user);
-
-      expect(
-        await screen.findByRole('option', { name: 'Firma Grafo' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole('option', { name: 'Firma Biométrica' }),
-      ).not.toBeInTheDocument();
-    });
-
-    it('elegida, describe el flujo y ofrece el código de seguridad', () => {
-      setBiometricPlan(true);
-
-      render(<Harness signatureType="BIOMETRIC" />);
-
-      expect(
-        screen.getByText(/prueba de vida y reconocimiento facial/),
-      ).toBeInTheDocument();
-      expect(screen.getByText('Código de seguridad')).toBeInTheDocument();
-    });
-
-    it('elegida, no muestra el aviso de la credencial de firma Grafo', () => {
-      useAuthStore.setState({ user: buildUser() });
-      setBiometricPlan(true);
-
-      render(<Harness signatureType="BIOMETRIC" />);
-
-      expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
-    });
   });
 });

@@ -86,12 +86,11 @@ describe('BiometricSignaturePanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('pendiente: muestra el estado y el QR de Didit', () => {
+  it('pendiente: muestra el encabezado de la verificación y el QR de Didit', () => {
     renderPanel({ session: session() });
 
-    expect(
-      screen.getByText(/verificación biométrica pendiente/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/paso 1 de 1/i)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/verifica tu identidad/i);
     expect(
       screen.getByLabelText(/código qr para continuar la verificación/i),
     ).toBeInTheDocument();
@@ -105,7 +104,7 @@ describe('BiometricSignaturePanel', () => {
       }),
     });
 
-    expect(screen.getByText(/en captura/i)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/verifica tu identidad/i);
     expect(screen.getByText(/esperando el resultado/i)).toBeInTheDocument();
   });
 

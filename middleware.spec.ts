@@ -41,12 +41,69 @@ describe('middleware', () => {
     });
   });
 
-  it('redirige a /login una ruta protegida sin sesión', () => {
+  it('redirige a /login una ruta protegida sin sesión, recordando la ruta pedida', () => {
     const response = middleware(buildRequest('/dashboard/documents/doc-1'));
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3001/login?returnTo=%2Fdashboard%2Fdocuments%2Fdoc-1',
+    );
+  });
+
+  it('la ruta recordada conserva su query (filtros, pestañas)', () => {
+    const response = middleware(
+      buildRequest('/dashboard/documents?view=pending&q=contrato'),
+    );
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3001/login?returnTo=%2Fdashboard%2Fdocuments%3Fview%3Dpending%26q%3Dcontrato',
+    );
+  });
+
+  it('desde la raíz sin sesión manda a /login a secas', () => {
+    const response = middleware(buildRequest('/'));
 
     expect(response.headers.get('location')).toBe(
       'http://localhost:3001/login',
     );
+  });
+
+  describe('pantallas de autenticación con sesión activa', () => {
+    it('sin ruta previa, manda al dashboard de documentos y no a la creación', () => {
+      const response = middleware(buildRequest('/login', 'jwt'));
+
+      expect(response.headers.get('location')).toBe(
+        'http://localhost:3001/dashboard/documents',
+      );
+    });
+
+    it('con ruta previa, manda a la ruta originalmente solicitada', () => {
+      const response = middleware(
+        buildRequest('/login?returnTo=%2Fdashboard%2Fplans', 'jwt'),
+      );
+
+      expect(response.headers.get('location')).toBe(
+        'http://localhost:3001/dashboard/plans',
+      );
+    });
+
+    it('ignora una ruta previa externa', () => {
+      const response = middleware(
+        buildRequest('/login?returnTo=%2F%2Fevil.com', 'jwt'),
+      );
+
+      expect(response.headers.get('location')).toBe(
+        'http://localhost:3001/dashboard/documents',
+      );
+    });
+
+    it('sin sesión, deja ver el login', () => {
+      const response = middleware(
+        buildRequest('/login?returnTo=%2Fdashboard%2Fplans'),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('location')).toBeNull();
+    });
   });
 
   it('mantiene el redirect 308 de las rutas heredadas del dashboard', () => {

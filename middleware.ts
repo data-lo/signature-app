@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/signup/verify'];
+import {
+  AUTH_ROUTES,
+  buildLoginPath,
+  resolvePostLoginDestination,
+} from '@/lib/auth-redirect';
 
 // Punto de entrada de los enlaces de correo para firmar (ver historia "Notificación por Email
 // para Firma Simple y Vinculación de Cuenta"). NO puede pasar por el guard de sesión: el
 // destinatario abre el correo casi siempre sin sesión iniciada, y si el middleware lo manda a
 // /login antes de renderizar la página, `setPendingSignatureContext` nunca corre y se pierde
-// para siempre qué documento venía a firmar (termina en /dashboard/documents/create tras el
+// para siempre qué documento venía a firmar (termina en el dashboard de documentos tras el
 // login). La propia página decide a dónde va: a /login si no hay token — guardando antes el
 // contexto, que /login consume para devolverlo al documento — o directo al documento si ya hay
 // sesión. Tampoco va en AUTH_ROUTES, porque ahí un usuario con sesión sería desviado al
@@ -52,15 +55,27 @@ export function middleware(request: NextRequest) {
 
   if (AUTH_ROUTES.includes(pathname)) {
     if (token) {
+      // Con sesión no hay nada que hacer en el login: a la ruta que esperaba (`?returnTo=`) o al
+      // dashboard de documentos.
       return NextResponse.redirect(
-        new URL('/dashboard/documents/create', request.url),
+        new URL(
+          resolvePostLoginDestination(request.nextUrl.search),
+          request.url,
+        ),
       );
     }
     return NextResponse.next();
   }
 
   if (!token) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    // Se recuerda la ruta pedida (con su query) para volver a ella tras iniciar sesión. Cubre
+    // también la sesión expirada: la cookie vence junto con el JWT, así que llega aquí sin token.
+    return NextResponse.redirect(
+      new URL(
+        buildLoginPath(`${pathname}${request.nextUrl.search}`),
+        request.url,
+      ),
+    );
   }
 
   return NextResponse.next();
