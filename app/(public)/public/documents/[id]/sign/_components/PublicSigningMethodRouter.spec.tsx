@@ -3,6 +3,7 @@ import { SignatureType } from '@/lib/enums/document';
 import PublicSigningMethodRouter from './PublicSigningMethodRouter';
 
 jest.mock('../../biometric-signature/_requests');
+jest.mock('../../advanced-signature/_requests');
 jest.mock('next/dynamic', () => ({
   __esModule: true,
   default: () =>
@@ -37,16 +38,20 @@ describe('PublicSigningMethodRouter', () => {
     expect(screen.getByText('a***@empresa.com')).toBeInTheDocument();
   });
 
-  it('FIEL: monta el flujo de Firma Avanzada', () => {
+  it('FIEL: monta la Firma Avanzada sin cuenta, con el correo enmascarado del backend', () => {
     renderWithProviders(
       <PublicSigningMethodRouter
         documentId="doc-1"
         invitation={INVITATION}
         signatureType={SignatureType.Fiel}
+        maskedEmail="a***@empresa.com"
       />,
     );
 
-    expect(screen.getByText(/firma electrónica avanzada/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/firma electrónica avanzada sin cuenta/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('a***@empresa.com')).toBeInTheDocument();
     expect(screen.queryByText(/biometría/i)).not.toBeInTheDocument();
   });
 
