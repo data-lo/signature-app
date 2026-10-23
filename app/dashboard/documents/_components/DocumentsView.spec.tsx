@@ -1,0 +1,987 @@
+import userEvent from '@testing-library/user-event';
+import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
+import DocumentsView, { DOCUMENTS_LOAD_ERROR_MESSAGE } from './DocumentsView';
+import { useDocuments } from '../_hooks/useDocuments';
+import { DocumentStatus, DocumentView } from '@/lib/enums/document';
+import { act } from '@testing-library/react';
+import { useState } from 'react';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
+
+jest.mock('../_hooks/useDocuments');
+const restoreMutate = jest.fn();
+jest.mock('../_hooks/useRestoreArchivedDocument', () => ({
+  useRestoreArchivedDocument: () => ({
+    mutate: restoreMutate,
+    isPending: false,
+    variables: undefined,
+  }),
+}));
+jest.mock('../_hooks/useDownloadDocument', () => ({
+  useDownloadDocument: () => ({
+    mutate: jest.fn(),
+    isPending: false,
+    variables: undefined,
+  }),
+}));
+jest.mock('../[documentId]/_hooks/useDocumentDetail', () => ({
+  useDocumentDetail: () => ({ data: undefined, isLoading: false }),
+}));
+
+const push = jest.fn();
+const searchParams = new URLSearchParams();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+  useSearchParams: () => searchParams,
+}));
+
+const mockedUseDocuments = useDocuments as jest.Mock;
+
+/** Los filtros con los que se hizo la última consulta. */
+function lastFilters() {
+  const calls = mockedUseDocuments.mock.calls;
+  return calls[calls.length - 1][0].filters;
+}
+
+describe('DocumentsView', () => {
+  beforeEach(() => {
+    push.mockReset();
+    searchParams.delete('view');
+    mockedUseDocuments.mockReset();
+    mockedUseDocuments.mockReturnValue({
+      data: {
+        items: [],
+        pagination: { page: 1, limit: 25, total: 0, totalPages: 0 },
+      },
+      isLoading: false,
+      isError: false,
+    });
+  });
+
+  /**
+   * Historia "Unificar listado de documentos": lo que antes eran tres rutas hermanas —"Por
+   * firmar", "Enviados para firma" y "Completados"— es una sola pantalla, y la sección pasó a ser
+   * el filtro `view`.
+   */
+  /**
+   * Historia "Configuración predeterminada del filtro de documentos": la pantalla abre en
+   * "Todos", sin recorte de participación y sin filtro de estado, para que la lista inicial traiga
+   * los documentos de todos los estados sin que el usuario toque nada.
+   */
+  it('abre en "Todos", sin recorte ni filtro de estado', () => {
+    renderWithProviders(<DocumentsView />);
+
+    expect(screen.getByText(/vista predeterminada/i)).toHaveTextContent(
+      'Vista predeterminada: Todos',
+    );
+    expect(lastFilters().view).toBe(DocumentView.All);
+    expect(lastFilters().statuses).toEqual([]);
+  });
+
+  /**
+   * Las rutas de las secciones anteriores redirigen aquí con su recorte en `?view=` (ver
+   * `next.config.ts`): quien llegue por un enlace guardado tiene que ver lo que iba a ver, no una
+   * lista genérica.
+   */
+  it('respeta el recorte que llega en la URL', () => {
+    searchParams.set('view', DocumentView.Completed);
+
+    renderWithProviders(<DocumentsView />);
+
+    expect(lastFilters().view).toBe(DocumentView.Completed);
+    expect(screen.getByText(/vista: completados/i)).toBeInTheDocument();
+  });
+
+  /** Un `view` inventado en la barra de direcciones no rompe la pantalla: se ignora. */
+  it('ignora un recorte desconocido y abre con el de por omisión', () => {
+    searchParams.set('view', 'inventado');
+
+    renderWithProviders(<DocumentsView />);
+
+    expect(lastFilters().view).toBe(DocumentView.All);
+  });
+
+  it('busca por nombre del documento o participante con una sola caja', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.type(
+      screen.getByRole('searchbox', {
+        name: /buscar por nombre del documento o participante/i,
+      }),
+      'contrato',
+    );
+
+    await waitFor(() => expect(lastFilters().search).toBe('contrato'));
+  });
+
+  /**
+   * El diseño pide que cada selección actualice la lista sola: no hay botón "Aplicar" ni
+   * borrador que confirmar.
+   */
+  it('aplica un filtro en cuanto se elige, sin botón de aplicar', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.click(screen.getByRole('button', { name: /filtros/i }));
+    const panel = await screen.findByRole('dialog');
+    expect(
+      within(panel).queryByRole('button', { name: /^aplicar$|^aceptar$/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(panel).getByRole('button', { name: 'Creados por mí' }));
+
+    await waitFor(() => expect(lastFilters().view).toBe(DocumentView.CreatedByMe));
+  });
+
+  /**
+   * Lo que el usuario ve al abrir el panel: "Todos" ya marcado y ningún estado elegido. Y "Todos"
+   * no lo encierra: puede pasar a otro recorte y, volviendo a pulsarlo, regresar.
+   */
+  it('muestra "Todos" seleccionado al abrir el panel y deja cambiarlo', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.click(screen.getByRole('button', { name: /filtros/i }));
+    const panel = await screen.findByRole('dialog');
+
+    expect(within(panel).getByRole('button', { name: 'Todos' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(
+      within(panel).getByRole('button', { name: 'En espera de firma' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+
+    const requiresMySignature = within(panel).getByRole('button', {
+      name: 'Requieren mi firma o revisión',
+    });
+    await user.click(requiresMySignature);
+    await waitFor(() =>
+      expect(lastFilters().view).toBe(DocumentView.RequiresMySignature),
+    );
+
+    await user.click(requiresMySignature);
+    await waitFor(() => expect(lastFilters().view).toBe(DocumentView.All));
+  });
+
+  it('acumula varios estados a la vez', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.click(screen.getByRole('button', { name: /filtros/i }));
+    const panel = await screen.findByRole('dialog');
+    await user.click(within(panel).getByRole('button', { name: 'En espera de firma' }));
+    await user.click(within(panel).getByRole('button', { name: 'Rechazado' }));
+
+    await waitFor(() =>
+      expect(lastFilters().statuses).toEqual([
+        DocumentStatus.PendingSignature,
+        DocumentStatus.Rejected,
+      ]),
+    );
+  });
+
+  /**
+   * Sin secciones, un resultado vacío no distingue "no hay documentos" de "quedó un filtro
+   * puesto": los chips son lo que hace visible la diferencia, y quitarlos no obliga a reabrir el
+   * panel.
+   */
+  it('muestra cada filtro aplicado como chip removible', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.click(screen.getByRole('button', { name: /filtros/i }));
+    const panel = await screen.findByRole('dialog');
+    await user.click(within(panel).getByRole('button', { name: 'En espera de firma' }));
+    await user.keyboard('{Escape}');
+
+    const chip = await screen.findByRole('button', {
+      name: /quitar filtro: en espera de firma/i,
+    });
+    await user.click(chip);
+
+    await waitFor(() => expect(lastFilters().statuses).toEqual([]));
+  });
+
+  /** Historia "Agregar filtro de documentos archivados". */
+  describe('filtro "Archivados"', () => {
+    async function openPanel(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole('button', { name: /filtros/i }));
+      return screen.findByRole('dialog');
+    }
+
+    /** Una respuesta ya resuelta, que es cuando tiene sentido hablar de "vacío". */
+    function respondWith(items: unknown[]) {
+      mockedUseDocuments.mockReturnValue({
+        data: {
+          items,
+          pagination: {
+            page: 1,
+            limit: 25,
+            total: items.length,
+            totalPages: items.length ? 1 : 0,
+          },
+        },
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+      });
+    }
+
+    it('se ofrece en el panel y se combina con el recorte elegido', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Creados por mí' }),
+      );
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(true));
+      expect(lastFilters().view).toBe(DocumentView.CreatedByMe);
+      expect(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    /** Elegir un filtro vuelve a la primera página, también éste. */
+    it('al aplicarlo vuelve a la primera página', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(true));
+      const calls = mockedUseDocuments.mock.calls;
+      expect(calls[calls.length - 1][0].page).toBe(1);
+    });
+
+    it('se quita desde su chip para volver a los documentos activos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.keyboard('{Escape}');
+
+      await user.click(
+        await screen.findByRole('button', {
+          name: /quitar filtro: archivados/i,
+        }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(false));
+    });
+
+    it('sin archivados muestra un estado vacío claro y la salida a los activos', async () => {
+      respondWith([]);
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.keyboard('{Escape}');
+
+      expect(
+        await screen.findByText('No tienes documentos archivados'),
+      ).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /ver documentos activos/i }),
+      );
+
+      await waitFor(() => expect(lastFilters().archived).toBe(false));
+      expect(
+        screen.queryByText('No tienes documentos archivados'),
+      ).not.toBeInTheDocument();
+    });
+
+    /** Con otros criterios, "no tienes archivados" podría ser falso: se dice otra cosa. */
+    it('con búsqueda u otros filtros, el vacío no afirma que no haya archivados', async () => {
+      respondWith([]);
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.click(
+        within(panel).getByRole('button', { name: 'Creados por mí' }),
+      );
+      await user.keyboard('{Escape}');
+
+      expect(
+        await screen.findByText(
+          'Ningún documento archivado coincide con la búsqueda o los filtros',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('No tienes documentos archivados'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('fuera del filtro no muestra el estado vacío de archivados', () => {
+      respondWith([]);
+      renderWithProviders(<DocumentsView />);
+
+      expect(
+        screen.queryByText(/documentos archivados/i),
+      ).not.toBeInTheDocument();
+    });
+
+    /** Lo que se lista ahí ya está archivado: ofrecer "Archivar" otra vez no tiene sentido. */
+    it('en la vista de archivados no ofrece "Archivar"', async () => {
+      respondWith([
+        {
+          id: 'doc-archivado',
+          fileName: 'contrato.pdf',
+          creator: 'Ana López',
+          totalPages: 1,
+          status: DocumentStatus.Signed,
+          createdAt: '2026-03-15T12:00:00.000Z',
+          signedAt: '2026-05-10T12:00:00.000Z',
+        },
+      ]);
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const panel = await openPanel(user);
+      await user.click(
+        within(panel).getByRole('button', { name: 'Archivados' }),
+      );
+      await user.keyboard('{Escape}');
+
+      await user.click(
+        screen.getByRole('button', { name: /acciones del documento/i }),
+      );
+      const menu = await screen.findByRole('menu');
+
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Descargar' }),
+      ).toBeInTheDocument();
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * Recuperar es el camino de vuelta de "Archivar": vive en la vista de archivados y pide el mismo
+     * permiso de lectura que archivar.
+     */
+    describe('recuperar un documento archivado', () => {
+      const ARCHIVED_DOCUMENT = {
+        id: 'doc-archivado',
+        fileName: 'contrato.pdf',
+        creator: 'Ana López',
+        totalPages: 1,
+        status: DocumentStatus.Signed,
+        createdAt: '2026-03-15T12:00:00.000Z',
+        signedAt: '2026-05-10T12:00:00.000Z',
+      };
+
+      beforeEach(() => restoreMutate.mockReset());
+
+      async function openRowMenu(
+        user: ReturnType<typeof userEvent.setup>,
+        { archived }: { archived: boolean },
+      ) {
+        if (archived) {
+          const panel = await openPanel(user);
+          await user.click(
+            within(panel).getByRole('button', { name: 'Archivados' }),
+          );
+          await user.keyboard('{Escape}');
+        }
+        await user.click(
+          screen.getByRole('button', { name: /acciones del documento/i }),
+        );
+        return screen.findByRole('menu');
+      }
+
+      it('en la vista de archivados ofrece "Recuperar" y lo ejecuta sobre esa fila', async () => {
+        respondWith([ARCHIVED_DOCUMENT]);
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsView />, {
+          permissions: ['DOCUMENT.READ_OWN'],
+        });
+
+        const menu = await openRowMenu(user, { archived: true });
+        await user.click(
+          within(menu).getByRole('menuitem', { name: 'Recuperar' }),
+        );
+
+        expect(restoreMutate).toHaveBeenCalledWith('doc-archivado');
+        expect(
+          screen.queryByRole('menuitem', { name: 'Archivar' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('fuera de la vista de archivados no ofrece "Recuperar"', async () => {
+        respondWith([ARCHIVED_DOCUMENT]);
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsView />, {
+          permissions: ['DOCUMENT.READ_OWN'],
+        });
+
+        const menu = await openRowMenu(user, { archived: false });
+
+        expect(
+          within(menu).getByRole('menuitem', { name: 'Archivar' }),
+        ).toBeInTheDocument();
+        expect(
+          within(menu).queryByRole('menuitem', { name: 'Recuperar' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('sin permiso de lectura de documentos no ofrece "Recuperar"', async () => {
+        respondWith([ARCHIVED_DOCUMENT]);
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsView />);
+
+        const menu = await openRowMenu(user, { archived: true });
+
+        expect(
+          within(menu).queryByRole('menuitem', { name: 'Recuperar' }),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  it('lleva al detalle al seleccionar una fila', async () => {
+    mockedUseDocuments.mockReturnValue({
+      data: {
+        items: [
+          {
+            id: 'doc-9',
+            fileName: 'contrato.pdf',
+            fileType: 'application/pdf',
+            signers: [],
+            witnesses: [],
+            creator: 'Sara Ramírez',
+            totalPages: 1,
+            status: DocumentStatus.PendingSignature,
+            createdAt: new Date(2026, 2, 15).toISOString(),
+            signedAt: null,
+          },
+        ],
+        pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+      },
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsView />);
+
+    await user.click(screen.getByText('contrato.pdf'));
+
+    expect(push).toHaveBeenCalledWith('/dashboard/documents/doc-9');
+  });
+
+  /**
+   * El alta salió del sidebar: este botón es el único acceso a la creación desde la navegación,
+   * así que si desaparece la pantalla queda sin manera de llegar al alta salvo tecleando la
+   * URL a mano.
+   */
+  it('ofrece crear un documento desde la misma pantalla', () => {
+    renderWithProviders(<DocumentsView />);
+
+    expect(
+      screen.getByRole('button', { name: /crear documento/i }),
+    ).toHaveAttribute('href', '/dashboard/documents/create');
+  });
+  /** Historia "Actualizar tabla de documentos a fondo blanco": los estados de la consulta. */
+  describe('estados de la consulta', () => {
+    it('mientras la consulta no tiene datos, la tabla muestra la carga', () => {
+      mockedUseDocuments.mockReturnValue({
+        data: undefined,
+        isPending: true,
+        isError: false,
+      });
+
+      renderWithProviders(<DocumentsView />);
+
+      expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Cargando documentos',
+      );
+    });
+
+    it('si la consulta falla, la tabla muestra el error', () => {
+      mockedUseDocuments.mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isError: true,
+      });
+
+      renderWithProviders(<DocumentsView />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        DOCUMENTS_LOAD_ERROR_MESSAGE,
+      );
+    });
+
+    it('sin documentos, la tabla muestra el estado vacío', () => {
+      renderWithProviders(<DocumentsView />);
+
+      expect(
+        screen.getByText('No hay documentos para mostrar.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * La paginación contra un listado simulado que responde como el backend: páginas desde 1,
+   * `totalPages = ceil(total / limit)` (0 sin documentos) y la página pedida aunque ya no exista.
+   */
+  describe('paginación', () => {
+    let totalDocuments = 60;
+
+    function buildItems(page: number, limit: number) {
+      const first = (page - 1) * limit;
+      const count = Math.max(0, Math.min(limit, totalDocuments - first));
+      return Array.from({ length: count }, (_, index) => ({
+        id: `doc-${first + index + 1}`,
+        fileName: `documento-${first + index + 1}.pdf`,
+        creator: 'Ana López',
+        totalPages: 1,
+        status: DocumentStatus.PendingSignature,
+        createdAt: '2026-03-15T12:00:00.000Z',
+      }));
+    }
+
+    function lastQuery() {
+      const calls = mockedUseDocuments.mock.calls;
+      return calls[calls.length - 1][0];
+    }
+
+    function control(name: string) {
+      return screen.getByRole('button', { name });
+    }
+
+    function indicator() {
+      return document.querySelector(
+        '[data-slot="documents-table-page-indicator"]',
+      );
+    }
+
+    /**
+     * Vuelve a renderizar la vista dentro de los mismos providers, como cuando una mutación
+     * invalida `['documents']` y llega la respuesta nueva.
+     */
+    let simulateRefetch: () => void = () => {};
+    function RefetchHarness() {
+      const [, setTick] = useState(0);
+      simulateRefetch = () => setTick((tick) => tick + 1);
+      return <DocumentsView />;
+    }
+
+    beforeEach(() => {
+      totalDocuments = 60;
+      useAuthStore.setState({
+        activeAccount: {
+          id: 'account-1',
+          accountType: 'PERSONAL',
+          organizationId: null,
+          roleId: null,
+        },
+      });
+      mockedUseDocuments.mockImplementation(
+        ({ page, limit }: { page: number; limit: number }) => ({
+          data: {
+            items: buildItems(page, limit),
+            pagination: {
+              page,
+              limit,
+              total: totalDocuments,
+              totalPages: Math.ceil(totalDocuments / limit),
+            },
+          },
+          isPending: false,
+          isLoading: false,
+          isError: false,
+          isSuccess: true,
+          isPlaceholderData: false,
+        }),
+      );
+    });
+
+    it('abre en la página 1 con 25 por página y carga la primera página', () => {
+      renderWithProviders(<DocumentsView />);
+
+      expect(lastQuery()).toMatchObject({ page: 1, limit: 25 });
+      expect(screen.getByText('documento-1.pdf')).toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('1 de 3');
+      expect(control('Página anterior')).toBeDisabled();
+    });
+
+    it('carga la página intermedia y la última con sus documentos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      await user.click(control('Página siguiente'));
+
+      expect(lastQuery()).toMatchObject({ page: 2, limit: 25 });
+      expect(screen.getByText('documento-26.pdf')).toBeInTheDocument();
+      expect(screen.queryByText('documento-1.pdf')).not.toBeInTheDocument();
+
+      await user.click(control('Última página'));
+
+      expect(lastQuery()).toMatchObject({ page: 3, limit: 25 });
+      expect(screen.getByText('documento-60.pdf')).toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('3 de 3');
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(control('Última página')).toBeDisabled();
+    });
+
+    /**
+     * Mientras llega la página pedida, la consulta trae como placeholder la anterior. Sus filas no
+     * se pintan como si fueran de la página nueva: se ve la carga, y el indicador ya dice a dónde
+     * se va.
+     */
+    it('mientras cambia de página muestra la carga y no las filas anteriores', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      mockedUseDocuments.mockImplementation(({ limit }: { limit: number }) => ({
+        data: {
+          items: buildItems(1, limit),
+          pagination: { page: 1, limit, total: 60, totalPages: 3 },
+        },
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        isPlaceholderData: true,
+      }));
+      await user.click(control('Página siguiente'));
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Cargando documentos',
+      );
+      expect(screen.queryByText('documento-1.pdf')).not.toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('2 de 3');
+    });
+
+    it('vuelve a la primera página al buscar', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      await user.click(control('Página siguiente'));
+      expect(lastQuery().page).toBe(2);
+
+      await user.type(
+        screen.getByRole('searchbox', {
+          name: /buscar por nombre del documento o participante/i,
+        }),
+        'contrato',
+      );
+
+      await waitFor(() => expect(lastQuery().filters.search).toBe('contrato'));
+      expect(lastQuery().page).toBe(1);
+    });
+
+    it('vuelve a la primera página al cambiar de cuenta activa', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      await user.click(control('Última página'));
+      expect(lastQuery().page).toBe(3);
+
+      act(() => {
+        useAuthStore.setState({
+          activeAccount: {
+            id: 'account-2',
+            accountType: 'ORGANIZATION',
+            organizationId: 'org-1',
+            roleId: null,
+          },
+        });
+      });
+
+      expect(lastQuery().page).toBe(1);
+      expect(indicator()).toHaveTextContent('1 de 3');
+    });
+
+    it('vuelve a la primera página y pide otro límite al cambiar el tamaño', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      await user.click(control('Página siguiente'));
+
+      screen
+        .getByRole('combobox', { name: 'Documentos por página' })
+        .focus();
+      await user.keyboard('{Enter}');
+      await user.click(await screen.findByRole('option', { name: '10' }));
+
+      expect(lastQuery()).toMatchObject({ page: 1, limit: 10 });
+      expect(indicator()).toHaveTextContent('1 de 6');
+    });
+
+    /**
+     * Archivar o cancelar el último documento de la última página invalida la lista, y el
+     * refetch trae una página menos: la tabla no debe quedarse en una página que ya no existe
+     * diciendo "no hay documentos".
+     */
+    it('si la página actual deja de existir, pasa a la última válida', async () => {
+      const user = userEvent.setup();
+      totalDocuments = 51;
+      renderWithProviders(<RefetchHarness />);
+      await user.click(control('Última página'));
+      expect(lastQuery().page).toBe(3);
+      expect(screen.getByText('documento-51.pdf')).toBeInTheDocument();
+
+      totalDocuments = 50;
+      act(() => simulateRefetch());
+
+      await waitFor(() => expect(lastQuery().page).toBe(2));
+      expect(screen.getByText('documento-50.pdf')).toBeInTheDocument();
+      expect(
+        screen.queryByText('No hay documentos para mostrar.'),
+      ).not.toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('2 de 2');
+    });
+
+    it('si se va el último documento de todos, vuelve a la página 1 vacía', async () => {
+      const user = userEvent.setup();
+      totalDocuments = 26;
+      renderWithProviders(<RefetchHarness />);
+      await user.click(control('Página siguiente'));
+      expect(lastQuery().page).toBe(2);
+
+      totalDocuments = 0;
+      act(() => simulateRefetch());
+
+      await waitFor(() => expect(lastQuery().page).toBe(1));
+      expect(
+        screen.getByText('No hay documentos para mostrar.'),
+      ).toBeInTheDocument();
+      expect(indicator()).toHaveTextContent('1 de 1');
+    });
+
+    it('con una sola página no ofrece navegación', () => {
+      totalDocuments = 3;
+      renderWithProviders(<DocumentsView />);
+
+      expect(indicator()).toHaveTextContent('1 de 1');
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(control('Última página')).toBeDisabled();
+    });
+  });
+
+  /**
+   * Historia "Personalizador de columnas en la tabla de Documentos": cada usuario elige qué
+   * columnas ver, la elección sobrevive a la recarga y la columna de acciones no se puede ocultar.
+   */
+  describe('personalizar columnas', () => {
+    const storageKey = 'documents-table-columns:user-1';
+
+    function headers() {
+      return screen
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent ?? '');
+    }
+
+    async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(
+        screen.getByRole('button', { name: /personalizar columnas/i }),
+      );
+      return screen.findByRole('menu');
+    }
+
+    beforeEach(() => {
+      window.localStorage.clear();
+      useAuthStore.setState({
+        user: {
+          id: 'user-1',
+          email: 'ana@example.com',
+          identificationNumber: 'LOPA800101',
+          name: 'Ana',
+          lastName: 'López',
+          signingCredentialStatus: SigningCredentialStatus.Configured,
+          personalConfigured: true,
+        },
+      });
+      mockedUseDocuments.mockReturnValue({
+        data: {
+          items: [
+            {
+              id: 'doc-1',
+              fileName: 'contrato.pdf',
+              creator: 'Ana López',
+              totalPages: 1,
+              status: DocumentStatus.PendingSignature,
+              createdAt: '2026-03-15T12:00:00.000Z',
+            },
+          ],
+          pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+        },
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        isPlaceholderData: false,
+      });
+    });
+
+    afterEach(() => {
+      useAuthStore.setState({ user: null });
+    });
+
+    it('muestra todas las columnas marcadas, con "Documento" fija y sin la de acciones', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+
+      const menu = await openMenu(user);
+      const options = within(menu).getAllByRole('menuitemcheckbox');
+
+      expect(options.map((option) => option.textContent)).toEqual([
+        'Índice',
+        'DocumentoSiempre visible',
+        'Creado por',
+        'Participación',
+        'Estatus',
+        'Fecha de creación',
+        'Fecha de firma',
+        'Tipo de firma',
+      ]);
+      options.forEach((option) =>
+        expect(option).toHaveAttribute('aria-checked', 'true'),
+      );
+      expect(
+        within(menu).getByRole('menuitemcheckbox', { name: /documento/i }),
+      ).toHaveAttribute('aria-disabled', 'true');
+      expect(
+        within(menu).queryByRole('menuitemcheckbox', { name: /acciones/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('oculta y vuelve a mostrar una columna en su posición, sin cerrar el menú', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      const menu = await openMenu(user);
+      const creator = within(menu).getByRole('menuitemcheckbox', {
+        name: 'Creado por',
+      });
+
+      await user.click(creator);
+
+      expect(headers()).not.toContain('Creado por');
+      expect(creator).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      // La fila sigue pintando una celda por encabezado.
+      const row = screen.getByText('contrato.pdf').closest('tr')!;
+      expect(within(row).getAllByRole('cell')).toHaveLength(headers().length);
+
+      await user.click(creator);
+
+      expect(headers().slice(0, 3)).toEqual(['#', 'Documento', 'Creado por']);
+    });
+
+    it('la columna de acciones sigue aunque se oculten todas las demás', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      const menu = await openMenu(user);
+
+      for (const option of within(menu).getAllByRole('menuitemcheckbox')) {
+        if (option.getAttribute('aria-disabled') !== 'true') {
+          await user.click(option);
+        }
+      }
+
+      expect(headers()).toEqual(['Documento', '']);
+      expect(
+        screen.getByRole('columnheader', { name: 'Acciones' }),
+      ).toBeInTheDocument();
+    });
+
+    it('guarda la preferencia por usuario y la restaura al recargar', async () => {
+      const user = userEvent.setup();
+      const { unmount } = renderWithProviders(<DocumentsView />);
+      const menu = await openMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitemcheckbox', { name: 'Fecha de firma' }),
+      );
+
+      expect(JSON.parse(window.localStorage.getItem(storageKey)!)).not.toContain(
+        'signedAt',
+      );
+
+      unmount();
+      renderWithProviders(<DocumentsView />);
+
+      expect(headers()).not.toContain('Fecha de firma');
+      expect(headers()).toContain('Fecha de creación');
+    });
+
+    it('con una preferencia ilegible abre con la configuración predeterminada', () => {
+      window.localStorage.setItem(storageKey, '{roto');
+      renderWithProviders(<DocumentsView />);
+
+      expect(headers()).toContain('Fecha de firma');
+      expect(headers()).toHaveLength(9);
+    });
+
+    it('"Restablecer columnas" vuelve a la configuración predeterminada', async () => {
+      window.localStorage.setItem(storageKey, '["document"]');
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      expect(headers()).toEqual(['Documento', '']);
+
+      const menu = await openMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /restablecer columnas/i }),
+      );
+
+      expect(headers()).toHaveLength(9);
+      expect(window.localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    it('se maneja con teclado', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsView />);
+      screen.getByRole('button', { name: /personalizar columnas/i }).focus();
+
+      await user.keyboard('{Enter}');
+      const menu = await screen.findByRole('menu');
+      const index = within(menu).getByRole('menuitemcheckbox', {
+        name: 'Índice',
+      });
+      await waitFor(() => expect(index).toHaveFocus());
+      await user.keyboard(' ');
+
+      expect(index).toHaveAttribute('aria-checked', 'false');
+      expect(headers()).not.toContain('#');
+    });
+
+    it('mantiene los estados de carga y vacío ocupando todo el ancho', () => {
+      window.localStorage.setItem(storageKey, '["document","status"]');
+      mockedUseDocuments.mockReturnValue({
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 25, total: 0, totalPages: 0 },
+        },
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        isPlaceholderData: false,
+      });
+      renderWithProviders(<DocumentsView />);
+
+      const emptyCell = screen
+        .getByText('No hay documentos para mostrar.')
+        .closest('td')!;
+      expect(emptyCell).toHaveAttribute('colspan', '3');
+    });
+  });
+});

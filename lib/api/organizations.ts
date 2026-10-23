@@ -1,0 +1,113 @@
+import apiClient from '@/lib/axios';
+
+/**
+ * El perfil de una organización — espejo de `OrganizationProfileData` en el backend
+ * (`src/account/interfaces/response/organization-response.ts`).
+ *
+ * Los campos opcionales llegan en `null` y no ausentes: una organización que nunca capturó su
+ * domicilio es distinta de una respuesta que se lo dejó fuera, y la pantalla lo pinta como "Sin
+ * capturar" en vez de en blanco.
+ */
+export interface OrganizationProfile {
+  id: string;
+  /** Razón social: el nombre legal completo. */
+  name: string;
+  /** Nombre corto con el que la organización se presenta en la interfaz. */
+  displayName: string;
+  /** Identificador fiscal; en México, su RFC (antes `rfc`). */
+  taxId: string | null;
+  phoneNumber: string | null;
+  address: string | null;
+  domainAllowed: string | null;
+  isActive: boolean;
+  /**
+   * Si los documentos de la organización pueden entrar a Búsqueda Inteligente. Lo edita la
+   * tarjeta "Búsqueda inteligente" de esta misma pantalla; las organizaciones nuevas nacen con él
+   * encendido.
+   */
+  indexDocuments: boolean;
+}
+
+/**
+ * Pide el perfil de una organización (`GET /organizations/:organizationId`).
+ *
+ * Es la única lectura que devuelve RFC, teléfono, domicilio y dominio permitido: el catálogo de
+ * cuentas (`GET /accounts/me`) publica sólo razón social y nombre de visualización, porque es lo
+ * que rotula el selector de cuentas.
+ *
+ * @param organizationId - Organización cuyo perfil se pide.
+ * @returns El perfil de la organización.
+ *
+ * @throws {AxiosError} 403 si quien pregunta no es miembro activo de esa organización o su rol no
+ *   tiene `ORGANIZATION.READ`; 404 si no existe.
+ *
+ * @example
+ * ```ts
+ * const organization = await getOrganizationRequest('org-1');
+ * organization.taxId; // 'ACM010101AAA'
+ * ```
+ */
+export async function getOrganizationRequest(
+  organizationId: string,
+): Promise<OrganizationProfile> {
+  const { data } = await apiClient.get<{
+    success: boolean;
+    message: string;
+    data: OrganizationProfile;
+  }>(`/api/v1/organizations/${organizationId}`);
+
+  return data.data;
+}
+
+/**
+ * Lo que acepta `PATCH /organizations/:organizationId` — espejo de `UpdateOrganizationDto` en el
+ * backend. Usa los mismos nombres que `OrganizationProfile`, así que se manda lo que se leyó.
+ *
+ * Todo es opcional: sólo se escribe lo que viaja. Los opcionales en `null` se borran; los dos
+ * nombres no se pueden borrar. `indexDocuments` viaja solo, desde la tarjeta de Búsqueda
+ * Inteligente, y no admite `null`.
+ */
+export type UpdateOrganizationPayload = Partial<
+  Pick<
+    OrganizationProfile,
+    | 'displayName'
+    | 'name'
+    | 'taxId'
+    | 'phoneNumber'
+    | 'address'
+    | 'domainAllowed'
+    | 'indexDocuments'
+  >
+>;
+
+/**
+ * Guarda el perfil de una organización (`PATCH /organizations/:organizationId`).
+ *
+ * El backend responde con el perfil completo tal como quedó —la misma forma que la lectura—, así
+ * que quien llama puede pintarlo sin volver a pedirlo.
+ *
+ * @param organizationId - Organización a editar.
+ * @param payload - Campos a escribir; los ausentes no se tocan.
+ * @returns El perfil actualizado.
+ *
+ * @throws {AxiosError} 400 si algún campo no tiene un formato válido; 403 si quien edita no es
+ *   miembro activo de esa organización o su rol no tiene `ORGANIZATION.UPDATE`; 404 si no existe.
+ *
+ * @example
+ * ```ts
+ * const organization = await updateOrganizationRequest('org-1', { phoneNumber: '5512345678' });
+ * organization.phoneNumber; // '5512345678'
+ * ```
+ */
+export async function updateOrganizationRequest(
+  organizationId: string,
+  payload: UpdateOrganizationPayload,
+): Promise<OrganizationProfile> {
+  const { data } = await apiClient.patch<{
+    success: boolean;
+    message: string;
+    data: OrganizationProfile;
+  }>(`/api/v1/organizations/${organizationId}`, payload);
+
+  return data.data;
+}

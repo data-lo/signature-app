@@ -1,0 +1,63 @@
+import type { SignerFormValues, WitnessFormValues } from '../_schemas';
+
+/**
+ * Configuración de los campos de texto de un participante (`CollaboratorFormItem`). Existe para
+ * quitar la repetición de bloques `<Controller>` idénticos por campo, sin perder tipado: `name`
+ * está acotado a las llaves reales del colaborador, así que renombrar un campo del esquema
+ * rompe la compilación aquí en vez de fallar en silencio en tiempo de ejecución. Se arma sobre la
+ * UNIÓN de llaves de firmante y testigo (no sobre `keyof CollaboratorFormValues`, que al ser
+ * unión discriminada solo expone las llaves comunes): `taxId` ya solo existe en el testigo.
+ */
+export interface CollaboratorFieldConfig {
+  name: Extract<
+    keyof SignerFormValues | keyof WitnessFormValues,
+    'firstName' | 'lastName' | 'email' | 'taxId'
+  >;
+  label: string;
+  type: 'text' | 'email';
+  placeholder?: string;
+  required: boolean;
+}
+
+/** Nombre y apellido: se renderizan juntos en una grilla de dos columnas. */
+export const COLLABORATOR_NAME_FIELDS: readonly CollaboratorFieldConfig[] = [
+  {
+    name: 'firstName',
+    label: 'Nombre(s)',
+    type: 'text',
+    placeholder: 'Juan',
+    required: true,
+  },
+  {
+    name: 'lastName',
+    label: 'Apellido',
+    type: 'text',
+    placeholder: 'Pérez',
+    required: true,
+  },
+];
+
+export const COLLABORATOR_EMAIL_FIELD: CollaboratorFieldConfig = {
+  name: 'email',
+  label: 'Email',
+  type: 'email',
+  placeholder: 'juan.perez@correo.com',
+  required: true,
+};
+
+/**
+ * El identificador fiscal solo se pide a los testigos, y ahí es opcional (historia "Eliminar
+ * campo RFC de la sección de Espectadores"; la decisión de mostrarlo o no es del componente, ver
+ * `CollaboratorFormItem`). A los firmantes ya no se les pide en ningún flujo — ver historia
+ * "Selección de tipo de firma al crear documentos".
+ *
+ * El campo se llama `taxId` y la etiqueta sigue diciendo "RFC": lo que se estandarizó es el
+ * nombre del dato en el contrato, no lo que el usuario mexicano tiene que escribir ahí.
+ */
+export const COLLABORATOR_TAX_ID_FIELD: CollaboratorFieldConfig = {
+  name: 'taxId',
+  label: 'RFC',
+  type: 'text',
+  placeholder: 'PEAJ800101ABC',
+  required: false,
+};

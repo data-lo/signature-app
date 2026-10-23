@@ -1,0 +1,1447 @@
+import userEvent from '@testing-library/user-event';
+import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
+import DocumentsTable, {
+  documentRowIndex,
+  EMPTY_DOCUMENTS_MESSAGE,
+  type DocumentListItem,
+} from './DocumentsTable';
+import { useDownloadDocument } from '../_hooks/useDownloadDocument';
+import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
+import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
+import {
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
+
+jest.mock('../_hooks/useDownloadDocument');
+jest.mock('../_hooks/useArchiveCompletedDocument');
+jest.mock('../[documentId]/_hooks/useDocumentDetail');
+jest.mock('./PdfPreview', () => ({
+  __esModule: true,
+  default: () => <div>PDF preview</div>,
+}));
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: { success: jest.fn(), error: jest.fn() },
+}));
+
+const mockedUseDownloadDocument = useDownloadDocument as jest.Mock;
+const mockedUseArchiveCompletedDocument =
+  useArchiveCompletedDocument as jest.Mock;
+const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
+
+/** Detalle mínimo del documento: el modal de participantes solo lee `participants`. */
+function buildDetail(participants: unknown[] = []) {
+  return {
+    data: { id: 'doc-1', participants },
+    isLoading: false,
+    isError: false,
+  };
+}
+
+function buildParticipant(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'part-1',
+    userId: null,
+    email: 'juan.perez@empresa.com',
+    name: 'Juan Pérez',
+    role: ParticipantRole.Signer,
+    status: ParticipantStatus.Pending,
+    cancellationReason: null,
+    ...overrides,
+  };
+}
+
+function buildDoc(overrides: Partial<DocumentListItem> = {}): DocumentListItem {
+  return {
+    id: 'doc-1',
+    fileName: 'contrato.pdf',
+    fileType: 'application/pdf',
+    signers: ['Juan Pérez'],
+    witnesses: [],
+    creator: 'Creador Uno',
+    creatorRfc: 'CRUN850315HN2',
+    totalPages: 1,
+    status: DocumentStatus.Signed,
+    createdAt: new Date(2026, 2, 15, 23, 55).toISOString(),
+    signedAt: new Date(2026, 4, 10, 9, 30).toISOString(),
+    ...overrides,
+  };
+}
+
+/**
+ * Celda de la única fila renderizada que corresponde a la columna `header`, ubicada por la
+ * posición de ese encabezado: así las aserciones siguen valiendo si el orden vuelve a cambiar.
+ */
+function dataCell(header: string): HTMLElement {
+  const headers = screen.getAllByRole('columnheader');
+  const columnIndex = headers.findIndex(
+    (columnHeader) => columnHeader.textContent?.trim() === header,
+  );
+  expect(columnIndex).toBeGreaterThan(-1);
+
+  const [row] = screen.getAllByRole('row').slice(1);
+  return within(row).getAllByRole('cell')[columnIndex];
+}
+
+/** Abre el menú de tres puntos de la única fila renderizada y devuelve su contenido. */
+async function openRowMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    screen.getByRole('button', { name: /acciones del documento/i }),
+  );
+  return screen.findByRole('menu');
+}
+
+/**
+ * Permisos de lectura con los que se ofrece "Archivar" (ver `ARCHIVE_DOCUMENT_PERMISSIONS`): los de
+ * un OWNER o ADMIN de fábrica. Las pruebas que no los pasan renderizan sin permisos.
+ */
+const DOCUMENT_READER_PERMISSIONS = [
+  'DOCUMENT.READ_OWN',
+  'DOCUMENT.READ_ORGANIZATION',
+] as const;
+
+describe('DocumentsTable', () => {
+  const downloadMutate = jest.fn();
+  const archiveMutate = jest.fn();
+
+  beforeEach(() => {
+    downloadMutate.mockReset();
+    archiveMutate.mockReset();
+    mockedUseArchiveCompletedDocument.mockReturnValue({
+      mutate: archiveMutate,
+      isPending: false,
+      variables: undefined,
+    });
+    mockedUseDownloadDocument.mockReturnValue({
+      mutate: downloadMutate,
+      isPending: false,
+      variables: undefined,
+    });
+    mockedUseDocumentDetail.mockReturnValue(buildDetail([buildParticipant()]));
+  });
+
+  describe('estructura de la tabla', () => {
+    it('renderiza las columnas en el orden Índice / Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      // Por nombre accesible: el de "Índice" se ve como un gato, pero se anuncia como "Índice".
+      const names = [
+        'Índice',
+        'Documento',
+        'Creado por',
+        'Participación',
+        'Estatus',
+        'Fecha de creación',
+        'Fecha de firma',
+        'Tipo de firma',
+        'Acciones',
+      ];
+
+      expect(screen.getAllByRole('columnheader')).toEqual(
+        names.map((name) => screen.getByRole('columnheader', { name })),
+      );
+    });
+
+    it('el encabezado del índice muestra un gato, oculto a los lectores de pantalla, y se anuncia como "Índice"', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const header = screen.getByRole('columnheader', { name: 'Índice' });
+      expect(within(header).getByText('🐱')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
+      expect(within(header).getByText('Índice')).toHaveClass('sr-only');
+      expect(screen.getAllByRole('columnheader')[0]).toBe(header);
+    });
+
+    /**
+     * Historia "Ajustar columnas de la tabla de documentos": la columna Documento sólo lleva la
+     * información del archivo. El estatus se sigue viendo, en su propia columna.
+     */
+    it('la columna Documento ya no muestra el punto de color del estatus', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Rejected })]}
+        />,
+      );
+
+      const documentCell = dataCell('Documento');
+      expect(
+        documentCell.querySelector('[data-slot="status-dot"]'),
+      ).not.toBeInTheDocument();
+      expect(documentCell).toHaveTextContent('contrato.pdf');
+      expect(dataCell('Estatus')).toHaveTextContent('Rechazado');
+    });
+
+    it('muestra el RFC del creador rotulado y como texto secundario debajo de su nombre', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(screen.getByText('Creador Uno')).toBeInTheDocument();
+      expect(screen.getByText(/^RFC: CRUN850315HN2$/)).toHaveClass(
+        'text-muted-foreground',
+      );
+    });
+
+    it('omite el RFC (sin dejar hueco ni rótulo suelto) si el creador todavía no lo registró', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ creatorRfc: null })]} />,
+      );
+
+      expect(screen.getByText('Creador Uno')).toBeInTheDocument();
+      expect(screen.queryByText(/RFC:/)).not.toBeInTheDocument();
+    });
+
+    it('muestra el nombre de quien creó el documento en "Creado por"', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataCell('Creado por')).toHaveTextContent('Creador Uno');
+    });
+  });
+
+  /**
+   * Historia "Reordenar y ajustar datos en las tablas de documentos": las dos fechas se muestran
+   * en DD/MM/YYYY, que es lo que se compara de un vistazo en un listado. El formato largo
+   * ("Domingo 15 de marzo, 11:55 PM") sigue en las pantallas de detalle y evidencia.
+   */
+  describe('fechas', () => {
+    it('muestra la fecha de creación en formato DD/MM/YYYY', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataCell('Fecha de creación')).toHaveTextContent('15/03/2026');
+    });
+
+    it('muestra la fecha de firma en formato DD/MM/YYYY', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('10/05/2026');
+    });
+
+    it('rellena con ceros los días y meses de un solo dígito', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ createdAt: new Date(2026, 0, 2, 8, 5).toISOString() }),
+          ]}
+        />,
+      );
+
+      expect(dataCell('Fecha de creación')).toHaveTextContent('02/01/2026');
+    });
+
+    it('muestra "No disponible" en "Fecha de firma" mientras el documento no está firmado', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({
+              status: DocumentStatus.PendingSignature,
+              signedAt: null,
+            }),
+          ]}
+        />,
+      );
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('No disponible');
+    });
+
+    /** Documentos del endpoint antiguo: la fila se ve completa igual, sin fecha inventada. */
+    it('también muestra "No disponible" si el backend no informa la fecha de firma', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ signedAt: undefined })]} />,
+      );
+
+      expect(dataCell('Fecha de firma')).toHaveTextContent('No disponible');
+    });
+
+    /**
+     * Historia "Mostrar fecha y hora completa con Tooltip": la fecha compacta se queda en la celda
+     * y el detalle con hora de 24 horas aparece en el Tooltip de shadcn al pasar el cursor.
+     */
+    /**
+     * Historia "Truncar el nombre del documento y mostrarlo completo en un tooltip": el nombre
+     * ocupa una sola línea dentro de una columna de ancho fijo y el completo va en el Tooltip.
+     * El detalle de cuándo abre (sólo si está recortado, también con el foco) lo cubre
+     * `DocumentFileName.spec.tsx`.
+     */
+    describe('nombre del documento recortado', () => {
+      const LONG_NAME =
+        'Contrato de prestación de servicios profesionales 2026.pdf';
+
+      afterEach(() => jest.restoreAllMocks());
+
+      it('la columna tiene un ancho fijo y el nombre no se parte en varias líneas', () => {
+        renderWithProviders(
+          <DocumentsTable
+            documents={[buildDoc({ fileName: LONG_NAME })]}
+            onRowSelect={jest.fn()}
+          />,
+        );
+
+        const cell = dataCell('Documento');
+        expect(cell).toHaveClass('w-64', 'max-w-64');
+        expect(cell).not.toHaveClass('whitespace-normal');
+
+        const name = within(cell).getByRole('button', { name: LONG_NAME });
+        expect(name).toHaveClass('truncate');
+        expect(name).not.toHaveClass('break-words');
+      });
+
+      it('un nombre recortado muestra el nombre completo en el tooltip al pasar el cursor', async () => {
+        jest
+          .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+          .mockReturnValue(480);
+        jest
+          .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+          .mockReturnValue(256);
+        const user = userEvent.setup();
+        renderWithProviders(
+          <DocumentsTable
+            documents={[buildDoc({ fileName: LONG_NAME })]}
+            onRowSelect={jest.fn()}
+          />,
+        );
+
+        await user.hover(
+          within(dataCell('Documento')).getByRole('button', {
+            name: LONG_NAME,
+          }),
+        );
+
+        expect(
+          await screen.findByText(LONG_NAME, {
+            selector: '[data-slot="tooltip-content"]',
+          }),
+        ).toBeVisible();
+      });
+    });
+
+    describe('tooltip con la fecha completa', () => {
+      it('la fecha de creación muestra su fecha y hora completas al pasar el cursor', async () => {
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+        const trigger = within(dataCell('Fecha de creación')).getByRole(
+          'button',
+        );
+        expect(trigger).toHaveTextContent('15/03/2026');
+
+        await user.hover(trigger);
+
+        const tooltip = await screen.findByText('DOMINGO 15 DE MARZO 23:55', {
+          selector: '[data-slot="tooltip-content"]',
+        });
+        expect(tooltip).toBeVisible();
+      });
+
+      it('la fecha de firma muestra su fecha y hora completas al pasar el cursor', async () => {
+        const user = userEvent.setup();
+        renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+        await user.hover(
+          within(dataCell('Fecha de firma')).getByRole('button'),
+        );
+
+        expect(
+          await screen.findByText('DOMINGO 10 DE MAYO 09:30', {
+            selector: '[data-slot="tooltip-content"]',
+          }),
+        ).toBeVisible();
+      });
+
+      /** Sin hover (teclado, lector de pantalla) el detalle sigue formando parte del nombre. */
+      it('el disparador incluye la fecha completa en su nombre accesible', () => {
+        renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+        expect(
+          within(dataCell('Fecha de creación')).getByRole('button', {
+            name: /^15\/03\/2026\s*, DOMINGO 15 DE MARZO 23:55$/,
+          }),
+        ).toBeInTheDocument();
+      });
+
+      it.each([
+        [
+          'sin firmar',
+          { status: DocumentStatus.PendingSignature, signedAt: null },
+        ],
+        ['sin fecha informada', { signedAt: undefined }],
+        ['con fecha ilegible', { signedAt: 'no-es-fecha' }],
+      ])(
+        'un documento %s no tiene tooltip en "Fecha de firma"',
+        async (_label, overrides) => {
+          const user = userEvent.setup();
+          renderWithProviders(
+            <DocumentsTable documents={[buildDoc(overrides)]} />,
+          );
+
+          const cell = dataCell('Fecha de firma');
+          expect(cell).toHaveTextContent('No disponible');
+          expect(within(cell).queryByRole('button')).not.toBeInTheDocument();
+
+          await user.hover(within(cell).getByText('No disponible'));
+
+          expect(
+            document.querySelector('[data-slot="tooltip-content"]'),
+          ).toBeNull();
+        },
+      );
+
+      it('hacer clic en la fecha sigue abriendo el detalle del documento', async () => {
+        const user = userEvent.setup();
+        const onRowSelect = jest.fn();
+        renderWithProviders(
+          <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+        );
+
+        await user.click(
+          within(dataCell('Fecha de creación')).getByRole('button'),
+        );
+
+        expect(onRowSelect).toHaveBeenCalledWith('doc-1');
+      });
+    });
+  });
+
+  /**
+   * Historia "Actualizar tabla de documentos a fondo blanco": la tabla y su paginación viven en
+   * una tarjeta `bg-card` (blanca en tema claro), y los estados sin documentos se dibujan dentro
+   * de ella en vez de dejar un cuerpo vacío.
+   */
+  describe('tarjeta blanca y estados', () => {
+    function card(): HTMLElement {
+      const element = document.querySelector<HTMLElement>(
+        '[data-slot="documents-table-card"]',
+      );
+      expect(element).not.toBeNull();
+      return element!;
+    }
+
+    it('la tabla y la paginación van dentro de una tarjeta con fondo de tarjeta', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(card()).toHaveClass('bg-card', 'border', 'rounded-xl');
+      expect(card()).toContainElement(screen.getByRole('table'));
+      expect(card()).toContainElement(
+        document.querySelector<HTMLElement>(
+          '[data-slot="documents-table-pagination"]',
+        ),
+      );
+    });
+
+    it('con información, muestra una fila por documento y resalta la fila en hover', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc(), buildDoc({ id: 'doc-2', fileName: 'b.pdf' })]}
+        />,
+      );
+
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveClass('hover:bg-muted');
+      expect(screen.getByRole('table')).not.toHaveAttribute('aria-busy');
+    });
+
+    it('sin documentos, muestra el estado vacío en una fila de ancho completo', () => {
+      renderWithProviders(<DocumentsTable documents={[]} />);
+
+      const cell = screen.getByRole('cell', {
+        name: 'No hay documentos para mostrar.',
+      });
+      // Las nueve columnas, contando "Índice".
+      expect(cell).toHaveAttribute('colspan', '9');
+    });
+
+    it('cargando, muestra el esqueleto, marca la tabla como ocupada y lo anuncia', () => {
+      renderWithProviders(<DocumentsTable documents={[]} isLoading />);
+
+      expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Cargando documentos',
+      );
+      expect(
+        document.querySelectorAll('[data-slot="documents-loading-row"]'),
+      ).toHaveLength(5);
+      expect(
+        screen.queryByText('No hay documentos para mostrar.'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('con error, muestra el mensaje en lugar de la lista, aunque haya datos o esté cargando', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          isLoading
+          errorMessage="No se pudieron cargar los documentos."
+        />,
+      );
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'No se pudieron cargar los documentos.',
+      );
+      expect(screen.queryByText('contrato.pdf')).not.toBeInTheDocument();
+      expect(
+        document.querySelector('[data-slot="documents-loading-row"]'),
+      ).toBeNull();
+    });
+
+    it('la paginación sigue visible y funcional en todos los estados', async () => {
+      const user = userEvent.setup();
+      const onPageChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[]}
+          page={1}
+          totalPages={3}
+          onPageChange={onPageChange}
+          isLoading
+        />,
+      );
+
+      const pagination = document.querySelector<HTMLElement>(
+        '[data-slot="documents-table-pagination"]',
+      )!;
+      expect(pagination).toHaveTextContent('Documentos por página');
+
+      const buttons = within(pagination).getAllByRole('button');
+      await user.click(buttons[buttons.length - 2]);
+
+      expect(onPageChange).toHaveBeenCalledWith(2);
+    });
+  });
+
+  /**
+   * Los controles se calculan con la página y el `totalPages` que recibe la tabla. El backend
+   * numera desde 1 y responde `totalPages: 0` cuando no hay documentos.
+   */
+  describe('controles de paginación', () => {
+    function renderPagination({
+      page,
+      totalPages,
+    }: {
+      page: number;
+      totalPages: number;
+    }) {
+      const onPageChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          page={page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+        />,
+      );
+      return onPageChange;
+    }
+
+    function control(name: string) {
+      return screen.getByRole('button', { name });
+    }
+
+    function indicator() {
+      return document.querySelector(
+        '[data-slot="documents-table-page-indicator"]',
+      );
+    }
+
+    it('en la primera página deshabilita "Primera" y "Anterior"', () => {
+      renderPagination({ page: 1, totalPages: 3 });
+
+      expect(control('Primera página')).toBeDisabled();
+      expect(control('Página anterior')).toBeDisabled();
+      expect(control('Página siguiente')).toBeEnabled();
+      expect(control('Última página')).toBeEnabled();
+      expect(indicator()).toHaveTextContent('1 de 3');
+    });
+
+    it('en una página intermedia habilita todo y pide la vecina correcta', async () => {
+      const user = userEvent.setup();
+      const onPageChange = renderPagination({ page: 2, totalPages: 3 });
+
+      for (const name of [
+        'Primera página',
+        'Página anterior',
+        'Página siguiente',
+        'Última página',
+      ]) {
+        expect(control(name)).toBeEnabled();
+      }
+
+      await user.click(control('Página anterior'));
+      await user.click(control('Página siguiente'));
+      await user.click(control('Primera página'));
+      await user.click(control('Última página'));
+
+      expect(onPageChange.mock.calls).toEqual([[1], [3], [1], [3]]);
+    });
+
+    it('en la última página deshabilita "Siguiente" y "Última"', () => {
+      renderPagination({ page: 3, totalPages: 3 });
+
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(control('Última página')).toBeDisabled();
+      expect(control('Página anterior')).toBeEnabled();
+      expect(indicator()).toHaveTextContent('3 de 3');
+    });
+
+    it('con una sola página deshabilita toda la navegación', () => {
+      renderPagination({ page: 1, totalPages: 1 });
+
+      for (const name of [
+        'Primera página',
+        'Página anterior',
+        'Página siguiente',
+        'Última página',
+      ]) {
+        expect(control(name)).toBeDisabled();
+      }
+      expect(indicator()).toHaveTextContent('1 de 1');
+    });
+
+    /** `totalPages: 0` no significa "página 0": la tabla está en la 1 de 1, vacía. */
+    it('con total cero se queda en "1 de 1" y sin navegación', () => {
+      const onPageChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[]}
+          page={1}
+          totalPages={0}
+          onPageChange={onPageChange}
+        />,
+      );
+
+      expect(screen.getByText(EMPTY_DOCUMENTS_MESSAGE)).toBeInTheDocument();
+      expect(control('Última página')).toBeDisabled();
+      expect(control('Página siguiente')).toBeDisabled();
+      expect(indicator()).toHaveTextContent('1 de 1');
+    });
+
+    it('elegir otro tamaño de página lo notifica', async () => {
+      const user = userEvent.setup();
+      const onPageSizeChange = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          page={1}
+          totalPages={2}
+          onPageChange={jest.fn()}
+          pageSize={25}
+          onPageSizeChange={onPageSizeChange}
+        />,
+      );
+
+      screen.getByRole('combobox', { name: 'Documentos por página' }).focus();
+      await user.keyboard('{Enter}');
+      await user.click(await screen.findByRole('option', { name: '50' }));
+
+      expect(onPageSizeChange).toHaveBeenCalledWith(50);
+    });
+  });
+
+  describe('menú de acciones', () => {
+    /**
+     * `buildDoc()` construye un documento ya firmado por todos, así que su menú incluye
+     * "Archivar"; ver el `describe('archivar')` para cuándo aparece y cuándo no.
+     */
+    it('concentra Descargar, Ver participantes, Compartir y Archivar en el menú de tres puntos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu)
+          .getAllByRole('menuitem')
+          .map((item) => item.textContent?.trim()),
+      ).toEqual(['Descargar', 'Ver participantes', 'Compartir', 'Archivar']);
+    });
+
+    it('bug corregido: "Descargar" de un documento firmado dispara la descarga en vez de no hacer nada', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /descargar/i }),
+      );
+
+      expect(downloadMutate).toHaveBeenCalledWith('doc-1');
+    });
+
+    it('muestra "Descargando..." y deshabilita la acción mientras la descarga de ese documento está en curso', async () => {
+      mockedUseDownloadDocument.mockReturnValue({
+        mutate: downloadMutate,
+        isPending: true,
+        variables: 'doc-1',
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: /descargando/i }),
+      ).toHaveAttribute('data-disabled');
+    });
+
+    it('no deshabilita la descarga de un documento distinto al que está en curso', async () => {
+      mockedUseDownloadDocument.mockReturnValue({
+        mutate: downloadMutate,
+        isPending: true,
+        variables: 'otro-doc',
+      });
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ id: 'doc-1' })]} />,
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: /^descargar/i }),
+      ).not.toHaveAttribute('data-disabled');
+    });
+
+    /**
+     * Historia "Hacer seleccionables las filas": firmar y ver detalle salieron del menú porque
+     * las dos abrían `/dashboard/documents/:id`, que es lo que ahora hace la fila.
+     */
+    it.each([/^firmar$/i, /ver detalle/i])(
+      'ya no ofrece %s en el menú',
+      async (name) => {
+        const user = userEvent.setup();
+        renderWithProviders(
+          <DocumentsTable
+            documents={[buildDoc({ status: DocumentStatus.PendingSignature })]}
+            onRowSelect={jest.fn()}
+          />,
+        );
+
+        const menu = await openRowMenu(user);
+
+        expect(
+          within(menu).queryByRole('menuitem', { name }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it('tampoco ofrece firmar como botón de texto en la fila', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.PendingSignature })]}
+          onRowSelect={jest.fn()}
+        />,
+      );
+
+      expect(
+        screen.queryByRole('button', { name: /^firmar$/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /acciones del documento/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Hacer seleccionables las filas en tablas de documentos": la fila entera es el
+   * camino al detalle, y las acciones que quedan no deben dispararlo.
+   */
+  /**
+   * Archivar es la única acción del menú que depende del documento y no sólo de la fila: se
+   * ofrece sobre lo que ya está firmado por todos, y sobre nada más.
+   *
+   * Antes dependía además de la sección —vivía sólo en "Completados"—, pero con la lista
+   * unificada la misma tabla muestra a la vez lo pendiente y lo firmado, así que el estatus de
+   * cada documento es lo único que queda por consultar.
+   */
+  describe('archivar', () => {
+    it('ofrece "Archivar" en un documento firmado por todos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      ).toBeInTheDocument();
+    });
+
+    it('archiva el documento de esa fila', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9', status: DocumentStatus.Signed })]}
+        />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      );
+
+      expect(archiveMutate).toHaveBeenCalledWith('doc-9');
+    });
+
+    /**
+     * El backend rechaza archivar cualquier cosa que no esté en `signed`, así que ofrecerlo sobre
+     * un documento cancelado sólo produciría un error que el usuario no puede evitar.
+     */
+    it.each([
+      DocumentStatus.PendingSignature,
+      DocumentStatus.Cancelled,
+      DocumentStatus.CancellationPending,
+      DocumentStatus.Rejected,
+    ])('no ofrece archivar un documento en estatus %s', async (status) => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ status })]} />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('muestra "Archivando..." y deshabilita la acción mientras ese documento se archiva', async () => {
+      mockedUseArchiveCompletedDocument.mockReturnValue({
+        mutate: archiveMutate,
+        isPending: true,
+        variables: 'doc-1',
+      });
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: /archivando/i }),
+      ).toHaveAttribute('data-disabled');
+    });
+
+    /**
+     * El caso de la historia: el documento lo creó otra persona y quien mira no participa en
+     * él, pero su rol ve los documentos de toda la organización. La opción depende del permiso,
+     * no de quién creó el documento.
+     */
+    it('ofrece "Archivar" a quien no creó el documento si tiene DOCUMENT.READ_ORGANIZATION', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({
+              id: 'doc-ajeno',
+              creator: 'Otra Persona',
+              status: DocumentStatus.Signed,
+            }),
+          ]}
+        />,
+        { permissions: ['DOCUMENT.READ_ORGANIZATION'] },
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      );
+
+      expect(archiveMutate).toHaveBeenCalledWith('doc-ajeno');
+    });
+
+    it('ofrece "Archivar" al creador con DOCUMENT.READ_OWN', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+        { permissions: ['DOCUMENT.READ_OWN'] },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Archivar' }),
+      ).toBeInTheDocument();
+    });
+
+    /** Sin permiso de lectura no se ofrece, aunque el documento esté firmado. */
+    it('no ofrece "Archivar" sin permiso de lectura de documentos', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+        />,
+        { permissions: ['DOCUMENT.CREATE'] },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Descargar' }),
+      ).toBeInTheDocument();
+    });
+
+    /** La vista de archivados apaga la acción: todo lo que lista ya está archivado. */
+    it('con canArchiveRows en false no ofrece "Archivar" ni en un documento firmado', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ status: DocumentStatus.Signed })]}
+          canArchiveRows={false}
+        />,
+        { permissions: DOCUMENT_READER_PERMISSIONS },
+      );
+
+      const menu = await openRowMenu(user);
+
+      expect(
+        within(menu).queryByRole('menuitem', { name: /archivar/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('estado vacío', () => {
+    it('pinta el estado vacío cuando la lista no trae documentos', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[]} emptyState={<p>Nada por aquí</p>} />,
+      );
+
+      expect(screen.getByText('Nada por aquí')).toBeInTheDocument();
+    });
+
+    it('no lo pinta si hay documentos', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          emptyState={<p>Nada por aquí</p>}
+        />,
+      );
+
+      expect(screen.queryByText('Nada por aquí')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('fila seleccionable', () => {
+    /** La única fila de datos renderizada (la primera de `getAllByRole('row')` es el encabezado). */
+    function dataRow(): HTMLElement {
+      return screen.getAllByRole('row')[1];
+    }
+
+    it('navega al detalle al hacer clic en cualquier punto de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9' })]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      await user.click(within(dataRow()).getByText('Creador Uno'));
+
+      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+    });
+
+    /**
+     * Las columnas que se reordenaron y las fechas que cambiaron de formato viven dentro de la
+     * fila, no al lado: activarlas navega igual que cualquier otro punto de ella.
+     */
+    it.each(['Estatus', 'Fecha de creación', 'Fecha de firma'])(
+      'navega también al hacer clic en la columna %s',
+      async (header) => {
+        const user = userEvent.setup();
+        const onRowSelect = jest.fn();
+        renderWithProviders(
+          <DocumentsTable
+            documents={[buildDoc({ id: 'doc-9' })]}
+            onRowSelect={onRowSelect}
+          />,
+        );
+
+        await user.click(dataCell(header));
+
+        expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+      },
+    );
+
+    it('indica que la fila es seleccionable con el cursor de mano', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
+      );
+
+      expect(dataRow()).toHaveClass('cursor-pointer');
+    });
+
+    /** El nombre del documento es un botón real para que la fila se alcance con Tab. */
+    it('permite abrir el documento con el teclado', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9' })]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      // El primer Tab cae en el botón de ordenar del encabezado Documento; el segundo, en la fila.
+      await user.tab();
+      await user.tab();
+      expect(
+        screen.getByRole('button', { name: 'contrato.pdf' }),
+      ).toHaveFocus();
+
+      await user.keyboard('{Enter}');
+      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+    });
+
+    it('no hace la fila seleccionable si la vista no ofrece la navegación', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(dataRow()).not.toHaveClass('cursor-pointer');
+      expect(
+        screen.queryByRole('button', { name: 'contrato.pdf' }),
+      ).not.toBeInTheDocument();
+
+      // Sin `onRowSelect` la fila es texto: el clic no rompe nada ni navega a ningún lado.
+      await user.click(within(dataRow()).getByText('contrato.pdf'));
+    });
+
+    it('descargar desde el menú no dispara la navegación de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /descargar/i }),
+      );
+
+      expect(downloadMutate).toHaveBeenCalledWith('doc-1');
+      expect(onRowSelect).not.toHaveBeenCalled();
+    });
+
+    it('compartir desde el menú no dispara la navegación de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /compartir/i }),
+      );
+
+      expect(
+        await screen.findByLabelText(/enlace público del documento/i),
+      ).toBeInTheDocument();
+      expect(onRowSelect).not.toHaveBeenCalled();
+    });
+
+    it('ver participantes desde el menú no dispara la navegación de la fila', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={onRowSelect} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
+      );
+
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(onRowSelect).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Historia "Mostrar tipo de firma en las tablas de documentos". El valor lo resuelve el backend
+   * a partir de los firmantes del documento; acá solo se traduce a la etiqueta de la columna.
+   */
+  describe('columna Tipo de firma', () => {
+    it('muestra "Simple" para un documento de firma simple', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ signatureType: SignatureType.Simple })]}
+        />,
+      );
+
+      expect(dataCell('Tipo de firma')).toHaveTextContent('Simple');
+    });
+
+    it('muestra "E.Firma" para un documento de firma avanzada', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ signatureType: SignatureType.Fiel })]}
+        />,
+      );
+
+      expect(dataCell('Tipo de firma')).toHaveTextContent('E.Firma');
+    });
+
+    // Documentos creados antes de que se registrara el tipo de firma: la fila se sigue viendo
+    // completa, con un guion en vez de un tipo inventado.
+    it('muestra un guion cuando el documento no tiene tipo de firma registrado', () => {
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ signatureType: null })]} />,
+      );
+
+      expect(dataCell('Tipo de firma')).toHaveTextContent('—');
+    });
+
+    // Criterio "la nueva columna no afecta la visualización, filtros ni acciones existentes".
+    it('no altera el resto de las columnas de la fila', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ signatureType: SignatureType.Fiel })]}
+        />,
+      );
+
+      const [row] = screen.getAllByRole('row').slice(1);
+      expect(within(row).getByText('contrato.pdf')).toBeInTheDocument();
+      expect(within(row).getByText('Creador Uno')).toBeInTheDocument();
+      expect(within(row).getByText('Firmado por todos')).toBeInTheDocument();
+      expect(
+        within(row).getByRole('button', { name: /acciones del documento/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Consultar participantes desde las acciones del documento": la tabla solo abre el
+   * modal con el documento de la fila; lo que se muestra dentro se prueba en
+   * DocumentParticipantsDialog.spec.
+   */
+  describe('ver participantes', () => {
+    it('abre el modal de participantes del documento de esa fila', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc({ id: 'doc-9' })]} />,
+      );
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /ver participantes/i }),
+      );
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Participantes')).toBeInTheDocument();
+      expect(within(dialog).getByText('Juan Pérez')).toBeInTheDocument();
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        'doc-9',
+        expect.objectContaining({ enabled: true }),
+      );
+    });
+
+    /** Cerrado no consulta: el detalle solo se pide cuando alguien abre el modal. */
+    it('no consulta el detalle mientras el modal está cerrado', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(mockedUseDocumentDetail).toHaveBeenCalledWith(
+        '',
+        expect.objectContaining({ enabled: false }),
+      );
+    });
+  });
+
+  describe('compartir', () => {
+    it('genera el enlace a la vista pública del documento y lo copia al portapapeles', async () => {
+      // `userEvent.setup()` instala su propio stub de `navigator.clipboard`, así que la copia se
+      // verifica leyendo de vuelta ese portapapeles en vez de espiar `writeText`.
+      const user = userEvent.setup();
+      const expectedUrl = `${window.location.origin}/public/documents/doc-1`;
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const menu = await openRowMenu(user);
+      await user.click(
+        within(menu).getByRole('menuitem', { name: /compartir/i }),
+      );
+
+      const link = await screen.findByLabelText(
+        /enlace público del documento/i,
+      );
+      expect(link).toHaveValue(expectedUrl);
+
+      await user.click(screen.getByRole('button', { name: /copiar enlace/i }));
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: /enlace copiado/i }),
+        ).toBeInTheDocument(),
+      );
+      expect(await navigator.clipboard.readText()).toBe(expectedUrl);
+    });
+  });
+
+  describe('índice', () => {
+    function indexCells(): string[] {
+      const headers = screen.getAllByRole('columnheader');
+      const column = headers.indexOf(
+        screen.getByRole('columnheader', { name: 'Índice' }),
+      );
+      return screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[column].textContent!);
+    }
+
+    it('cada fila muestra su consecutivo desde 1 en la primera página', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1' }),
+            buildDoc({ id: 'doc-2' }),
+            buildDoc({ id: 'doc-3' }),
+          ]}
+        />,
+      );
+
+      expect(indexCells()).toEqual(['1', '2', '3']);
+    });
+
+    it('el consecutivo continúa entre páginas', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-11' }), buildDoc({ id: 'doc-12' })]}
+          page={2}
+          totalPages={3}
+          pageSize={10}
+        />,
+      );
+
+      expect(indexCells()).toEqual(['11', '12']);
+    });
+
+    it('documentRowIndex no baja de 1 aunque llegue una página inválida', () => {
+      expect(documentRowIndex(0, 10, 0)).toBe(1);
+      expect(documentRowIndex(3, 25, 4)).toBe(55);
+    });
+  });
+
+  describe('ordenamiento por nombre', () => {
+    const docs = [
+      buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
+      buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
+      buildDoc({ id: 'doc-3', fileName: 'Bitácora.pdf' }),
+    ];
+
+    /** Nombres de la columna Documento, en el orden en que se ven las filas. */
+    function documentNames(): string[] {
+      return screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[1].textContent!.trim());
+    }
+
+    function documentHeader(): HTMLElement {
+      return screen.getByRole('columnheader', { name: 'Documento' });
+    }
+
+    it('la columna Documento tiene un botón para ordenar', () => {
+      renderWithProviders(<DocumentsTable documents={docs} />);
+
+      expect(
+        within(documentHeader()).getByRole('button', { name: 'Documento' }),
+      ).toBeInTheDocument();
+    });
+
+    it('arranca desactivado: respeta el orden del backend', () => {
+      renderWithProviders(<DocumentsTable documents={docs} />);
+
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'none');
+      expect(documentNames()).toEqual([
+        'contrato.pdf',
+        'anexo.pdf',
+        'Bitácora.pdf',
+      ]);
+    });
+
+    it('la primera activación ordena ascendente y la segunda descendente', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsTable documents={docs} />);
+      const button = within(documentHeader()).getByRole('button', {
+        name: 'Documento',
+      });
+
+      await user.click(button);
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'ascending');
+      expect(documentNames()).toEqual([
+        'anexo.pdf',
+        'Bitácora.pdf',
+        'contrato.pdf',
+      ]);
+
+      await user.click(button);
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'descending');
+      expect(documentNames()).toEqual([
+        'contrato.pdf',
+        'Bitácora.pdf',
+        'anexo.pdf',
+      ]);
+
+      await user.click(button);
+      expect(documentHeader()).toHaveAttribute('aria-sort', 'ascending');
+    });
+
+    it('sólo reordena lo cargado: no pide páginas, no abre filas ni modifica la lista recibida', async () => {
+      const user = userEvent.setup();
+      const onPageChange = jest.fn();
+      const onRowSelect = jest.fn();
+      const received = [...docs];
+      renderWithProviders(
+        <DocumentsTable
+          documents={received}
+          page={1}
+          totalPages={3}
+          pageSize={10}
+          onPageChange={onPageChange}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      await user.click(
+        within(documentHeader()).getByRole('button', { name: 'Documento' }),
+      );
+
+      expect(onPageChange).not.toHaveBeenCalled();
+      expect(onRowSelect).not.toHaveBeenCalled();
+      expect(received.map((doc) => doc.id)).toEqual([
+        'doc-1',
+        'doc-2',
+        'doc-3',
+      ]);
+    });
+
+    it('el índice sigue siendo consecutivo con las filas ordenadas', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable
+          documents={docs}
+          page={2}
+          pageSize={10}
+          totalPages={2}
+        />,
+      );
+
+      await user.click(
+        within(documentHeader()).getByRole('button', { name: 'Documento' }),
+      );
+
+      expect(
+        screen
+          .getAllByRole('row')
+          .slice(1)
+          .map((row) => within(row).getAllByRole('cell')[0].textContent),
+      ).toEqual(['11', '12', '13']);
+    });
+  });
+
+  describe('visualizar documento', () => {
+    it('cada fila tiene una acción "Ver documento" con el nombre de su archivo', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
+            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
+          ]}
+          onRowSelect={jest.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
+      ).toBeInTheDocument();
+    });
+
+    it('abre el documento de esa fila una sola vez (la fila no lo vuelve a abrir)', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
+            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
+          ]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
+      );
+
+      expect(onRowSelect).toHaveBeenCalledTimes(1);
+      expect(onRowSelect).toHaveBeenCalledWith('doc-2');
+    });
+
+    it('se puede activar con el teclado', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc({ id: 'doc-9' })]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      screen
+        .getByRole('button', { name: 'Ver documento contrato.pdf' })
+        .focus();
+      await user.keyboard('{Enter}');
+
+      expect(onRowSelect).toHaveBeenCalledTimes(1);
+      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
+    });
+
+    it('muestra el tooltip "Ver documento" al pasar el cursor', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
+      );
+
+      await user.hover(
+        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
+      );
+
+      expect(await screen.findByText('Ver documento')).toBeInTheDocument();
+    });
+
+    it('no se ofrece si la vista no tiene a dónde abrir el documento', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(
+        screen.queryByRole('button', { name: /ver documento/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+});

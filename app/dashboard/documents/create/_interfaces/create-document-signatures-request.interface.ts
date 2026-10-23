@@ -1,0 +1,145 @@
+import type {
+  CollaboratorFormValues,
+  DocumentSignatureType,
+} from '../_schemas';
+
+/**
+ * Contratos de SOLICITUD de `POST /api/v1/documents/signatures`. Se mantienen separados de los
+ * valores del formulario (`_schemas`) a propósito: el formulario habla de "colaboradores con
+ * firmas colocadas por arrastre", el backend habla de multipart con JSON serializado y un
+ * `orderIndex` calculado — reutilizar una sola interfaz para ambos obligaba a que un cambio de UI
+ * arrastrara al backend y viceversa. La traducción entre ambos mundos vive en `_mappers/`.
+ */
+
+/**
+ * Espejo de `documentData.signatureType` con el vocabulario del dominio del backend (FIEL en vez
+ * de ADVANCED). Ya no admite `MIX`: desde la historia "Selección de tipo de firma al crear
+ * documentos" el tipo es uno solo por documento, así que "firmas distintas" no es un estado
+ * alcanzable. El backend rechaza el payload si este campo contradice a `documentData.signatureType`.
+ */
+export type RequiresDifferentSignatures = 'SIMPLE' | 'FIEL' | 'BIOMETRIC';
+
+/** Forma exacta que espera el backend por cada ubicación de firma (ver SignaturePositionDto). */
+export interface SignaturePositionPayload {
+  signatureId: string;
+  page: number;
+  xRatio: number;
+  yRatio: number;
+  widthRatio: number;
+  heightRatio: number;
+}
+
+/** Lo que comparten los dos orígenes de colaborador en el payload. */
+interface CollaboratorPayloadBase {
+  collaboratorType: 'SIGNER' | 'WITNESS';
+  signatures?: SignaturePositionPayload[];
+  requiresTwoFactorAuth?: boolean;
+  /**
+   * Posición final tras el reordenamiento manual (ver historia "Habilitar ordenamiento Drag and
+   * Drop para firmantes requeridos") — refleja el índice del colaborador dentro del arreglo ya
+   * reordenado (0-based); DocumentSignaturesService lo usa para calcular signingOrder.
+   */
+  orderIndex: number;
+}
+
+/**
+ * Colaborador elegido del Directorio con usuario vinculado: sólo viaja `linkedUserId`. Nombre,
+ * apellido y correo los resuelve el backend desde ese usuario, y `addToDirectory` no aplica.
+ */
+export interface DirectoryCollaboratorPayload extends CollaboratorPayloadBase {
+  source: 'DIRECTORY';
+  linkedUserId: string;
+}
+
+/**
+ * Colaborador capturado a mano (o elegido del Directorio sin usuario vinculado): viajan sus datos
+ * completos y si debe quedar en el Directorio. `taxId` solo viaja para WITNESS — a los firmantes
+ * ya no se les pide en ningún flujo.
+ */
+export interface ManualCollaboratorPayload extends CollaboratorPayloadBase {
+  source: 'MANUAL';
+  firstName: string;
+  lastName: string;
+  email: string;
+  addToDirectory: boolean;
+  taxId?: string | null;
+}
+
+/**
+ * Forma exacta que espera el backend por cada colaborador (campo `collaborators`), diferenciada
+ * por `source` (historia "Enviar colaboradores desde Directorio mediante usuario vinculado al
+ * crear un documento"). Sin `signatureType`: lo define el documento entero
+ * (`DocumentDataPayload.signatureType`).
+ */
+export type CollaboratorPayload =
+  DirectoryCollaboratorPayload | ManualCollaboratorPayload;
+
+/** Campo `documentData` del multipart (serializado como JSON dentro de un campo de texto). */
+export interface DocumentDataPayload {
+  fileName: string;
+  requiresApproval: boolean;
+  /**
+   * Usuario que aprobará el documento (historia "Implementar flujo de aprobación previo al proceso
+   * de firma"). Es el `users.id` del aprobador, no el id de su membresía.
+   *
+   * El backend lo exige cuando `requiresApproval` es `true` y **lo rechaza** cuando es `false`, así
+   * que se omite en vez de mandarlo en `null`: mandar aprobador diciendo que no hace falta
+   * aprobación es la contradicción que ese contrato rechaza a propósito.
+   */
+  reviewerUserId?: string;
+  /** Espejo de `requiresOrder` del formulario, con el nombre que usa el backend. */
+  isSequential: boolean;
+  /** Tipo de firma exigido a TODOS los firmantes del documento — única fuente de verdad del flujo. */
+  signatureType: DocumentSignatureType;
+  /**
+   * Si el documento entra a Búsqueda Inteligente (ver `SmartSearchCard`).
+   *
+   * Se manda siempre, aunque el backend lo trate como opcional y asigne `true` cuando falta: acá
+   * SIEMPRE hay un valor —la casilla arranca marcada y el usuario puede dejarla como está— y
+   * omitirlo haría que el documento se indexara por el default del backend y no por lo que se vio
+   * en pantalla, que es justo la ambigüedad que ese default existe para resolver en los clientes
+   * que no ofrecen la opción.
+   */
+  isIndexable: boolean;
+}
+
+/**
+ * Recibe el porcentaje (0–100) del documento ya subido al servidor. Llegar a 100 no significa que
+ * el envío terminó: el servidor todavía procesa y guarda el archivo antes de responder.
+ */
+export type UploadProgressCallback = (percent: number) => void;
+
+/** Solicitud completa que arma `createDocumentSignaturesRequest` (un solo multipart). */
+export interface CreateDocumentSignaturesRequest {
+  file: File;
+  documentData: DocumentDataPayload;
+  collaborators: CollaboratorPayload[];
+  requiresDifferentSignatures: RequiresDifferentSignatures;
+  onUploadProgress?: UploadProgressCallback;
+}
+
+/**
+ * Entrada de la mutación (`useCreateDocumentSignatures`), en términos del formulario: es el punto
+ * en el que la pantalla entrega lo que capturó el usuario y delega la traducción al payload del
+ * backend. Distinta de `CreateDocumentSignaturesRequest` justamente porque todavía no pasó por
+ * los mappers.
+ */
+export interface CreateDocumentSignaturesInput {
+  file: File;
+  fileName: string;
+  requiresApproval: boolean;
+  /** Aprobador elegido, o `null` cuando el documento no requiere aprobación. */
+  reviewerUserId: string | null;
+  requiresOrder: boolean;
+  signatureType: DocumentSignatureType;
+  requiresTwoFactorAuth: boolean;
+  collaborators: CollaboratorFormValues[];
+  /**
+   * Sale del formulario como cualquier otro campo (ver `SmartSearchCard`), desde que la card con
+   * la casilla reemplazó al modal que se interponía al enviar. Se sigue listando aparte aquí
+   * porque esta entrada refleja el contrato de la mutación, no la forma del formulario.
+   */
+  isIndexable: boolean;
+  /** Avance de la subida del archivo (ver `UploadProgressCallback`). */
+  onUploadProgress?: UploadProgressCallback;
+}

@@ -1,0 +1,49 @@
+name: Continuous Deployment Development
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  deploy:
+    name: Build Image & Push to Docker Hub
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Debug - verificar secret de compilación
+        run: |
+          if [ -z "${{ secrets.BACKEND_URL_BUILD }}" ]; then
+            echo "BACKEND_URL_BUILD está vacío o no existe como secret"
+          else
+            echo "BACKEND_URL_BUILD tiene un valor definido"
+          fi
+          
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          no-cache: false
+          build-args: |
+            BACKEND_URL_BUILD=${{ secrets.BACKEND_URL_BUILD }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ secrets.NEXT_PUBLIC_SENTRY_ENVIRONMENT }}
+          tags: |
+            dataloplatforms/signature-app:latest
+            dataloplatforms/signature-app:${{ github.sha }}
+      - name: Disparar despliegue en Dokploy
+        run: |
+            echo "Enviando solicitud de despliegue a Dokploy..."
+            RESPONSE=$(curl -s -X POST "https://dokploy.data-lo.online/api/deploy/compose/nhI-aPDgdpE_h_OzCnzV-")
+            echo "Respuesta del servidor: $RESPONSE"
+            echo "¡Despliegue solicitado con éxito!"

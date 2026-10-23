@@ -1,0 +1,94 @@
+'use client';
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import { createDocumentSignaturesRequest } from '../_requests';
+import { getUploadErrorMessage } from '../_upload-errors';
+import {
+  toRequiresDifferentSignatures,
+  toCollaboratorPayloads,
+} from '../_mappers/collaborator-payload.mapper';
+import type { CreateDocumentSignaturesInput } from '../_interfaces/create-document-signatures-request.interface';
+
+export const CREATE_DOCUMENT_ERROR_MESSAGE =
+  'Ocurrió un error al enviar el documento a firma. Intenta de nuevo.';
+
+/**
+ * Escenario 4 de la historia: tras un envío exitoso, `mutate` invalida `documents` (la tabla
+ * se refresca sola por el refetch de React Query) — la limpieza del formulario y del widget de
+ * carga la maneja el caller en `onSuccess` (ver `useCreateDocumentForm`), porque solo él tiene
+ * la instancia del formulario y el estado del archivo.
+ *
+ * La traducción de los valores del formulario al payload del backend vive en `_mappers/`: aquí
+ * solo se orquesta la mutación y sus efectos (aviso de error, invalidación de caché).
+ *
+ * La confirmación de éxito NO se emite aquí: dejó de ser un toast y pasó a ser un AlertDialog que
+ * el usuario tiene que reconocer (ver `DocumentSentDialog`), porque incluye información que debe
+ * poder leer con calma —el aviso por correo y dónde seguir el estado— y un toast se desvanece
+ * solo. Lo abre la pantalla desde `onSubmitted`, que es quien puede renderizarlo.
+ */
+export function useCreateDocumentSignatures() {
+  const queryClient = useQueryClient();
+  const activeAccountId = useAuthStore((state) => state.activeAccount?.id);
+
+  return useMutation({
+    mutationFn: async ({
+      file,
+      fileName,
+      requiresApproval,
+      reviewerUserId,
+      requiresOrder,
+      signatureType,
+      requiresTwoFactorAuth,
+      collaborators,
+      isIndexable,
+      onUploadProgress,
+    }: CreateDocumentSignaturesInput) =>
+      createDocumentSignaturesRequest({
+        file,
+        onUploadProgress,
+        documentData: {
+          fileName,
+          requiresApproval,
+          /**
+           * Se omite cuando no hay aprobación, en vez de mandarlo en `null`: el backend rechaza el
+           * payload que trae aprobador diciendo a la vez que no requiere aprobación.
+           */
+          ...(requiresApproval && reviewerUserId ? { reviewerUserId } : {}),
+          isSequential: requiresOrder,
+          signatureType,
+          isIndexable,
+        },
+        collaborators: toCollaboratorPayloads(
+          collaborators,
+          signatureType,
+          requiresTwoFactorAuth,
+        ),
+        requiresDifferentSignatures:
+          toRequiresDifferentSignatures(signatureType),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      /**
+       * Crear un documento GASTA un crédito en el servidor (ver `ConsumeDocumentCreditUseCase`),
+       * así que el saldo que anuncia la barra superior (`DocumentsAvailability`) queda viejo en
+       * cuanto el envío sale bien: sin esto seguiría diciendo el número anterior hasta la
+       * siguiente recarga o cambio de cuenta.
+       *
+       * Se invalida la llave de ESA cuenta —la cuenta forma parte de la llave— para no tirar lo
+       * consultado en la otra: quien tiene cuenta personal y organización no debe perder el
+       * estado de una por trabajar en la otra.
+       */
+      queryClient.invalidateQueries({
+        queryKey: billingAccessQueryKey(activeAccountId),
+        exact: true,
+      });
+    },
+    onError: (error) => {
+      // El documento y la configuración siguen en pantalla: el mismo botón de envío reintenta.
+      toast.error(getUploadErrorMessage(error, CREATE_DOCUMENT_ERROR_MESSAGE));
+    },
+  });
+}

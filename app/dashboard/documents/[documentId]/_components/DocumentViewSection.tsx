@@ -1,0 +1,421 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import toast from 'react-hot-toast';
+import {
+  useGeolocation,
+  type GeolocationCoords,
+} from '@/lib/hooks/useGeolocation';
+import { GEOLOCATION_ERROR_MESSAGES } from '@/lib/hooks/geolocation-error-messages';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import { isSigningCredentialConfigured } from '@/lib/store/auth.slice';
+import { SignatureType } from '@/lib/enums/document';
+import { useDocumentDetail } from '../_hooks/useDocumentDetail';
+import { toDocumentLoadErrorKind } from '../_errors';
+import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
+import { useSignDocument } from '../_hooks/useSignDocument';
+import { useRejectDocument } from '../_hooks/useRejectDocument';
+import { useRequestCancellation } from '../_hooks/useRequestCancellation';
+import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
+import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
+import { useVerifyCode } from '../_hooks/useVerifyCode';
+import { useShareDocumentLink } from '../_hooks/useShareDocumentLink';
+import {
+  useBiometricSignature,
+  useStartBiometricSignature,
+} from '../_hooks/useBiometricSignature';
+import { useBiometricIdentityCheck } from '../_hooks/useBiometricIdentityCheck';
+import {
+  rejectDocumentSchema,
+  type RejectDocumentFormValues,
+} from '../_schemas';
+import type { SignDocumentResponseData } from '../_requests';
+import { DOCUMENTS_SECTIONS } from '../../_config/sections';
+import DocumentView from './DocumentView';
+import type { AdvancedSignatureSubmitValues } from './AdvancedSignatureDialog';
+
+interface DocumentViewSectionProps {
+  documentId: string;
+}
+
+/**
+ * Sección del detalle de un documento: aquí viven la obtención de datos, las variables, los
+ * estados locales y toda la lógica de interacción (firmar, rechazar, cancelar, compartir).
+ *
+ * No dibuja nada por su cuenta: se lo entrega a `DocumentView`, que solo compone la pantalla con
+ * los datos y callbacks que recibe.
+ */
+export default function DocumentViewSection({
+  documentId,
+}: DocumentViewSectionProps) {
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showCancellationDialog, setShowCancellationDialog] = useState(false);
+  const [showConfirmCancellationDialog, setShowConfirmCancellationDialog] =
+    useState(false);
+  const [verificationCodeInput, setVerificationCodeInput] = useState('');
+  const [codeRequested, setCodeRequested] = useState(false);
+  // `null` mientras no se ha pedido ningún código; `false` cuando el backend lo emitió pero no
+  // pudo mandar el correo (ver useRequestVerificationCode) — ahí se avisa de forma persistente,
+  // porque un toast se va y el usuario se quedaría esperando un correo que no va a llegar.
+  const [codeEmailDelivered, setCodeEmailDelivered] = useState<boolean | null>(
+    null,
+  );
+  const [showSignatureRequiredDialog, setShowSignatureRequiredDialog] =
+    useState(false);
+  // Motivo por el que la ubicación no pudo obtenerse. Se muestra de forma persistente (no solo
+  // como toast) porque ahora bloquea la firma: el usuario necesita ver qué corregir para poder
+  // reintentar.
+  const [geoBlockedReason, setGeoBlockedReason] = useState<string | null>(null);
+  // Ubicación ya obtenida para una firma FIEL, capturada antes de abrir el diálogo de e.firma.
+  const [advancedSignatureCoords, setAdvancedSignatureCoords] =
+    useState<GeolocationCoords | null>(null);
+  const [showAdvancedSignatureDialog, setShowAdvancedSignatureDialog] =
+    useState(false);
+  /**
+   * Desenlace de la firma que acaba de registrarse, o `null` mientras no se haya firmado en esta
+   * visita. Guarda `documentCompleted` en vez de mirar el detalle recargado porque ese llega
+   * después —y por otra petición—: el acuse tiene que poder dibujarse en el instante en que la
+   * firma queda registrada, no cuando el detalle se ponga al día.
+   */
+  const [signatureOutcome, setSignatureOutcome] =
+    useState<SignDocumentResponseData | null>(null);
+
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  /**
+   * `isPending` y no `isLoading`: la consulta espera a que se hidrate la cuenta activa, y en ese
+   * rato está deshabilitada — `isLoading` sería `false` y la vista, sin documento ni error, caería
+   * en "No se pudo cargar".
+   */
+  const {
+    data: document,
+    isPending: isDocumentPending,
+    error: documentError,
+  } = useDocumentDetail(documentId);
+  const {
+    data: fileUrl,
+    isLoading: isFileUrlLoading,
+    isError: isFileUrlError,
+    isFetching: isFileUrlFetching,
+    isStale: isFileUrlStale,
+    refetch: refetchFileUrl,
+  } = useDocumentFileUrl(documentId);
+  /**
+   * La URL en caché ya no sirve (entró en el margen de vencimiento o una mutación la invalidó) y
+   * está llegando la nueva. Mientras tanto el visor espera en vez de empezar a descargar el PDF
+   * con la vieja: la bajaría dos veces, o —si ya venció— mostraría un error que se arregla solo.
+   */
+  const isFileUrlRenewing = isFileUrlStale && isFileUrlFetching;
+  const signMutation = useSignDocument(documentId);
+  const { status: geoStatus, requestLocation } = useGeolocation();
+  const rejectMutation = useRejectDocument(documentId);
+  const requestCancellationMutation = useRequestCancellation(documentId);
+  const confirmCancellationMutation = useConfirmCancellation(documentId);
+  const requestVerificationCodeMutation =
+    useRequestVerificationCode(documentId);
+  const verifyCodeMutation = useVerifyCode(documentId);
+  const shareLink = useShareDocumentLink(documentId);
+  const queryClient = useQueryClient();
+
+  /**
+   * Firmante con firma BIOMETRIC que todavía puede firmar: sólo a él se le muestra "Firmar con
+   * biometría" y sólo para él se consulta el estado de Didit.
+   */
+  const isBiometricSigner =
+    document?.mySignatureType === SignatureType.BIOMETRIC &&
+    Boolean(document?.canSign);
+  const biometricSignature = useBiometricSignature(documentId, {
+    enabled: isBiometricSigner,
+  });
+  const startBiometricSignature = useStartBiometricSignature(documentId);
+  const checkBiometricIdentity = useBiometricIdentityCheck();
+  /**
+   * El firmante intentó la firma biométrica sin identidad verificada. Se avisa con el
+   * `ErrorAlert` del panel, no con un toast: el aviso tiene que quedarse a la vista con el camino
+   * para resolverlo, porque reintentar no sirve hasta validar la identidad.
+   */
+  const [biometricIdentityRequired, setBiometricIdentityRequired] =
+    useState(false);
+  const [isCheckingBiometricIdentity, setIsCheckingBiometricIdentity] =
+    useState(false);
+  /** Intento cuyo acuse ya se mostró: el sondeo puede traer la misma firma más de una vez. */
+  const acknowledgedBiometricAttemptRef = useRef<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RejectDocumentFormValues>({
+    resolver: zodResolver(rejectDocumentSchema),
+  });
+
+  function onReject(values: RejectDocumentFormValues) {
+    rejectMutation.mutate(values.reason);
+  }
+
+  /**
+   * La ubicación es obligatoria para firmar: si no se puede obtener (permiso rechazado, no
+   * disponible, timeout o navegador sin soporte) el proceso se detiene aquí y no se manda nada
+   * al backend — que de todos modos responde 400 sin ella. Antes se firmaba igual y se
+   * registraba la firma sin ubicación; el requisito cambió.
+   *
+   * Devuelve las coordenadas o null, dejando el mensaje de error visible para que el usuario
+   * sepa qué corregir y pueda reintentar.
+   */
+  async function resolveRequiredLocation(): Promise<GeolocationCoords | null> {
+    const { coords, error } = await requestLocation();
+    if (error || !coords) {
+      const reason = error
+        ? GEOLOCATION_ERROR_MESSAGES[error]
+        : 'no se pudo determinar tu ubicación';
+      setGeoBlockedReason(reason);
+      toast.error(`No se puede firmar sin tu ubicación: ${reason}.`);
+      return null;
+    }
+    setGeoBlockedReason(null);
+    return coords;
+  }
+
+  async function handleSignClick() {
+    // También para FIEL se pide la ubicación ANTES de abrir el diálogo de e.firma: así el
+    // usuario no captura contraseña ni archivos para toparse con el bloqueo al final.
+    const coords = await resolveRequiredLocation();
+    if (!coords) return;
+
+    if (document?.mySignatureType === SignatureType.Fiel) {
+      setAdvancedSignatureCoords(coords);
+      setShowAdvancedSignatureDialog(true);
+      return;
+    }
+
+    signMutation.mutate(
+      { geolocation: coords },
+      { onSuccess: showSignatureReceipt },
+    );
+  }
+
+  /**
+   * Abre el acuse de la firma. La pantalla NO navega todavía: hasta que el firmante cierre el
+   * modal sigue viendo el documento que acaba de firmar, que es el contexto en el que la
+   * confirmación significa algo.
+   */
+  function showSignatureReceipt(data: SignDocumentResponseData) {
+    setSignatureOutcome(data);
+  }
+
+  /**
+   * Cerrar el acuse retoma lo que la pantalla hacía antes de que existiera: volver al listado de
+   * documentos. El documento recién firmado ya no espera nada de este usuario, así que dejarlo en
+   * el detalle sería dejarlo mirando una pantalla sin ninguna acción disponible.
+   */
+  function handleSignatureReceiptClose() {
+    setSignatureOutcome(null);
+    router.push(DOCUMENTS_SECTIONS.list.href);
+  }
+
+  /**
+   * Firma biométrica. Antes que nada se comprueba la identidad: sin ella el backend no abre la
+   * sesión, así que no tiene caso pedir la ubicación. Luego la ubicación se pide ANTES de abrir la
+   * sesión de Didit, igual que en las otras firmas, para que el firmante no haga la prueba de vida
+   * y se tope al final con el bloqueo.
+   *
+   * La comprobación se repite en cada intento: en cuanto la identidad queda validada, el siguiente
+   * clic quita el aviso y sigue con la firma normalmente.
+   */
+  async function handleStartBiometricSignature() {
+    setIsCheckingBiometricIdentity(true);
+    const identityVerified = await checkBiometricIdentity();
+    setIsCheckingBiometricIdentity(false);
+    setBiometricIdentityRequired(!identityVerified);
+    if (!identityVerified) return;
+
+    const coords = await resolveRequiredLocation();
+    if (!coords) return;
+
+    startBiometricSignature.mutate(coords);
+  }
+
+  function handleAdvancedSignatureSubmit(
+    values: AdvancedSignatureSubmitValues,
+  ) {
+    if (!advancedSignatureCoords) return;
+
+    signMutation.mutate(
+      { geolocation: advancedSignatureCoords, advancedSignature: values },
+      {
+        onSuccess: (data) => {
+          // El diálogo de e.firma se cierra antes de abrir el acuse: son dos modales, y
+          // apilarlos dejaría la confirmación detrás del formulario que acaba de enviarse.
+          setShowAdvancedSignatureDialog(false);
+          setAdvancedSignatureCoords(null);
+          showSignatureReceipt(data);
+        },
+      },
+    );
+  }
+
+  function handleRequestVerificationCode() {
+    requestVerificationCodeMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        setCodeRequested(true);
+        setCodeEmailDelivered(data?.emailDelivered ?? true);
+      },
+    });
+  }
+
+  /**
+   * La condición es la misma que aplica el backend al firmar: `signingCredentialStatus` en
+   * CONFIGURED. Antes se miraba `signatureConfigured`, derivada de tener `signatureId`, que
+   * decía otra cosa — un usuario con la rúbrica subida pero con la identidad rechazada pasaba
+   * este control y se topaba con el rechazo recién al enviar la firma.
+   *
+   * Bug corregido: mientras el store todavía no hidrata el perfil (`user` undefined), esta
+   * condición daba `true` y abría el modal "Firma no configurada" —bloqueando la pantalla
+   * completa— a usuarios que sí tenían su firma lista; se veía como un modal fantasma que
+   * aparecía y desaparecía según lo que tardara `/api/v1/auth/me`. "Todavía no sé" se trata distinto
+   * de "sé que falta": sin perfil no se afirma nada.
+   */
+  const needsSimpleSignatureSetup =
+    document?.mySignatureType === SignatureType.Simple &&
+    user != null &&
+    !isSigningCredentialConfigured(user.signingCredentialStatus);
+
+  /**
+   * La firma biométrica se registra en el backend al llegar el webhook de Didit, no en respuesta a
+   * un clic: el sondeo es quien se entera. En ese momento se hace lo mismo que al terminar
+   * `useSignDocument` —refrescar el detalle, la URL del archivo y los listados— y se abre el mismo
+   * acuse de firma.
+   */
+  const biometricSession = biometricSignature.data;
+  useEffect(() => {
+    if (!biometricSession?.signatureCompleted) return;
+    if (
+      acknowledgedBiometricAttemptRef.current === biometricSession.attemptId
+    ) {
+      return;
+    }
+
+    acknowledgedBiometricAttemptRef.current = biometricSession.attemptId;
+    setSignatureOutcome({
+      id: documentId,
+      documentCompleted: biometricSession.documentCompleted,
+    });
+    queryClient.invalidateQueries({ queryKey: ['documentDetail', documentId] });
+    queryClient.invalidateQueries({
+      queryKey: ['documentFileUrl', documentId],
+    });
+    queryClient.invalidateQueries({ queryKey: ['documents'] });
+  }, [biometricSession, documentId, queryClient]);
+
+  // Alcance: solo firma simple. Bloquea también la lectura del documento (no solo
+  // los botones de firma) porque el usuario puede llegar por URL directa (ej.
+  // /documents/:id) sin haber pasado antes por una pantalla que ya lo avisara.
+  useEffect(() => {
+    if (needsSimpleSignatureSetup) {
+      setShowSignatureRequiredDialog(true);
+    }
+  }, [needsSimpleSignatureSetup]);
+
+  return (
+    <DocumentView
+      isLoading={isDocumentPending}
+      loadError={documentError ? toDocumentLoadErrorKind(documentError) : null}
+      document={document ?? null}
+      file={{
+        url: isFileUrlRenewing ? null : (fileUrl?.secureUrl ?? null),
+        isLoading: isFileUrlLoading || isFileUrlRenewing,
+        isError: isFileUrlError,
+        isRetrying: isFileUrlFetching,
+        onRetry: () => void refetchFileUrl(),
+      }}
+      needsSimpleSignatureSetup={needsSimpleSignatureSetup}
+      signing={{
+        geoBlockedReason,
+        isRequestingLocation: geoStatus === 'requesting',
+        isSigning: signMutation.isPending,
+        onSign: handleSignClick,
+      }}
+      biometric={
+        isBiometricSigner
+          ? {
+              session: biometricSession ?? null,
+              isLoading: biometricSignature.isLoading,
+              geoBlockedReason,
+              isRequestingLocation: geoStatus === 'requesting',
+              isStarting:
+                isCheckingBiometricIdentity ||
+                startBiometricSignature.isPending,
+              onStart: () => void handleStartBiometricSignature(),
+              verificationScope: 'identity',
+            }
+          : undefined
+      }
+      biometricIdentityRequired={isBiometricSigner && biometricIdentityRequired}
+      verification={{
+        codeRequested,
+        codeEmailDelivered,
+        codeInput: verificationCodeInput,
+        isRequestingCode: requestVerificationCodeMutation.isPending,
+        isVerifyingCode: verifyCodeMutation.isPending,
+        onCodeInputChange: setVerificationCodeInput,
+        onRequestCode: handleRequestVerificationCode,
+        onVerifyCode: () =>
+          verifyCodeMutation.mutate(verificationCodeInput, {
+            onSuccess: () => setVerificationCodeInput(''),
+          }),
+      }}
+      reject={{
+        isFormOpen: showRejectForm,
+        reasonField: register('reason'),
+        errorMessage: errors.reason?.message,
+        isRejecting: rejectMutation.isPending,
+        onOpenForm: () => setShowRejectForm(true),
+        onCancelForm: () => setShowRejectForm(false),
+        onSubmit: handleSubmit(onReject),
+      }}
+      share={{
+        status: shareLink.status,
+        publicUrl: shareLink.publicUrl,
+        onShare: () => void shareLink.share(),
+        onDismissFallback: shareLink.dismissFallback,
+      }}
+      cancellation={{
+        isRequestDialogOpen: showCancellationDialog,
+        isConfirmDialogOpen: showConfirmCancellationDialog,
+        isRequesting: requestCancellationMutation.isPending,
+        isConfirming: confirmCancellationMutation.isPending,
+        onOpenRequestDialog: setShowCancellationDialog,
+        onOpenConfirmDialog: setShowConfirmCancellationDialog,
+        onRequest: () =>
+          requestCancellationMutation.mutate(undefined, {
+            onSuccess: () => setShowCancellationDialog(false),
+          }),
+        onConfirm: () =>
+          confirmCancellationMutation.mutate(undefined, {
+            onSuccess: () => setShowConfirmCancellationDialog(false),
+          }),
+      }}
+      signatureRequiredDialog={{
+        open: showSignatureRequiredDialog,
+        onOpenChange: setShowSignatureRequiredDialog,
+      }}
+      advancedSignatureDialog={{
+        open: showAdvancedSignatureDialog,
+        onOpenChange: setShowAdvancedSignatureDialog,
+        onSubmit: handleAdvancedSignatureSubmit,
+        isConfirming: signMutation.isPending,
+      }}
+      signatureSuccessDialog={{
+        open: signatureOutcome !== null,
+        // Sólo se lee con el modal abierto; el `?? false` es para el instante en que se cierra y
+        // el estado vuelve a null mientras el diálogo todavía anima su salida.
+        documentCompleted: signatureOutcome?.documentCompleted ?? false,
+        onClose: handleSignatureReceiptClose,
+      }}
+    />
+  );
+}

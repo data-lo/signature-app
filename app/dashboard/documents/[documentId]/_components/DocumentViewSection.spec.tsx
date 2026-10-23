@@ -1,0 +1,1591 @@
+import userEvent from '@testing-library/user-event';
+import { AxiosError, type AxiosResponse } from 'axios';
+import toast from 'react-hot-toast';
+import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
+import DocumentViewSection from './DocumentViewSection';
+import { SigningCredentialStatus } from '@/lib/enums/identity';
+import { useDocumentDetail } from '../_hooks/useDocumentDetail';
+import { useDocumentFileUrl } from '../../_hooks/useDocumentFileUrl';
+import { useSignDocument } from '../_hooks/useSignDocument';
+import { useRejectDocument } from '../_hooks/useRejectDocument';
+import { useRequestCancellation } from '../_hooks/useRequestCancellation';
+import { useConfirmCancellation } from '../_hooks/useConfirmCancellation';
+import { useRequestVerificationCode } from '../_hooks/useRequestVerificationCode';
+import { useVerifyCode } from '../_hooks/useVerifyCode';
+import {
+  useBiometricSignature,
+  useStartBiometricSignature,
+} from '../_hooks/useBiometricSignature';
+import { useBiometricIdentityCheck } from '../_hooks/useBiometricIdentityCheck';
+import { useAuthStore } from '@/lib/store/useAuthStore';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import type { AuthUser } from '@/lib/store/types/auth-store.types';
+import type { BiometricSignatureSession, DocumentDetail } from '../_requests';
+import {
+  BiometricSignatureStatus,
+  DocumentStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  SignatureType,
+} from '@/lib/enums/document';
+
+/**
+ * La pantalla navega a "Por firmar" al cerrar el acuse de la firma (ver
+ * `handleSignatureReceiptClose`), así que necesita un router. `push` se inspecciona en las
+ * pruebas del modal.
+ */
+const push = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+}));
+
+jest.mock('../_hooks/useDocumentDetail');
+jest.mock('../../_hooks/useDocumentFileUrl');
+jest.mock('../_hooks/useSignDocument');
+jest.mock('../_hooks/useRejectDocument');
+jest.mock('../_hooks/useRequestCancellation');
+jest.mock('../_hooks/useConfirmCancellation');
+jest.mock('../_hooks/useRequestVerificationCode');
+jest.mock('../_hooks/useVerifyCode');
+jest.mock('../_hooks/useBiometricSignature');
+jest.mock('../_hooks/useBiometricIdentityCheck');
+jest.mock('../../_components/PdfPreview', () => ({
+  __esModule: true,
+  default: ({ file }: { file: string }) => <div>PDF preview: {file}</div>,
+}));
+jest.mock('./EfirmaFilePicker', () => ({
+  __esModule: true,
+  default: ({
+    extension,
+    onFileSelected,
+  }: {
+    extension: string;
+    fileLabel: string;
+    onFileSelected: (file: File | null) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onFileSelected(
+          new File(['contenido'], `archivo.${extension}`, {
+            type: 'application/octet-stream',
+          }),
+        )
+      }
+    >
+      {`Seleccionar archivo .${extension} de prueba`}
+    </button>
+  ),
+}));
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: Object.assign(jest.fn(), { success: jest.fn(), error: jest.fn() }),
+}));
+// El copiado real (Clipboard API y su respaldo con execCommand) se prueba en lib/clipboard.spec.ts;
+// aquí solo interesa cómo reacciona la sección según haya copiado o no.
+jest.mock('@/lib/clipboard');
+
+const mockedCopyTextToClipboard = copyTextToClipboard as jest.Mock;
+const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
+const mockedUseDocumentFileUrl = useDocumentFileUrl as jest.Mock;
+const mockedUseSignDocument = useSignDocument as jest.Mock;
+const mockedUseRejectDocument = useRejectDocument as jest.Mock;
+const mockedUseRequestCancellation = useRequestCancellation as jest.Mock;
+const mockedUseConfirmCancellation = useConfirmCancellation as jest.Mock;
+const mockedUseRequestVerificationCode =
+  useRequestVerificationCode as jest.Mock;
+const mockedUseVerifyCode = useVerifyCode as jest.Mock;
+const mockedUseBiometricSignature = useBiometricSignature as jest.Mock;
+const mockedUseStartBiometricSignature =
+  useStartBiometricSignature as jest.Mock;
+const mockedUseBiometricIdentityCheck = useBiometricIdentityCheck as jest.Mock;
+const mockedToast = toast as unknown as jest.Mock & {
+  error: jest.Mock;
+  success: jest.Mock;
+};
+
+function baseDocument(overrides: Partial<DocumentDetail> = {}): DocumentDetail {
+  return {
+    id: 'doc-1',
+    fileName: 'contrato.pdf',
+    fileType: 'application/pdf',
+    totalPages: 1,
+    status: DocumentStatus.PendingSignature,
+    creator: 'Creador Uno',
+    // Distinto del secureUrl que devuelve el mock de useDocumentFileUrl a propósito: algunas
+    // pruebas verifican que el visor use el del endpoint dedicado, no este (ver bug corregido).
+    secureUrl: 'https://minio/stale-detail-url',
+    expiresIn: 3600,
+    participants: [],
+    myRole: ParticipantRole.Signer,
+    myStatus: ParticipantStatus.Pending,
+    mySignatureType: null,
+    canSign: false,
+    canReject: false,
+    canRequestCancellation: false,
+    canConfirmCancellation: false,
+    requiresVerification: false,
+    verificationConfirmed: false,
+    ...overrides,
+  };
+}
+
+function buildUser(overrides: Partial<AuthUser> = {}): AuthUser {
+  return {
+    id: 'user-1',
+    email: 'juan@empresa.com',
+    identificationNumber: 'PELJ850101HDFRNN08',
+    name: 'Juan',
+    lastName: 'Pérez',
+    signingCredentialStatus:
+      SigningCredentialStatus.IdentityVerificationRequired,
+    personalConfigured: false,
+    ...overrides,
+  };
+}
+
+const DEFAULT_COORDS = {
+  latitude: 19.4326,
+  longitude: -99.1332,
+  accuracy: 15,
+};
+
+function mockGeolocationSuccess(coords = DEFAULT_COORDS) {
+  Object.defineProperty(global.navigator, 'geolocation', {
+    configurable: true,
+    value: {
+      getCurrentPosition: jest.fn((success: PositionCallback) =>
+        success({ coords } as GeolocationPosition),
+      ),
+    },
+  });
+}
+
+function mockGeolocationError(code: 1 | 2 | 3) {
+  Object.defineProperty(global.navigator, 'geolocation', {
+    configurable: true,
+    value: {
+      getCurrentPosition: jest.fn(
+        (_success: PositionCallback, error: PositionErrorCallback) =>
+          error({
+            code,
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          } as GeolocationPositionError),
+      ),
+    },
+  });
+}
+
+function mockGeolocationUnsupported() {
+  Object.defineProperty(global.navigator, 'geolocation', {
+    configurable: true,
+    value: undefined,
+  });
+}
+
+describe('DocumentViewSection', () => {
+  const signMutate = jest.fn();
+  const rejectMutate = jest.fn();
+  const requestCancellationMutate = jest.fn();
+  const confirmCancellationMutate = jest.fn();
+
+  beforeEach(() => {
+    push.mockReset();
+    signMutate.mockReset();
+    rejectMutate.mockReset();
+    requestCancellationMutate.mockReset();
+    confirmCancellationMutate.mockReset();
+    mockedToast.mockClear();
+    mockedToast.error.mockClear();
+    mockedToast.success.mockClear();
+    mockedCopyTextToClipboard.mockReset().mockResolvedValue(true);
+    mockGeolocationSuccess();
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus: SigningCredentialStatus.Configured,
+      }),
+    });
+
+    mockedUseSignDocument.mockReturnValue({
+      mutate: signMutate,
+      isPending: false,
+    });
+    mockedUseRejectDocument.mockReturnValue({
+      mutate: rejectMutate,
+      isPending: false,
+    });
+    mockedUseRequestCancellation.mockReturnValue({
+      mutate: requestCancellationMutate,
+      isPending: false,
+    });
+    mockedUseConfirmCancellation.mockReturnValue({
+      mutate: confirmCancellationMutate,
+      isPending: false,
+    });
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseVerifyCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseBiometricSignature.mockReturnValue({
+      data: null,
+      isLoading: false,
+    });
+    mockedUseStartBiometricSignature.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseDocumentFileUrl.mockReturnValue({
+      data: {
+        fileId: 'obj-1',
+        secureUrl: 'https://minio/file',
+        expiresIn: 86400,
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: jest.fn(),
+    });
+  });
+
+  it('muestra el botón de firmar cuando es el turno del usuario', async () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+
+    await waitFor(() => expect(signMutate).toHaveBeenCalled());
+  });
+
+  it('muestra un aviso explicando por qué se solicita la ubicación antes de firmar', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(screen.getByText(/solicitaremos tu ubicación/i)).toBeInTheDocument();
+  });
+
+  it('al confirmar la firma, solicita la geolocalización y la envía junto con la firma', async () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+
+    await waitFor(() =>
+      expect(signMutate).toHaveBeenCalledWith(
+        { geolocation: DEFAULT_COORDS },
+        // El segundo argumento es el `onSuccess` que abre el acuse de la firma.
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      ),
+    );
+    expect(mockedToast).not.toHaveBeenCalled();
+  });
+
+  /**
+   * La ubicación pasó de opcional a OBLIGATORIA: antes, cualquiera de estos fallos dejaba firmar
+   * igual y solo avisaba que la firma iba sin ubicación. Ahora corta el proceso — no se llama a
+   * la mutación — y explica el motivo de forma persistente para poder reintentar.
+   */
+  it.each([
+    [
+      'el usuario rechaza el permiso',
+      () => mockGeolocationError(1),
+      /no diste permiso de ubicación/i,
+    ],
+    [
+      'la ubicación no está disponible',
+      () => mockGeolocationError(2),
+      /no se pudo determinar tu ubicación/i,
+    ],
+    [
+      'se agota el tiempo de espera',
+      () => mockGeolocationError(3),
+      /se agotó el tiempo de espera/i,
+    ],
+    [
+      'el navegador no soporta geolocalización',
+      mockGeolocationUnsupported,
+      /tu navegador no permite compartir ubicación/i,
+    ],
+  ])(
+    'si %s: NO firma y explica por qué está bloqueado',
+    async (_caso, mockGeo, expectedReason) => {
+      mockGeo();
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ canSign: true, canReject: true }),
+        isLoading: false,
+        isError: false,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      await waitFor(() =>
+        expect(mockedToast.error).toHaveBeenCalledWith(
+          expect.stringMatching(expectedReason),
+        ),
+      );
+      expect(signMutate).not.toHaveBeenCalled();
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(expectedReason);
+      expect(
+        screen.getByRole('button', { name: /reintentar con ubicación/i }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it('no reutiliza una posición cacheada: cada intento de firma pide una lectura fresca', async () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    );
+    await waitFor(() => expect(signMutate).toHaveBeenCalledTimes(1));
+
+    expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      expect.objectContaining({ maximumAge: 0 }),
+    );
+  });
+
+  it('bug corregido: si el documento requiere verificación y aún no se confirma, oculta "Continuar a firmar" y muestra el flujo de código en su lugar', async () => {
+    const requestCodeMutate = jest.fn((_vars, opts) =>
+      opts?.onSuccess?.({ emailDelivered: true }),
+    );
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: requestCodeMutate,
+      isPending: false,
+    });
+    const verifyCodeMutate = jest.fn();
+    mockedUseVerifyCode.mockReturnValue({
+      mutate: verifyCodeMutate,
+      isPending: false,
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.queryByRole('button', { name: /continuar a firmar/i }),
+    ).not.toBeInTheDocument();
+
+    // Los textos de la tarjeta los define producto (ver historia "Actualizar la tarjeta OTP en
+    // Documentos por firmar"): se fijan aquí para que un refactor no los revierta en silencio.
+    expect(
+      screen.getByText('Autoriza tu firma con código de validación'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Te enviaremos un código para validar tu firma'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /validar mi firma/i }));
+    expect(requestCodeMutate).toHaveBeenCalled();
+
+    await user.type(
+      screen.getByPlaceholderText(/código de verificación/i),
+      '123456',
+    );
+    await user.click(screen.getByRole('button', { name: /verificar código/i }));
+
+    expect(verifyCodeMutate).toHaveBeenCalledWith('123456', expect.anything());
+  });
+
+  it('bug corregido: si el correo del código no se pudo enviar, la pantalla igual avanza al campo del código y avisa que no llegó (antes el 500 dejaba al firmante encerrado)', async () => {
+    const requestCodeMutate = jest.fn((_vars, opts) =>
+      opts?.onSuccess?.({ emailDelivered: false }),
+    );
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: requestCodeMutate,
+      isPending: false,
+    });
+    mockedUseVerifyCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    await user.click(screen.getByRole('button', { name: /validar mi firma/i }));
+
+    expect(
+      screen.getByPlaceholderText(/código de verificación/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no pudimos enviarte el correo/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /reenviar código/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('bug corregido: mientras el perfil no ha hidratado, NO se abre el modal "Firma no configurada" (antes bloqueaba la pantalla a quien sí la tenía lista)', () => {
+    useAuthStore.setState({ user: null });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.queryByRole('dialog', { name: /firma no configurada/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('bug corregido: con la verificación pendiente, el firmante todavía puede rechazar (rechazar es negarse a firmar, no firmar)', async () => {
+    mockedUseRequestVerificationCode.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    // Firmar sigue bloqueado hasta validar el código...
+    expect(
+      screen.queryByRole('button', { name: /continuar a firmar/i }),
+    ).not.toBeInTheDocument();
+
+    // ...pero rechazar está disponible y abre el formulario de motivo.
+    await user.click(
+      screen.getByRole('button', { name: /rechazar documento/i }),
+    );
+
+    expect(
+      screen.getByPlaceholderText(/explica detalladamente por qué rechazas/i),
+    ).toBeInTheDocument();
+  });
+
+  it('sin permiso para rechazar (canReject:false) no se ofrece la acción', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: false,
+        requiresVerification: false,
+        verificationConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.queryByRole('button', { name: /rechazar documento/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('muestra "Continuar a firmar" directamente cuando la verificación ya fue confirmada', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        requiresVerification: true,
+        verificationConfirmed: true,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.getByRole('button', { name: /continuar a firmar/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('permite rechazar con un motivo', async () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /rechazar documento/i }),
+    );
+    await user.type(
+      screen.getByPlaceholderText(/explica detalladamente/i),
+      'El documento tiene un error',
+    );
+    await user.click(screen.getByRole('button', { name: /^rechazar$/i }));
+
+    expect(rejectMutate).toHaveBeenCalledWith('El documento tiene un error');
+  });
+
+  it('bug corregido: si el documento requiere firma simple y el usuario no la tiene configurada, deshabilita/atenúa la firma y muestra la leyenda explicativa', () => {
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.getByText(
+        /para firmar documentos con tu firma digital simple, esta debe estar configurada/i,
+      ),
+    ).toBeInTheDocument();
+
+    const signButton = screen.getByRole('button', {
+      name: /continuar a firmar/i,
+      hidden: true,
+    });
+    const wrapper = signButton.parentElement?.parentElement;
+    expect(wrapper).toHaveAttribute('inert');
+    expect(wrapper).toHaveAttribute('aria-disabled', 'true');
+    expect(wrapper?.className).toContain('opacity-50');
+    expect(wrapper?.className).toContain('pointer-events-none');
+  });
+
+  /**
+   * Rechazar no produce ninguna firma, así que no exige la credencial: el backend dejó de
+   * pedirla para `PATCH /document/:id/reject`. Cuando sí la exigía, un firmante sin identidad
+   * validada no podía firmar —correcto— pero tampoco declinar, y el documento se quedaba
+   * esperando para siempre una respuesta que esa persona no podía dar.
+   */
+  it('sin credencial configurada, rechazar sigue disponible', async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    // Se cierra el diálogo de "Firma no configurada" para llegar a la pantalla.
+    await user.keyboard('{Escape}');
+
+    const reject = screen.getByRole('button', {
+      name: /rechazar documento/i,
+    });
+
+    expect(reject.closest('[inert]')).toBeNull();
+
+    await user.click(reject);
+
+    expect(
+      screen.getByPlaceholderText(/explica detalladamente por qué rechazas/i),
+    ).toBeInTheDocument();
+  });
+
+  it('bug corregido: sin firma configurada, la leyenda incluye un acceso HABILITADO para configurarla — al cerrar el modal la pantalla quedaba sin ninguna acción posible', async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    // Se cierra el diálogo, que es justo lo que dejaba al firmante encerrado.
+    await user.keyboard('{Escape}');
+
+    const configure = screen.getByRole('button', {
+      name: /configurar mi firma/i,
+    });
+    expect(configure).toHaveAttribute(
+      'href',
+      '/dashboard/personal-documents/identity',
+    );
+    // Fuera del bloque inerte: es la única acción con la que el firmante puede avanzar.
+    expect(configure.closest('[inert]')).toBeNull();
+  });
+
+  it('bug corregido: al acceder por ruta directa sin firma simple configurada, bloquea el documento con un overlay y despliega un modal de alerta', () => {
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.getAllByText(
+        /tu firma no ha sido configurada\. por favor confígurala para continuar/i,
+      ).length,
+    ).toBeGreaterThan(0);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /configurar firma/i }),
+    ).toHaveAttribute('href', '/dashboard/personal-documents/identity');
+  });
+
+  it('no bloquea el documento ni abre el modal de firma cuando el documento no requiere firma simple', () => {
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus:
+          SigningCredentialStatus.IdentityVerificationRequired,
+      }),
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Fiel,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/tu firma no ha sido configurada/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('no muestra la leyenda de firma simple cuando el usuario ya la tiene configurada', () => {
+    useAuthStore.setState({
+      user: buildUser({
+        signingCredentialStatus: SigningCredentialStatus.Configured,
+      }),
+    });
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: true,
+        canReject: true,
+        mySignatureType: SignatureType.Simple,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.queryByText(/esta debe estar configurada/i),
+    ).not.toBeInTheDocument();
+    const signButton = screen.getByRole('button', {
+      name: /continuar a firmar/i,
+    });
+    expect(signButton.parentElement?.parentElement).not.toHaveAttribute(
+      'inert',
+    );
+  });
+
+  it('muestra un mensaje cuando no es el turno del usuario', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        canSign: false,
+        canReject: false,
+        myStatus: ParticipantStatus.Pending,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.getByText(/aún no es tu turno para firmar este documento/i),
+    ).toBeInTheDocument();
+  });
+
+  it('no muestra "Solicitar cancelación" aunque el backend lo permita', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        status: DocumentStatus.Signed,
+        myRole: ParticipantRole.Creator,
+        myStatus: null,
+        canRequestCancellation: true,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.queryByRole('button', { name: /solicitar cancelación/i }),
+    ).not.toBeInTheDocument();
+    expect(requestCancellationMutate).not.toHaveBeenCalled();
+  });
+
+  it('permite a un firmante confirmar la cancelación pendiente', async () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({
+        status: DocumentStatus.CancellationPending,
+        canConfirmCancellation: true,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    await user.click(
+      screen.getByRole('button', { name: /confirmar cancelación/i }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', { name: /confirmar cancelación/i }),
+    );
+
+    expect(confirmCancellationMutate).toHaveBeenCalled();
+  });
+
+  it('bug corregido: pide el secureUrl del archivo por separado del detalle del documento y muestra un loader propio mientras llega', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    mockedUseDocumentFileUrl.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: true,
+      refetch: jest.fn(),
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(screen.getByText(/cargando documento/i)).toBeInTheDocument();
+    expect(screen.queryByText(/pdf preview/i)).not.toBeInTheDocument();
+  });
+
+  it('bug corregido: si falla la obtención del secureUrl del archivo, ofrece un botón para reintentar en vez de quedarse sin explicación', async () => {
+    const refetchFileUrl = jest.fn();
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    mockedUseDocumentFileUrl.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      isFetching: false,
+      refetch: refetchFileUrl,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.getByText(/no se pudo cargar el archivo del documento/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/pdf preview/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /reintentar/i }));
+    expect(refetchFileUrl).toHaveBeenCalled();
+  });
+
+  it('bug corregido: renderiza el PDF con el secureUrl obtenido del endpoint dedicado, no con el del detalle del documento', () => {
+    mockedUseDocumentDetail.mockReturnValue({
+      data: baseDocument({ canSign: true, canReject: true }),
+      isLoading: false,
+      isError: false,
+    });
+    renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+    expect(
+      screen.getByText('PDF preview: https://minio/file'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/stale-detail-url/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Historia "Mostrar confirmación al firmar un documento": firmar era la acción más consecuente
+   * del producto y su único acuse era un toast que se desvanecía mientras la pantalla ya estaba
+   * navegando a otra sección. Ahora la confirmación espera a que la lean, y dice cosas distintas
+   * según si esta firma cerró el documento o todavía faltan participantes.
+   */
+  describe('confirmación tras firmar', () => {
+    // Las secciones se unificaron: el destino es el listado único, con su recorte en `?view=`.
+    const COMPLETED_VIEW = '/dashboard/documents?view=completed';
+    const DOCUMENTS_LIST = '/dashboard/documents';
+
+    /** Hace que `signMutate` se comporte como una firma exitosa con el desenlace indicado. */
+    function resolveSignatureWith(documentCompleted: boolean) {
+      signMutate.mockImplementation(
+        (
+          _payload: unknown,
+          options?: { onSuccess?: (data: unknown) => void },
+        ) => options?.onSuccess?.({ id: 'doc-1', documentCompleted }),
+      );
+    }
+
+    async function sign(documentCompleted: boolean) {
+      resolveSignatureWith(documentCompleted);
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ canSign: true, canReject: true }),
+        isLoading: false,
+        isError: false,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      return { user, dialog: await screen.findByRole('dialog') };
+    }
+
+    it('con participantes pendientes: confirma la firma y anuncia el aviso posterior', async () => {
+      const { dialog } = await sign(false);
+
+      expect(
+        within(dialog).getByText(/este documento ha sido firmado por ti/i),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          /te notificaremos cuando el documento se haya completado/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          /podrás consultarlo en la sección de documentos completados cuando todas las firmas hayan sido registradas/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * El punto de tener dos textos: con firmas pendientes el documento NO está en Completados
+     * todavía, y mandar ahí al firmante a buscarlo sería mandarlo a una lista vacía.
+     */
+    it('con participantes pendientes: NO afirma que el documento ya esté en completados', async () => {
+      const { dialog } = await sign(false);
+
+      expect(
+        within(dialog).queryByText(
+          /^puedes consultarlo en la sección de documentos completados\.$/i,
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/firmado y completado correctamente/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('cuando esta firma completa el documento: lo confirma y lo da por disponible en completados', async () => {
+      const { dialog } = await sign(true);
+
+      expect(
+        within(dialog).getByText(
+          /este documento ha sido firmado y completado correctamente/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          /puedes consultarlo en la sección de documentos completados/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/te notificaremos/i),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * Regresión de la historia: antes se navegaba dentro del `onSuccess` de la mutación, así que
+     * la vista se desmontaba en el mismo instante en que la firma quedaba registrada y no había
+     * dónde dibujar la confirmación.
+     */
+    it('no navega antes de mostrar la confirmación', async () => {
+      await sign(false);
+
+      expect(push).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('button', { name: /^cerrar$/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('al cerrar, sigue con el comportamiento normal de la pantalla y vuelve al listado', async () => {
+      const { user, dialog } = await sign(false);
+
+      await user.click(
+        within(dialog).getByRole('button', { name: /^cerrar$/i }),
+      );
+
+      expect(push).toHaveBeenCalledWith(DOCUMENTS_LIST);
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      );
+    });
+
+    it('ofrece ir al listado con el recorte de completados ya aplicado', async () => {
+      const { dialog } = await sign(true);
+
+      // Es un enlace real (`<a href>`) con apariencia y rol de botón, igual que el resto de las
+      // acciones de navegación del producto: así conserva abrir en otra pestaña y copiar destino.
+      const action = within(dialog).getByRole('button', {
+        name: /ver documentos completados/i,
+      });
+      expect(action.tagName).toBe('A');
+      expect(action).toHaveAttribute('href', COMPLETED_VIEW);
+    });
+
+    it('si la firma falla, no muestra ninguna confirmación', async () => {
+      signMutate.mockImplementation(
+        (_payload: unknown, options?: { onError?: (error: Error) => void }) =>
+          options?.onError?.(new Error('500')),
+      );
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ canSign: true, canReject: true }),
+        isLoading: false,
+        isError: false,
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      await waitFor(() => expect(signMutate).toHaveBeenCalled());
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('firma electrónica avanzada (FIEL)', () => {
+    function renderFielDocument() {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({
+          canSign: true,
+          canReject: true,
+          mySignatureType: SignatureType.Fiel,
+        }),
+        isLoading: false,
+        isError: false,
+      });
+      return renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+    }
+
+    it('al hacer clic en "Continuar a firmar" abre el diálogo de e.firma en vez de firmar directamente', async () => {
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      expect(
+        await screen.findByText(/firma electrónica avanzada \(e\.firma\)/i),
+      ).toBeInTheDocument();
+      expect(signMutate).not.toHaveBeenCalled();
+    });
+
+    it('sin ubicación no abre siquiera el diálogo de e.firma: el bloqueo ocurre antes de pedir contraseña y archivos', async () => {
+      mockGeolocationError(1);
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+
+      await waitFor(() => expect(mockedToast.error).toHaveBeenCalled());
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(signMutate).not.toHaveBeenCalled();
+    });
+
+    it('al completar y enviar el formulario de e.firma, llama a signMutate con la contraseña y los archivos', async () => {
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+      const dialog = await screen.findByRole('dialog');
+
+      await user.click(
+        within(dialog).getByRole('button', {
+          name: /seleccionar archivo \.key/i,
+        }),
+      );
+      await user.click(
+        within(dialog).getByRole('button', {
+          name: /seleccionar archivo \.cer/i,
+        }),
+      );
+      await user.type(
+        within(dialog).getByLabelText(/contraseña de la llave privada/i),
+        'MiContraseña123',
+      );
+      await user.click(
+        within(dialog).getByRole('button', { name: /firmar documento/i }),
+      );
+
+      // La firma FIEL también manda la ubicación (obligatoria): antes el payload era una unión
+      // excluyente y la firma avanzada viajaba SIN geolocalización.
+      expect(signMutate).toHaveBeenCalledWith(
+        {
+          geolocation: DEFAULT_COORDS,
+          advancedSignature: {
+            password: 'MiContraseña123',
+            keyFile: expect.any(File),
+            cerFile: expect.any(File),
+          },
+        },
+        expect.anything(),
+      );
+    });
+
+    /**
+     * Dos modales para una sola acción: el formulario de e.firma tiene que irse antes de que
+     * llegue el acuse, o la confirmación quedaría detrás del formulario que acaba de enviarse.
+     */
+    it('al firmar con e.firma, cierra el formulario y muestra la confirmación de la firma', async () => {
+      signMutate.mockImplementation(
+        (
+          _payload: unknown,
+          options?: { onSuccess?: (data: unknown) => void },
+        ) => options?.onSuccess?.({ id: 'doc-1', documentCompleted: true }),
+      );
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+      const efirmaDialog = await screen.findByRole('dialog');
+      await user.click(
+        within(efirmaDialog).getByRole('button', {
+          name: /seleccionar archivo \.key/i,
+        }),
+      );
+      await user.click(
+        within(efirmaDialog).getByRole('button', {
+          name: /seleccionar archivo \.cer/i,
+        }),
+      );
+      await user.type(
+        within(efirmaDialog).getByLabelText(/contraseña de la llave privada/i),
+        'MiContraseña123',
+      );
+      await user.click(
+        within(efirmaDialog).getByRole('button', { name: /firmar documento/i }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            /este documento ha sido firmado y completado correctamente/i,
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByLabelText(/contraseña de la llave privada/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('cancelar el diálogo de e.firma lo cierra sin firmar', async () => {
+      const user = userEvent.setup();
+      renderFielDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /continuar a firmar/i }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      await user.click(
+        within(dialog).getByRole('button', { name: /cancelar/i }),
+      );
+
+      expect(
+        screen.queryByText(/firma electrónica avanzada \(e\.firma\)/i),
+      ).not.toBeInTheDocument();
+      expect(signMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('compartir el enlace público', () => {
+    const PUBLIC_URL = `${window.location.origin}/public/documents/doc-1`;
+
+    function renderSignedDocument() {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({ status: DocumentStatus.Signed }),
+        isLoading: false,
+        isError: false,
+      });
+      return renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+    }
+
+    it('genera la URL de la vista pública del documento y la copia al portapapeles', async () => {
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      await waitFor(() =>
+        expect(mockedCopyTextToClipboard).toHaveBeenCalledWith(PUBLIC_URL),
+      );
+    });
+
+    it('la URL apunta al visor público y no a la ruta autenticada del documento', async () => {
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      await waitFor(() => expect(mockedCopyTextToClipboard).toHaveBeenCalled());
+      const [copiedUrl] = mockedCopyTextToClipboard.mock.calls[0];
+      expect(copiedUrl).toContain('/public/documents/doc-1');
+      expect(copiedUrl).not.toContain('/dashboard');
+    });
+
+    it('avisa al usuario que el enlace se copió correctamente', async () => {
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      await waitFor(() =>
+        expect(mockedToast.success).toHaveBeenCalledWith('Enlace copiado'),
+      );
+      expect(
+        await screen.findByRole('button', { name: /enlace copiado/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('si la copia automática falla, ofrece el enlace para copiarlo manualmente', async () => {
+      mockedCopyTextToClipboard.mockResolvedValue(false);
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+
+      const field = await screen.findByLabelText(
+        /enlace público del documento/i,
+      );
+      expect(field).toHaveValue(PUBLIC_URL);
+      expect(mockedToast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/cópialo manualmente/i),
+      );
+    });
+
+    it('tras un fallo, reintentar la copia vuelve a intentarlo y confirma si esta vez sí copió', async () => {
+      mockedCopyTextToClipboard.mockResolvedValueOnce(false);
+      const user = userEvent.setup();
+      renderSignedDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      );
+      await screen.findByRole('button', { name: /reintentar copia/i });
+
+      mockedCopyTextToClipboard.mockResolvedValue(true);
+      await user.click(
+        screen.getByRole('button', { name: /reintentar copia/i }),
+      );
+
+      expect(
+        await screen.findByRole('button', { name: /enlace copiado/i }),
+      ).toBeInTheDocument();
+      // El respaldo manual desaparece al lograrse la copia: ya no hay nada que copiar a mano.
+      expect(
+        screen.queryByLabelText(/enlace público del documento/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('la acción está disponible aunque el documento siga pendiente de firma', () => {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({
+          status: DocumentStatus.PendingSignature,
+          canSign: true,
+        }),
+        isLoading: false,
+        isError: false,
+      });
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByRole('button', { name: /compartir enlace/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Historia "Corregir acceso y carga de documentos de todas las organizaciones para usuarios con
+   * permiso de lectura": quien no tiene acceso ve por qué, no un "Intenta de nuevo más tarde".
+   */
+  describe('cuando el detalle no se puede cargar', () => {
+    function httpError(status: number) {
+      return new AxiosError(
+        'Request failed',
+        'ERR_BAD_REQUEST',
+        undefined,
+        undefined,
+        { status, data: {} } as AxiosResponse,
+      );
+    }
+
+    function detailFailsWith(error: unknown) {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isLoading: false,
+        isError: true,
+        error,
+      });
+    }
+
+    it('con 403 muestra un mensaje de permisos en vez del error genérico', () => {
+      detailFailsWith(httpError(403));
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByText(/no tienes permiso para ver este documento/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/intenta de nuevo más tarde/i),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/cargando documento/i)).not.toBeInTheDocument();
+    });
+
+    it('con 404 dice que el documento no existe', () => {
+      detailFailsWith(httpError(404));
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByText(/el documento no existe o fue eliminado/i),
+      ).toBeInTheDocument();
+    });
+
+    it('con un fallo del servidor conserva el mensaje de reintentar más tarde', () => {
+      detailFailsWith(httpError(500));
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.getByText(/no se pudo cargar el documento/i),
+      ).toBeInTheDocument();
+    });
+
+    it('mientras la consulta está pendiente muestra el cargando, no un error', () => {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: undefined,
+        isPending: true,
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(screen.getByText(/cargando documento/i)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/no se pudo cargar el documento/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('firma biométrica', () => {
+    const startMutate = jest.fn();
+    /** Comprobación de identidad previa a Didit; por omisión, identidad verificada. */
+    const checkIdentity = jest.fn();
+
+    function biometricSession(
+      overrides: Partial<BiometricSignatureSession> = {},
+    ): BiometricSignatureSession {
+      return {
+        attemptId: 'attempt-1',
+        status: BiometricSignatureStatus.Pending,
+        url: 'https://verify.didit.me/session/abc',
+        expiresAt: null,
+        reused: false,
+        signatureCompleted: false,
+        documentCompleted: false,
+        ...overrides,
+      };
+    }
+
+    function renderBiometricSigner(session: BiometricSignatureSession | null) {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({
+          canSign: true,
+          canReject: true,
+          mySignatureType: SignatureType.BIOMETRIC,
+        }),
+        isLoading: false,
+        isError: false,
+      });
+      mockedUseBiometricSignature.mockReturnValue({
+        data: session,
+        isLoading: false,
+      });
+      return renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+    }
+
+    beforeEach(() => {
+      startMutate.mockReset();
+      mockedUseStartBiometricSignature.mockReturnValue({
+        mutate: startMutate,
+        isPending: false,
+      });
+      checkIdentity.mockReset();
+      checkIdentity.mockResolvedValue(true);
+      mockedUseBiometricIdentityCheck.mockReturnValue(checkIdentity);
+    });
+
+    async function tryBiometricSignature(
+      user: ReturnType<typeof userEvent.setup>,
+    ) {
+      await user.click(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      );
+    }
+
+    /**
+     * Historia "Mostrar componente de Error al intentar firma biométrica sin validación de
+     * identidad": el aviso es el `ErrorAlert` de la aplicación, no un toast, y la sesión de Didit
+     * no se abre.
+     */
+    describe('sin identidad verificada', () => {
+      beforeEach(() => checkIdentity.mockResolvedValue(false));
+
+      it('muestra el ErrorAlert que pide validar la identidad, sin toast', async () => {
+        const user = userEvent.setup();
+        renderBiometricSigner(null);
+
+        await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+        await tryBiometricSignature(user);
+
+        const alert = await screen.findByRole('alert');
+        expect(alert).toHaveTextContent('Verifica tu identidad');
+        expect(alert).toHaveTextContent(
+          /primero necesitas validar tu identidad/i,
+        );
+        expect(
+          within(alert).getByRole('link', { name: /verificar mi identidad/i }),
+        ).toHaveAttribute('href', '/dashboard/personal-documents/identity');
+        expect(mockedToast.error).not.toHaveBeenCalled();
+      });
+
+      it('no pide la ubicación ni inicia la sesión de Didit', async () => {
+        const user = userEvent.setup();
+        renderBiometricSigner(null);
+
+        await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+        await tryBiometricSignature(user);
+
+        await screen.findByRole('alert');
+        expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+        expect(startMutate).not.toHaveBeenCalled();
+      });
+
+      it('tras validar la identidad, el siguiente intento quita el aviso y sigue con la firma', async () => {
+        const user = userEvent.setup();
+        renderBiometricSigner(null);
+
+        await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+        await tryBiometricSignature(user);
+        await screen.findByRole('alert');
+
+        checkIdentity.mockResolvedValue(true);
+        await tryBiometricSignature(user);
+
+        await waitFor(() =>
+          expect(startMutate).toHaveBeenCalledWith(DEFAULT_COORDS),
+        );
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      });
+    });
+
+    it('al firmante biométrico le ofrece "Firmar con biometría" en vez de "Continuar a firmar"', () => {
+      renderBiometricSigner(null);
+
+      expect(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /continuar a firmar/i }),
+      ).not.toBeInTheDocument();
+      expect(mockedUseBiometricSignature).toHaveBeenCalledWith('doc-1', {
+        enabled: true,
+      });
+    });
+
+    it('a un firmante de firma simple no le muestra la acción ni consulta Didit', () => {
+      mockedUseDocumentDetail.mockReturnValue({
+        data: baseDocument({
+          canSign: true,
+          mySignatureType: SignatureType.Simple,
+        }),
+        isLoading: false,
+        isError: false,
+      });
+      renderWithProviders(<DocumentViewSection documentId="doc-1" />);
+
+      expect(
+        screen.queryByRole('button', { name: /firmar con biometría/i }),
+      ).not.toBeInTheDocument();
+      expect(mockedUseBiometricSignature).toHaveBeenCalledWith('doc-1', {
+        enabled: false,
+      });
+    });
+
+    it('sin consentimiento explícito no se puede iniciar', () => {
+      renderBiometricSigner(null);
+
+      expect(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      ).toBeDisabled();
+    });
+
+    it('pide la ubicación y con ella inicia la sesión de Didit', async () => {
+      const user = userEvent.setup();
+      renderBiometricSigner(null);
+
+      await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+      await user.click(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      );
+
+      await waitFor(() =>
+        expect(startMutate).toHaveBeenCalledWith(DEFAULT_COORDS),
+      );
+    });
+
+    it('sin ubicación no abre ninguna sesión', async () => {
+      mockGeolocationError(1);
+      const user = userEvent.setup();
+      renderBiometricSigner(null);
+
+      await user.click(screen.getByRole('checkbox', { name: /acepto/i }));
+      await user.click(
+        screen.getByRole('button', { name: /firmar con biometría/i }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /no diste permiso de ubicación/i,
+      );
+      expect(startMutate).not.toHaveBeenCalled();
+    });
+
+    it('con una sesión abierta (p. ej. tras recargar) muestra el QR sin pedir otra', () => {
+      renderBiometricSigner(
+        biometricSession({ status: BiometricSignatureStatus.InProgress }),
+      );
+
+      expect(screen.getByText(/en captura/i)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(/código qr para continuar la verificación/i),
+      ).toBeInTheDocument();
+      expect(startMutate).not.toHaveBeenCalled();
+    });
+
+    it('cuando el backend registra la firma, abre el acuse y vuelve a pedir el detalle', async () => {
+      renderBiometricSigner(
+        biometricSession({
+          status: BiometricSignatureStatus.Approved,
+          url: null,
+          signatureCompleted: true,
+          documentCompleted: true,
+        }),
+      );
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent(/documentos completados/i);
+    });
+  });
+});

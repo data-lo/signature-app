@@ -1,0 +1,44 @@
+import Link from 'next/link';
+import Image from 'next/image';
+import LoginForm from './_components/login-form';
+
+
+interface LoginPageProps {
+  searchParams: Promise<{ registered?: string; reset?: string }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { registered, reset } = await searchParams;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-muted p-4">
+      <div className="flex flex-col gap-6 max-w-md w-full">
+        <Link href="/" className="flex items-center justify-center gap-2">
+          <Image
+            src="/isotipo-firmalo.svg"
+            alt="Firmalo"
+            width={32}
+            height={32}
+            className="size-8"
+          />
+          <span className="text-lg font-semibold tracking-tight text-foreground">
+            Firmalo
+          </span>
+        </Link>
+
+        {registered === '1' && (
+          <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2 text-sm text-center dark:bg-green-950 dark:text-green-300 dark:border-green-900">
+            Cuenta creada correctamente, inicia sesión
+          </div>
+        )}
+
+        {reset === '1' && (
+          <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2 text-sm text-center dark:bg-green-950 dark:text-green-300 dark:border-green-900">
+            Contraseña actualizada correctamente, inicia sesión
+          </div>
+        )}
+        <LoginForm />
+      </div>
+    </div>
+  );
+}
