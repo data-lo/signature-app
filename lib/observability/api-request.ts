@@ -70,11 +70,16 @@ const KNOWN_METHODS = new Set([
 /** Primer elemento del fingerprint de los eventos de API: es como `filterApiErrorEvent` los reconoce. */
 export const API_EVENT_FINGERPRINT = 'api-request';
 
-/** Categorías que se envían como evento: indican un problema del servicio o de la conexión. */
+/**
+ * Categorías que se envían como evento. Los 4xx también se conservan: aunque normalmente los
+ * provoca una solicitud inválida o sin permiso, son necesarios para diagnosticar los errores que
+ * el usuario recibe en el frontend. Se emiten como `warning`, no como error del servidor.
+ */
 const REPORTED_FAILURES: ReadonlySet<FailureCategory> = new Set([
   'server',
   'network',
   'timeout',
+  'client',
 ]);
 
 /**
@@ -409,15 +414,15 @@ export function apiRequestTags(
 
 /**
  * Registra una petición terminada: breadcrumb, span del SDK y, si es un fallo que conviene
- * vigilar (`server`, `network`, `timeout`), un evento.
+ * vigilar (`server`, `network`, `timeout`, `client`), un evento.
  *
  * - **Breadcrumb** `api.request` con sólo el registro. Sustituye al breadcrumb `xhr` del SDK,
  *   que está apagado porque lleva la URL con query (ver `sentry.client.config.ts`).
  * - **Evento** de nivel `error` (servidor) o `warning` (conexión), agrupado por método + ruta +
  *   categoría: un endpoint que falla es UNA incidencia, no una por llamada. Sin el `AxiosError`:
  *   el mensaje y las etiquetas salen del registro.
- * - `client` y `cancelled` sólo se clasifican: un 401, 403, 404 o 422 es una respuesta esperada
- *   que la pantalla maneja, y una cancelación no es un fallo del servicio.
+ * - Los 4xx (`client`) se reportan como `warning`: no son un fallo del servidor, pero sí dejan
+ *   evidencia de una respuesta de error que recibió el usuario. Una cancelación no se reporta.
  *
  * Nunca lanza: la telemetría no puede romper una petición.
  *
@@ -444,7 +449,7 @@ export function reportApiRequest(
       level:
         category === undefined
           ? 'info'
-          : REPORTED_FAILURES.has(category)
+          : category === 'server'
             ? 'error'
             : 'warning',
       data: { ...record },

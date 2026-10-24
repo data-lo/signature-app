@@ -336,8 +336,8 @@ describe('apiClient instrumentado', () => {
     expect(JSON.stringify(event)).not.toMatch(/ana@example|Bearer|6f1c/);
   });
 
-  it.each([401, 403, 404, 422])(
-    'un %d se clasifica pero no se reporta',
+  it.each([400, 401, 403, 404, 422])(
+    'un %d se reporta como advertencia de cliente',
     async (status) => {
       respondWith(async (config) => {
         throw httpError(status, config);
@@ -346,7 +346,24 @@ describe('apiClient instrumentado', () => {
       await expect(apiClient.get('/api/v1/document/6f1c')).rejects.toThrow();
       await Sentry.flush();
 
-      expect(events).toEqual([]);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        message: 'API client: GET /api/v1/document/:id',
+        level: 'warning',
+        fingerprint: [
+          'api-request',
+          'GET',
+          '/api/v1/document/:id',
+          'client',
+        ],
+        tags: {
+          'api.method': 'GET',
+          'api.route': '/api/v1/document/:id',
+          'api.outcome': 'failure',
+          'http.status_class': '4xx',
+          'api.failure_category': 'client',
+        },
+      });
       expect(
         breadcrumbs.find((b) => b.category === 'api.request')?.data,
       ).toMatchObject({ outcome: 'failure', failure_category: 'client' });
@@ -369,7 +386,7 @@ describe('apiClient instrumentado', () => {
     ).toMatchObject({ failure_category: 'cancelled', status_class: 'none' });
   });
 
-  it('el AxiosError que nadie atrapa no sale como excepción no controlada', async () => {
+  it('el AxiosError 4xx que nadie atrapa no se duplica como excepción no controlada', async () => {
     const error = httpError(404);
     recordApiError(error);
 
@@ -378,7 +395,11 @@ describe('apiClient instrumentado', () => {
     });
     await Sentry.flush();
 
-    expect(events).toEqual([]);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      message: 'API client: GET /api/v1/document/:id',
+      fingerprint: ['api-request', 'GET', '/api/v1/document/:id', 'client'],
+    });
   });
 
   it('el evento de API sale sin la página, la URL ni los breadcrumbs de navegación', () => {
