@@ -91,17 +91,22 @@ const REPORTED_FAILURES: ReadonlySet<FailureCategory> = new Set([
  * que podría incluir tokens, cuerpos o datos de usuarios.
  */
 function logApiRequest(record: ApiRequestRecord): void {
+  const attributes: Record<string, unknown> = { ...record };
+
   if (record.failure_category === 'server') {
-    Sentry.logger.error('API request failed', record);
+    Sentry.logger.error('API request failed', attributes);
     return;
   }
 
   if (record.failure_category) {
-    Sentry.logger.warn('API request completed with an error response', record);
+    Sentry.logger.warn(
+      'API request completed with an error response',
+      attributes,
+    );
     return;
   }
 
-  Sentry.logger.info('API request succeeded', record);
+  Sentry.logger.info('API request succeeded', attributes);
 }
 
 /**
@@ -176,7 +181,7 @@ export function normalizeApiRoute(
     .filter(Boolean)
     .map((segment) =>
       STATIC_SEGMENT.test(segment) &&
-      segment.length <= MAX_STATIC_SEGMENT_LENGTH
+        segment.length <= MAX_STATIC_SEGMENT_LENGTH
         ? segment
         : DYNAMIC_SEGMENT,
     );
