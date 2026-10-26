@@ -70,12 +70,44 @@ const KNOWN_METHODS = new Set([
 /** Primer elemento del fingerprint de los eventos de API: es como `filterApiErrorEvent` los reconoce. */
 export const API_EVENT_FINGERPRINT = 'api-request';
 
-/** Categorías que se envían como evento: indican un problema del servicio o de la conexión. */
+/**
+ * Categorías que se envían como evento. Los 4xx también se conservan: aunque normalmente los
+ * provoca una solicitud inválida o sin permiso, son necesarios para diagnosticar los errores que
+ * el usuario recibe en el frontend. Se emiten como `warning`, no como error del servidor.
+ */
 const REPORTED_FAILURES: ReadonlySet<FailureCategory> = new Set([
   'server',
   'network',
   'timeout',
+  'client',
 ]);
+
+/**
+ * Envía el resultado de una petición como log estructurado independiente.
+ *
+ * A diferencia de un breadcrumb, este registro no necesita que ocurra después un error o una
+ * transacción para llegar a GlitchTip. `ApiRequestRecord` ya contiene exclusivamente método,
+ * ruta normalizada, clase de estado, duración y resultado; nunca se pasa la respuesta de Axios,
+ * que podría incluir tokens, cuerpos o datos de usuarios.
+ */
+function logApiRequest(record: ApiRequestRecord): void {
+  const attributes: Record<string, unknown> = { ...record };
+
+  if (record.failure_category === 'server') {
+    Sentry.logger.error('API request failed', attributes);
+    return;
+  }
+
+  if (record.failure_category) {
+    Sentry.logger.warn(
+      'API request completed with an error response',
+      attributes,
+    );
+    return;
+  }
+
+  Sentry.logger.info('API request succeeded', attributes);
+}
 
 /**
  * Une `baseURL` y `url` como lo hace axios (`combineURLs`), sin duplicar barras.
@@ -149,7 +181,7 @@ export function normalizeApiRoute(
     .filter(Boolean)
     .map((segment) =>
       STATIC_SEGMENT.test(segment) &&
-      segment.length <= MAX_STATIC_SEGMENT_LENGTH
+        segment.length <= MAX_STATIC_SEGMENT_LENGTH
         ? segment
         : DYNAMIC_SEGMENT,
     );
@@ -409,15 +441,18 @@ export function apiRequestTags(
 
 /**
  * Registra una petición terminada: breadcrumb, span del SDK y, si es un fallo que conviene
- * vigilar (`server`, `network`, `timeout`), un evento.
+ * vigilar (`server`, `network`, `timeout`, `client`), un evento y un log estructurado.
  *
  * - **Breadcrumb** `api.request` con sólo el registro. Sustituye al breadcrumb `xhr` del SDK,
  *   que está apagado porque lleva la URL con query (ver `sentry.client.config.ts`).
  * - **Evento** de nivel `error` (servidor) o `warning` (conexión), agrupado por método + ruta +
  *   categoría: un endpoint que falla es UNA incidencia, no una por llamada. Sin el `AxiosError`:
  *   el mensaje y las etiquetas salen del registro.
- * - `client` y `cancelled` sólo se clasifican: un 401, 403, 404 o 422 es una respuesta esperada
- *   que la pantalla maneja, y una cancelación no es un fallo del servicio.
+ * - Los 4xx (`client`) se reportan como `warning`: no son un fallo del servidor, pero sí dejan
+ *   evidencia de una respuesta de error que recibió el usuario. Una cancelación no se reporta.
+ * - **Log estructurado**: cada respuesta (incluidos 2xx y 4xx) se transmite con
+ *   `Sentry.logger` y aparece en la vista Logs de GlitchTip, independientemente de las trazas
+ *   y breadcrumbs.
  *
  * Nunca lanza: la telemetría no puede romper una petición.
  *
@@ -438,13 +473,15 @@ export function reportApiRequest(
 ): void {
   try {
     const category = record.failure_category;
+    logApiRequest(record);
+
     Sentry.addBreadcrumb({
       type: 'http',
       category: 'api.request',
       level:
         category === undefined
           ? 'info'
-          : REPORTED_FAILURES.has(category)
+          : category === 'server'
             ? 'error'
             : 'warning',
       data: { ...record },
