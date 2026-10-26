@@ -83,6 +83,33 @@ const REPORTED_FAILURES: ReadonlySet<FailureCategory> = new Set([
 ]);
 
 /**
+ * Envía el resultado de una petición como log estructurado independiente.
+ *
+ * A diferencia de un breadcrumb, este registro no necesita que ocurra después un error o una
+ * transacción para llegar a GlitchTip. `ApiRequestRecord` ya contiene exclusivamente método,
+ * ruta normalizada, clase de estado, duración y resultado; nunca se pasa la respuesta de Axios,
+ * que podría incluir tokens, cuerpos o datos de usuarios.
+ */
+function logApiRequest(record: ApiRequestRecord): void {
+  const attributes: Record<string, unknown> = { ...record };
+
+  if (record.failure_category === 'server') {
+    Sentry.logger.error('API request failed', attributes);
+    return;
+  }
+
+  if (record.failure_category) {
+    Sentry.logger.warn(
+      'API request completed with an error response',
+      attributes,
+    );
+    return;
+  }
+
+  Sentry.logger.info('API request succeeded', attributes);
+}
+
+/**
  * Une `baseURL` y `url` como lo hace axios (`combineURLs`), sin duplicar barras.
  *
  * @param baseURL - Base del cliente, p. ej. `/api`.
@@ -154,7 +181,7 @@ export function normalizeApiRoute(
     .filter(Boolean)
     .map((segment) =>
       STATIC_SEGMENT.test(segment) &&
-      segment.length <= MAX_STATIC_SEGMENT_LENGTH
+        segment.length <= MAX_STATIC_SEGMENT_LENGTH
         ? segment
         : DYNAMIC_SEGMENT,
     );
@@ -414,7 +441,7 @@ export function apiRequestTags(
 
 /**
  * Registra una petición terminada: breadcrumb, span del SDK y, si es un fallo que conviene
- * vigilar (`server`, `network`, `timeout`, `client`), un evento.
+ * vigilar (`server`, `network`, `timeout`, `client`), un evento y un log estructurado.
  *
  * - **Breadcrumb** `api.request` con sólo el registro. Sustituye al breadcrumb `xhr` del SDK,
  *   que está apagado porque lleva la URL con query (ver `sentry.client.config.ts`).
@@ -423,6 +450,9 @@ export function apiRequestTags(
  *   el mensaje y las etiquetas salen del registro.
  * - Los 4xx (`client`) se reportan como `warning`: no son un fallo del servidor, pero sí dejan
  *   evidencia de una respuesta de error que recibió el usuario. Una cancelación no se reporta.
+ * - **Log estructurado**: cada respuesta (incluidos 2xx y 4xx) se transmite con
+ *   `Sentry.logger` y aparece en la vista Logs de GlitchTip, independientemente de las trazas
+ *   y breadcrumbs.
  *
  * Nunca lanza: la telemetría no puede romper una petición.
  *
@@ -443,6 +473,8 @@ export function reportApiRequest(
 ): void {
   try {
     const category = record.failure_category;
+    logApiRequest(record);
+
     Sentry.addBreadcrumb({
       type: 'http',
       category: 'api.request',

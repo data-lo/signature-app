@@ -253,10 +253,16 @@ describe('apiClient instrumentado', () => {
   let events: ErrorEvent[];
   let breadcrumbs: Breadcrumb[];
   const originalAdapter = apiClient.defaults.adapter;
+  let infoLog: jest.SpiedFunction<typeof Sentry.logger.info>;
+  let warningLog: jest.SpiedFunction<typeof Sentry.logger.warn>;
+  let errorLog: jest.SpiedFunction<typeof Sentry.logger.error>;
 
   beforeEach(() => {
     events = [];
     breadcrumbs = [];
+    infoLog = jest.spyOn(Sentry.logger, 'info').mockImplementation();
+    warningLog = jest.spyOn(Sentry.logger, 'warn').mockImplementation();
+    errorLog = jest.spyOn(Sentry.logger, 'error').mockImplementation();
     Sentry.init({
       dsn: 'https://public@glitchtip.example.com/1',
       defaultIntegrations: false,
@@ -277,6 +283,7 @@ describe('apiClient instrumentado', () => {
   afterEach(async () => {
     apiClient.defaults.adapter = originalAdapter;
     await Sentry.close();
+    jest.restoreAllMocks();
   });
 
   function respondWith(adapter: AxiosAdapter) {
@@ -303,6 +310,13 @@ describe('apiClient instrumentado', () => {
       outcome: 'success',
     });
     expect(JSON.stringify(breadcrumbs)).not.toMatch(/ana|6f1c|Bearer/);
+    expect(infoLog).toHaveBeenCalledWith('API request succeeded', {
+      method: 'GET',
+      route: '/api/v1/document/:id',
+      status_class: '2xx',
+      duration_ms: expect.any(Number),
+      outcome: 'success',
+    });
     await Sentry.flush();
     expect(events).toEqual([]);
   });
@@ -334,6 +348,14 @@ describe('apiClient instrumentado', () => {
     expect(event.exception).toBeUndefined();
     expect(event.extra).toBeUndefined();
     expect(JSON.stringify(event)).not.toMatch(/ana@example|Bearer|6f1c/);
+    expect(errorLog).toHaveBeenCalledWith('API request failed', {
+      method: 'GET',
+      route: '/api/v1/document/:id',
+      status_class: '5xx',
+      duration_ms: expect.any(Number),
+      outcome: 'failure',
+      failure_category: 'server',
+    });
   });
 
   it.each([400, 401, 403, 404, 422])(
@@ -364,6 +386,14 @@ describe('apiClient instrumentado', () => {
           'api.failure_category': 'client',
         },
       });
+      expect(warningLog).toHaveBeenCalledWith(
+        'API request completed with an error response',
+        expect.objectContaining({
+          status_class: '4xx',
+          outcome: 'failure',
+          failure_category: 'client',
+        }),
+      );
       expect(
         breadcrumbs.find((b) => b.category === 'api.request')?.data,
       ).toMatchObject({ outcome: 'failure', failure_category: 'client' });
