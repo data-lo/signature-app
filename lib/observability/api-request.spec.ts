@@ -253,10 +253,16 @@ describe('apiClient instrumentado', () => {
   let events: ErrorEvent[];
   let breadcrumbs: Breadcrumb[];
   const originalAdapter = apiClient.defaults.adapter;
+  let infoLog: jest.SpiedFunction<typeof Sentry.logger.info>;
+  let warningLog: jest.SpiedFunction<typeof Sentry.logger.warn>;
+  let errorLog: jest.SpiedFunction<typeof Sentry.logger.error>;
 
   beforeEach(() => {
     events = [];
     breadcrumbs = [];
+    infoLog = jest.spyOn(Sentry.logger, 'info').mockImplementation();
+    warningLog = jest.spyOn(Sentry.logger, 'warn').mockImplementation();
+    errorLog = jest.spyOn(Sentry.logger, 'error').mockImplementation();
     Sentry.init({
       dsn: 'https://public@glitchtip.example.com/1',
       defaultIntegrations: false,
@@ -277,6 +283,7 @@ describe('apiClient instrumentado', () => {
   afterEach(async () => {
     apiClient.defaults.adapter = originalAdapter;
     await Sentry.close();
+    jest.restoreAllMocks();
   });
 
   function respondWith(adapter: AxiosAdapter) {
@@ -303,6 +310,13 @@ describe('apiClient instrumentado', () => {
       outcome: 'success',
     });
     expect(JSON.stringify(breadcrumbs)).not.toMatch(/ana|6f1c|Bearer/);
+    expect(infoLog).toHaveBeenCalledWith('API request succeeded', {
+      method: 'GET',
+      route: '/api/v1/document/:id',
+      status_class: '2xx',
+      duration_ms: expect.any(Number),
+      outcome: 'success',
+    });
     await Sentry.flush();
     expect(events).toEqual([]);
   });
@@ -334,10 +348,18 @@ describe('apiClient instrumentado', () => {
     expect(event.exception).toBeUndefined();
     expect(event.extra).toBeUndefined();
     expect(JSON.stringify(event)).not.toMatch(/ana@example|Bearer|6f1c/);
+    expect(errorLog).toHaveBeenCalledWith('API request failed', {
+      method: 'GET',
+      route: '/api/v1/document/:id',
+      status_class: '5xx',
+      duration_ms: expect.any(Number),
+      outcome: 'failure',
+      failure_category: 'server',
+    });
   });
 
-  it.each([401, 403, 404, 422])(
-    'un %d se clasifica pero no se reporta',
+  it.each([400, 401, 403, 404, 422])(
+    'un %d se reporta como advertencia de cliente',
     async (status) => {
       respondWith(async (config) => {
         throw httpError(status, config);
@@ -346,7 +368,32 @@ describe('apiClient instrumentado', () => {
       await expect(apiClient.get('/api/v1/document/6f1c')).rejects.toThrow();
       await Sentry.flush();
 
-      expect(events).toEqual([]);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        message: 'API client: GET /api/v1/document/:id',
+        level: 'warning',
+        fingerprint: [
+          'api-request',
+          'GET',
+          '/api/v1/document/:id',
+          'client',
+        ],
+        tags: {
+          'api.method': 'GET',
+          'api.route': '/api/v1/document/:id',
+          'api.outcome': 'failure',
+          'http.status_class': '4xx',
+          'api.failure_category': 'client',
+        },
+      });
+      expect(warningLog).toHaveBeenCalledWith(
+        'API request completed with an error response',
+        expect.objectContaining({
+          status_class: '4xx',
+          outcome: 'failure',
+          failure_category: 'client',
+        }),
+      );
       expect(
         breadcrumbs.find((b) => b.category === 'api.request')?.data,
       ).toMatchObject({ outcome: 'failure', failure_category: 'client' });
@@ -369,7 +416,7 @@ describe('apiClient instrumentado', () => {
     ).toMatchObject({ failure_category: 'cancelled', status_class: 'none' });
   });
 
-  it('el AxiosError que nadie atrapa no sale como excepción no controlada', async () => {
+  it('el AxiosError 4xx que nadie atrapa no se duplica como excepción no controlada', async () => {
     const error = httpError(404);
     recordApiError(error);
 
@@ -378,7 +425,11 @@ describe('apiClient instrumentado', () => {
     });
     await Sentry.flush();
 
-    expect(events).toEqual([]);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      message: 'API client: GET /api/v1/document/:id',
+      fingerprint: ['api-request', 'GET', '/api/v1/document/:id', 'client'],
+    });
   });
 
   it('el evento de API sale sin la página, la URL ni los breadcrumbs de navegación', () => {
