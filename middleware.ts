@@ -24,6 +24,12 @@ import {
 // comprueba que quien reclama sea el mismo usuario que generó la captura.
 const PUBLIC_ROUTES = ['/access-document', '/signature-capture'];
 
+// Prefijos de rutas sin sesión. `/sign/:token` es la pantalla de firma por invitación individual:
+// el firmante la abre desde su correo sin cuenta o sin sesión, y el token es lo único que la
+// autoriza (lo valida el backend). Si el middleware la mandara a /login, el `returnTo` llevaría el
+// token a la URL del login.
+const PUBLIC_ROUTE_PREFIXES = ['/sign/'];
+
 // El dashboard vivía en la raíz (/home, /documents, /organization, /personal-documents, /plans)
 // antes de moverlo bajo /dashboard. Cualquier link/bookmark viejo a una de estas rutas se
 // redirige permanentemente (308) a su equivalente bajo /dashboard — la protección de auth no se
@@ -49,7 +55,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  if (PUBLIC_ROUTES.includes(pathname)) {
+  if (
+    PUBLIC_ROUTES.includes(pathname) ||
+    PUBLIC_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  ) {
     return NextResponse.next();
   }
 

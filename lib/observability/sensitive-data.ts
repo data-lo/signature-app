@@ -28,6 +28,8 @@ const SENSITIVE_TEXT_PATTERNS: readonly [RegExp, string][] = [
   [/\b[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z\d]\d\b/gi, '[curp]'],
   // RFC de persona física (13) o moral (12).
   [/\b[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}\b/gi, '[rfc]'],
+  // Token de invitación de firma en la ruta: `/sign/<token>` y `/public/signing-sessions/<token>`.
+  [/(\/sign(?:ing-sessions)?\/)[\w-]+/g, `$1${REDACTED}`],
   // Valores de parámetros de query: tokens de invitación, firmas de URL prefirmadas, OTP…
   [/([?&][\w.%-]+=)[^&\s#"']*/g, `$1${REDACTED}`],
   // OTP, teléfonos, folios: 6 dígitos o más seguidos.

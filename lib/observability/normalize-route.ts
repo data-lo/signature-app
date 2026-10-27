@@ -57,6 +57,8 @@ const STATIC_ROUTES: ReadonlySet<string> = new Set([
 const DYNAMIC_ROUTE_PATTERNS: readonly (readonly string[])[] = [
   ['public', 'documents', '[id]', 'signatures', '[collaboratorId]'],
   ['public', 'documents', '[id]'],
+  // Invitación individual de firma: el segmento es el token, nunca sale tal cual.
+  ['sign', '[token]'],
   ['dashboard', 'documents', '[documentId]'],
   ['dashboard', 'organizations', '[organizationId]'],
 ];

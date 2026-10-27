@@ -145,6 +145,22 @@ describe('PublicInvitationEntry', () => {
       expect(getPublicSigningContext()).toBeNull();
     });
 
+    it('continuar sin cuenta monta la pantalla compartida con /sign/:token (resumen + flujo del tipo)', async () => {
+      const user = userEvent.setup();
+      renderEntry();
+
+      await user.click(
+        await screen.findByRole('button', { name: /continuar sin cuenta/i }),
+      );
+
+      const summary = await screen.findByRole('region', {
+        name: /resumen de la firma/i,
+      });
+      expect(summary).toHaveTextContent('Vas a firmar: contrato.pdf');
+      expect(summary).toHaveTextContent('Tipo de firma: Biometría');
+      expect(screen.getByText('a***@empresa.com')).toBeInTheDocument();
+    });
+
     it('para FIEL muestra continuar sin cuenta y abre la Firma Avanzada sin cuenta en la misma pantalla', async () => {
       mockedGetInvitation.mockResolvedValue({
         ...INVITATION,

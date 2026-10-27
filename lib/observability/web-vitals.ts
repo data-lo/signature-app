@@ -87,6 +87,7 @@ export const ROUTE_TEMPLATES: readonly string[] = [
   '/public/documents/[id]/biometric-signature',
   '/public/documents/[id]/sign',
   '/public/documents/[id]/signatures/[collaboratorId]',
+  '/sign/[token]',
   '/signature-capture',
   '/signup',
   '/signup/verify',
