@@ -1,5 +1,9 @@
 import { SignatureType } from '@/lib/enums/document';
 import type { PublicSigningInvitation } from '../public/documents/[id]/sign/_requests';
+import type {
+  CurrentSigningSession,
+  InvitationContext,
+} from './invitation/invitation-requests';
 
 /**
  * Tipo de firma tal como lo resuelve la pantalla pública. Es el vocabulario del ticket, no el del
@@ -18,6 +22,11 @@ export type SignatureFlowType = 'SIMPLE' | 'ADVANCED' | 'BIOMETRIC';
  * - `ALREADY_SIGNED`: el firmante ya firmó, o el documento quedó firmado por todos.
  * - `DOCUMENT_CANCELLED`: el documento se canceló.
  * - `UNAVAILABLE`: el documento no admite la firma de este firmante.
+ * - `WAITING_FOR_PREVIOUS_SIGNER`: el documento es secuencial y todavía no es su turno.
+ * - `ACCOUNT_REQUIRED`: la invitación está vinculada a una cuenta de la plataforma; se firma desde
+ *   ella, no desde el enlace.
+ * - `SESSION_EXPIRED`: la sesión de firma (o el acceso a la invitación) venció; hay que volver a
+ *   abrir el enlace.
  * - `ERROR`: no se pudo consultar (red, 5xx); se puede reintentar.
  */
 export type SigningSessionStatus =
@@ -29,6 +38,9 @@ export type SigningSessionStatus =
   | 'ALREADY_SIGNED'
   | 'DOCUMENT_CANCELLED'
   | 'UNAVAILABLE'
+  | 'WAITING_FOR_PREVIOUS_SIGNER'
+  | 'ACCOUNT_REQUIRED'
+  | 'SESSION_EXPIRED'
   | 'ERROR';
 
 /** Cuenta de plataforma del firmante, según el backend. */
@@ -36,8 +48,11 @@ export type SignerAccountStatus = 'NONE' | 'ACTIVE' | 'PROVISIONED';
 
 /** Documento que se firma. */
 export interface DocumentSigningContext {
-  /** Lo usan los flujos de invitado, cuyos endpoints van por documento. Nunca va en la URL nueva. */
-  id: string;
+  /**
+   * Lo usan los flujos de invitado de `/public/documents/:id/sign`, cuyos endpoints van por
+   * documento. `null` en la sesión de una invitación individual: ahí el navegador nunca lo conoce.
+   */
+  id: string | null;
   /** `null` cuando no se conoce (de regreso de Didit, sin invitación en la URL). */
   name: string | null;
 }
@@ -77,6 +92,18 @@ export interface SigningSession {
   };
   positions: SignaturePosition[];
   expiresAt?: string;
+  /**
+   * Sólo en la sesión de una invitación individual (`/sign/:token`, `/sign/launch/:token`): lo que
+   * el backend resolvió para firmar desde la cookie de la sesión.
+   */
+  sessionDetails?: {
+    /** SHA-256 del PDF vigente; se manda al firmar. */
+    documentHash: string | null;
+    /** El documento espera su firma y es su turno. */
+    canSign: boolean;
+    /** Firma simple: credencial del usuario provisional (`SigningCredentialStatus`). */
+    credentialStatus: string | null;
+  };
 }
 
 /** Lo que reciben los flujos y el layout: una sesión activa, o sólo el estado que la impide. */
@@ -92,32 +119,6 @@ export interface SigningResult {
 /** Fallo inesperado de un flujo, para registrarlo sin datos sensibles. */
 export interface SigningError {
   cause: unknown;
-}
-
-/** Respuesta de `GET /public/signing-sessions/:token` (ver `GetSigningSessionUseCase`). */
-export interface SigningSessionResponse {
-  status:
-    | 'ACTIVE'
-    | 'EXPIRED'
-    | 'REVOKED'
-    | 'ALREADY_SIGNED'
-    | 'DOCUMENT_CANCELLED'
-    | 'UNAVAILABLE';
-  document?: { id: string; name: string };
-  signer?: {
-    collaboratorId: string;
-    maskedEmail: string;
-    /** Ciclo de vida del usuario de la cuenta vinculada; `null` sin cuenta. */
-    accountStatus: 'ACTIVE' | 'PROVISIONED' | null;
-    guestSigningAllowed: boolean;
-  };
-  signature?: {
-    type: string;
-    requiresEmailVerification: boolean;
-    requiresIdentityValidation: boolean;
-  };
-  positions?: SignaturePosition[];
-  expiresAt?: string;
 }
 
 /** Tipo del backend → tipo de flujo. Lo que no esté aquí no tiene flujo. */
@@ -151,42 +152,68 @@ export function toSignatureFlowType(
 }
 
 /**
- * Adaptador de la ruta nueva: sesión del token (`/sign/:token`) → `SigningSessionState`.
+ * Adaptador de la invitación individual ANTES del código (`/sign/:token`, `/sign/launch/:token`):
+ * su contexto mínimo → el estado que se muestra. Una invitación activa que sólo se firma desde la
+ * cuenta de la plataforma se informa como `ACCOUNT_REQUIRED`: el enlace no la deja seguir.
  *
- * @param response - Respuesta del backend.
- * @returns La sesión activa, o sólo el estado si la invitación ya no sirve (o llegó incompleta).
+ * @param context - Contexto que devolvió el canje del token.
+ * @returns El estado de la pantalla; `ACTIVE` sólo si puede pedir el código.
  *
  * @throws Nada.
  *
  * @example
  * ```ts
- * fromSigningSessionResponse({ status: 'EXPIRED' }); // { status: 'EXPIRED' }
+ * invitationStatusOf({ status: 'WAITING_FOR_PREVIOUS_SIGNER' }); // 'WAITING_FOR_PREVIOUS_SIGNER'
  * ```
  */
-export function fromSigningSessionResponse(
-  response: SigningSessionResponse,
-): SigningSessionState {
-  if (response.status !== 'ACTIVE') return { status: response.status };
+export function invitationStatusOf(
+  context: InvitationContext,
+): SigningSessionStatus {
+  if (context.status !== 'ACTIVE') return context.status;
+  if (!context.signer || !context.signature) return 'INVALID';
+  if (!context.signer.publicSigningAllowed) return 'ACCOUNT_REQUIRED';
+  return 'ACTIVE';
+}
 
-  const { document, signer, signature } = response;
-  if (!document || !signer || !signature) return { status: 'INVALID' };
-
+/**
+ * Adaptador de la sesión pública DESPUÉS del código: `GET /public/signing-sessions/current` →
+ * `SigningSession`. Es la misma sesión llegue el firmante por el correo o por el portal del tercero.
+ *
+ * @param current - Contexto completo de la sesión.
+ * @returns La sesión activa, con sus detalles para firmar.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * fromCurrentSigningSession(current).signature.type; // 'SIMPLE'
+ * ```
+ */
+export function fromCurrentSigningSession(
+  current: CurrentSigningSession,
+): SigningSession {
+  const type = toSignatureFlowType(current.signature.type);
   return {
     status: 'ACTIVE',
-    document: { id: document.id, name: document.name },
+    document: { id: null, name: current.document.name },
     signer: {
-      collaboratorId: signer.collaboratorId,
-      maskedEmail: signer.maskedEmail,
-      accountStatus: signer.accountStatus ?? 'NONE',
-      guestSigningAllowed: signer.guestSigningAllowed,
+      collaboratorId: null,
+      maskedEmail: current.signer.maskedEmail,
+      accountStatus: current.signer.accountStatus ?? 'NONE',
+      guestSigningAllowed: true,
     },
     signature: {
-      type: toSignatureFlowType(signature.type),
-      requiresEmailVerification: signature.requiresEmailVerification,
-      requiresIdentityValidation: signature.requiresIdentityValidation,
+      type,
+      requiresEmailVerification: true,
+      requiresIdentityValidation: current.signature.requiresIdentityValidation,
     },
-    positions: response.positions ?? [],
-    expiresAt: response.expiresAt,
+    positions: current.positions,
+    expiresAt: current.session.expiresAt,
+    sessionDetails: {
+      documentHash: current.document.documentHash,
+      canSign: current.signer.canSign,
+      credentialStatus: current.signature.credentialStatus,
+    },
   };
 }
 

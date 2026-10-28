@@ -44,6 +44,21 @@ export const SIGNING_STATUS_COPY: Record<
     message:
       'Este documento no tiene una firma pendiente para esta invitación en este momento.',
   },
+  WAITING_FOR_PREVIOUS_SIGNER: {
+    title: 'Todavía no es tu turno',
+    message:
+      'Este documento se firma en orden y falta la firma de alguien antes que tú. Te avisaremos por correo cuando sea tu turno; entonces vuelve a abrir tu enlace.',
+  },
+  ACCOUNT_REQUIRED: {
+    title: 'Firma desde tu cuenta',
+    message:
+      'Esta invitación está vinculada a tu cuenta de Firmalo. Inicia sesión en la plataforma para firmar el documento.',
+  },
+  SESSION_EXPIRED: {
+    title: 'Tu sesión de firma venció',
+    message:
+      'Por seguridad, la sesión de firma dura poco. Vuelve a abrir el enlace de tu invitación y confirma de nuevo tu correo.',
+  },
   UNSUPPORTED: {
     title: 'Tipo de firma no disponible',
     message:

@@ -52,6 +52,11 @@ describe('normalizeRoute', () => {
       ['/public/documents/doc-456/sign', '/public/documents/[id]/sign'],
       ['/sign/q3VbX7f0_Lr9-ZtKp2NcWm4YhA8sDe1JuGo6BiQk5Rv', '/sign/[token]'],
       [
+        '/sign/launch/sla_q3VbX7f0_Lr9-ZtKp2NcWm4YhA8sDe1JuGo6BiQk5Rv',
+        '/sign/launch/[token]',
+      ],
+      ['/sign/session', '/sign/session'],
+      [
         '/public/documents/doc-456/advanced-signature',
         '/public/documents/[id]/advanced-signature',
       ],

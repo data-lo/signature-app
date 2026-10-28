@@ -66,13 +66,15 @@ export default function AccountSigningAccess({
   const collaboratorId = signer.collaboratorId;
   const hasSession = Boolean(getAuthToken());
 
+  const documentId = document.id;
+
   function continueWithAccount() {
-    if (!collaboratorId) return;
-    setPublicSigningContext(document.id, collaboratorId);
+    if (!collaboratorId || !documentId) return;
+    setPublicSigningContext(documentId, collaboratorId);
     setRedirecting(true);
     // Con sesión, la pantalla actual vincula la cuenta (o avisa si no corresponde); sin ella, el
     // login vuelve a esa pantalla con el contexto guardado.
-    router.push(hasSession ? publicSigningPath(document.id) : '/login');
+    router.push(hasSession ? publicSigningPath(documentId) : '/login');
   }
 
   return (
@@ -84,7 +86,7 @@ export default function AccountSigningAccess({
         <p className="text-sm text-muted-foreground">{description}</p>
         <Button
           type="button"
-          disabled={!collaboratorId || redirecting}
+          disabled={!collaboratorId || !documentId || redirecting}
           onClick={continueWithAccount}
         >
           {redirecting ? (

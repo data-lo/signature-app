@@ -1,7 +1,8 @@
 import { SignatureType } from '@/lib/enums/document';
 import {
   fromPublicSigningInvitation,
-  fromSigningSessionResponse,
+  fromCurrentSigningSession,
+  invitationStatusOf,
   toSignatureFlowType,
 } from './signing-session';
 
@@ -18,41 +19,91 @@ describe('toSignatureFlowType', () => {
   });
 });
 
-describe('fromSigningSessionResponse (adaptador de /sign/:token)', () => {
-  it('normaliza una sesión activa', () => {
+describe('invitationStatusOf (antes del código: /sign/:token y /sign/launch/:token)', () => {
+  const active = {
+    status: 'ACTIVE' as const,
+    document: { name: 'contrato.pdf' },
+    signer: {
+      maskedEmail: 'a***@correo.com',
+      accountStatus: 'PROVISIONED' as const,
+      publicSigningAllowed: true,
+    },
+    signature: {
+      type: 'SIMPLE',
+      requiresEmailVerification: true,
+      requiresIdentityValidation: true,
+    },
+  };
+
+  it('activa y con firma pública: puede pedir el código', () => {
+    expect(invitationStatusOf(active)).toBe('ACTIVE');
+  });
+
+  it('activa pero vinculada a una cuenta: se firma desde la plataforma', () => {
     expect(
-      fromSigningSessionResponse({
-        status: 'ACTIVE',
-        document: { id: 'doc-1', name: 'contrato.pdf' },
-        signer: {
-          collaboratorId: 'c-1',
-          maskedEmail: 'a***@empresa.com',
-          accountStatus: null,
-          guestSigningAllowed: true,
-        },
-        signature: {
-          type: 'FIEL',
-          requiresEmailVerification: true,
-          requiresIdentityValidation: false,
-        },
-        positions: [
-          {
-            page: 1,
-            xRatio: 0.1,
-            yRatio: 0.2,
-            widthRatio: 0.3,
-            heightRatio: 0.1,
-          },
-        ],
-        expiresAt: '2026-11-01T00:00:00.000Z',
+      invitationStatusOf({
+        ...active,
+        signer: { ...active.signer, publicSigningAllowed: false },
       }),
-    ).toEqual({
-      status: 'ACTIVE',
-      document: { id: 'doc-1', name: 'contrato.pdf' },
+    ).toBe('ACCOUNT_REQUIRED');
+  });
+
+  it.each([
+    'WAITING_FOR_PREVIOUS_SIGNER',
+    'EXPIRED',
+    'REVOKED',
+    'ALREADY_SIGNED',
+    'DOCUMENT_CANCELLED',
+    'UNAVAILABLE',
+  ] as const)('%s pasa tal cual', (status) => {
+    expect(invitationStatusOf({ status })).toBe(status);
+  });
+
+  it('ACTIVE incompleto se trata como invitación inválida', () => {
+    expect(invitationStatusOf({ status: 'ACTIVE' })).toBe('INVALID');
+  });
+});
+
+describe('fromCurrentSigningSession (después del código, misma sesión para correo y portal)', () => {
+  it('normaliza la sesión sin ids del documento ni del colaborador', () => {
+    const session = fromCurrentSigningSession({
+      document: {
+        name: 'contrato.pdf',
+        status: 'PENDING_SIGNATURE',
+        totalPages: 2,
+        documentHash: 'h'.repeat(64),
+      },
       signer: {
-        collaboratorId: 'c-1',
-        maskedEmail: 'a***@empresa.com',
-        accountStatus: 'NONE',
+        maskedEmail: 'a***@correo.com',
+        status: 'PENDING',
+        canSign: true,
+        accountStatus: 'PROVISIONED',
+      },
+      signature: {
+        type: 'FIEL',
+        emailVerified: true,
+        requiresIdentityValidation: false,
+        credentialStatus: null,
+      },
+      positions: [
+        {
+          page: 1,
+          xRatio: 0.1,
+          yRatio: 0.2,
+          widthRatio: 0.3,
+          heightRatio: 0.1,
+        },
+      ],
+      session: { expiresAt: '2026-10-27T20:00:00.000Z' },
+    });
+
+    expect(session).toEqual({
+      status: 'ACTIVE',
+      document: { id: null, name: 'contrato.pdf' },
+      signer: {
+        collaboratorId: null,
+        maskedEmail: 'a***@correo.com',
+        accountStatus: 'PROVISIONED',
         guestSigningAllowed: true,
       },
       signature: {
@@ -69,28 +120,12 @@ describe('fromSigningSessionResponse (adaptador de /sign/:token)', () => {
           heightRatio: 0.1,
         },
       ],
-      expiresAt: '2026-11-01T00:00:00.000Z',
-    });
-  });
-
-  it.each([
-    'EXPIRED',
-    'REVOKED',
-    'ALREADY_SIGNED',
-    'DOCUMENT_CANCELLED',
-    'UNAVAILABLE',
-  ] as const)('%s: sólo el estado, aunque llegaran datos', (status) => {
-    expect(
-      fromSigningSessionResponse({
-        status,
-        document: { id: 'doc-1', name: 'contrato.pdf' },
-      }),
-    ).toEqual({ status });
-  });
-
-  it('ACTIVE incompleto se trata como invitación inválida', () => {
-    expect(fromSigningSessionResponse({ status: 'ACTIVE' })).toEqual({
-      status: 'INVALID',
+      expiresAt: '2026-10-27T20:00:00.000Z',
+      sessionDetails: {
+        documentHash: 'h'.repeat(64),
+        canSign: true,
+        credentialStatus: null,
+      },
     });
   });
 });

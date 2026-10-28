@@ -44,6 +44,7 @@ const STATIC_ROUTES: ReadonlySet<string> = new Set([
   '/forgot-password',
   '/join',
   '/login',
+  '/sign/session',
   '/signature-capture',
   '/signup',
   '/signup/verify',
@@ -58,6 +59,8 @@ const DYNAMIC_ROUTE_PATTERNS: readonly (readonly string[])[] = [
   ['public', 'documents', '[id]', 'signatures', '[collaboratorId]'],
   ['public', 'documents', '[id]'],
   // Invitación individual de firma: el segmento es el token, nunca sale tal cual.
+  // Acceso temporal desde el portal de un tercero: también es un token.
+  ['sign', 'launch', '[token]'],
   ['sign', '[token]'],
   ['dashboard', 'documents', '[documentId]'],
   ['dashboard', 'organizations', '[organizationId]'],

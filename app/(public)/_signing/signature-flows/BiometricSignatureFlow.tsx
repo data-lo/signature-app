@@ -2,6 +2,7 @@
 
 import PublicBiometricSigningFlow from '@/app/(public)/public/documents/[id]/biometric-signature/_components/PublicBiometricSigningFlow';
 import AccountSigningAccess from '../AccountSigningAccess';
+import SigningSessionStatusView from '../SigningSessionStatusView';
 import { guestInvitationOf, type SignatureFlowProps } from './types';
 
 /**
@@ -32,9 +33,13 @@ export default function BiometricSignatureFlow({
     );
   }
 
+  // Estos flujos van por documento (`/public/documents/:id/sign`); sin id no hay a qué firmar.
+  const documentId = session.document.id;
+  if (!documentId) return <SigningSessionStatusView kind="INVALID" />;
+
   return (
     <PublicBiometricSigningFlow
-      documentId={session.document.id}
+      documentId={documentId}
       invitation={guestInvitationOf(session)}
       maskedEmail={session.signer.maskedEmail}
       onSigned={onSuccess}

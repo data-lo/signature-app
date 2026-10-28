@@ -1,25 +1,17 @@
-import type { Metadata } from 'next';
-import InvitationSigningEntry from './_components/InvitationSigningEntry';
+import InvitationSigningEntry from '@/app/(public)/_signing/invitation/InvitationSigningEntry';
+import { signingPageMetadata } from '@/app/(public)/_signing/invitation/signing-page-metadata';
 
-/**
- * Sin `Referer`: el token va en la ruta, y sin esto el navegador lo mandaría a cada recurso que
- * cargue la página (el PDF prefirmado, Didit). Tampoco se indexa.
- */
-export const metadata: Metadata = {
-  title: 'Firma de documento',
-  referrer: 'no-referrer',
-  robots: { index: false, follow: false },
-};
+export const metadata = signingPageMetadata;
 
 interface InvitationSigningPageProps {
   params: Promise<{ token: string }>;
 }
 
 /**
- * Pantalla pública de firma por invitación individual (`/sign/:token`). Es la misma experiencia que
- * `/public/documents/:id/sign` —`PublicSigningLayout` y los flujos por tipo de firma—, pero el
- * contexto sale del token: la URL no lleva el id del documento ni del colaborador. No requiere
- * sesión (el middleware la deja pasar, ver `PUBLIC_ROUTE_PREFIXES`).
+ * Firma por invitación individual desde el enlace del correo (`/sign/:token`). Canjea el token,
+ * pide el código del correo de la invitación y abre la sesión pública de firma, la misma que la del
+ * portal del tercero (`/sign/launch/:token`). No requiere sesión de la plataforma (el middleware
+ * deja pasar `/sign/`).
  *
  * @param props.params - `token` de la invitación.
  * @returns La pantalla de firma de la invitación.
@@ -36,7 +28,7 @@ export default async function InvitationSigningPage({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted p-4 sm:p-8">
-      <InvitationSigningEntry token={token} />
+      <InvitationSigningEntry source={{ kind: 'EMAIL', token }} />
     </main>
   );
 }

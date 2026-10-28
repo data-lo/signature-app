@@ -88,6 +88,8 @@ export const ROUTE_TEMPLATES: readonly string[] = [
   '/public/documents/[id]/sign',
   '/public/documents/[id]/signatures/[collaboratorId]',
   '/sign/[token]',
+  '/sign/launch/[token]',
+  '/sign/session',
   '/signature-capture',
   '/signup',
   '/signup/verify',

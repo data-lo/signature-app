@@ -6,6 +6,7 @@ import SignerSummary from './SignerSummary';
 import SigningSessionStatusView from './SigningSessionStatusView';
 import { useSigningSession } from './SigningSessionProvider';
 import SignatureFlowResolver from './signature-flows/SignatureFlowResolver';
+import type { SignatureFlowRegistry } from './signature-flows/registry';
 import { isActiveSigningSession, type SigningError } from './signing-session';
 
 /**
@@ -28,7 +29,15 @@ import { isActiveSigningSession, type SigningError } from './signing-session';
  * <SigningSessionProvider state={state}><PublicSigningLayout /></SigningSessionProvider>
  * ```
  */
-export default function PublicSigningLayout() {
+export default function PublicSigningLayout({
+  registry,
+}: {
+  /**
+   * Flujos por tipo de firma. Por omisión los de invitado de `/public/documents/:id/sign`; la
+   * invitación individual (`/sign/:token`, `/sign/launch/:token`) pasa los de la sesión pública.
+   */
+  registry?: SignatureFlowRegistry;
+} = {}) {
   const { state, setResult, retry } = useSigningSession();
   const handleError = useCallback(
     (error: SigningError) => logSafeError('[public-signing]', error.cause),
@@ -45,6 +54,7 @@ export default function PublicSigningLayout() {
       <SignatureFlowResolver
         session={state}
         onSuccess={setResult}
+        registry={registry}
         onError={handleError}
       />
     </div>
