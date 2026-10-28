@@ -50,6 +50,24 @@ describe('redactSensitiveText', () => {
     ['RFC LOPA800101AB1', 'RFC [rfc]'],
     ['/join?token=abc123&x=1', `/join?token=${REDACTED}&x=${REDACTED}`],
     ['tu código es 482913', 'tu código es [número]'],
+    ['/sign/q3VbX7f0_Lr9-ZtKp2NcWm4YhA8sDe1', `/sign/${REDACTED}`],
+    ['/sign/launch/sla_q3VbX7f0_Lr9-ZtKp2NcWm4', `/sign/launch/${REDACTED}`],
+    [
+      'POST /api/v1/public/signing-launches/sla_q3VbX7f0_Lr9/access',
+      `POST /api/v1/public/signing-launches/${REDACTED}/access`,
+    ],
+    [
+      'POST /api/v1/public/signing-invitations/q3VbX7f0_Lr9-ZtKp/access',
+      `POST /api/v1/public/signing-invitations/${REDACTED}/access`,
+    ],
+    [
+      'GET /api/v1/public/signing-sessions/q3VbX7f0_Lr9-ZtKp',
+      `GET /api/v1/public/signing-sessions/${REDACTED}`,
+    ],
+    [
+      '/public/documents/doc-1/sign?x=1',
+      `/public/documents/doc-1/sign?x=${REDACTED}`,
+    ],
   ])('%s → %s', (input, expected) => {
     expect(redactSensitiveText(input)).toBe(expected);
   });

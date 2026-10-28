@@ -41,6 +41,40 @@ describe('middleware', () => {
     });
   });
 
+  describe('/sign/:token (invitación individual de firma)', () => {
+    const TOKEN = 'q3VbX7f0_Lr9-ZtKp2NcWm4YhA8sDe1JuGo6BiQk5Rv';
+
+    it.each([`/sign/launch/sla_${TOKEN}`, '/sign/session'])(
+      'también %s (portal del tercero y regreso de Didit) sin sesión',
+      (path) => {
+        const response = middleware(buildRequest(path));
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('location')).toBeNull();
+      },
+    );
+
+    it('deja pasar sin sesión: firmar no requiere login', () => {
+      const response = middleware(buildRequest(`/sign/${TOKEN}`));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('location')).toBeNull();
+    });
+
+    it('deja pasar también con sesión activa', () => {
+      const response = middleware(buildRequest(`/sign/${TOKEN}`, 'jwt'));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('location')).toBeNull();
+    });
+
+    it('sólo el prefijo /sign/: /signup sigue su propia regla', () => {
+      const response = middleware(buildRequest('/signupx'));
+
+      expect(response.headers.get('location')).toContain('/login');
+    });
+  });
+
   it('redirige a /login una ruta protegida sin sesión, recordando la ruta pedida', () => {
     const response = middleware(buildRequest('/dashboard/documents/doc-1'));
 
