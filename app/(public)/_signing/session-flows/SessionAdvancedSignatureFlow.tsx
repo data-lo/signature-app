@@ -6,12 +6,14 @@ import { KeyRound, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getErrorMessage } from '@/lib/error-handler';
 import AdvancedSignatureDialog, {
   type AdvancedSignatureSubmitValues,
 } from '@/app/dashboard/documents/[documentId]/_components/AdvancedSignatureDialog';
 import SigningDocumentWorkspace from '../SigningDocumentWorkspace';
-import { signAdvancedRequest } from '../invitation/invitation-requests';
+import {
+  signAdvancedRequest,
+  type CertificateRequirements,
+} from '../invitation/invitation-requests';
 import type { SignatureFlowProps } from '../signature-flows/types';
 import type { SigningResult } from '../signing-session';
 import {
@@ -20,10 +22,37 @@ import {
   SigningDocumentError,
   SigningPending,
   isUnexpectedSigningError,
+  signingErrorMessage,
   useCurrentSigningDocument,
   useSigningIdempotencyKey,
   useSigningLocation,
 } from './session-signing';
+
+/**
+ * Lo que se valida del certificado, en palabras del firmante.
+ *
+ * @param requirements - Requisitos que resolvió el backend; `null` si no los mandó.
+ * @returns Una etiqueta por validación activa.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * certificateCheckLabels({ validateValidity: true, validateRevocation: false, validateSubjectMatch: false });
+ * // ['Que esté vigente y emitido por el SAT']
+ * ```
+ */
+export function certificateCheckLabels(
+  requirements: CertificateRequirements | null,
+): string[] {
+  if (!requirements) return [];
+  return [
+    requirements.validateValidity && 'Que esté vigente y emitido por el SAT',
+    requirements.validateRevocation && 'Que el SAT no lo haya revocado',
+    requirements.validateSubjectMatch &&
+      'Que su titular sea la persona invitada a firmar',
+  ].filter((label): label is string => Boolean(label));
+}
 
 /**
  * Firma Electrónica Avanzada desde la sesión pública de una invitación individual (correo o
@@ -73,7 +102,9 @@ export default function SessionAdvancedSignatureFlow({
           onSuccess(signed);
         },
         onError: (error) => {
-          toast.error(getErrorMessage(error, 'No se pudo registrar la firma.'));
+          toast.error(
+            signingErrorMessage(error, 'No se pudo registrar la firma.'),
+          );
           if (isUnexpectedSigningError(error)) onError({ cause: error });
         },
       },
@@ -95,6 +126,9 @@ export default function SessionAdvancedSignatureFlow({
   }
 
   const signing = sign.isPending || locating;
+  const certificateChecks = certificateCheckLabels(
+    session.sessionDetails.certificateRequirements ?? null,
+  );
 
   return (
     <SigningDocumentWorkspace fileUrl={documentQuery.data.fileUrl}>
@@ -113,6 +147,18 @@ export default function SessionAdvancedSignatureFlow({
             tu certificado (.cer), la contraseña de tu e.firma y permitir el
             acceso a tu ubicación.
           </p>
+          {certificateChecks.length > 0 && (
+            <div className="flex flex-col gap-1 text-sm">
+              <p className="text-muted-foreground">
+                Al firmar validaremos tu certificado:
+              </p>
+              <ul className="list-disc pl-5 text-muted-foreground">
+                {certificateChecks.map((check) => (
+                  <li key={check}>{check}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <Button
             type="button"
             disabled={signing}

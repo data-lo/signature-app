@@ -1,8 +1,11 @@
 import { SignatureType } from '@/lib/enums/document';
 import type { PublicSigningInvitation } from '../public/documents/[id]/sign/_requests';
 import type {
+  CertificateRequirements,
   CurrentSigningSession,
+  IdentityVerificationState,
   InvitationContext,
+  SigningReadiness,
 } from './invitation/invitation-requests';
 
 /**
@@ -103,6 +106,12 @@ export interface SigningSession {
     canSign: boolean;
     /** Firma simple: credencial del usuario provisional (`SigningCredentialStatus`). */
     credentialStatus: string | null;
+    /** Si ya se puede firmar según el backend y, si no, por qué. */
+    readiness?: SigningReadiness;
+    /** Firma simple: estado de la verificación de identidad. */
+    identityVerification?: IdentityVerificationState | null;
+    /** Firma avanzada: qué se valida del certificado. */
+    certificateRequirements?: CertificateRequirements | null;
   };
 }
 
@@ -125,13 +134,15 @@ export interface SigningError {
 const BACKEND_SIGNATURE_TYPES: Readonly<Record<string, SignatureFlowType>> = {
   [SignatureType.Simple]: 'SIMPLE',
   [SignatureType.Fiel]: 'ADVANCED',
+  // La sesión pública ya habla el vocabulario del contrato.
+  ADVANCED: 'ADVANCED',
   [SignatureType.BIOMETRIC]: 'BIOMETRIC',
 };
 
 /**
  * Traduce el tipo de firma del backend al vocabulario de la pantalla.
  *
- * @param backendType - `SIMPLE`, `FIEL` o `BIOMETRIC` (o lo que mande el backend).
+ * @param backendType - `SIMPLE`, `FIEL`/`ADVANCED` o `BIOMETRIC` (o lo que mande el backend).
  * @returns El tipo de flujo, o `null` si no se conoce.
  *
  * @throws Nada.
@@ -139,6 +150,7 @@ const BACKEND_SIGNATURE_TYPES: Readonly<Record<string, SignatureFlowType>> = {
  * @example
  * ```ts
  * toSignatureFlowType('FIEL'); // 'ADVANCED'
+ * toSignatureFlowType('ADVANCED'); // 'ADVANCED'
  * toSignatureFlowType('NOM151'); // null
  * ```
  */
@@ -198,7 +210,7 @@ export function fromCurrentSigningSession(
     document: { id: null, name: current.document.name },
     signer: {
       collaboratorId: null,
-      maskedEmail: current.signer.maskedEmail,
+      maskedEmail: current.signer.emailMasked ?? current.signer.maskedEmail,
       accountStatus: current.signer.accountStatus ?? 'NONE',
       guestSigningAllowed: true,
     },
@@ -213,6 +225,10 @@ export function fromCurrentSigningSession(
       documentHash: current.document.documentHash,
       canSign: current.signer.canSign,
       credentialStatus: current.signature.credentialStatus,
+      readiness: current.status,
+      identityVerification: current.signature.identityVerification ?? null,
+      certificateRequirements:
+        current.signature.certificateRequirements ?? null,
     },
   };
 }

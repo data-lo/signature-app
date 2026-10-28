@@ -8,16 +8,19 @@ import {
   getBiometricSigningStatusRequest,
   getCurrentSigningDocumentRequest,
   getCurrentSigningSessionRequest,
+  getIdentityVerificationRequest,
   signAdvancedRequest,
   signSimpleRequest,
   startBiometricSigningRequest,
-  verifyIdentityRequest,
+  startIdentityVerificationRequest,
+  type IdentityVerificationState,
 } from '../invitation/invitation-requests';
 import SigningSessionScreen from '../invitation/SigningSessionScreen';
 import type { SigningSession } from '../signing-session';
 import SessionAdvancedSignatureFlow from './SessionAdvancedSignatureFlow';
 import SessionBiometricSignatureFlow from './SessionBiometricSignatureFlow';
 import SessionSimpleSignatureFlow from './SessionSimpleSignatureFlow';
+import toast from 'react-hot-toast';
 
 jest.mock('../invitation/invitation-requests');
 jest.mock('next/dynamic', () => ({
@@ -88,9 +91,38 @@ jest.mock(
 
 const HASH = 'h'.repeat(64);
 
+/** Estado de identidad de la sesión simple, con lo que se indique encima. */
+function identity(
+  overrides: Partial<IdentityVerificationState> = {},
+): IdentityVerificationState {
+  return {
+    status: 'APPROVED',
+    verificationId: 'iv-1',
+    dataMatches: true,
+    resumeUrl: null,
+    satisfied: true,
+    errorCode: null,
+    ...overrides,
+  };
+}
+
+/** Error de la sesión pública con su código estable. */
+function codedError(status: number, code: string) {
+  return new AxiosError(String(status), String(status), undefined, undefined, {
+    status,
+    data: {
+      statusCode: status,
+      error: 'x',
+      code,
+      message: 'texto del backend',
+    },
+  } as AxiosResponse);
+}
+
 function session(
   type: SigningSession['signature']['type'],
   credentialStatus: string | null = null,
+  extra: Partial<NonNullable<SigningSession['sessionDetails']>> = {},
 ): SigningSession {
   return {
     status: 'ACTIVE',
@@ -107,7 +139,12 @@ function session(
       requiresIdentityValidation: type !== 'ADVANCED',
     },
     positions: [],
-    sessionDetails: { documentHash: HASH, canSign: true, credentialStatus },
+    sessionDetails: {
+      documentHash: HASH,
+      canSign: true,
+      credentialStatus,
+      ...extra,
+    },
   };
 }
 
@@ -199,27 +236,203 @@ describe('flujos de la sesión pública de firma', () => {
       );
       expect(keys[0]).toBe(keys[1]);
     });
+
+    it('muestra qué se validará del certificado', async () => {
+      renderFlow(
+        SessionAdvancedSignatureFlow,
+        session('ADVANCED', null, {
+          certificateRequirements: {
+            validateValidity: true,
+            validateRevocation: true,
+            validateSubjectMatch: true,
+          },
+        }),
+      );
+
+      expect(
+        await screen.findByText('Que el SAT no lo haya revocado'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Que su titular sea la persona invitada a firmar'),
+      ).toBeInTheDocument();
+    });
+
+    it.each([
+      ['CERTIFICATE_REVOKED', /revocado/i],
+      ['CERTIFICATE_INVALID', /no es válida/i],
+      [
+        'CERTIFICATE_SUBJECT_MISMATCH',
+        /titular de la e\.firma no corresponde/i,
+      ],
+      ['SIGNATURE_VALIDATION_FAILED', /no corresponde al documento/i],
+    ])(
+      'un certificado rechazado (%s) muestra el mensaje controlado de su código, no el del backend',
+      async (code, message) => {
+        (signAdvancedRequest as jest.Mock).mockRejectedValueOnce(
+          codedError(422, code),
+        );
+        const user = userEvent.setup();
+        renderFlow(SessionAdvancedSignatureFlow, session('ADVANCED'));
+
+        await user.click(
+          await screen.findByRole('button', { name: /firmar con e.firma/i }),
+        );
+        await user.click(
+          screen.getByRole('button', { name: /confirmar e.firma/i }),
+        );
+
+        await waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith(
+            expect.stringMatching(message),
+          ),
+        );
+        expect(toast.error).not.toHaveBeenCalledWith('texto del backend');
+        expect(screen.queryByText('Firma registrada')).not.toBeInTheDocument();
+      },
+    );
   });
 
   describe('simple', () => {
     it('sin identidad verificada: abre Didit con regreso a /sign/session, sin mostrar el PDF todavía', async () => {
       // La redirección en sí (`window.location.assign`) no se afirma: jsdom no deja interceptarla
       // (mismo criterio que `PaymentServicesView.spec`). Se afirma la petición a Didit.
-      (verifyIdentityRequest as jest.Mock).mockResolvedValue({
+      const notStarted = identity({
+        status: 'NOT_STARTED',
+        satisfied: false,
+        dataMatches: null,
+        errorCode: 'IDENTITY_VERIFICATION_REQUIRED',
+      });
+      (getIdentityVerificationRequest as jest.Mock).mockResolvedValue(
+        notStarted,
+      );
+      (startIdentityVerificationRequest as jest.Mock).mockResolvedValue({
         url: 'https://verify.didit.me/s/1',
       });
       const user = userEvent.setup();
       renderFlow(
         SessionSimpleSignatureFlow,
-        session('SIMPLE', SigningCredentialStatus.IdentityVerificationRequired),
+        session(
+          'SIMPLE',
+          SigningCredentialStatus.IdentityVerificationRequired,
+          { identityVerification: notStarted },
+        ),
       );
 
       await user.click(
         screen.getByRole('button', { name: /verificar identidad/i }),
       );
 
-      expect(verifyIdentityRequest).toHaveBeenCalledWith('/sign/session');
+      expect(startIdentityVerificationRequest).toHaveBeenCalledWith(
+        '/sign/session',
+      );
       expect(screen.queryByText(/^PDF:/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /firmar documento/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('mientras Didit decide consulta el estado y habilita la firma al aprobarse', async () => {
+      const pending = identity({
+        status: 'IN_PROGRESS',
+        satisfied: false,
+        dataMatches: null,
+        resumeUrl: 'https://verify.didit.me/s/1',
+        errorCode: 'IDENTITY_VERIFICATION_REQUIRED',
+      });
+      (getIdentityVerificationRequest as jest.Mock).mockResolvedValueOnce(
+        identity(),
+      );
+      renderFlow(
+        SessionSimpleSignatureFlow,
+        session('SIMPLE', SigningCredentialStatus.Configured, {
+          identityVerification: pending,
+        }),
+      );
+
+      expect(
+        screen.getByRole('link', { name: /continuar verificación/i }),
+      ).toHaveAttribute('href', 'https://verify.didit.me/s/1');
+      expect(
+        screen.queryByRole('button', { name: /firmar documento/i }),
+      ).not.toBeInTheDocument();
+
+      expect(
+        await screen.findByRole(
+          'button',
+          { name: /firmar documento/i },
+          { timeout: 8000 },
+        ),
+      ).toBeEnabled();
+      expect(getIdentityVerificationRequest).toHaveBeenCalled();
+    }, 15000);
+
+    it.each([
+      [
+        'rechazada',
+        identity({
+          status: 'REJECTED',
+          satisfied: false,
+          dataMatches: null,
+          errorCode: 'IDENTITY_VERIFICATION_REJECTED',
+        }),
+        /no pudimos verificar tu identidad/i,
+      ],
+      [
+        'de otra persona',
+        identity({
+          satisfied: false,
+          dataMatches: false,
+          errorCode: 'IDENTITY_DATA_MISMATCH',
+        }),
+        /no corresponde a la persona invitada/i,
+      ],
+    ])(
+      'identidad %s: lo explica y no deja firmar ni reintentar',
+      async (_name, state, message) => {
+        (getIdentityVerificationRequest as jest.Mock).mockResolvedValue(state);
+        renderFlow(
+          SessionSimpleSignatureFlow,
+          session('SIMPLE', SigningCredentialStatus.Configured, {
+            identityVerification: state,
+          }),
+        );
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(message);
+        expect(
+          screen.queryByRole('button', {
+            name: /firmar documento|verificar identidad/i,
+          }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it('si al firmar la identidad ya no cumple, muestra el mensaje de su código y vuelve a consultarla', async () => {
+      (signSimpleRequest as jest.Mock).mockRejectedValueOnce(
+        codedError(403, 'IDENTITY_DATA_MISMATCH'),
+      );
+      (getIdentityVerificationRequest as jest.Mock).mockResolvedValue(
+        identity(),
+      );
+      const user = userEvent.setup();
+      renderFlow(
+        SessionSimpleSignatureFlow,
+        session('SIMPLE', SigningCredentialStatus.Configured, {
+          identityVerification: identity(),
+        }),
+      );
+
+      await user.click(
+        await screen.findByRole('button', { name: /firmar documento/i }),
+      );
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringMatching(/no corresponde a la persona invitada/i),
+        ),
+      );
+      await waitFor(() =>
+        expect(getIdentityVerificationRequest).toHaveBeenCalled(),
+      );
     });
 
     it('identidad aprobada sin rúbrica: hay que dibujarla y se manda con la firma', async () => {

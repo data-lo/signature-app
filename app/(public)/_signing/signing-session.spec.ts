@@ -10,6 +10,7 @@ describe('toSignatureFlowType', () => {
   it.each([
     ['SIMPLE', 'SIMPLE'],
     ['FIEL', 'ADVANCED'],
+    ['ADVANCED', 'ADVANCED'],
     ['BIOMETRIC', 'BIOMETRIC'],
     ['NOM151', null],
     ['constructor', null],
@@ -67,6 +68,7 @@ describe('invitationStatusOf (antes del código: /sign/:token y /sign/launch/:to
 describe('fromCurrentSigningSession (después del código, misma sesión para correo y portal)', () => {
   it('normaliza la sesión sin ids del documento ni del colaborador', () => {
     const session = fromCurrentSigningSession({
+      status: 'READY_TO_SIGN',
       document: {
         name: 'contrato.pdf',
         status: 'PENDING_SIGNATURE',
@@ -74,16 +76,28 @@ describe('fromCurrentSigningSession (después del código, misma sesión para co
         documentHash: 'h'.repeat(64),
       },
       signer: {
+        name: 'Ana López',
+        emailMasked: 'a***@correo.com',
         maskedEmail: 'a***@correo.com',
+        isProvisional: true,
         status: 'PENDING',
         canSign: true,
         accountStatus: 'PROVISIONED',
       },
       signature: {
-        type: 'FIEL',
+        type: 'ADVANCED',
         emailVerified: true,
+        requiresEmailVerification: true,
         requiresIdentityValidation: false,
+        identityProvider: null,
+        requiresCertificateValidation: true,
+        certificateRequirements: {
+          validateValidity: true,
+          validateRevocation: true,
+          validateSubjectMatch: true,
+        },
         credentialStatus: null,
+        identityVerification: null,
       },
       positions: [
         {
@@ -125,6 +139,13 @@ describe('fromCurrentSigningSession (después del código, misma sesión para co
         documentHash: 'h'.repeat(64),
         canSign: true,
         credentialStatus: null,
+        readiness: 'READY_TO_SIGN',
+        identityVerification: null,
+        certificateRequirements: {
+          validateValidity: true,
+          validateRevocation: true,
+          validateSubjectMatch: true,
+        },
       },
     });
   });
