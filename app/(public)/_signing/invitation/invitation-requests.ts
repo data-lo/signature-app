@@ -42,15 +42,78 @@ export interface InvitationContext {
     publicSigningAllowed: boolean;
   };
   signature?: {
+    /** `SIMPLE`, `ADVANCED` o `BIOMETRIC`. */
     type: string;
     requiresEmailVerification: boolean;
     requiresIdentityValidation: boolean;
+    requiresCertificateValidation?: boolean;
   };
   expiresAt?: string;
 }
 
+/**
+ * Códigos estables de los errores de la firma pública. La pantalla decide qué mostrar por el
+ * código, nunca por el texto del backend.
+ */
+export type SigningErrorCode =
+  | 'EMAIL_VERIFICATION_REQUIRED'
+  | 'IDENTITY_VERIFICATION_REQUIRED'
+  | 'IDENTITY_VERIFICATION_REJECTED'
+  | 'IDENTITY_DATA_MISMATCH'
+  | 'CERTIFICATE_INVALID'
+  | 'CERTIFICATE_REVOKED'
+  | 'CERTIFICATE_SUBJECT_MISMATCH'
+  | 'SIGNATURE_VALIDATION_FAILED'
+  | 'SIGNING_SESSION_EXPIRED'
+  | 'SIGNING_NOT_AVAILABLE';
+
+/** Cuerpo de cualquier error de la sesión pública. */
+export interface SigningErrorBody {
+  statusCode: number;
+  error: string;
+  code: SigningErrorCode | null;
+  message: string;
+}
+
+/** Si ya se puede firmar y, si no, por qué (lo decide el backend). */
+export type SigningReadiness =
+  | 'READY_TO_SIGN'
+  | 'SIGNED'
+  | 'SIGNING_NOT_AVAILABLE'
+  | 'IDENTITY_VERIFICATION_REQUIRED'
+  | 'IDENTITY_VERIFICATION_REJECTED'
+  | 'IDENTITY_DATA_MISMATCH';
+
+/** Estado de la verificación de identidad (Didit) del firmante simple, evaluado contra la política. */
+export interface IdentityVerificationState {
+  status:
+    | 'NOT_STARTED'
+    | 'PENDING'
+    | 'IN_PROGRESS'
+    | 'IN_REVIEW'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'EXPIRED';
+  verificationId: string | null;
+  /** Si los datos leídos por Didit corresponden al firmante; `null` sin aprobación. */
+  dataMatches: boolean | null;
+  /** URL de Didit para retomar un intento abierto. */
+  resumeUrl: string | null;
+  /** La identidad ya cumple: se puede firmar. */
+  satisfied: boolean;
+  errorCode: SigningErrorCode | null;
+}
+
+/** Qué valida la firma avanzada en el certificado. */
+export interface CertificateRequirements {
+  validateValidity: boolean;
+  validateRevocation: boolean;
+  validateSubjectMatch: boolean;
+}
+
 /** Contexto completo de la sesión pública de firma. */
 export interface CurrentSigningSession {
+  status: SigningReadiness;
   document: {
     name: string;
     status: string;
@@ -58,17 +121,28 @@ export interface CurrentSigningSession {
     documentHash: string | null;
   };
   signer: {
+    name: string;
+    emailMasked: string;
+    /** @deprecated Igual a `emailMasked`. */
     maskedEmail: string;
+    isProvisional: boolean;
     status: string;
     canSign: boolean;
     accountStatus: 'ACTIVE' | 'PROVISIONED' | null;
   };
   signature: {
+    /** `SIMPLE`, `ADVANCED` o `BIOMETRIC`. */
     type: string;
     emailVerified: true;
+    requiresEmailVerification: boolean;
     requiresIdentityValidation: boolean;
+    identityProvider: 'DIDIT' | null;
+    requiresCertificateValidation: boolean;
+    certificateRequirements: CertificateRequirements | null;
     /** Sólo firma simple: credencial del usuario provisional (`SigningCredentialStatus`). */
     credentialStatus: string | null;
+    /** Sólo firma simple: estado de la verificación de identidad. */
+    identityVerification: IdentityVerificationState | null;
   };
   positions: SignaturePosition[];
   session: { expiresAt: string };
@@ -219,19 +293,39 @@ export async function getCurrentSigningDocumentRequest(): Promise<{
  * @param returnPath - Ruta de la app a la que vuelve Didit (`/sign/session`).
  * @returns La URL hospedada de Didit.
  *
- * @throws {AxiosError} 400 si no es firma simple con usuario provisional, 401 sin sesión.
+ * @throws {AxiosError} 400 si no es firma simple con usuario provisional, 401 sin sesión, 409
+ *   (`SIGNING_NOT_AVAILABLE`) si todavía no puede firmar, 429 si inició demasiadas verificaciones.
  *
  * @example
  * ```ts
- * const { url } = await verifyIdentityRequest('/sign/session');
+ * const { url } = await startIdentityVerificationRequest('/sign/session');
  * ```
  */
-export async function verifyIdentityRequest(
+export async function startIdentityVerificationRequest(
   returnPath: string,
 ): Promise<{ url: string }> {
   const { data } = await signingClient.post(
-    `${SESSION}/simple/verify-identity`,
+    `${SESSION}/simple/identity-verification/start`,
     { returnPath },
+  );
+  return data;
+}
+
+/**
+ * Estado de la verificación de identidad del firmante simple, para sondear el resultado de Didit.
+ *
+ * @returns El estado evaluado contra la política (aprobada, pendiente, rechazada…).
+ *
+ * @throws {AxiosError} 400 si no es firma simple, 401 sin sesión.
+ *
+ * @example
+ * ```ts
+ * const { satisfied } = await getIdentityVerificationRequest();
+ * ```
+ */
+export async function getIdentityVerificationRequest(): Promise<IdentityVerificationState> {
+  const { data } = await signingClient.get<IdentityVerificationState>(
+    `${SESSION}/simple/identity-verification`,
   );
   return data;
 }
@@ -243,8 +337,9 @@ export async function verifyIdentityRequest(
  * @param idempotencyKey - Clave del intento; la misma en un reintento.
  * @returns La firma registrada.
  *
- * @throws {AxiosError} 400 si falta la rúbrica o el PDF cambió, 401 sin sesión, 409 si sigue en
- *   curso, 422 si la clave se usó con otra petición.
+ * @throws {AxiosError} 400 si falta la rúbrica o el PDF cambió, 401 sin sesión, 403 con `code`
+ *   de correo o identidad, 409 si sigue en curso o `SIGNING_NOT_AVAILABLE`, 422 si la clave se usó
+ *   con otra petición.
  *
  * @example
  * ```ts
@@ -282,7 +377,9 @@ export async function signSimpleRequest(
  * @param idempotencyKey - Clave del intento.
  * @returns La firma registrada.
  *
- * @throws {AxiosError} 400/401/409 como la firma simple; 422 si la e.firma no es válida.
+ * @throws {AxiosError} 400/401/409 como la firma simple; 422 con `code` del certificado
+ *   (`CERTIFICATE_INVALID`, `CERTIFICATE_REVOKED`, `CERTIFICATE_SUBJECT_MISMATCH`,
+ *   `SIGNATURE_VALIDATION_FAILED`); 429 si hubo demasiados intentos.
  *
  * @example
  * ```ts

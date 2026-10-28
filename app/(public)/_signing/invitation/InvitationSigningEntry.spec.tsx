@@ -61,6 +61,7 @@ const ACTIVE: InvitationContext = {
 };
 
 const CURRENT: CurrentSigningSession = {
+  status: 'READY_TO_SIGN',
   document: {
     name: 'contrato.pdf',
     status: 'PENDING_SIGNATURE',
@@ -68,16 +69,28 @@ const CURRENT: CurrentSigningSession = {
     documentHash: 'h'.repeat(64),
   },
   signer: {
+    name: 'Ana López',
+    emailMasked: 'a***@correo.com',
     maskedEmail: 'a***@correo.com',
+    isProvisional: false,
     status: 'PENDING',
     canSign: true,
     accountStatus: null,
   },
   signature: {
-    type: 'FIEL',
+    type: 'ADVANCED',
     emailVerified: true,
+    requiresEmailVerification: true,
     requiresIdentityValidation: false,
+    identityProvider: null,
+    requiresCertificateValidation: true,
+    certificateRequirements: {
+      validateValidity: true,
+      validateRevocation: true,
+      validateSubjectMatch: true,
+    },
     credentialStatus: null,
+    identityVerification: null,
   },
   positions: [],
   session: { expiresAt: '2026-10-27T20:00:00.000Z' },

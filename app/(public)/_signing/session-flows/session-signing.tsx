@@ -10,7 +10,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useGeolocation } from '@/lib/hooks/useGeolocation';
 import { GEOLOCATION_ERROR_MESSAGES } from '@/lib/hooks/geolocation-error-messages';
 import type { BiometricGeolocation } from '@/lib/biometric-signature';
-import { getCurrentSigningDocumentRequest } from '../invitation/invitation-requests';
+import { getErrorMessage } from '@/lib/error-handler';
+import {
+  getCurrentSigningDocumentRequest,
+  type SigningErrorBody,
+  type SigningErrorCode,
+} from '../invitation/invitation-requests';
 import type { SigningResult } from '../signing-session';
 
 /**
@@ -118,6 +123,71 @@ export function useSigningLocation() {
 export function isUnexpectedSigningError(error: unknown): boolean {
   const status = isAxiosError(error) ? error.response?.status : undefined;
   return status === undefined || status >= 500;
+}
+
+/** Mensaje controlado de cada código de la firma pública (ver `SigningErrorCode`). */
+export const SIGNING_ERROR_MESSAGES: Readonly<
+  Record<SigningErrorCode, string>
+> = {
+  EMAIL_VERIFICATION_REQUIRED:
+    'Valida el código que enviamos a tu correo antes de firmar.',
+  IDENTITY_VERIFICATION_REQUIRED:
+    'Antes de firmar tienes que completar la verificación de tu identidad.',
+  IDENTITY_VERIFICATION_REJECTED:
+    'No pudimos verificar tu identidad. Contacta a quien te envió el documento.',
+  IDENTITY_DATA_MISMATCH:
+    'La identificación verificada no corresponde a la persona invitada a firmar este documento.',
+  CERTIFICATE_INVALID:
+    'Tu e.firma no es válida: revisa que el certificado esté vigente y que la llave y la contraseña correspondan.',
+  CERTIFICATE_REVOKED:
+    'El SAT reporta tu certificado como revocado. Tramita uno nuevo para firmar.',
+  CERTIFICATE_SUBJECT_MISMATCH:
+    'El titular de la e.firma no corresponde a la persona invitada a firmar este documento.',
+  SIGNATURE_VALIDATION_FAILED:
+    'La firma no corresponde al documento que revisaste. Vuelve a abrirlo y firma de nuevo.',
+  SIGNING_SESSION_EXPIRED:
+    'Tu sesión de firma venció. Vuelve a abrir tu invitación y valida el código.',
+  SIGNING_NOT_AVAILABLE:
+    'Este documento no tiene una firma pendiente para ti en este momento.',
+};
+
+/**
+ * Código estable de un error de la sesión pública, si el backend lo mandó.
+ *
+ * @param error - Error de la petición.
+ * @returns El código, o `null`.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * signingErrorCode(error); // 'CERTIFICATE_REVOKED'
+ * ```
+ */
+export function signingErrorCode(error: unknown): SigningErrorCode | null {
+  if (!isAxiosError<Partial<SigningErrorBody>>(error)) return null;
+  const code = error.response?.data?.code;
+  return code && Object.hasOwn(SIGNING_ERROR_MESSAGES, code) ? code : null;
+}
+
+/**
+ * Mensaje para el firmante de un error de firma: el controlado de su código, o el del backend (o
+ * el de respaldo) si no trae uno conocido.
+ *
+ * @param error - Error de la petición.
+ * @param fallback - Mensaje si no hay nada mejor.
+ * @returns El mensaje.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * toast.error(signingErrorMessage(error, 'No se pudo registrar la firma.'));
+ * ```
+ */
+export function signingErrorMessage(error: unknown, fallback: string): string {
+  const code = signingErrorCode(error);
+  return code ? SIGNING_ERROR_MESSAGES[code] : getErrorMessage(error, fallback);
 }
 
 /** Espera con su texto. */
