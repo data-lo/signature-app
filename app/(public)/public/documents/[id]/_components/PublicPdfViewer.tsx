@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Document } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -15,6 +15,11 @@ import { usePdfDocumentLoader } from '@/components/pdf/use-pdf-document-loader';
 
 interface PublicPdfViewerProps {
   file: string;
+  /**
+   * Capa opcional sobre cada página (p. ej. dónde va la firma, ver `SignaturePositionsLayer`). Se
+   * dibuja dentro de un contenedor `relative` del tamaño de la página.
+   */
+  renderPageOverlay?: (pageNumber: number) => ReactNode;
 }
 
 const CONTAINER_PADDING = 48;
@@ -30,6 +35,7 @@ const MAX_PAGE_WIDTH = 900;
  * ningún árbol de rutas.
  *
  * @param props.file - URL pública del documento firmado.
+ * @param props.renderPageOverlay - Capa opcional sobre cada página.
  * @returns El panel con scroll y las páginas del documento.
  *
  * @example
@@ -37,7 +43,10 @@ const MAX_PAGE_WIDTH = 900;
  * <PublicPdfViewer file={secureUrl} />
  * ```
  */
-export default function PublicPdfViewer({ file }: PublicPdfViewerProps) {
+export default function PublicPdfViewer({
+  file,
+  renderPageOverlay,
+}: PublicPdfViewerProps) {
   const loader = usePdfDocumentLoader(file);
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageWidth, setPageWidth] = useState(520);
@@ -90,13 +99,14 @@ export default function PublicPdfViewer({ file }: PublicPdfViewerProps) {
             <PdfLoadingMessage progress={loader.progress} />
           ) : (
             loader.pageSizes.map((size, i) => (
-              <div key={i} className="shadow-xl">
+              <div key={i} className="relative shadow-xl">
                 <LazyPdfPage
                   pageNumber={i + 1}
                   width={pageWidth}
                   size={size}
                   scrollRootRef={containerRef}
                 />
+                {renderPageOverlay?.(i + 1)}
               </div>
             ))
           )}

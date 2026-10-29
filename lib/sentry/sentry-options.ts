@@ -2,6 +2,8 @@ import type { ErrorEvent, Event } from '@sentry/nextjs';
 
 import {
   redactEvent,
+  redactSensitiveText,
+  redactValue,
   scrubBreadcrumb,
 } from '@/lib/observability/sensitive-data';
 
@@ -89,11 +91,16 @@ export function resolveSentryRelease(): string | undefined {
  * recoja, pero cualquier integración, versión nueva del SDK o `setContext` manual podría volver a
  * colarlos. Este filtro corre al final, sobre el evento ya armado, y no depende de nada de eso.
  *
+ * También redacta las URLs que el SDK arma con el path crudo —`request.url`, el nombre de la
+ * transacción, la descripción y los datos de cada span y los del contexto de la traza—: el path
+ * de `/sign/:token` lleva el token de la invitación (ver `redactSensitiveText`).
+ *
  * Muta el evento recibido (es lo que esperan `beforeSend`/`beforeSendTransaction`) y lo devuelve
  * para poder encadenarlo.
  *
  * @param event - Evento de error o transacción tal como lo armó el SDK.
- * @returns El mismo evento, sin `request.cookies` y sin los encabezados de `SENSITIVE_HEADER_NAMES`.
+ * @returns El mismo evento, sin `request.cookies`, sin los encabezados de `SENSITIVE_HEADER_NAMES`
+ *   y con las URLs redactadas.
  *
  * @example
  * ```ts
@@ -104,10 +111,23 @@ export function resolveSentryRelease(): string | undefined {
  * ```
  */
 export function scrubSensitiveRequestData<T extends Event>(event: T): T {
+  if (event.transaction) {
+    event.transaction = redactSensitiveText(event.transaction);
+  }
+  for (const span of event.spans ?? []) {
+    if (span.description) {
+      span.description = redactSensitiveText(span.description);
+    }
+    if (span.data) span.data = redactValue(span.data) as typeof span.data;
+  }
+  const trace = event.contexts?.trace;
+  if (trace?.data) trace.data = redactValue(trace.data) as typeof trace.data;
+
   const request = event.request;
   if (!request) return event;
 
   delete request.cookies;
+  if (request.url) request.url = redactSensitiveText(request.url);
 
   if (request.headers) {
     for (const name of Object.keys(request.headers)) {
