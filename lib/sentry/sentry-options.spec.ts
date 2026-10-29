@@ -33,6 +33,34 @@ describe('scrubSensitiveRequestData', () => {
     });
   });
 
+  it('no deja salir el token de /sign/:token en la URL, la transacción ni los spans', () => {
+    const token = 'q3VbX7f0_Lr9-ZtKp2NcWm4YhA8sDe1JuGo6BiQk5Rv';
+    const event = scrubSensitiveRequestData({
+      type: 'transaction',
+      transaction: `GET /sign/${token}`,
+      request: { url: `https://app.example.com/sign/${token}` },
+      contexts: {
+        trace: {
+          trace_id: 't',
+          span_id: 's',
+          data: { 'http.target': `/sign/${token}` },
+        },
+      },
+      spans: [
+        {
+          span_id: 's2',
+          trace_id: 't',
+          start_timestamp: 0,
+          description: `GET /api/api/v1/public/signing-sessions/${token}`,
+          data: { url: `/api/api/v1/public/signing-sessions/${token}` },
+        },
+      ],
+    } as unknown as ErrorEvent);
+
+    expect(JSON.stringify(event)).not.toContain(token);
+    expect(event.request?.url).toBe('https://app.example.com/sign/[redactado]');
+  });
+
   it('deja intacto un evento sin petición', () => {
     const event = errorEvent(undefined);
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { isAxiosError } from 'axios';
 import { CheckCircle2, KeyRound, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -21,12 +20,7 @@ import {
   useSignGuestAdvancedDocument,
 } from '../../advanced-signature/_hooks/useGuestAdvancedSignature';
 import GuestAdvancedAccessCodeStep from '../../advanced-signature/_components/GuestAdvancedAccessCodeStep';
-
-// react-pdf necesita el DOM: el visor sólo se carga en el cliente, igual que en la vista pública.
-const PublicPdfViewer = dynamic(
-  () => import('../../_components/PublicPdfViewer'),
-  { ssr: false },
-);
+import SigningDocumentWorkspace from '@/app/(public)/_signing/SigningDocumentWorkspace';
 
 export const EXPIRED_ACCESS_NOTICE =
   'Tu acceso venció o ya no es válido. Solicita un nuevo código para continuar con la firma.';
@@ -40,6 +34,10 @@ interface PublicAdvancedSigningFlowProps {
   invitation: GuestInvitation;
   /** Correo invitado enmascarado por el backend, para el paso del código. */
   maskedEmail?: string;
+  /** Se llama una vez registrada la firma. */
+  onSigned?: (result: { documentCompleted: boolean }) => void;
+  /** Se llama ante un fallo de la firma que no es de la e.firma ni del acceso (red, 5xx). */
+  onError?: (error: unknown) => void;
 }
 
 /** Encabezado con el paso en curso, para que el invitado sepa siempre dónde va. */
@@ -69,6 +67,8 @@ function StepLabel({ step, text }: { step: 1 | 2; text: string }) {
  * @param props.documentId - Documento de la invitación.
  * @param props.invitation - Colaborador y, si viene, correo del enlace.
  * @param props.maskedEmail - Correo enmascarado por el backend.
+ * @param props.onSigned - Aviso de firma registrada.
+ * @param props.onError - Aviso de un fallo inesperado al firmar.
  * @returns El paso del flujo en el que va el invitado.
  *
  * @example
@@ -80,6 +80,8 @@ export default function PublicAdvancedSigningFlow({
   documentId,
   invitation,
   maskedEmail,
+  onSigned,
+  onError,
 }: PublicAdvancedSigningFlowProps) {
   const { access, loaded, save, clear } = useGuestAccess(
     documentId,
@@ -133,12 +135,17 @@ export default function PublicAdvancedSigningFlow({
           setResult(data);
           // El acceso quedó consumido: guardarlo sólo dejaría un token inútil.
           clear();
+          onSigned?.({ documentCompleted: data.documentCompleted });
         },
         onError: (signError) => {
+          const status = isAxiosError(signError)
+            ? signError.response?.status
+            : undefined;
           // Si el documento cambió, se vuelve a cargar para que lo revise antes de reintentar.
-          if (isAxiosError(signError) && signError.response?.status === 400) {
+          if (status === 400) {
             void documentQuery.refetch();
           }
+          if (status === undefined || status >= 500) onError?.(signError);
         },
       },
     );
@@ -246,13 +253,7 @@ export default function PublicAdvancedSigningFlow({
   const signing = sign.isPending || geoStatus === 'requesting';
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <Card className="h-[75vh] overflow-hidden p-0">
-        <CardContent className="h-full p-0">
-          <PublicPdfViewer file={document.fileUrl} />
-        </CardContent>
-      </Card>
-
+    <SigningDocumentWorkspace fileUrl={document.fileUrl}>
       <Card>
         <CardHeader className="gap-1">
           <StepLabel step={2} text="Revisa y firma" />
@@ -299,6 +300,6 @@ export default function PublicAdvancedSigningFlow({
         onSubmit={(values) => void handleSign(values)}
         confirming={signing}
       />
-    </div>
+    </SigningDocumentWorkspace>
   );
 }

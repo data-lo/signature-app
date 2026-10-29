@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,12 +16,7 @@ import {
   useStartGuestBiometricSession,
 } from '../_hooks/useGuestBiometricSignature';
 import GuestAccessCodeStep from './GuestAccessCodeStep';
-
-// react-pdf necesita el DOM: el visor sólo se carga en el cliente, igual que en la vista pública.
-const PublicPdfViewer = dynamic(
-  () => import('../../_components/PublicPdfViewer'),
-  { ssr: false },
-);
+import SigningDocumentWorkspace from '@/app/(public)/_signing/SigningDocumentWorkspace';
 
 const EXPIRED_ACCESS_NOTICE =
   'Tu acceso venció. Solicita un nuevo código para continuar con la firma.';
@@ -33,6 +27,10 @@ interface PublicBiometricSigningFlowProps {
   invitation: GuestInvitation | null;
   /** Correo invitado enmascarado por el backend, para el paso del código. */
   maskedEmail?: string;
+  /** Se llama una vez, cuando el backend da la firma por completada. */
+  onSigned?: (result: { documentCompleted: boolean }) => void;
+  /** Se llama si no se pudo iniciar la sesión de Didit por un fallo que no es del acceso. */
+  onError?: (error: unknown) => void;
 }
 
 /**
@@ -50,6 +48,8 @@ export default function PublicBiometricSigningFlow({
   documentId,
   invitation,
   maskedEmail,
+  onSigned,
+  onError,
 }: PublicBiometricSigningFlowProps) {
   const { access, loaded, save, clear } = useGuestAccess(documentId);
   const [notice, setNotice] = useState<string | null>(null);
@@ -84,8 +84,24 @@ export default function PublicBiometricSigningFlow({
       return;
     }
     setGeoBlockedReason(null);
-    start.mutate(coords);
+    start.mutate(coords, {
+      onError: (startError) => {
+        if (!isGuestAccessExpired(startError)) onError?.(startError);
+      },
+    });
   }
+
+  const signedNotified = useRef(false);
+  const completedSession = sessionQuery.data?.signatureCompleted
+    ? sessionQuery.data
+    : null;
+  useEffect(() => {
+    if (!completedSession || signedNotified.current) return;
+    signedNotified.current = true;
+    onSigned?.({
+      documentCompleted: Boolean(completedSession.documentCompleted),
+    });
+  }, [completedSession, onSigned]);
 
   if (!loaded) {
     return null;
@@ -163,13 +179,7 @@ export default function PublicBiometricSigningFlow({
   const signed = Boolean(session?.signatureCompleted);
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <Card className="h-[75vh] overflow-hidden p-0">
-        <CardContent className="h-full p-0">
-          <PublicPdfViewer file={document.fileUrl} />
-        </CardContent>
-      </Card>
-
+    <SigningDocumentWorkspace fileUrl={document.fileUrl}>
       <Card>
         <CardHeader>
           <CardTitle className="break-words text-base">
@@ -202,6 +212,6 @@ export default function PublicBiometricSigningFlow({
           )}
         </CardContent>
       </Card>
-    </div>
+    </SigningDocumentWorkspace>
   );
 }

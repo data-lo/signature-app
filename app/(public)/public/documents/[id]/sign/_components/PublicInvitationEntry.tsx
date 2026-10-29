@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
@@ -19,7 +19,9 @@ import {
 import { readStoredGuestAccess } from '../../biometric-signature/_hooks/useGuestAccess';
 import { SignatureType } from '@/lib/enums/document';
 import { getPublicSigningInvitationRequest } from '../_requests';
-import PublicSigningMethodRouter from './PublicSigningMethodRouter';
+import { SigningSessionProvider } from '@/app/(public)/_signing/SigningSessionProvider';
+import PublicSigningLayout from '@/app/(public)/_signing/PublicSigningLayout';
+import { fromPublicSigningInvitation } from '@/app/(public)/_signing/signing-session';
 
 export const ACCOUNT_MISMATCH_MESSAGE =
   'La cuenta activa no corresponde al correo invitado para este documento.';
@@ -119,6 +121,10 @@ function Pending({ text }: { text: string }) {
  * El frontend nunca vincula ni compara correos: decide el backend con el correo verificado de la
  * sesión. Al volver de Didit (sin invitación en la URL ni contexto) retoma la firma biométrica con
  * el acceso de invitado de la pestaña.
+ *
+ * Es el adaptador de esta ruta al modelo compartido: al continuar sin cuenta convierte la
+ * invitación en una `SigningSession` (`fromPublicSigningInvitation`) y la firma sigue en
+ * `PublicSigningLayout`, la misma pantalla que usa `/sign/:token`.
  */
 export default function PublicInvitationEntry({
   documentId,
@@ -211,20 +217,31 @@ export default function PublicInvitationEntry({
     setChoice('guest');
   }
 
-  const guestInvitation = reference
-    ? { collaboratorId: reference, ...(email ? { email } : {}) }
-    : null;
+  /** Sesión normalizada para el layout compartido: la del invitado, o la de regreso de Didit. */
+  const guestSession = useMemo(() => {
+    if (reference === null && resumesBiometric) {
+      return fromPublicSigningInvitation(
+        documentId,
+        null,
+        { collaboratorId: null, email: null },
+        SignatureType.BIOMETRIC,
+      );
+    }
+    if (choice !== 'guest' || !reference || !invitation) return null;
+    return fromPublicSigningInvitation(documentId, invitation, {
+      collaboratorId: reference,
+      email,
+    });
+  }, [choice, documentId, email, invitation, reference, resumesBiometric]);
 
   if (reference === undefined) return null;
 
   if (reference === null) {
-    if (resumesBiometric) {
+    if (guestSession) {
       return (
-        <PublicSigningMethodRouter
-          documentId={documentId}
-          invitation={null}
-          signatureType={SignatureType.BIOMETRIC}
-        />
+        <SigningSessionProvider state={guestSession}>
+          <PublicSigningLayout />
+        </SigningSessionProvider>
       );
     }
     return (
@@ -278,14 +295,11 @@ export default function PublicInvitationEntry({
     );
   }
 
-  if (choice === 'guest') {
+  if (choice === 'guest' && guestSession) {
     return (
-      <PublicSigningMethodRouter
-        documentId={documentId}
-        invitation={guestInvitation}
-        signatureType={invitation.signatureType}
-        maskedEmail={invitation.maskedEmail}
-      />
+      <SigningSessionProvider state={guestSession}>
+        <PublicSigningLayout />
+      </SigningSessionProvider>
     );
   }
 
