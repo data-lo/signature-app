@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import SigningSessionStatusView from '../SigningSessionStatusView';
 import { invitationStatusOf } from '../signing-session';
+import AccountSigningLogin from './AccountSigningLogin';
 import InvitationCodeStep from './InvitationCodeStep';
 import SigningSessionScreen from './SigningSessionScreen';
 import {
@@ -29,7 +30,9 @@ interface InvitationSigningEntryProps {
  * 1. **Canje del token** — el único paso distinto: el del correo vive días; el del portal, minutos
  *    y un solo uso. El backend resuelve la invitación y deja la cookie de acceso.
  * 2. **Estado** — invitación inválida, vencida, revocada, ya firmada, documento cancelado, todavía
- *    no es su turno, o se firma desde la cuenta: estado controlado, sin PDF ni datos.
+ *    no es su turno, o se firma desde la cuenta: estado controlado, sin PDF ni datos. Si se firma
+ *    desde una cuenta activa, el backend manda el documento y se ofrece iniciar sesión
+ *    (`AccountSigningLogin`) para volver a él ya autenticado.
  * 3. **Código al correo de la invitación** (`InvitationCodeStep`), antes de ver el documento.
  * 4. **Sesión pública** (`SigningSessionScreen`): la misma para los dos orígenes.
  *
@@ -75,6 +78,11 @@ export default function InvitationSigningEntry({
   }, [openQuery.data, openQuery.error, openQuery.isError]);
 
   if (verified) return <SigningSessionScreen />;
+
+  const accountDocumentId = openQuery.data?.document?.id;
+  if (status === 'ACCOUNT_REQUIRED' && accountDocumentId) {
+    return <AccountSigningLogin documentId={accountDocumentId} />;
+  }
 
   if (status !== 'ACTIVE') {
     return (
