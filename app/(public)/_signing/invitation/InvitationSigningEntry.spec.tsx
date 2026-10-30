@@ -11,6 +11,7 @@ import {
   type CurrentSigningSession,
   type InvitationContext,
 } from './invitation-requests';
+import { getAuthToken } from '@/lib/cookies';
 import InvitationSigningEntry, {
   type InvitationSource,
 } from './InvitationSigningEntry';
@@ -27,9 +28,11 @@ jest.mock('react-hot-toast', () => ({
   __esModule: true,
   default: Object.assign(jest.fn(), { success: jest.fn(), error: jest.fn() }),
 }));
+const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
 }));
+jest.mock('@/lib/cookies', () => ({ getAuthToken: jest.fn() }));
 
 const mockedOpenInvitation = openInvitationRequest as jest.Mock;
 const mockedOpenLaunch = openLaunchRequest as jest.Mock;
@@ -37,6 +40,7 @@ const mockedRequestCode = requestInvitationCodeRequest as jest.Mock;
 const mockedVerifyCode = verifyInvitationCodeRequest as jest.Mock;
 const mockedCurrent = getCurrentSigningSessionRequest as jest.Mock;
 const mockedDocument = getCurrentSigningDocumentRequest as jest.Mock;
+const mockedAuthToken = getAuthToken as jest.Mock;
 
 const EMAIL: InvitationSource = { kind: 'EMAIL', token: 'q'.repeat(43) };
 const LAUNCH: InvitationSource = {
@@ -218,6 +222,47 @@ describe('InvitationSigningEntry (/sign/:token y /sign/launch/:token)', () => {
     expect(
       screen.queryByRole('button', { name: /enviar código/i }),
     ).not.toBeInTheDocument();
+  });
+
+  const ACCOUNT_SIGNER: InvitationContext = {
+    ...ACTIVE,
+    document: { name: 'contrato.pdf', id: 'doc-1' },
+    signer: {
+      maskedEmail: 'a***@correo.com',
+      accountStatus: 'ACTIVE',
+      publicSigningAllowed: false,
+    },
+    signature: { ...ACTIVE.signature!, type: 'SIMPLE' },
+  };
+
+  it('firmante con cuenta activa sin sesión: inicia sesión y vuelve al documento', async () => {
+    mockedAuthToken.mockReturnValue(undefined);
+    mockedOpenInvitation.mockResolvedValue(ACCOUNT_SIGNER);
+    renderEntry(EMAIL);
+
+    expect(
+      await screen.findByText(/inicia sesión para firmar/i),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: /iniciar sesión/i }),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/login?returnTo=%2Fdashboard%2Fdocuments%2Fdoc-1',
+    );
+    expect(mockedRequestCode).not.toHaveBeenCalled();
+  });
+
+  it('firmante con cuenta activa y sesión iniciada: va directo al documento', async () => {
+    mockedAuthToken.mockReturnValue('jwt');
+    mockedOpenLaunch.mockResolvedValue(ACCOUNT_SIGNER);
+    renderEntry(LAUNCH);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /ir al documento/i }),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/documents/doc-1');
   });
 
   it('acceso del portal vencido o ya usado: invitación inválida, sin reintento (es de un solo uso)', async () => {
