@@ -851,7 +851,7 @@ describe('CreateDocumentView', () => {
       // Con firma simple: sin RFC y sin control de 2FA (se fuerza a true de forma oculta).
       expect(screen.queryByLabelText(/^rfc/i)).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('checkbox', { name: /código de verificación/i }),
+        screen.queryByRole('checkbox', { name: /código de seguridad/i }),
       ).not.toBeInTheDocument();
 
       await selectSignatureType(user, /firma electrónica avanzada/i);
@@ -859,7 +859,7 @@ describe('CreateDocumentView', () => {
 
       expect(screen.queryByLabelText(/^rfc/i)).not.toBeInTheDocument();
       expect(
-        screen.getByRole('checkbox', { name: /código de verificación/i }),
+        screen.getByRole('checkbox', { name: /código de seguridad/i }),
       ).toBeInTheDocument();
     });
 

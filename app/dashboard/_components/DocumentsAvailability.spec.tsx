@@ -106,7 +106,7 @@ describe('DocumentsAvailability', () => {
     render(<DocumentsAvailability />, { wrapper });
 
     expect(
-      screen.queryByText(/documentos?/),
+      screen.queryByText(/\d+ documentos?|sin documentos/i),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: ADD_DOCUMENTS_LABEL }),
