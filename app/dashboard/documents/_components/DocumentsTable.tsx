@@ -65,6 +65,7 @@ import {
 } from '../_config/sorting';
 import {
   DEFAULT_VISIBLE_DOCUMENT_COLUMNS,
+  documentTableLayout,
   normalizeVisibleDocumentColumns,
   type DocumentColumnId,
 } from '../_config/columns';
@@ -320,11 +321,12 @@ export default function DocumentsTable({
   /** Normalizada para que "Documento" no pueda faltar aunque el llamador la omita. */
   const shownColumns = new Set(normalizeVisibleDocumentColumns(visibleColumns));
   const isShown = (columnId: DocumentColumnId) => shownColumns.has(columnId);
+  const tableLayout = documentTableLayout(visibleColumns);
   /**
    * Columnas pintadas, más la de acciones. Lo usan las filas de carga, vacía y error para ocupar
    * todo el ancho con cualquier combinación de columnas visibles.
    */
-  const columnCount = shownColumns.size + 1;
+  const columnCount = tableLayout.columns.length;
   const [shareDoc, setShareDoc] = useState<DocumentListItem | null>(null);
   const [participantsDoc, setParticipantsDoc] =
     useState<DocumentListItem | null>(null);
@@ -378,26 +380,34 @@ export default function DocumentsTable({
       <DataTableCard data-slot="documents-table-card">
         {/*
           Una grilla explícita evita que una celda con texto largo (nombre, RFC o estatus) le
-          quite espacio de forma impredecible a las demás. El ancho mínimo conserva columnas
+          quite espacio de forma impredecible a las demás. Se arma sólo con las columnas visibles:
+          "Documento" no lleva ancho y absorbe el espacio libre. El ancho mínimo conserva columnas
           legibles; por debajo de él, el contenedor de `Table` ofrece desplazamiento horizontal.
         */}
         <Table
           aria-busy={bodyState === 'loading' || undefined}
-          className="min-w-[1200px] table-fixed [&_[data-slot=table-head]]:!h-12 [&_[data-slot=table-head]]:!px-3 [&_[data-slot=table-cell]]:!px-3 [&_[data-slot=table-cell]]:!py-3"
+          style={{ minWidth: tableLayout.minWidth }}
+          className="table-fixed [&_[data-slot=table-head]]:!h-12 [&_[data-slot=table-head]]:!px-3 [&_[data-slot=table-cell]]:!px-3 [&_[data-slot=table-cell]]:!py-3"
         >
           <colgroup>
-            <col className="w-[2%]" />
-            <col className="w-[19%]" />
-            <col className="w-[14%]" />
-            <col className="w-[12%]" />
-            <col className="w-[15%]" />
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[7%]" />
-            <col className="w-[5%]" />
+            {tableLayout.columns.map((column) => (
+              <col
+                key={column.id}
+                data-column={column.id}
+                style={
+                  column.width === null ? undefined : { width: column.width }
+                }
+              />
+            ))}
           </colgroup>
           <DataTableHeader>
-            {isShown('index') && <TableHead className="w-16">#</TableHead>}
+            {isShown('index') && (
+              <TableHead>
+                {/* Se ve "#", que un lector de pantalla no lee de forma útil: se anuncia "Índice". */}
+                <span aria-hidden="true">#</span>
+                <span className="sr-only">Índice</span>
+              </TableHead>
+            )}
             {isShown('document') && (
               <TableHead aria-sort={ARIA_SORT[nameSort]}>
                 <SortableHeader
@@ -414,7 +424,7 @@ export default function DocumentsTable({
             {isShown('createdAt') && <TableHead>Fecha de creación</TableHead>}
             {isShown('signedAt') && <TableHead>Fecha de firma</TableHead>}
             {isShown('signatureType') && <TableHead>Tipo de firma</TableHead>}
-            <TableHead aria-label="Acciones" className="w-16" />
+            <TableHead aria-label="Acciones" />
           </DataTableHeader>
           <TableBody>
             {bodyState === 'error' && (
@@ -481,21 +491,21 @@ export default function DocumentsTable({
                   onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
                 >
                   {isShown('index') && (
-                    <TableCell className="w-16 whitespace-nowrap tabular-nums text-muted-foreground">
+                    <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                       {documentRowIndex(page, pageSize, rowIndex)}
                     </TableCell>
                   )}
-                  {/* Ancho fijo (`w-64 max-w-64`) en todas las resoluciones: el nombre se recorta
-                    dentro de él en una sola línea y el completo va en el tooltip (ver
-                    `DocumentFileName`), así la columna y la altura de la fila no dependen de lo
-                    largo que sea. En pantallas angostas la tabla se desplaza en horizontal. */}
+                  {/* El ancho lo decide el `colgroup`: el nombre se recorta dentro de él en una sola
+                    línea y el completo va en el tooltip (ver `DocumentFileName`), así la columna y
+                    la altura de la fila no dependen de lo largo que sea. En pantallas angostas la
+                    tabla se desplaza en horizontal. */}
                   {/* Sólo la información del archivo: el estatus ya tiene su propia columna, y el
                     punto de color que lo repetía aquí se quitó (historia "Ajustar columnas de la
                     tabla de documentos"). */}
                   {/* "Documento" no se puede ocultar (ver `../_config/columns`), así que el botón
                     del nombre —el acceso por teclado a la fila— siempre está. */}
                   {isShown('document') && (
-                    <TableCell className="w-64 max-w-64 text-emerald-700 dark:text-emerald-400">
+                    <TableCell className="text-emerald-700 dark:text-emerald-400">
                       {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
                         alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
                         sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
