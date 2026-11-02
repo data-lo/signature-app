@@ -226,7 +226,7 @@ describe('DashboardBreadcrumbs', () => {
     renderWithProviders(<DashboardBreadcrumbs />);
 
     expect(
-      screen.getByRole('link', { name: 'Agregar Documentos' }),
+      screen.getByRole('link', { name: 'Agregar documentos' }),
     ).toHaveAttribute('href', '/dashboard/subscriptions');
   });
 

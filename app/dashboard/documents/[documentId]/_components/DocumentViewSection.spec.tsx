@@ -1300,8 +1300,9 @@ describe('DocumentViewSection', () => {
       });
       renderWithProviders(<DocumentViewSection documentId="doc-1" />);
 
+      // En el panel de firma la acción va compacta y se rotula distinto.
       expect(
-        screen.getByRole('button', { name: /compartir enlace/i }),
+        screen.getByRole('button', { name: /copiar enlace/i }),
       ).toBeInTheDocument();
     });
   });
@@ -1567,7 +1568,7 @@ describe('DocumentViewSection', () => {
         biometricSession({ status: BiometricSignatureStatus.InProgress }),
       );
 
-      expect(screen.getByText(/en captura/i)).toBeInTheDocument();
+      expect(screen.getByText(/verifica tu identidad/i)).toBeInTheDocument();
       expect(
         screen.getByLabelText(/código qr para continuar la verificación/i),
       ).toBeInTheDocument();
