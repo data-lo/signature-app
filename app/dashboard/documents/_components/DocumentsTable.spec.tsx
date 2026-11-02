@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, screen, waitFor, within } from '@/test-utils';
 import DocumentsTable, {
@@ -5,6 +6,7 @@ import DocumentsTable, {
   EMPTY_DOCUMENTS_MESSAGE,
   type DocumentListItem,
 } from './DocumentsTable';
+import type { DocumentColumnId } from '../_config/columns';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
 import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
 import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
@@ -127,7 +129,7 @@ describe('DocumentsTable', () => {
     it('renderiza las columnas en el orden Índice / Documento / Creado por / Participación / Estatus / Fecha de creación / Fecha de firma / Tipo de firma / Acciones', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
-      // Por nombre accesible: el de "Índice" se ve como un gato, pero se anuncia como "Índice".
+      // Por nombre accesible: el de "Índice" se ve como "#", pero se anuncia como "Índice".
       const names = [
         'Índice',
         'Documento',
@@ -145,11 +147,11 @@ describe('DocumentsTable', () => {
       );
     });
 
-    it('el encabezado del índice muestra un gato, oculto a los lectores de pantalla, y se anuncia como "Índice"', () => {
+    it('el encabezado del índice muestra "#", oculto a los lectores de pantalla, y se anuncia como "Índice"', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
 
       const header = screen.getByRole('columnheader', { name: 'Índice' });
-      expect(within(header).getByText('🐱')).toHaveAttribute(
+      expect(within(header).getByText('#')).toHaveAttribute(
         'aria-hidden',
         'true',
       );
@@ -206,6 +208,123 @@ describe('DocumentsTable', () => {
    * en DD/MM/YYYY, que es lo que se compara de un vistazo en un listado. El formato largo
    * ("Domingo 15 de marzo, 11:55 PM") sigue en las pantallas de detalle y evidencia.
    */
+  describe('distribución según las columnas visibles', () => {
+    const ALL_COLUMNS: DocumentColumnId[] = [
+      'index',
+      'document',
+      'creator',
+      'participation',
+      'status',
+      'createdAt',
+      'signedAt',
+      'signatureType',
+    ];
+
+    /** Lo que define la grilla: qué columna va en cada `col`, con qué ancho y el mínimo. */
+    function grid() {
+      const table = screen.getByRole('table');
+      return {
+        minWidth: table.style.minWidth,
+        columns: Array.from(table.querySelectorAll('col')).map((col) => [
+          col.dataset.column,
+          col.style.width,
+        ]),
+      };
+    }
+
+    it.each([
+      ['todas las columnas', ALL_COLUMNS, '1200px'],
+      ['pocas columnas', ['document'], '288px'],
+      [
+        'columnas intermedias',
+        ['index', 'document', 'status', 'signedAt'],
+        '660px',
+      ],
+    ] as [string, DocumentColumnId[], string][])(
+      'con %s, el colgroup coincide con los encabezados y Documento no lleva ancho',
+      (_, visibleColumns, minWidth) => {
+        renderWithProviders(
+          <DocumentsTable
+            documents={[buildDoc()]}
+            visibleColumns={visibleColumns}
+          />,
+        );
+
+        const { columns, minWidth: tableMinWidth } = grid();
+        expect(tableMinWidth).toBe(minWidth);
+        expect(columns).toHaveLength(visibleColumns.length + 1);
+        expect(columns).toHaveLength(
+          screen.getAllByRole('columnheader').length,
+        );
+        expect(columns.map(([id]) => id)).toEqual([
+          ...visibleColumns,
+          'actions',
+        ]);
+        expect(columns).toContainEqual(['document', '']);
+        expect(columns[columns.length - 1]).toEqual(['actions', '60px']);
+      },
+    );
+
+    it('redistribuye al ocultar una columna y la recupera al volver a mostrarla, sin remontar', async () => {
+      const user = userEvent.setup();
+
+      function TableWithColumnToggle() {
+        const [statusVisible, setStatusVisible] = useState(true);
+        return (
+          <>
+            <button onClick={() => setStatusVisible((visible) => !visible)}>
+              Alternar estatus
+            </button>
+            <DocumentsTable
+              documents={[buildDoc()]}
+              visibleColumns={
+                statusVisible
+                  ? ALL_COLUMNS
+                  : ALL_COLUMNS.filter((id) => id !== 'status')
+              }
+            />
+          </>
+        );
+      }
+
+      renderWithProviders(<TableWithColumnToggle />);
+      const toggle = screen.getByRole('button', { name: 'Alternar estatus' });
+      const original = grid();
+      const table = screen.getByRole('table');
+
+      await user.click(toggle);
+      expect(grid().minWidth).toBe('1020px');
+      expect(grid().columns.map(([id]) => id)).not.toContain('status');
+
+      await user.click(toggle);
+      expect(grid()).toEqual(original);
+      expect(screen.getByRole('table')).toBe(table);
+    });
+
+    it.each([
+      ['vacío', {}],
+      ['de error', { errorMessage: 'Falló' }],
+      ['de carga', { isLoading: true }],
+    ] as const)(
+      'el estado %s cubre sólo las columnas visibles',
+      (_, stateProps) => {
+        const { container } = renderWithProviders(
+          <DocumentsTable
+            documents={[]}
+            visibleColumns={['index', 'document']}
+            {...stateProps}
+          />,
+        );
+
+        const cells = container.querySelectorAll('tbody td[colspan]');
+        expect(cells.length).toBeGreaterThan(0);
+        cells.forEach((cell) => {
+          expect(cell).toHaveAttribute('colspan', '3');
+        });
+      },
+    );
+  });
+
   describe('fechas', () => {
     it('muestra la fecha de creación en formato DD/MM/YYYY', () => {
       renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
@@ -271,7 +390,7 @@ describe('DocumentsTable', () => {
 
       afterEach(() => jest.restoreAllMocks());
 
-      it('la columna tiene un ancho fijo y el nombre no se parte en varias líneas', () => {
+      it('el nombre se recorta dentro de la columna y no se parte en varias líneas', () => {
         renderWithProviders(
           <DocumentsTable
             documents={[buildDoc({ fileName: LONG_NAME })]}
@@ -280,7 +399,6 @@ describe('DocumentsTable', () => {
         );
 
         const cell = dataCell('Documento');
-        expect(cell).toHaveClass('w-64', 'max-w-64');
         expect(cell).not.toHaveClass('whitespace-normal');
 
         const name = within(cell).getByRole('button', { name: LONG_NAME });
@@ -987,6 +1105,25 @@ describe('DocumentsTable', () => {
       },
     );
 
+    it('activar el nombre abre el documento de esa fila una sola vez', async () => {
+      const user = userEvent.setup();
+      const onRowSelect = jest.fn();
+      renderWithProviders(
+        <DocumentsTable
+          documents={[
+            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
+            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
+          ]}
+          onRowSelect={onRowSelect}
+        />,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'anexo.pdf' }));
+
+      expect(onRowSelect).toHaveBeenCalledTimes(1);
+      expect(onRowSelect).toHaveBeenCalledWith('doc-2');
+    });
+
     it('indica que la fila es seleccionable con el cursor de mano', () => {
       renderWithProviders(
         <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
@@ -1360,88 +1497,6 @@ describe('DocumentsTable', () => {
           .slice(1)
           .map((row) => within(row).getAllByRole('cell')[0].textContent),
       ).toEqual(['11', '12', '13']);
-    });
-  });
-
-  describe('visualizar documento', () => {
-    it('cada fila tiene una acción "Ver documento" con el nombre de su archivo', () => {
-      renderWithProviders(
-        <DocumentsTable
-          documents={[
-            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
-            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
-          ]}
-          onRowSelect={jest.fn()}
-        />,
-      );
-
-      expect(
-        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
-      ).toBeInTheDocument();
-    });
-
-    it('abre el documento de esa fila una sola vez (la fila no lo vuelve a abrir)', async () => {
-      const user = userEvent.setup();
-      const onRowSelect = jest.fn();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[
-            buildDoc({ id: 'doc-1', fileName: 'contrato.pdf' }),
-            buildDoc({ id: 'doc-2', fileName: 'anexo.pdf' }),
-          ]}
-          onRowSelect={onRowSelect}
-        />,
-      );
-
-      await user.click(
-        screen.getByRole('button', { name: 'Ver documento anexo.pdf' }),
-      );
-
-      expect(onRowSelect).toHaveBeenCalledTimes(1);
-      expect(onRowSelect).toHaveBeenCalledWith('doc-2');
-    });
-
-    it('se puede activar con el teclado', async () => {
-      const user = userEvent.setup();
-      const onRowSelect = jest.fn();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ id: 'doc-9' })]}
-          onRowSelect={onRowSelect}
-        />,
-      );
-
-      screen
-        .getByRole('button', { name: 'Ver documento contrato.pdf' })
-        .focus();
-      await user.keyboard('{Enter}');
-
-      expect(onRowSelect).toHaveBeenCalledTimes(1);
-      expect(onRowSelect).toHaveBeenCalledWith('doc-9');
-    });
-
-    it('muestra el tooltip "Ver documento" al pasar el cursor', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc()]} onRowSelect={jest.fn()} />,
-      );
-
-      await user.hover(
-        screen.getByRole('button', { name: 'Ver documento contrato.pdf' }),
-      );
-
-      expect(await screen.findByText('Ver documento')).toBeInTheDocument();
-    });
-
-    it('no se ofrece si la vista no tiene a dónde abrir el documento', () => {
-      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
-
-      expect(
-        screen.queryByRole('button', { name: /ver documento/i }),
-      ).not.toBeInTheDocument();
     });
   });
 });
