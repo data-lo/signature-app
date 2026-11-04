@@ -39,9 +39,10 @@ export function toRequiresDifferentSignatures(
  * manda requiresTwoFactorAuth=true "oculto". En firma avanzada y biométrica, la configuración
  * única del documento se aplica a todos los firmantes.
  *
- * Un firmante nunca lleva `taxId`: el flujo avanzado obtiene ese dato del certificado de e.firma
- * al firmar (ver historia "Selección de tipo de firma al crear documentos"), y el simple nunca lo
- * pidió.
+ * Ningún colaborador lleva identificador fiscal: el flujo avanzado lo obtiene del certificado de
+ * e.firma al firmar (ver historia "Selección de tipo de firma al crear documentos"), el simple
+ * nunca lo pidió y al testigo dejó de pedírsele (historia "Eliminar campo RFC de la sección de
+ * Testigos").
  */
 export function toCollaboratorPayload(
   collaborator: CollaboratorFormValues,
@@ -70,14 +71,7 @@ export function toCollaboratorPayload(
         };
 
   if (collaborator.collaboratorType === 'WITNESS') {
-    return identity.source === 'DIRECTORY'
-      ? { ...identity, collaboratorType: 'WITNESS', orderIndex }
-      : {
-          ...identity,
-          collaboratorType: 'WITNESS',
-          taxId: collaborator.taxId,
-          orderIndex,
-        };
+    return { ...identity, collaboratorType: 'WITNESS', orderIndex };
   }
 
   return {

@@ -38,7 +38,6 @@ function viewer(): WitnessFormValues {
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
-    taxId: 'AURU800101ABC',
   };
 }
 
@@ -86,12 +85,13 @@ describe('createDocumentSignaturesSchema', () => {
     expect(result.error?.issues[0].path).toEqual(['signatureType']);
   });
 
-  it('acepta un testigo sin taxId', () => {
+  it('acepta un testigo sin RFC y no conserva uno que llegue en los valores', () => {
     const result = createDocumentSignaturesSchema.safeParse(
-      formValues([signer(), { ...viewer(), taxId: '' }]),
+      formValues([signer(), { ...viewer(), taxId: 'AURU800101ABC' } as never]),
     );
 
     expect(result.success).toBe(true);
+    expect(result.data?.collaborators[1]).not.toHaveProperty('taxId');
   });
 
   it('rechaza un correo con formato inválido', () => {

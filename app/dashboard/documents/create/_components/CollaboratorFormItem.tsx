@@ -8,7 +8,6 @@ import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
   COLLABORATOR_NAME_FIELDS,
-  COLLABORATOR_TAX_ID_FIELD,
 } from '../_config/collaborator-fields.config';
 import type { CreateDocumentSignaturesFormValues } from '../_schemas';
 import AddToDirectoryCheckbox from './AddToDirectoryCheckbox';
@@ -37,7 +36,8 @@ interface CollaboratorFormItemProps {
  * solo los campos que aplican a cada uno:
  *  - SIGNER: nombre/apellido/email siempre; la configuración de 2FA aplica a todo el documento
  *    y se decide en la segunda sección.
- *  - WITNESS: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
+ *  - WITNESS: nombre/apellido/email siempre, sin nada de firma/2FA/posición ni RFC (historia
+ *    "Eliminar campo RFC de la sección de Testigos").
  *
  * Historia "Selección de tipo de firma al crear documentos": el tipo de firma ya no se elige por
  * firmante (era un checkbox acá) sino una sola vez para todo el documento. El
@@ -66,12 +66,11 @@ export default function CollaboratorFormItem({
   });
   const isSigner = collaboratorType === 'SIGNER';
   // Elegido del Directorio con usuario vinculado: su identidad la resuelve el backend desde ese
-  // usuario, así que en pantalla se muestra en solo lectura y no lleva RFC ni "Agregar al
+  // usuario, así que en pantalla se muestra en solo lectura y no lleva "Agregar al
   // directorio" (ya está en él). Ver historia "Enviar colaboradores desde Directorio mediante
   // usuario vinculado al crear un documento".
   const isFromDirectory = source === 'DIRECTORY';
   const isReadOnly = isSelf || isFromDirectory;
-  const showTaxId = collaboratorType === 'WITNESS' && !isFromDirectory;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -144,16 +143,6 @@ export default function CollaboratorFormItem({
         placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
         disabled={isReadOnly}
       />
-
-      {showTaxId && (
-        <FormInput
-          control={control}
-          name={`collaborators.${index}.${COLLABORATOR_TAX_ID_FIELD.name}`}
-          label={COLLABORATOR_TAX_ID_FIELD.label}
-          type={COLLABORATOR_TAX_ID_FIELD.type}
-          placeholder={COLLABORATOR_TAX_ID_FIELD.placeholder}
-        />
-      )}
 
       {!isReadOnly && (
         <AddToDirectoryCheckbox control={control} index={index} />

@@ -15,18 +15,6 @@ const emailField = z
   .min(1, { message: 'Ingresa el correo electrónico del participante.' })
   .email({ message: 'Ingresa un correo electrónico válido.' });
 /**
- * Identificador fiscal del testigo —en México, su RFC, que es lo que sigue diciendo la
- * etiqueta en pantalla—. Se llamaba `rfc` hasta la historia "Estandarizar campos de
- * colaboradores": el nombre del campo deja de dar por hecho el régimen fiscal, el dato que se
- * captura es el mismo.
- *
- * Opcional desde la historia "Eliminar campo RFC de la sección de Espectadores": un testigo
- * puede guardarse sin él. `.trim()` sigue aplicando por si acaso llega solo espacios; un string
- * vacío es válido y así viaja al backend, donde `CollaboratorPayloadDto.taxId` también lo acepta.
- */
-const taxIdField = z.string().trim();
-
-/**
  * Origen de la identidad del colaborador (historia "Enviar colaboradores desde Directorio
  * mediante usuario vinculado al crear un documento"). `MANUAL`: capturado en la tarjeta.
  * `DIRECTORY`: elegido del Directorio, con usuario vinculado; su nombre, apellido y correo se
@@ -78,15 +66,14 @@ export const signerSchema = z.object({
 });
 
 /**
- * El identificador fiscal sobrevive solo acá: un testigo no firma, así que no hay certificado
- * del que leerlo.
+ * Un testigo se identifica sólo con nombre, apellido y correo: no firma, y desde la historia
+ * "Eliminar campo RFC de la sección de Testigos" tampoco se le pide identificador fiscal.
  */
 export const witnessSchema = z.object({
   collaboratorType: z.literal('WITNESS'),
   firstName: firstNameField,
   lastName: lastNameField,
   email: emailField,
-  taxId: taxIdField,
   ...directoryFields,
 });
 
@@ -119,7 +106,6 @@ export function emptyWitness(): WitnessFormValues {
     firstName: '',
     lastName: '',
     email: '',
-    taxId: '',
     source: 'MANUAL',
     addToDirectory: false,
   };
