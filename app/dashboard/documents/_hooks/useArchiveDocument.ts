@@ -19,8 +19,7 @@ export const ARCHIVE_GENERIC_ERROR_MESSAGE =
  *
  * Un 403 lleva su propio texto porque el del backend no sirve aquí: la autorización de archivar
  * es la misma Policy que la del detalle, y su mensaje habla de "consultar" el documento. El resto
- * —el 400 de un documento que no está firmado, el 404— sí trae un mensaje del backend que se
- * entiende tal cual.
+ * —como el 404— sí trae un mensaje del backend que se entiende tal cual.
  *
  * @param error - Lo que rechazó la petición.
  * @returns El mensaje para el aviso de error.
@@ -39,7 +38,7 @@ export function archiveErrorMessage(error: unknown): string {
 }
 
 /**
- * Archiva un documento completado y lo saca del listado del usuario.
+ * Archiva un documento, en cualquier estatus, y lo saca del listado del usuario.
  *
  * **La fila desaparece por refetch y no borrándola del caché a mano.** El backend ya excluye del
  * listado lo que este usuario archivó, así que invalidar la consulta trae la lista correcta —con
@@ -54,7 +53,7 @@ export function archiveErrorMessage(error: unknown): string {
  * fila archivada seguía en pantalla hasta recargar. No dio error porque invalidar una clave
  * inexistente es una operación válida: simplemente no encuentra nada que refrescar.
  */
-export function useArchiveCompletedDocument() {
+export function useArchiveDocument() {
   const queryClient = useQueryClient();
 
   return useMutation({

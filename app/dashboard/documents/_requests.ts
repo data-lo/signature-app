@@ -56,7 +56,7 @@ export interface ArchivedDocument {
 }
 
 /**
- * Archiva un documento completado para el USUARIO EN SESIÓN.
+ * Archiva un documento, en cualquier estatus, para el USUARIO EN SESIÓN.
  *
  * No cambia el documento ni lo esconde de los demás participantes: el backend sólo guarda la
  * preferencia del par documento-usuario, y a partir de ahí el listado deja de devolverlo a quien

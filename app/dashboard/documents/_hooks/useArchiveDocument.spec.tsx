@@ -6,8 +6,8 @@ import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import {
   ARCHIVE_FORBIDDEN_MESSAGE,
   ARCHIVE_GENERIC_ERROR_MESSAGE,
-  useArchiveCompletedDocument,
-} from './useArchiveCompletedDocument';
+  useArchiveDocument,
+} from './useArchiveDocument';
 import { archiveDocumentRequest } from '../_requests';
 
 /** Rechazo de axios con el código y el cuerpo que mandaría el backend. */
@@ -41,7 +41,7 @@ function wrapper({ children }: { children: ReactNode }) {
   );
 }
 
-describe('useArchiveCompletedDocument', () => {
+describe('useArchiveDocument', () => {
   beforeEach(() => {
     queryClient = new QueryClient({
       defaultOptions: { mutations: { retry: false } },
@@ -57,7 +57,7 @@ describe('useArchiveCompletedDocument', () => {
   });
 
   it('archiva el documento que recibe', async () => {
-    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+    const { result } = renderHook(() => useArchiveDocument(), {
       wrapper,
     });
 
@@ -81,7 +81,7 @@ describe('useArchiveCompletedDocument', () => {
    */
   it('invalida el listado de documentos para que la fila archivada desaparezca', async () => {
     const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+    const { result } = renderHook(() => useArchiveDocument(), {
       wrapper,
     });
 
@@ -95,7 +95,7 @@ describe('useArchiveCompletedDocument', () => {
   });
 
   it('confirma el archivado al usuario', async () => {
-    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+    const { result } = renderHook(() => useArchiveDocument(), {
       wrapper,
     });
 
@@ -110,7 +110,7 @@ describe('useArchiveCompletedDocument', () => {
   it('avisa del error y no invalida el listado si la petición falla', async () => {
     const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
     mockedArchiveDocumentRequest.mockRejectedValue(new Error('500'));
-    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+    const { result } = renderHook(() => useArchiveDocument(), {
       wrapper,
     });
 
@@ -135,7 +135,7 @@ describe('useArchiveCompletedDocument', () => {
         message: 'No tienes permiso para consultar este documento',
       }),
     );
-    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+    const { result } = renderHook(() => useArchiveDocument(), {
       wrapper,
     });
 
@@ -153,7 +153,7 @@ describe('useArchiveCompletedDocument', () => {
     mockedArchiveDocumentRequest.mockRejectedValue(
       axiosErrorWith(400, { message: backendMessage }),
     );
-    const { result } = renderHook(() => useArchiveCompletedDocument(), {
+    const { result } = renderHook(() => useArchiveDocument(), {
       wrapper,
     });
 

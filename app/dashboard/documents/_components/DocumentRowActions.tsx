@@ -34,7 +34,7 @@ interface DocumentRowActionsProps {
  * firma, Completados).
  *
  * Sólo quedan las acciones que hacen algo distinto de abrir el documento: descargar, consultar
- * participantes, compartir y —en Completados— archivar. "Firmar" y "Ver detalle" se retiraron
+ * participantes, compartir y archivar. "Firmar" y "Ver detalle" se retiraron
  * porque ambas llevaban a `/dashboard/documents/:id` y esa navegación ahora la hace el clic sobre
  * la fila entera; tenerlas también en el menú era ofrecer tres caminos al mismo lugar.
  *

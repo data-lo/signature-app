@@ -8,7 +8,7 @@ import DocumentsTable, {
 } from './DocumentsTable';
 import type { DocumentColumnId } from '../_config/columns';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
+import { useArchiveDocument } from '../_hooks/useArchiveDocument';
 import { useDocumentDetail } from '../[documentId]/_hooks/useDocumentDetail';
 import {
   DocumentStatus,
@@ -18,7 +18,7 @@ import {
 } from '@/lib/enums/document';
 
 jest.mock('../_hooks/useDownloadDocument');
-jest.mock('../_hooks/useArchiveCompletedDocument');
+jest.mock('../_hooks/useArchiveDocument');
 jest.mock('../[documentId]/_hooks/useDocumentDetail');
 jest.mock('./PdfPreview', () => ({
   __esModule: true,
@@ -30,8 +30,7 @@ jest.mock('react-hot-toast', () => ({
 }));
 
 const mockedUseDownloadDocument = useDownloadDocument as jest.Mock;
-const mockedUseArchiveCompletedDocument =
-  useArchiveCompletedDocument as jest.Mock;
+const mockedUseArchiveDocument = useArchiveDocument as jest.Mock;
 const mockedUseDocumentDetail = useDocumentDetail as jest.Mock;
 
 /** Detalle mínimo del documento: el modal de participantes solo lee `participants`. */
@@ -112,7 +111,7 @@ describe('DocumentsTable', () => {
   beforeEach(() => {
     downloadMutate.mockReset();
     archiveMutate.mockReset();
-    mockedUseArchiveCompletedDocument.mockReturnValue({
+    mockedUseArchiveDocument.mockReturnValue({
       mutate: archiveMutate,
       isPending: false,
       variables: undefined,
@@ -759,8 +758,8 @@ describe('DocumentsTable', () => {
 
   describe('menú de acciones', () => {
     /**
-     * `buildDoc()` construye un documento ya firmado por todos, así que su menú incluye
-     * "Archivar"; ver el `describe('archivar')` para cuándo aparece y cuándo no.
+     * Con permiso de lectura el menú incluye "Archivar"; ver el `describe('archivar')` para
+     * cuándo aparece y cuándo no.
      */
     it('concentra Descargar, Ver participantes, Compartir y Archivar en el menú de tres puntos', async () => {
       const user = userEvent.setup();
@@ -873,29 +872,27 @@ describe('DocumentsTable', () => {
    * camino al detalle, y las acciones que quedan no deben dispararlo.
    */
   /**
-   * Archivar es la única acción del menú que depende del documento y no sólo de la fila: se
-   * ofrece sobre lo que ya está firmado por todos, y sobre nada más.
-   *
-   * Antes dependía además de la sección —vivía sólo en "Completados"—, pero con la lista
-   * unificada la misma tabla muestra a la vez lo pendiente y lo firmado, así que el estatus de
-   * cada documento es lo único que queda por consultar.
+   * Archivar no depende del estatus del documento (historia "Habilitar archivado para todos los
+   * archivos, independientemente de su estatus"): sólo del permiso y de la vista.
    */
   describe('archivar', () => {
-    it('ofrece "Archivar" en un documento firmado por todos', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable
-          documents={[buildDoc({ status: DocumentStatus.Signed })]}
-        />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
+    it.each(Object.values(DocumentStatus))(
+      'ofrece "Archivar" en un documento en estatus %s y lo ejecuta sobre esa fila',
+      async (status) => {
+        const user = userEvent.setup();
+        renderWithProviders(
+          <DocumentsTable documents={[buildDoc({ id: 'doc-9', status })]} />,
+          { permissions: DOCUMENT_READER_PERMISSIONS },
+        );
 
-      const menu = await openRowMenu(user);
+        const menu = await openRowMenu(user);
+        await user.click(
+          within(menu).getByRole('menuitem', { name: 'Archivar' }),
+        );
 
-      expect(
-        within(menu).getByRole('menuitem', { name: 'Archivar' }),
-      ).toBeInTheDocument();
-    });
+        expect(archiveMutate).toHaveBeenCalledWith('doc-9');
+      },
+    );
 
     it('archiva el documento de esa fila', async () => {
       const user = userEvent.setup();
@@ -914,31 +911,8 @@ describe('DocumentsTable', () => {
       expect(archiveMutate).toHaveBeenCalledWith('doc-9');
     });
 
-    /**
-     * El backend rechaza archivar cualquier cosa que no esté en `signed`, así que ofrecerlo sobre
-     * un documento cancelado sólo produciría un error que el usuario no puede evitar.
-     */
-    it.each([
-      DocumentStatus.PendingSignature,
-      DocumentStatus.Cancelled,
-      DocumentStatus.CancellationPending,
-      DocumentStatus.Rejected,
-    ])('no ofrece archivar un documento en estatus %s', async (status) => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <DocumentsTable documents={[buildDoc({ status })]} />,
-        { permissions: DOCUMENT_READER_PERMISSIONS },
-      );
-
-      const menu = await openRowMenu(user);
-
-      expect(
-        within(menu).queryByRole('menuitem', { name: /archivar/i }),
-      ).not.toBeInTheDocument();
-    });
-
     it('muestra "Archivando..." y deshabilita la acción mientras ese documento se archiva', async () => {
-      mockedUseArchiveCompletedDocument.mockReturnValue({
+      mockedUseArchiveDocument.mockReturnValue({
         mutate: archiveMutate,
         isPending: true,
         variables: 'doc-1',
@@ -1023,7 +997,7 @@ describe('DocumentsTable', () => {
     });
 
     /** La vista de archivados apaga la acción: todo lo que lista ya está archivado. */
-    it('con canArchiveRows en false no ofrece "Archivar" ni en un documento firmado', async () => {
+    it('con canArchiveRows en false no ofrece "Archivar"', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <DocumentsTable

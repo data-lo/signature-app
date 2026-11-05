@@ -73,7 +73,7 @@ function ArchivedEmptyState({
         <p className="text-sm text-muted-foreground">
           {hasOtherCriteria
             ? 'Prueba con otros criterios o vuelve a tus documentos activos.'
-            : 'Archiva un documento firmado desde su menú de acciones para encontrarlo aquí.'}
+            : 'Archiva un documento desde su menú de acciones para encontrarlo aquí.'}
         </p>
       </div>
       <Button type="button" variant="outline" size="sm" onClick={onShowActive}>
@@ -190,7 +190,7 @@ export default function DocumentsView() {
           isDefault={columnsPreference.isDefault}
         />
       </div>
-      
+
       <p className="mb-3 text-sm text-primary">
         {isDefaultView ? 'Vista predeterminada: ' : 'Vista: '}
         {DOCUMENT_VIEW_LABELS[filters.view]}

@@ -40,7 +40,7 @@ import DocumentRowActions from './DocumentRowActions';
 import DocumentParticipantsDialog from './DocumentParticipantsDialog';
 import ShareDocumentDialog from './ShareDocumentDialog';
 import { useDownloadDocument } from '../_hooks/useDownloadDocument';
-import { useArchiveCompletedDocument } from '../_hooks/useArchiveCompletedDocument';
+import { useArchiveDocument } from '../_hooks/useArchiveDocument';
 import { useRestoreArchivedDocument } from '../_hooks/useRestoreArchivedDocument';
 import DocumentFileName from './DocumentFileName';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -339,7 +339,7 @@ export default function DocumentsTable({
     DEFAULT_DOCUMENT_NAME_SORT,
   );
   const downloadMutation = useDownloadDocument();
-  const archiveMutation = useArchiveCompletedDocument();
+  const archiveMutation = useArchiveDocument();
   const restoreMutation = useRestoreArchivedDocument();
   const { canAny } = usePermissions();
   const canArchiveDocuments = canAny(ARCHIVE_DOCUMENT_PERMISSIONS);
@@ -455,22 +455,14 @@ export default function DocumentsTable({
                 archiveMutation.isPending &&
                 archiveMutation.variables === doc.id;
               /**
-               * Sólo se archiva lo que ya está firmado por todos, que es lo único que el backend
-               * deja archivar.
+               * Se archiva en cualquier estatus (historia "Habilitar archivado para todos los
+               * archivos, independientemente de su estatus"), salvo en la vista de archivados.
                *
-               * Antes esta condición tenía una mitad más —la sección tenía que ser "Completados"—
-               * porque la acción vivía únicamente en esa pantalla. Con la lista unificada ya no
-               * hay sección que consultar: la misma tabla muestra a la vez lo pendiente y lo
-               * firmado, así que el estatus de CADA documento es lo que decide sobre la fila.
-               *
-               * La otra mitad es el permiso de la cuenta activa (`ARCHIVE_DOCUMENT_PERMISSIONS`),
+               * Lo que decide es el permiso de la cuenta activa (`ARCHIVE_DOCUMENT_PERMISSIONS`),
                * nunca quién creó el documento: un administrador que ve los documentos de toda la
                * organización puede archivar también los que no creó.
                */
-              const canArchive =
-                canArchiveRows &&
-                canArchiveDocuments &&
-                doc.status === DocumentStatus.Signed;
+              const canArchive = canArchiveRows && canArchiveDocuments;
               /**
                * Recuperar pide el mismo permiso que archivar y no mira el estatus: todo lo que
                * aparece en "Archivados" se puede devolver al listado.
