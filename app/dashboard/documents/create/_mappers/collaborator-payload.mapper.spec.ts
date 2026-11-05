@@ -69,6 +69,53 @@ describe('toCollaboratorPayload', () => {
     expect(manual(payload).taxId).toBeUndefined();
   });
 
+  describe('RFC del firmante FIEL', () => {
+    const withTaxId = (signerTaxId: string): CollaboratorFormValues => ({
+      ...emptySigner(),
+      signerTaxId,
+    });
+
+    it('con firma avanzada viaja normalizado como signerTaxId', () => {
+      const payload = toCollaboratorPayload(
+        withTaxId(' peaj 800101 abc '),
+        'ADVANCED',
+      );
+
+      expect(payload.signerTaxId).toBe('PEAJ800101ABC');
+    });
+
+    it('sin capturar no viaja', () => {
+      expect(
+        toCollaboratorPayload(withTaxId('  '), 'ADVANCED'),
+      ).not.toHaveProperty('signerTaxId');
+    });
+
+    it.each(['SIMPLE', 'BIOMETRIC'] as const)(
+      'con firma %s no viaja aunque se haya escrito antes de cambiar el tipo',
+      (signatureType) => {
+        expect(
+          toCollaboratorPayload(withTaxId('PEAJ800101ABC'), signatureType),
+        ).not.toHaveProperty('signerTaxId');
+      },
+    );
+
+    it('también viaja para un firmante del Directorio', () => {
+      const payload = toCollaboratorPayload(
+        {
+          ...withTaxId('PEAJ800101ABC'),
+          source: 'DIRECTORY',
+          linkedUserId: 'user-1',
+        } as CollaboratorFormValues,
+        'ADVANCED',
+      );
+
+      expect(payload).toMatchObject({
+        source: 'DIRECTORY',
+        signerTaxId: 'PEAJ800101ABC',
+      });
+    });
+  });
+
   it('historia "Ubicación de firmas por usuario": traduce cada posición colocada al shape del backend', () => {
     const payload = toCollaboratorPayload(
       signer({

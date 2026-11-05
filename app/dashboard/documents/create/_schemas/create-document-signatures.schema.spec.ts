@@ -60,6 +60,45 @@ function formValues(
 }
 
 describe('createDocumentSignaturesSchema', () => {
+  describe('RFC del firmante FIEL', () => {
+    const withTaxId = (signerTaxId: string) => ({
+      ...signer(),
+      signerTaxId,
+    });
+
+    it.each(['', 'PEAJ800101ABC', 'ACM010101AAA', ' peaj 800101 abc '])(
+      'con firma avanzada acepta "%s"',
+      (taxId) => {
+        const result = createDocumentSignaturesSchema.safeParse(
+          formValues([withTaxId(taxId)], false, 'ADVANCED'),
+        );
+
+        expect(result.success).toBe(true);
+      },
+    );
+
+    it('con firma avanzada rechaza un formato inválido en el campo del firmante', () => {
+      const result = createDocumentSignaturesSchema.safeParse(
+        formValues([withTaxId('ABC')], false, 'ADVANCED'),
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0].path).toEqual([
+        'collaborators',
+        0,
+        'signerTaxId',
+      ]);
+    });
+
+    it('con firma simple un valor oculto no impide el envío', () => {
+      const result = createDocumentSignaturesSchema.safeParse(
+        formValues([withTaxId('ABC')]),
+      );
+
+      expect(result.success).toBe(true);
+    });
+  });
+
   it('acepta un documento de firma simple con un firmante', () => {
     const result = createDocumentSignaturesSchema.safeParse(
       formValues([signer()]),

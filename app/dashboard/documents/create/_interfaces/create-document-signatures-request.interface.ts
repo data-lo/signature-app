@@ -32,6 +32,8 @@ export interface SignaturePositionPayload {
 /** Lo que comparten los dos orígenes de colaborador en el payload. */
 interface CollaboratorPayloadBase {
   collaboratorType: 'SIGNER' | 'WITNESS';
+  /** RFC del firmante; sólo con firma avanzada. Al firmar debe coincidir con el del certificado. */
+  signerTaxId?: string;
   signatures?: SignaturePositionPayload[];
   requiresTwoFactorAuth?: boolean;
   /**

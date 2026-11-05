@@ -1,5 +1,6 @@
 import {
   isDirectoryCollaborator,
+  normalizeTaxId,
   type CollaboratorFormValues,
   type DocumentSignatureType,
 } from '../_schemas';
@@ -39,9 +40,9 @@ export function toRequiresDifferentSignatures(
  * manda requiresTwoFactorAuth=true "oculto". En firma avanzada y biométrica, la configuración
  * única del documento se aplica a todos los firmantes.
  *
- * Un firmante nunca lleva `taxId`: el flujo avanzado obtiene ese dato del certificado de e.firma
- * al firmar (ver historia "Selección de tipo de firma al crear documentos"), y el simple nunca lo
- * pidió.
+ * Un firmante nunca lleva `taxId`. Su RFC viaja como `signerTaxId`, sólo con firma avanzada y si se
+ * capturó (historia "Validar RFC del firmante FIEL contra el certificado al momento de firmar"):
+ * un valor escrito antes de cambiar el tipo de firma se queda fuera.
  */
 export function toCollaboratorPayload(
   collaborator: CollaboratorFormValues,
@@ -80,9 +81,15 @@ export function toCollaboratorPayload(
         };
   }
 
+  const signerTaxId =
+    signatureType === 'ADVANCED'
+      ? normalizeTaxId(collaborator.signerTaxId ?? '')
+      : '';
+
   return {
     ...identity,
     collaboratorType: 'SIGNER',
+    ...(signerTaxId ? { signerTaxId } : {}),
     signatures: collaborator.signatures.map((position) => ({
       signatureId: position.id,
       page: position.page,

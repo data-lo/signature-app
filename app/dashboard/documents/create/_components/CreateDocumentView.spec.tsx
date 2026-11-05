@@ -843,7 +843,7 @@ describe('CreateDocumentView', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('el flujo de firma avanzada no pide RFC y muestra el 2FA en la configuración del documento', async () => {
+    it('el RFC del firmante sólo aparece con firma avanzada, junto al 2FA en la configuración', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -857,13 +857,55 @@ describe('CreateDocumentView', () => {
       await selectSignatureType(user, /firma electrónica avanzada/i);
       await openSection(user, /configurar firma/i);
 
-      expect(screen.queryByLabelText(/^rfc/i)).not.toBeInTheDocument();
       expect(
         screen.getByRole('checkbox', { name: /código de seguridad/i }),
       ).toBeInTheDocument();
+
+      await openSection(user, /añadir participantes/i);
+      expect(screen.getByLabelText(/^rfc \(opcional\)/i)).toBeInTheDocument();
     });
 
-    it('el testigo sigue siendo el único participante al que se le pide RFC', async () => {
+    it('envía normalizado el RFC capturado para un firmante FIEL', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma electrónica avanzada/i);
+      await openSection(user, /añadir participantes/i);
+      await user.type(
+        screen.getByLabelText(/^rfc \(opcional\)/i),
+        'peaj800101abc',
+      );
+
+      await submitRequest(user);
+
+      expect(mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          collaborators: [
+            expect.objectContaining({
+              collaboratorType: 'SIGNER',
+              signerTaxId: 'PEAJ800101ABC',
+            }),
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('muestra el error de formato del RFC del firmante FIEL', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await addSigner(user);
+      await selectSignatureType(user, /firma electrónica avanzada/i);
+      await openSection(user, /añadir participantes/i);
+      await user.type(screen.getByLabelText(/^rfc \(opcional\)/i), 'ABC');
+
+      expect(await screen.findByText(/ingresa un rfc válido/i)).toBeInTheDocument();
+    });
+
+    it('el testigo conserva su campo de RFC', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 

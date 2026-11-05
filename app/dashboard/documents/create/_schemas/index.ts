@@ -15,6 +15,8 @@ export {
   collaboratorSchema,
   emptySigner,
   emptyWitness,
+  normalizeTaxId,
+  isValidOptionalTaxId,
   countSigners,
   signersWithoutPosition,
   countWitnesses,

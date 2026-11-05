@@ -8,9 +8,13 @@ import { formatPersonName } from '@/lib/format-person-name';
 import {
   COLLABORATOR_EMAIL_FIELD,
   COLLABORATOR_NAME_FIELDS,
+  COLLABORATOR_SIGNER_TAX_ID_FIELD,
   COLLABORATOR_TAX_ID_FIELD,
 } from '../_config/collaborator-fields.config';
-import type { CreateDocumentSignaturesFormValues } from '../_schemas';
+import {
+  normalizeTaxId,
+  type CreateDocumentSignaturesFormValues,
+} from '../_schemas';
 import AddToDirectoryCheckbox from './AddToDirectoryCheckbox';
 import type { DragHandleProps } from './SortableCollaboratorItem';
 
@@ -35,14 +39,12 @@ interface CollaboratorFormItemProps {
  * Un bloque del arreglo unificado `collaborators` (ver historia "Frontend: Carga de Documentos
  * y Configuración de Firmantes") — el mismo componente renderiza SIGNER y WITNESS, mostrando
  * solo los campos que aplican a cada uno:
- *  - SIGNER: nombre/apellido/email siempre; la configuración de 2FA aplica a todo el documento
- *    y se decide en la segunda sección.
+ *  - SIGNER: nombre/apellido/email siempre; RFC opcional sólo con firma FIEL; la configuración
+ *    de 2FA aplica a todo el documento y se decide en la segunda sección.
  *  - WITNESS: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
  *
  * Historia "Selección de tipo de firma al crear documentos": el tipo de firma ya no se elige por
- * firmante (era un checkbox acá) sino una sola vez para todo el documento. El
- * RFC dejó de pedirse a los firmantes avanzados: el flujo de e.firma lo obtiene del certificado al
- * momento de firmar.
+ * firmante (era un checkbox acá) sino una sola vez para todo el documento.
  *
  * Los campos se arman desde `_config/collaborator-fields.config.ts` y cada uno resuelve su
  * propio error con `useController` (dentro de `FormInput`), así que este componente ya no
@@ -64,14 +66,17 @@ export default function CollaboratorFormItem({
     control,
     name: `collaborators.${index}.source`,
   });
+  const signatureType = useWatch({ control, name: 'signatureType' });
   const isSigner = collaboratorType === 'SIGNER';
   // Elegido del Directorio con usuario vinculado: su identidad la resuelve el backend desde ese
-  // usuario, así que en pantalla se muestra en solo lectura y no lleva RFC ni "Agregar al
+  // usuario, así que en pantalla se muestra en solo lectura y no lleva el RFC de testigo ni "Agregar al
   // directorio" (ya está en él). Ver historia "Enviar colaboradores desde Directorio mediante
   // usuario vinculado al crear un documento".
   const isFromDirectory = source === 'DIRECTORY';
   const isReadOnly = isSelf || isFromDirectory;
   const showTaxId = collaboratorType === 'WITNESS' && !isFromDirectory;
+  // Editable también en la tarjeta propia y en la del Directorio: ninguna de las dos lo trae.
+  const showSignerTaxId = isSigner && signatureType === 'ADVANCED';
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-input p-3">
@@ -144,6 +149,17 @@ export default function CollaboratorFormItem({
         placeholder={COLLABORATOR_EMAIL_FIELD.placeholder}
         disabled={isReadOnly}
       />
+
+      {showSignerTaxId && (
+        <FormInput
+          control={control}
+          name={`collaborators.${index}.${COLLABORATOR_SIGNER_TAX_ID_FIELD.name}`}
+          label={COLLABORATOR_SIGNER_TAX_ID_FIELD.label}
+          type={COLLABORATOR_SIGNER_TAX_ID_FIELD.type}
+          placeholder={COLLABORATOR_SIGNER_TAX_ID_FIELD.placeholder}
+          normalizeOnBlur={normalizeTaxId}
+        />
+      )}
 
       {showTaxId && (
         <FormInput
