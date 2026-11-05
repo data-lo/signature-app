@@ -16,6 +16,8 @@ export interface DocumentParticipant {
   role: ParticipantRole;
   status: ParticipantStatus;
   cancellationReason: string | null;
+  /** RFC registrado del firmante; el backend sólo lo manda a quien creó el documento y al propio firmante. */
+  taxId?: string | null;
 }
 
 export interface DocumentDetail {

@@ -11,7 +11,7 @@ import type { SignerFormValues, WitnessFormValues } from '../_schemas';
 export interface CollaboratorFieldConfig {
   name: Extract<
     keyof SignerFormValues | keyof WitnessFormValues,
-    'firstName' | 'lastName' | 'email' | 'taxId'
+    'firstName' | 'lastName' | 'email' | 'taxId' | 'signerTaxId'
   >;
   label: string;
   type: 'text' | 'email';
@@ -46,10 +46,21 @@ export const COLLABORATOR_EMAIL_FIELD: CollaboratorFieldConfig = {
 };
 
 /**
- * El identificador fiscal solo se pide a los testigos, y ahí es opcional (historia "Eliminar
+ * RFC opcional del firmante, sólo con firma FIEL (la decisión de mostrarlo es del componente, ver
+ * `CollaboratorFormItem`). Si se captura, al firmar debe coincidir con el del certificado.
+ */
+export const COLLABORATOR_SIGNER_TAX_ID_FIELD: CollaboratorFieldConfig = {
+  name: 'signerTaxId',
+  label: 'RFC (opcional)',
+  type: 'text',
+  placeholder: 'PEAJ800101ABC',
+  required: false,
+};
+
+/**
+ * El identificador fiscal de los testigos es opcional (historia "Eliminar
  * campo RFC de la sección de Espectadores"; la decisión de mostrarlo o no es del componente, ver
- * `CollaboratorFormItem`). A los firmantes ya no se les pide en ningún flujo — ver historia
- * "Selección de tipo de firma al crear documentos".
+ * `CollaboratorFormItem`).
  *
  * El campo se llama `taxId` y la etiqueta sigue diciendo "RFC": lo que se estandarizó es el
  * nombre del dato en el contrato, no lo que el usuario mexicano tiene que escribir ahí.
