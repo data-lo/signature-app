@@ -863,25 +863,22 @@ describe('CreateDocumentView', () => {
       ).toBeInTheDocument();
     });
 
-    it('el testigo sigue siendo el único participante al que se le pide RFC', async () => {
+    it('historia "Eliminar campo RFC de la sección de Testigos": al testigo tampoco se le pide RFC', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
       await openSection(user, /añadir participantes/i);
       await user.click(screen.getByRole('button', { name: /testigo/i }));
 
-      expect(screen.getByLabelText(/^rfc/i)).toBeInTheDocument();
+      expect(screen.getAllByLabelText(/^email/i).length).toBeGreaterThan(0);
+      expect(screen.queryByLabelText(/rfc/i)).not.toBeInTheDocument();
     });
 
     /**
-     * Historia "Estandarizar campos de colaboradores": la etiqueta sigue diciendo RFC —es lo que
-     * el usuario mexicano captura— pero el dato viaja al backend como `taxId`. Se comprueba de
-     * punta a punta, desde el campo que se llena hasta el payload de la mutación, porque el
-     * renombre atraviesa esquema, configuración de campos y mapper: cualquiera de los tres
-     * podría quedarse con el nombre viejo sin que las pruebas de unidad de los otros dos lo
-     * noten.
+     * De punta a punta, desde la tarjeta hasta el payload de la mutación: el alta de un testigo
+     * sigue funcionando sin RFC, y el dato no viaja ni siquiera vacío.
      */
-    it('lo que el testigo escribe en RFC viaja al backend como taxId', async () => {
+    it('el testigo se envía sin taxId en el payload', async () => {
       const user = userEvent.setup();
       renderWithProviders(<CreateDocumentView />);
 
@@ -894,22 +891,22 @@ describe('CreateDocumentView', () => {
       await user.type(lastNames[lastNames.length - 1], 'Ruiz');
       const emails = screen.getAllByLabelText(/^email/i);
       await user.type(emails[emails.length - 1], 'ana.ruiz@mail.com');
-      await user.type(screen.getByLabelText(/^rfc/i), 'AURU800101ABC');
       await selectSignatureType(user, /firma grafo/i);
 
       await submitRequest(user);
 
-      expect(mutate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          collaborators: expect.arrayContaining([
-            expect.objectContaining({
-              collaboratorType: 'WITNESS',
-              taxId: 'AURU800101ABC',
-            }),
-          ]),
-        }),
-        expect.anything(),
+      const { collaborators } = mutate.mock.calls[0][0] as {
+        collaborators: Record<string, unknown>[];
+      };
+      const witness = collaborators.find(
+        (collaborator) => collaborator.collaboratorType === 'WITNESS',
       );
+      expect(witness).toMatchObject({
+        firstName: 'Ana',
+        lastName: 'Ruiz',
+        email: 'ana.ruiz@mail.com',
+      });
+      expect(witness).not.toHaveProperty('taxId');
     });
   });
 
