@@ -30,7 +30,7 @@ export default function AdvancedSignatureFlow({
     return (
       <AccountSigningAccess
         session={session}
-        description="Esta invitación está vinculada a tu cuenta. Inicia sesión para firmar con tu e.firma desde tu panel."
+        description="Esta invitación está vinculada a tu cuenta. Inicia sesión para firmar con tu FIEL desde tu panel."
       />
     );
   }

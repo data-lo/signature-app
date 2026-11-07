@@ -115,15 +115,10 @@ async function signWithEfirma(
   user: ReturnType<typeof userEvent.setup>,
   password = 'secreta',
 ) {
-  await user.click(
-    await screen.findByRole('button', { name: /firmar con e\.firma/i }),
-  );
+  await user.click(await screen.findByRole('button', { name: /^firmar$/i }));
   await user.click(screen.getByRole('button', { name: /seleccionar \.key/i }));
   await user.click(screen.getByRole('button', { name: /seleccionar \.cer/i }));
-  await user.type(
-    screen.getByLabelText(/contraseña de la llave privada/i),
-    password,
-  );
+  await user.type(screen.getByLabelText(/contraseña de fiel/i), password);
   await user.click(screen.getByRole('button', { name: /firmar documento/i }));
 }
 
@@ -360,7 +355,7 @@ describe('PublicAdvancedSigningFlow', () => {
       await screen.findByText(/no tiene una firma pendiente para ti/i),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /firmar con e\.firma/i }),
+      screen.queryByRole('button', { name: /^firmar$/i }),
     ).not.toBeInTheDocument();
   });
 });

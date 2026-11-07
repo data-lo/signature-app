@@ -1055,17 +1055,27 @@ describe('DocumentViewSection', () => {
       return renderWithProviders(<DocumentViewSection documentId="doc-1" />);
     }
 
-    it('al hacer clic en "Continuar a firmar" abre el diálogo de e.firma en vez de firmar directamente', async () => {
+    it('muestra el método FIEL y sus requisitos, con "Firmar" habilitado y sin confirmación previa', () => {
+      renderFielDocument();
+
+      expect(screen.getByText('Método de firma: FIEL')).toBeInTheDocument();
+      expect(
+        screen.getByText('Prepara tu FIEL para continuar'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^firmar$/i })).toBeEnabled();
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /continuar a firmar/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('al hacer clic en "Firmar" abre el diálogo de FIEL en vez de firmar directamente', async () => {
       const user = userEvent.setup();
       renderFielDocument();
 
-      await user.click(
-        screen.getByRole('button', { name: /continuar a firmar/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
 
-      expect(
-        await screen.findByText(/firma electrónica avanzada \(e\.firma\)/i),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/firma con fiel/i)).toBeInTheDocument();
       expect(signMutate).not.toHaveBeenCalled();
     });
 
@@ -1074,9 +1084,7 @@ describe('DocumentViewSection', () => {
       const user = userEvent.setup();
       renderFielDocument();
 
-      await user.click(
-        screen.getByRole('button', { name: /continuar a firmar/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
 
       await waitFor(() => expect(mockedToast.error).toHaveBeenCalled());
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -1087,9 +1095,7 @@ describe('DocumentViewSection', () => {
       const user = userEvent.setup();
       renderFielDocument();
 
-      await user.click(
-        screen.getByRole('button', { name: /continuar a firmar/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
       const dialog = await screen.findByRole('dialog');
 
       await user.click(
@@ -1103,7 +1109,7 @@ describe('DocumentViewSection', () => {
         }),
       );
       await user.type(
-        within(dialog).getByLabelText(/contraseña de la llave privada/i),
+        within(dialog).getByLabelText(/contraseña de fiel/i),
         'MiContraseña123',
       );
       await user.click(
@@ -1139,9 +1145,7 @@ describe('DocumentViewSection', () => {
       const user = userEvent.setup();
       renderFielDocument();
 
-      await user.click(
-        screen.getByRole('button', { name: /continuar a firmar/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
       const efirmaDialog = await screen.findByRole('dialog');
       await user.click(
         within(efirmaDialog).getByRole('button', {
@@ -1154,7 +1158,7 @@ describe('DocumentViewSection', () => {
         }),
       );
       await user.type(
-        within(efirmaDialog).getByLabelText(/contraseña de la llave privada/i),
+        within(efirmaDialog).getByLabelText(/contraseña de fiel/i),
         'MiContraseña123',
       );
       await user.click(
@@ -1169,7 +1173,7 @@ describe('DocumentViewSection', () => {
         ).toBeInTheDocument(),
       );
       expect(
-        screen.queryByLabelText(/contraseña de la llave privada/i),
+        screen.queryByLabelText(/contraseña de fiel/i),
       ).not.toBeInTheDocument();
     });
 
@@ -1177,17 +1181,13 @@ describe('DocumentViewSection', () => {
       const user = userEvent.setup();
       renderFielDocument();
 
-      await user.click(
-        screen.getByRole('button', { name: /continuar a firmar/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /^firmar$/i }));
       const dialog = await screen.findByRole('dialog');
       await user.click(
         within(dialog).getByRole('button', { name: /cancelar/i }),
       );
 
-      expect(
-        screen.queryByText(/firma electrónica avanzada \(e\.firma\)/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/firma con fiel/i)).not.toBeInTheDocument();
       expect(signMutate).not.toHaveBeenCalled();
     });
   });
