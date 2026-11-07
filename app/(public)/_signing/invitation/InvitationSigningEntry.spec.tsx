@@ -167,7 +167,7 @@ describe('InvitationSigningEntry (/sign/:token y /sign/launch/:token)', () => {
       await screen.findByText('PDF: https://minio/contrato.pdf'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /firmar con e.firma/i }),
+      screen.getByRole('button', { name: /^firmar$/i }),
     ).toBeInTheDocument();
   });
 

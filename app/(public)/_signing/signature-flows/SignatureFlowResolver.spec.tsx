@@ -72,9 +72,7 @@ describe('SignatureFlowResolver', () => {
   it('ADVANCED: monta la Firma Avanzada sin cuenta existente', () => {
     renderResolver(session('ADVANCED'));
 
-    expect(
-      screen.getByText(/firma electrónica avanzada sin cuenta/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/firma con fiel sin cuenta/i)).toBeInTheDocument();
     expect(screen.queryByText(/biometría/i)).not.toBeInTheDocument();
   });
 
@@ -106,7 +104,7 @@ describe('SignatureFlowResolver', () => {
     );
 
     expect(
-      screen.queryByText(/firma electrónica avanzada sin cuenta/i),
+      screen.queryByText(/firma con fiel sin cuenta/i),
     ).not.toBeInTheDocument();
     expect(screen.getByText(/firma desde tu cuenta/i)).toBeInTheDocument();
   });

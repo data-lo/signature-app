@@ -157,7 +157,7 @@ describe('PublicInvitationEntry', () => {
         name: /resumen de la firma/i,
       });
       expect(summary).toHaveTextContent('Vas a firmar: contrato.pdf');
-      expect(summary).toHaveTextContent('Tipo de firma: Biometría');
+      expect(summary).toHaveTextContent('Método de firma: Biometría');
       expect(screen.getByText('a***@empresa.com')).toBeInTheDocument();
     });
 
@@ -174,7 +174,7 @@ describe('PublicInvitationEntry', () => {
       );
 
       expect(
-        await screen.findByText(/firma electrónica avanzada sin cuenta/i),
+        await screen.findByText(/firma con fiel sin cuenta/i),
       ).toBeInTheDocument();
       // El correo que se muestra es el que enmascaró el backend.
       expect(screen.getByText('a***@empresa.com')).toBeInTheDocument();
