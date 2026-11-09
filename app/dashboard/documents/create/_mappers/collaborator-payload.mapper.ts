@@ -71,14 +71,7 @@ export function toCollaboratorPayload(
         };
 
   if (collaborator.collaboratorType === 'WITNESS') {
-    return identity.source === 'DIRECTORY'
-      ? { ...identity, collaboratorType: 'WITNESS', orderIndex }
-      : {
-          ...identity,
-          collaboratorType: 'WITNESS',
-          taxId: collaborator.taxId,
-          orderIndex,
-        };
+    return { ...identity, collaboratorType: 'WITNESS', orderIndex };
   }
 
   const signerTaxId =

@@ -55,8 +55,7 @@ export interface DirectoryCollaboratorPayload extends CollaboratorPayloadBase {
 
 /**
  * Colaborador capturado a mano (o elegido del Directorio sin usuario vinculado): viajan sus datos
- * completos y si debe quedar en el Directorio. `taxId` solo viaja para WITNESS — a los firmantes
- * ya no se les pide en ningún flujo.
+ * completos y si debe quedar en el Directorio.
  */
 export interface ManualCollaboratorPayload extends CollaboratorPayloadBase {
   source: 'MANUAL';
@@ -64,7 +63,6 @@ export interface ManualCollaboratorPayload extends CollaboratorPayloadBase {
   lastName: string;
   email: string;
   addToDirectory: boolean;
-  taxId?: string | null;
 }
 
 /**

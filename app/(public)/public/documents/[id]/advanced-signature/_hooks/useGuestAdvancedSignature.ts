@@ -125,7 +125,7 @@ export function useSignGuestAdvancedDocument(
       toast.error(
         getErrorMessage(
           error,
-          'No se pudo firmar el documento. Revisa tu e.firma e intenta de nuevo.',
+          'No se pudo firmar el documento. Revisa tu FIEL e intenta de nuevo.',
         ),
       );
     },

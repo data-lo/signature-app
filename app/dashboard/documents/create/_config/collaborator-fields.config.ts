@@ -1,12 +1,10 @@
-import type { SignerFormValues, WitnessFormValues } from '../_schemas';
+import type { CollaboratorFormValues } from '../_schemas';
 
 /**
  * Configuración de los campos de texto de un participante (`CollaboratorFormItem`). Existe para
  * quitar la repetición de bloques `<Controller>` idénticos por campo, sin perder tipado: `name`
  * está acotado a las llaves reales del colaborador, así que renombrar un campo del esquema
- * rompe la compilación aquí en vez de fallar en silencio en tiempo de ejecución. Se arma sobre la
- * UNIÓN de llaves de firmante y testigo (no sobre `keyof CollaboratorFormValues`, que al ser
- * unión discriminada solo expone las llaves comunes): `taxId` ya solo existe en el testigo.
+ * rompe la compilación aquí en vez de fallar en silencio en tiempo de ejecución.
  */
 export interface CollaboratorFieldConfig {
   name: Extract<

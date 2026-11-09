@@ -70,7 +70,7 @@ export default function DocumentViewSection({
   // como toast) porque ahora bloquea la firma: el usuario necesita ver qué corregir para poder
   // reintentar.
   const [geoBlockedReason, setGeoBlockedReason] = useState<string | null>(null);
-  // Ubicación ya obtenida para una firma FIEL, capturada antes de abrir el diálogo de e.firma.
+  // Ubicación ya obtenida para una firma FIEL, capturada antes de abrir el diálogo de FIEL.
   const [advancedSignatureCoords, setAdvancedSignatureCoords] =
     useState<GeolocationCoords | null>(null);
   const [showAdvancedSignatureDialog, setShowAdvancedSignatureDialog] =
@@ -181,7 +181,7 @@ export default function DocumentViewSection({
   }
 
   async function handleSignClick() {
-    // También para FIEL se pide la ubicación ANTES de abrir el diálogo de e.firma: así el
+    // También para FIEL se pide la ubicación ANTES de abrir el diálogo de FIEL: así el
     // usuario no captura contraseña ni archivos para toparse con el bloqueo al final.
     const coords = await resolveRequiredLocation();
     if (!coords) return;
@@ -337,6 +337,7 @@ export default function DocumentViewSection({
         geoBlockedReason,
         isRequestingLocation: geoStatus === 'requesting',
         isSigning: signMutation.isPending,
+        isAdvancedSignature: document?.mySignatureType === SignatureType.Fiel,
         onSign: handleSignClick,
       }}
       biometric={

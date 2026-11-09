@@ -17,7 +17,7 @@ export type RejectDocumentFormValues = z.infer<typeof rejectDocumentSchema>;
 export const advancedSignatureSchema = z.object({
   password: z
     .string()
-    .min(1, { message: 'La contraseña de la llave privada es requerida' }),
+    .min(1, { message: 'La contraseña de FIEL es requerida' }),
 });
 
 export type AdvancedSignatureFormValues = z.infer<
