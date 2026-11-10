@@ -14,6 +14,45 @@ const emailField = z
   .trim()
   .min(1, { message: 'Ingresa el correo electrónico del participante.' })
   .email({ message: 'Ingresa un correo electrónico válido.' });
+/** Forma de un RFC de persona física (13) o moral (12), ya normalizado. */
+const TAX_ID_PATTERN = /^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}$/;
+
+/**
+ * Deja un RFC como lo guarda el backend: sin espacios y en mayúsculas.
+ *
+ * @param value - RFC tal como se capturó.
+ * @returns El RFC normalizado.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * normalizeTaxId(' peaj 800101 abc '); // 'PEAJ800101ABC'
+ * ```
+ */
+export function normalizeTaxId(value: string): string {
+  return value.replace(/\s+/g, '').toUpperCase();
+}
+
+/**
+ * Indica si un RFC opcional es aceptable: vacío, o con formato de RFC mexicano.
+ *
+ * @param value - RFC tal como se capturó.
+ * @returns `true` si está vacío o tiene formato válido.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * isValidOptionalTaxId('peaj800101abc'); // true
+ * isValidOptionalTaxId('ABC'); // false
+ * ```
+ */
+export function isValidOptionalTaxId(value: string): boolean {
+  const taxId = normalizeTaxId(value);
+  return taxId === '' || TAX_ID_PATTERN.test(taxId);
+}
+
 /**
  * Origen de la identidad del colaborador (historia "Enviar colaboradores desde Directorio
  * mediante usuario vinculado al crear un documento"). `MANUAL`: capturado en la tarjeta.
@@ -36,17 +75,21 @@ const directoryFields = {
 };
 
 /**
- * Un firmante NO declara su propio tipo de firma ni su identificador fiscal (ver historia
- * "Selección de tipo de firma al crear documentos"): el tipo lo define el documento completo
- * (`signatureType` en `documentConfigurationSchema`) y el RFC del flujo avanzado se extrae del
- * certificado de e.firma en el momento de firmar (ver `EfirmaService.extaerRfcDeSubject` en el
- * backend), así que pedirlo al crear el documento era capturar un dato que nadie valida ni usa.
+ * Un firmante NO declara su propio tipo de firma (ver historia "Selección de tipo de firma al
+ * crear documentos"): lo define el documento completo (`signatureType` en
+ * `documentConfigurationSchema`).
+ *
+ * `signerTaxId` es el RFC opcional de un firmante FIEL (historia "Validar RFC del firmante FIEL
+ * contra el certificado al momento de firmar"). Su formato se valida en
+ * `createDocumentSignaturesSchema`, que es donde se conoce el tipo de firma: un RFC escrito antes
+ * de cambiar a firma simple queda oculto y no debe impedir el envío.
  */
 export const signerSchema = z.object({
   collaboratorType: z.literal('SIGNER'),
   firstName: firstNameField,
   lastName: lastNameField,
   email: emailField,
+  signerTaxId: z.string().optional(),
   // Ubicaciones de firma colocadas por arrastre sobre el PDF (ver historia "Ubicación de
   // firmas por usuario"). El arreglo vacío es un estado válido MIENTRAS se llena el formulario
   // —el firmante se agrega antes de colocar su firma—, pero no se puede enviar así: lo impide
