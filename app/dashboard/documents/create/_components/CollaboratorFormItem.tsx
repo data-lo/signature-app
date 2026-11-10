@@ -9,7 +9,6 @@ import {
   COLLABORATOR_EMAIL_FIELD,
   COLLABORATOR_NAME_FIELDS,
   COLLABORATOR_SIGNER_TAX_ID_FIELD,
-  COLLABORATOR_TAX_ID_FIELD,
 } from '../_config/collaborator-fields.config';
 import {
   normalizeTaxId,
@@ -41,7 +40,8 @@ interface CollaboratorFormItemProps {
  * solo los campos que aplican a cada uno:
  *  - SIGNER: nombre/apellido/email siempre; RFC opcional sólo con firma FIEL; la configuración
  *    de 2FA aplica a todo el documento y se decide en la segunda sección.
- *  - WITNESS: nombre/apellido/email/RFC siempre, sin nada de firma/2FA/posición.
+ *  - WITNESS: nombre/apellido/email siempre, sin nada de firma/2FA/posición ni RFC (historia
+ *    "Eliminar campo RFC de la sección de Testigos").
  *
  * Historia "Selección de tipo de firma al crear documentos": el tipo de firma ya no se elige por
  * firmante (era un checkbox acá) sino una sola vez para todo el documento.
@@ -69,12 +69,11 @@ export default function CollaboratorFormItem({
   const signatureType = useWatch({ control, name: 'signatureType' });
   const isSigner = collaboratorType === 'SIGNER';
   // Elegido del Directorio con usuario vinculado: su identidad la resuelve el backend desde ese
-  // usuario, así que en pantalla se muestra en solo lectura y no lleva el RFC de testigo ni "Agregar al
+  // usuario, así que en pantalla se muestra en solo lectura y no lleva "Agregar al
   // directorio" (ya está en él). Ver historia "Enviar colaboradores desde Directorio mediante
   // usuario vinculado al crear un documento".
   const isFromDirectory = source === 'DIRECTORY';
   const isReadOnly = isSelf || isFromDirectory;
-  const showTaxId = collaboratorType === 'WITNESS' && !isFromDirectory;
   // Editable también en la tarjeta propia y en la del Directorio: ninguna de las dos lo trae.
   const showSignerTaxId = isSigner && signatureType === 'ADVANCED';
 
@@ -158,16 +157,6 @@ export default function CollaboratorFormItem({
           type={COLLABORATOR_SIGNER_TAX_ID_FIELD.type}
           placeholder={COLLABORATOR_SIGNER_TAX_ID_FIELD.placeholder}
           normalizeOnBlur={normalizeTaxId}
-        />
-      )}
-
-      {showTaxId && (
-        <FormInput
-          control={control}
-          name={`collaborators.${index}.${COLLABORATOR_TAX_ID_FIELD.name}`}
-          label={COLLABORATOR_TAX_ID_FIELD.label}
-          type={COLLABORATOR_TAX_ID_FIELD.type}
-          placeholder={COLLABORATOR_TAX_ID_FIELD.placeholder}
         />
       )}
 

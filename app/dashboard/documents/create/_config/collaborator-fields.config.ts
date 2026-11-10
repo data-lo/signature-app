@@ -1,15 +1,17 @@
-import type { CollaboratorFormValues } from '../_schemas';
+import type { SignerFormValues, WitnessFormValues } from '../_schemas';
 
 /**
  * Configuración de los campos de texto de un participante (`CollaboratorFormItem`). Existe para
  * quitar la repetición de bloques `<Controller>` idénticos por campo, sin perder tipado: `name`
  * está acotado a las llaves reales del colaborador, así que renombrar un campo del esquema
- * rompe la compilación aquí en vez de fallar en silencio en tiempo de ejecución.
+ * rompe la compilación aquí en vez de fallar en silencio en tiempo de ejecución. Se arma sobre la
+ * UNIÓN de llaves de firmante y testigo (no sobre `keyof CollaboratorFormValues`, que al ser
+ * unión discriminada solo expone las llaves comunes): `signerTaxId` solo existe en el firmante.
  */
 export interface CollaboratorFieldConfig {
   name: Extract<
     keyof SignerFormValues | keyof WitnessFormValues,
-    'firstName' | 'lastName' | 'email' | 'taxId' | 'signerTaxId'
+    'firstName' | 'lastName' | 'email' | 'signerTaxId'
   >;
   label: string;
   type: 'text' | 'email';
@@ -50,22 +52,6 @@ export const COLLABORATOR_EMAIL_FIELD: CollaboratorFieldConfig = {
 export const COLLABORATOR_SIGNER_TAX_ID_FIELD: CollaboratorFieldConfig = {
   name: 'signerTaxId',
   label: 'RFC (opcional)',
-  type: 'text',
-  placeholder: 'PEAJ800101ABC',
-  required: false,
-};
-
-/**
- * El identificador fiscal de los testigos es opcional (historia "Eliminar
- * campo RFC de la sección de Espectadores"; la decisión de mostrarlo o no es del componente, ver
- * `CollaboratorFormItem`).
- *
- * El campo se llama `taxId` y la etiqueta sigue diciendo "RFC": lo que se estandarizó es el
- * nombre del dato en el contrato, no lo que el usuario mexicano tiene que escribir ahí.
- */
-export const COLLABORATOR_TAX_ID_FIELD: CollaboratorFieldConfig = {
-  name: 'taxId',
-  label: 'RFC',
   type: 'text',
   placeholder: 'PEAJ800101ABC',
   required: false,
