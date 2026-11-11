@@ -1,15 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { Files, Plus } from 'lucide-react';
+import { Files, Plus, ScanFace } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import {
+  biometricAvailabilityLabel,
+  shouldShowBiometricCredits,
+} from '@/lib/biometric-credits';
 import { useBillingAccess } from '@/lib/hooks/useBillingAccess';
 import { cn } from '@/lib/utils';
 
 export const ADD_DOCUMENTS_LABEL = 'Agregar documentos';
 export const SUBSCRIPTIONS_ROUTE = '/dashboard/subscriptions';
-
 
 export function availabilityLabel(credits: number): string {
   if (credits === 0) {
@@ -29,9 +32,22 @@ export default function DocumentsAvailability() {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0 sm:flex-nowrap">
       {billing && (
-        <Badge variant={"secondary"} className="h-8 bg-primary/10 px-2 text-primary">
+        <Badge
+          variant={'secondary'}
+          className="h-8 bg-primary/10 px-2 text-primary"
+        >
           <Files />
           {availabilityLabel(billing.creditsAvailable)}
+        </Badge>
+      )}
+
+      {billing && shouldShowBiometricCredits(billing) && (
+        <Badge
+          variant={'secondary'}
+          className="h-8 bg-primary/10 px-2 text-primary"
+        >
+          <ScanFace />
+          {biometricAvailabilityLabel(billing.biometricCreditsAvailable ?? 0)}
         </Badge>
       )}
 

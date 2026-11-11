@@ -8,11 +8,7 @@ import apiClient from '@/lib/axios';
  * — la pantalla tiene que distinguirlo de `CANCELED`.
  */
 export type BillingProfileStatus =
-  | 'FREE'
-  | 'INCOMPLETE'
-  | 'ACTIVE'
-  | 'PAST_DUE'
-  | 'CANCELED';
+  'FREE' | 'INCOMPLETE' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED';
 
 /** Por dónde entró el dinero del último periodo cobrado. Espejo de `BILLING_SOURCE_ENUM`. */
 export type BillingSource = 'STRIPE' | 'MANUAL';
@@ -105,6 +101,14 @@ export interface BillingAccess {
   currentPeriodEnd: string | null;
   /** Documentos que la cuenta puede consumir HOY, sumando todos sus lotes vigentes. */
   creditsAvailable: number;
+  /**
+   * Créditos de firma biométrica que la cuenta puede usar HOY (lo comprado menos lo reservado por
+   * intentos en curso). Cada intento de Didit reserva uno y sólo se cobra si la firma se registra.
+   *
+   * Opcional porque un backend anterior a los créditos biométricos no lo manda: en ese caso la
+   * pantalla se calla en vez de anunciar un `0` que no le consta (ver `shouldShowBiometricCredits`).
+   */
+  biometricCreditsAvailable?: number;
   actions: PlanActions;
   limits: PlanLimits;
 }
