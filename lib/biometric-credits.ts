@@ -3,29 +3,24 @@ import type { BillingAccess } from '@/lib/api/billing';
 /**
  * Indica si conviene mostrar el saldo de firmas biométricas de la cuenta activa.
  *
- * - Si el backend no manda el campo (uno anterior a los créditos biométricos), no se muestra: un
- *   `0` inventado diría que la cuenta se quedó sin saldo sin saberlo.
- * - Se muestra si el plan incluye la firma biométrica, o si la cuenta tiene saldo aunque su plan ya
- *   no la incluya: los créditos comprados siguen siendo suyos.
+ * Se muestra si el plan incluye la firma biométrica (aunque el saldo sea `0`, que es una respuesta
+ * útil), o si la cuenta tiene saldo aunque su plan ya no la incluya: los créditos comprados siguen
+ * siendo suyos. Sin la capacidad y sin saldo, el renglón no le dice nada útil.
  *
  * @param billing - Estado de facturación de la cuenta activa.
  * @returns `true` si hay que dibujar el saldo biométrico.
  *
  * @example
  * ```ts
- * shouldShowBiometricCredits(buildBillingAccess({ biometricCreditsAvailable: 4 })); // true
+ * shouldShowBiometricCredits(buildBillingAccess({ credits: creditsOf(0, 4) })); // true
  * ```
  */
 export function shouldShowBiometricCredits(
-  billing: Pick<BillingAccess, 'biometricCreditsAvailable' | 'actions'>,
+  billing: Pick<BillingAccess, 'credits' | 'actions'>,
 ): boolean {
-  if (typeof billing.biometricCreditsAvailable !== 'number') {
-    return false;
-  }
-
   return (
     billing.actions.graphSignatureBiometrics ||
-    billing.biometricCreditsAvailable > 0
+    billing.credits.biometric.available > 0
   );
 }
 

@@ -6,7 +6,7 @@ import DocumentsAvailability, {
   SUBSCRIPTIONS_ROUTE,
 } from './DocumentsAvailability';
 import { getBillingAccessRequest } from '@/lib/api/billing';
-import { buildBillingAccess } from '@/lib/api/billing.fixtures';
+import { buildBillingAccess, creditsOf } from '@/lib/api/billing.fixtures';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 
 jest.mock('@/lib/api/billing');
@@ -42,7 +42,7 @@ describe('DocumentsAvailability', () => {
 
   it('anuncia el saldo de la cuenta activa', async () => {
     mockedRequest.mockResolvedValue(
-      buildBillingAccess({ creditsAvailable: 12 }),
+      buildBillingAccess({ credits: creditsOf(12) }),
     );
 
     render(<DocumentsAvailability />, { wrapper });
@@ -57,7 +57,7 @@ describe('DocumentsAvailability', () => {
   it('no anuncia el tope del plan ni una fracción junto al saldo', async () => {
     mockedRequest.mockResolvedValue(
       buildBillingAccess({
-        creditsAvailable: 12,
+        credits: creditsOf(12),
         limits: { documentsIncludedPerPeriod: 50 },
       }),
     );
@@ -71,7 +71,7 @@ describe('DocumentsAvailability', () => {
 
   it('concuerda la leyenda en singular con un solo documento', async () => {
     mockedRequest.mockResolvedValue(
-      buildBillingAccess({ creditsAvailable: 1 }),
+      buildBillingAccess({ credits: creditsOf(1) }),
     );
 
     render(<DocumentsAvailability />, { wrapper });
@@ -82,7 +82,7 @@ describe('DocumentsAvailability', () => {
   /** `0` es una respuesta —la cuenta se quedó sin documentos—, no una ausencia de dato. */
   it('anuncia el saldo agotado en vez de callarse', async () => {
     mockedRequest.mockResolvedValue(
-      buildBillingAccess({ creditsAvailable: 0 }),
+      buildBillingAccess({ credits: creditsOf(0) }),
     );
 
     render(<DocumentsAvailability />, { wrapper });
@@ -124,8 +124,7 @@ describe('DocumentsAvailability', () => {
     it('anuncia el saldo biométrico junto al de documentos', async () => {
       mockedRequest.mockResolvedValue(
         buildBillingAccess({
-          creditsAvailable: 12,
-          biometricCreditsAvailable: 5,
+          credits: creditsOf(12, 5),
         }),
       );
 
@@ -137,7 +136,7 @@ describe('DocumentsAvailability', () => {
 
     it('anuncia el saldo biométrico agotado si el plan incluye la firma biométrica', async () => {
       mockedRequest.mockResolvedValue(
-        buildBillingAccess({ biometricCreditsAvailable: 0 }),
+        buildBillingAccess({ credits: creditsOf(18, 0) }),
       );
 
       render(<DocumentsAvailability />, { wrapper });
@@ -150,20 +149,9 @@ describe('DocumentsAvailability', () => {
     it('no lo anuncia si el plan no incluye la firma biométrica y no hay saldo', async () => {
       mockedRequest.mockResolvedValue(
         buildBillingAccess({
-          biometricCreditsAvailable: 0,
+          credits: creditsOf(18, 0),
           actions: { graphSignatureBiometrics: false },
         }),
-      );
-
-      render(<DocumentsAvailability />, { wrapper });
-
-      await screen.findByText('18 documentos');
-      expect(screen.queryByText(/biométric/i)).not.toBeInTheDocument();
-    });
-
-    it('no lo anuncia si el backend no informa el saldo biométrico', async () => {
-      mockedRequest.mockResolvedValue(
-        buildBillingAccess({ biometricCreditsAvailable: undefined }),
       );
 
       render(<DocumentsAvailability />, { wrapper });
@@ -180,14 +168,14 @@ describe('DocumentsAvailability', () => {
    */
   it('vuelve a consultar el saldo al cambiar de cuenta', async () => {
     mockedRequest.mockResolvedValueOnce(
-      buildBillingAccess({ creditsAvailable: 12 }),
+      buildBillingAccess({ credits: creditsOf(12) }),
     );
 
     render(<DocumentsAvailability />, { wrapper });
     await screen.findByText('12 documentos');
 
     mockedRequest.mockResolvedValueOnce(
-      buildBillingAccess({ creditsAvailable: 3 }),
+      buildBillingAccess({ credits: creditsOf(3) }),
     );
     givenActiveAccount('cuenta-org-1');
 

@@ -1,4 +1,4 @@
-import { buildBillingAccess } from '@/lib/api/billing.fixtures';
+import { buildBillingAccess, creditsOf } from '@/lib/api/billing.fixtures';
 import {
   biometricAvailabilityLabel,
   shouldShowBiometricCredits,
@@ -19,7 +19,7 @@ describe('biometric-credits', () => {
     it('se muestra si el plan incluye la firma biométrica, aunque el saldo sea 0', () => {
       expect(
         shouldShowBiometricCredits(
-          buildBillingAccess({ biometricCreditsAvailable: 0 }),
+          buildBillingAccess({ credits: creditsOf(18, 0) }),
         ),
       ).toBe(true);
     });
@@ -28,7 +28,7 @@ describe('biometric-credits', () => {
       expect(
         shouldShowBiometricCredits(
           buildBillingAccess({
-            biometricCreditsAvailable: 3,
+            credits: creditsOf(18, 3),
             actions: { graphSignatureBiometrics: false },
           }),
         ),
@@ -39,17 +39,9 @@ describe('biometric-credits', () => {
       expect(
         shouldShowBiometricCredits(
           buildBillingAccess({
-            biometricCreditsAvailable: 0,
+            credits: creditsOf(18, 0),
             actions: { graphSignatureBiometrics: false },
           }),
-        ),
-      ).toBe(false);
-    });
-
-    it('no se muestra si el backend no informa el campo', () => {
-      expect(
-        shouldShowBiometricCredits(
-          buildBillingAccess({ biometricCreditsAvailable: undefined }),
         ),
       ).toBe(false);
     });

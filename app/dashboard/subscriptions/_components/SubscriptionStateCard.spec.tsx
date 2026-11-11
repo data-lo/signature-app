@@ -9,7 +9,7 @@ import {
 } from '../_requests';
 import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
 import { getBillingAccessRequest, type BillingAccess } from '@/lib/api/billing';
-import { buildBillingAccess } from '@/lib/api/billing.fixtures';
+import { buildBillingAccess, creditsOf } from '@/lib/api/billing.fixtures';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { PermissionProvider } from '@/components/authorization/PermissionProvider';
 import type { AccountKind } from '@/lib/store/types/auth-store.types';
@@ -541,7 +541,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: true,
         currentPlanType: 'premium',
         status: 'ACTIVE',
-        creditsAvailable: 18,
+        credits: creditsOf(18),
         limits: {
           documentsIncludedPerPeriod: 60,
           maxOrganizationMembers: null,
@@ -565,7 +565,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: true,
         currentPlanType: 'enterprise',
         status: 'ACTIVE',
-        creditsAvailable: 5,
+        credits: creditsOf(5),
         limits: {
           documentsIncludedPerPeriod: null,
           maxOrganizationMembers: null,
@@ -587,7 +587,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: false,
         currentPlanType: 'free',
         status: 'FREE',
-        creditsAvailable: 3,
+        credits: creditsOf(3),
       });
 
       render(<SubscriptionStateCard />, { wrapper });
@@ -605,8 +605,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: true,
         currentPlanType: 'premium',
         status: 'ACTIVE',
-        creditsAvailable: 18,
-        biometricCreditsAvailable: 7,
+        credits: creditsOf(18, 7),
       });
 
       render(<SubscriptionStateCard />, { wrapper });
@@ -622,8 +621,7 @@ describe('SubscriptionStateCard', () => {
         hasActiveSubscription: false,
         currentPlanType: 'free',
         status: 'FREE',
-        creditsAvailable: 3,
-        biometricCreditsAvailable: 2,
+        credits: creditsOf(3, 2),
       });
 
       render(<SubscriptionStateCard />, { wrapper });
@@ -638,7 +636,7 @@ describe('SubscriptionStateCard', () => {
     /** Sin la capacidad en el plan y sin saldo, el renglón no le dice nada útil. */
     it('se calla si el plan no incluye la firma biométrica y no hay saldo', async () => {
       givenSubscription({
-        biometricCreditsAvailable: 0,
+        credits: creditsOf(18, 0),
         actions: {
           ...buildBillingAccess().actions,
           graphSignatureBiometrics: false,
@@ -655,7 +653,7 @@ describe('SubscriptionStateCard', () => {
 
     it('muestra el saldo comprado aunque el plan ya no incluya la firma biométrica', async () => {
       givenSubscription({
-        biometricCreditsAvailable: 4,
+        credits: creditsOf(18, 4),
         actions: {
           ...buildBillingAccess().actions,
           graphSignatureBiometrics: false,
@@ -670,16 +668,18 @@ describe('SubscriptionStateCard', () => {
       expect(screen.getByText('4')).toBeInTheDocument();
     });
 
-    /** Un backend anterior a los créditos biométricos no manda el campo: no se inventa un 0. */
-    it('se calla si el backend no informa el saldo biométrico', async () => {
-      givenSubscription({ biometricCreditsAvailable: undefined });
+    /** El ejemplo del contrato: `credits.document.available` y `credits.biometric.available`. */
+    it('muestra ambos saldos de credits, uno debajo del otro', async () => {
+      givenSubscription({ credits: creditsOf(12, 8) });
 
       render(<SubscriptionStateCard />, { wrapper });
 
-      await screen.findByText(/documentos disponibles/i);
       expect(
-        screen.queryByText(/firmas biométricas disponibles/i),
-      ).not.toBeInTheDocument();
+        await screen.findByText(/documentos disponibles/i),
+      ).toHaveTextContent('Documentos disponibles: 12');
+      expect(
+        screen.getByText(/firmas biométricas disponibles/i),
+      ).toHaveTextContent('Firmas biométricas disponibles: 8');
     });
   });
 

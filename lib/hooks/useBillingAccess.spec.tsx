@@ -81,7 +81,7 @@ describe('useBillingAccess', () => {
         expect(result.current.data?.actions.preApproval).toBe(true),
       );
       expect(result.current.data?.limits).toEqual(PREMIUM.limits);
-      expect(result.current.data?.creditsAvailable).toBe(18);
+      expect(result.current.data?.credits.document.available).toBe(18);
     });
   });
 
