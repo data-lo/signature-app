@@ -1,4 +1,9 @@
-import type { BillingAccess, PlanActions, PlanLimits } from './billing';
+import type {
+  BillingAccess,
+  BillingCredits,
+  PlanActions,
+  PlanLimits,
+} from './billing';
 
 /**
  * Un `BillingAccess` de mentira para las pruebas, con todo puesto y sólo lo que interesa
@@ -43,8 +48,10 @@ export const SIN_PERFIL: BillingAccess = {
   cancelAtPeriodEnd: false,
   currentPeriodStart: null,
   currentPeriodEnd: null,
-  creditsAvailable: 0,
-  biometricCreditsAvailable: 0,
+  credits: {
+    document: { available: 0 },
+    biometric: { available: 0 },
+  },
   actions: ACCIONES_FREE,
   limits: LIMITES_FREE,
 };
@@ -79,14 +86,16 @@ export const ORGANIZATION_WITHOUT_PLAN: BillingAccess = {
 };
 
 /**
- * `actions` y `limits` se aceptan a medias —y se fusionan sobre los del plan gratuito— porque una
- * prueba casi siempre habla de UN beneficio: escribir las quince banderas para decir "éste tiene
- * branding" enterraría lo que la prueba quiere afirmar.
+ * `actions`, `limits` y `credits` se aceptan a medias —y se fusionan sobre los valores por
+ * omisión— porque una prueba casi siempre habla de UNA cosa: escribir las quince banderas para
+ * decir "éste tiene branding", o los dos saldos para decir "le quedan 3 documentos", enterraría lo
+ * que la prueba quiere afirmar. Por omisión: 18 documentos y 0 firmas biométricas.
  */
 export function buildBillingAccess(
-  overrides: Partial<Omit<BillingAccess, 'actions' | 'limits'>> & {
+  overrides: Partial<Omit<BillingAccess, 'actions' | 'limits' | 'credits'>> & {
     actions?: Partial<PlanActions>;
     limits?: Partial<PlanLimits>;
+    credits?: Partial<BillingCredits>;
   } = {},
 ): BillingAccess {
   return {
@@ -96,9 +105,32 @@ export function buildBillingAccess(
     currentPlanType: 'plus',
     status: 'ACTIVE',
     billingSource: 'STRIPE',
-    creditsAvailable: 18,
     ...overrides,
+    credits: {
+      document: { available: 18 },
+      biometric: { available: 0 },
+      ...overrides.credits,
+    },
     actions: { ...ACCIONES_FREE, ...overrides.actions },
     limits: { ...LIMITES_FREE, ...overrides.limits },
+  };
+}
+
+/**
+ * Atajo para el caso más común en pruebas: sólo los saldos.
+ *
+ * @param document - Documentos disponibles.
+ * @param biometric - Firmas biométricas disponibles; por omisión `0`.
+ * @returns Los saldos con la forma del contrato.
+ *
+ * @example
+ * ```ts
+ * buildBillingAccess({ credits: creditsOf(12, 8) });
+ * ```
+ */
+export function creditsOf(document: number, biometric = 0): BillingCredits {
+  return {
+    document: { available: document },
+    biometric: { available: biometric },
   };
 }

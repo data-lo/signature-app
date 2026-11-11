@@ -37,7 +37,7 @@ export default function DocumentsAvailability() {
           className="h-8 bg-primary/10 px-2 text-primary"
         >
           <Files />
-          {availabilityLabel(billing.creditsAvailable)}
+          {availabilityLabel(billing.credits.document.available)}
         </Badge>
       )}
 
@@ -47,7 +47,7 @@ export default function DocumentsAvailability() {
           className="h-8 bg-primary/10 px-2 text-primary"
         >
           <ScanFace />
-          {biometricAvailabilityLabel(billing.biometricCreditsAvailable ?? 0)}
+          {biometricAvailabilityLabel(billing.credits.biometric.available)}
         </Badge>
       )}
 

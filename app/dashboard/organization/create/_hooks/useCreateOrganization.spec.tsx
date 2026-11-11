@@ -209,7 +209,10 @@ describe('useCreateOrganization', () => {
         queryClient.getQueryData(billingAccessQueryKey(NEW_ORG.id)),
       ).toEqual(ORGANIZATION_WITHOUT_PLAN);
       expect(ORGANIZATION_WITHOUT_PLAN.currentPlanType).toBeNull();
-      expect(ORGANIZATION_WITHOUT_PLAN.creditsAvailable).toBe(0);
+      expect(ORGANIZATION_WITHOUT_PLAN.credits).toEqual({
+        document: { available: 0 },
+        biometric: { available: 0 },
+      });
       expect(ORGANIZATION_WITHOUT_PLAN.actions.signSimpleAndAdvanced).toBe(
         false,
       );

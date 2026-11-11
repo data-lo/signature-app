@@ -49,15 +49,15 @@ function planLabel(planType: string): string {
  * quien sí tiene saldo comprado.
  */
 function SaldoDeDocumentos({
-  creditsAvailable,
+  available,
   documentsIncludedPerPeriod,
 }: {
-  creditsAvailable: number;
+  available: number;
   documentsIncludedPerPeriod: number | null;
 }) {
   return (
     <p className="text-sm text-muted-foreground">
-      Documentos disponibles: <strong>{creditsAvailable}</strong>
+      Documentos disponibles: <strong>{available}</strong>
       {documentsIncludedPerPeriod
         ? ` de ${documentsIncludedPerPeriod} incluidos por periodo.`
         : '.'}
@@ -68,8 +68,8 @@ function SaldoDeDocumentos({
 /**
  * Créditos de firma biométrica disponibles, debajo del saldo de documentos.
  *
- * Se calla si el backend no manda el dato o si el plan no incluye la firma biométrica y la cuenta
- * no tiene saldo (ver `shouldShowBiometricCredits`).
+ * Se calla si el plan no incluye la firma biométrica y la cuenta no tiene saldo (ver
+ * `shouldShowBiometricCredits`).
  *
  * @param props.billing - Estado de facturación de la cuenta activa.
  * @returns El párrafo del saldo biométrico, o nada.
@@ -82,7 +82,7 @@ function SaldoDeDocumentos({
 function SaldoBiometrico({
   billing,
 }: {
-  billing: Pick<BillingAccess, 'biometricCreditsAvailable' | 'actions'>;
+  billing: Pick<BillingAccess, 'credits' | 'actions'>;
 }) {
   if (!shouldShowBiometricCredits(billing)) {
     return null;
@@ -91,7 +91,7 @@ function SaldoBiometrico({
   return (
     <p className="text-sm text-muted-foreground">
       Firmas biométricas disponibles:{' '}
-      <strong>{billing.biometricCreditsAvailable}</strong>.
+      <strong>{billing.credits.biometric.available}</strong>.
     </p>
   );
 }
@@ -184,7 +184,7 @@ export default function SubscriptionStateCard() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <SaldoDeDocumentos
-            creditsAvailable={subscription.creditsAvailable}
+            available={subscription.credits.document.available}
             documentsIncludedPerPeriod={
               subscription.limits.documentsIncludedPerPeriod
             }
@@ -244,7 +244,7 @@ export default function SubscriptionStateCard() {
 
       <CardContent className="flex flex-col gap-4">
         <SaldoDeDocumentos
-          creditsAvailable={subscription.creditsAvailable}
+          available={subscription.credits.document.available}
           documentsIncludedPerPeriod={
             subscription.limits.documentsIncludedPerPeriod
           }

@@ -99,18 +99,30 @@ export interface BillingAccess {
   cancelAtPeriodEnd: boolean;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
-  /** Documentos que la cuenta puede consumir HOY, sumando todos sus lotes vigentes. */
-  creditsAvailable: number;
   /**
-   * Créditos de firma biométrica que la cuenta puede usar HOY (lo comprado menos lo reservado por
-   * intentos en curso). Cada intento de Didit reserva uno y sólo se cobra si la firma se registra.
+   * Saldos de la cuenta por tipo de crédito. Nunca nulos: sin perfil o sin lotes, cada tipo llega
+   * en `0`.
    *
-   * Opcional porque un backend anterior a los créditos biométricos no lo manda: en ese caso la
-   * pantalla se calla en vez de anunciar un `0` que no le consta (ver `shouldShowBiometricCredits`).
+   * El backend todavía manda `creditsAvailable` (obsoleto, espejo de `credits.document.available`);
+   * no se declara aquí a propósito, para que ninguna pantalla vuelva a leerlo.
    */
-  biometricCreditsAvailable?: number;
+  credits: BillingCredits;
   actions: PlanActions;
   limits: PlanLimits;
+}
+
+/** Saldo de un tipo de crédito. */
+export interface CreditBalance {
+  /** Créditos utilizables HOY: lo comprado o incluido, menos lo reservado por procesos en curso. */
+  available: number;
+}
+
+/** Espejo de `BillingCredits` en signature-server. */
+export interface BillingCredits {
+  /** Créditos para crear documentos. */
+  document: CreditBalance;
+  /** Créditos de firma biométrica: cada intento de Didit reserva uno y sólo se cobra si se firma. */
+  biometric: CreditBalance;
 }
 
 /**
