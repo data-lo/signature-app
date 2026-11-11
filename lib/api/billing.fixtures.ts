@@ -44,6 +44,7 @@ export const SIN_PERFIL: BillingAccess = {
   currentPeriodStart: null,
   currentPeriodEnd: null,
   creditsAvailable: 0,
+  biometricCreditsAvailable: 0,
   actions: ACCIONES_FREE,
   limits: LIMITES_FREE,
 };

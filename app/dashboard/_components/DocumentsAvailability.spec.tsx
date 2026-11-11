@@ -47,9 +47,7 @@ describe('DocumentsAvailability', () => {
 
     render(<DocumentsAvailability />, { wrapper });
 
-    expect(
-      await screen.findByText('12 documentos'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('12 documentos')).toBeInTheDocument();
   });
 
   /**
@@ -78,9 +76,7 @@ describe('DocumentsAvailability', () => {
 
     render(<DocumentsAvailability />, { wrapper });
 
-    expect(
-      await screen.findByText('1 documento'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('1 documento')).toBeInTheDocument();
   });
 
   /** `0` es una respuesta —la cuenta se quedó sin documentos—, no una ausencia de dato. */
@@ -124,6 +120,59 @@ describe('DocumentsAvailability', () => {
     await waitFor(() => expect(mockedRequest).toHaveBeenCalled());
   });
 
+  describe('firmas biométricas', () => {
+    it('anuncia el saldo biométrico junto al de documentos', async () => {
+      mockedRequest.mockResolvedValue(
+        buildBillingAccess({
+          creditsAvailable: 12,
+          biometricCreditsAvailable: 5,
+        }),
+      );
+
+      render(<DocumentsAvailability />, { wrapper });
+
+      expect(await screen.findByText('12 documentos')).toBeInTheDocument();
+      expect(screen.getByText('5 firmas biométricas')).toBeInTheDocument();
+    });
+
+    it('anuncia el saldo biométrico agotado si el plan incluye la firma biométrica', async () => {
+      mockedRequest.mockResolvedValue(
+        buildBillingAccess({ biometricCreditsAvailable: 0 }),
+      );
+
+      render(<DocumentsAvailability />, { wrapper });
+
+      expect(
+        await screen.findByText('Sin firmas biométricas disponibles'),
+      ).toBeInTheDocument();
+    });
+
+    it('no lo anuncia si el plan no incluye la firma biométrica y no hay saldo', async () => {
+      mockedRequest.mockResolvedValue(
+        buildBillingAccess({
+          biometricCreditsAvailable: 0,
+          actions: { graphSignatureBiometrics: false },
+        }),
+      );
+
+      render(<DocumentsAvailability />, { wrapper });
+
+      await screen.findByText('18 documentos');
+      expect(screen.queryByText(/biométric/i)).not.toBeInTheDocument();
+    });
+
+    it('no lo anuncia si el backend no informa el saldo biométrico', async () => {
+      mockedRequest.mockResolvedValue(
+        buildBillingAccess({ biometricCreditsAvailable: undefined }),
+      );
+
+      render(<DocumentsAvailability />, { wrapper });
+
+      await screen.findByText('18 documentos');
+      expect(screen.queryByText(/biométric/i)).not.toBeInTheDocument();
+    });
+  });
+
   /**
    * El saldo es de la CUENTA ACTIVA, y la cuenta va en la `queryKey` de `useBillingAccess`: al
    * cambiar de cuenta se vuelve a consultar y el número se redibuja solo. Sin esta prueba, un
@@ -142,8 +191,6 @@ describe('DocumentsAvailability', () => {
     );
     givenActiveAccount('cuenta-org-1');
 
-    expect(
-      await screen.findByText('3 documentos'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('3 documentos')).toBeInTheDocument();
   });
 });

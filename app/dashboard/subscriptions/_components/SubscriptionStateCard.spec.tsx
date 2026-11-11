@@ -542,7 +542,10 @@ describe('SubscriptionStateCard', () => {
         currentPlanType: 'premium',
         status: 'ACTIVE',
         creditsAvailable: 18,
-        limits: { documentsIncludedPerPeriod: 60, maxOrganizationMembers: null },
+        limits: {
+          documentsIncludedPerPeriod: 60,
+          maxOrganizationMembers: null,
+        },
       });
 
       render(<SubscriptionStateCard />, { wrapper });
@@ -593,6 +596,90 @@ describe('SubscriptionStateCard', () => {
         expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
       );
       expect(screen.getByText('3')).toBeInTheDocument();
+    });
+  });
+
+  describe('saldo de firmas biométricas', () => {
+    it('muestra los créditos biométricos disponibles debajo de los documentos', async () => {
+      givenSubscription({
+        hasActiveSubscription: true,
+        currentPlanType: 'premium',
+        status: 'ACTIVE',
+        creditsAvailable: 18,
+        biometricCreditsAvailable: 7,
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      expect(
+        await screen.findByText(/firmas biométricas disponibles/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText('7')).toBeInTheDocument();
+    });
+
+    it('también los muestra en el plan gratuito', async () => {
+      givenSubscription({
+        hasActiveSubscription: false,
+        currentPlanType: 'free',
+        status: 'FREE',
+        creditsAvailable: 3,
+        biometricCreditsAvailable: 2,
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await screen.findByText('Plan Gratuito');
+      expect(
+        screen.getByText(/firmas biométricas disponibles/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
+    });
+
+    /** Sin la capacidad en el plan y sin saldo, el renglón no le dice nada útil. */
+    it('se calla si el plan no incluye la firma biométrica y no hay saldo', async () => {
+      givenSubscription({
+        biometricCreditsAvailable: 0,
+        actions: {
+          ...buildBillingAccess().actions,
+          graphSignatureBiometrics: false,
+        },
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await screen.findByText(/documentos disponibles/i);
+      expect(
+        screen.queryByText(/firmas biométricas disponibles/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('muestra el saldo comprado aunque el plan ya no incluya la firma biométrica', async () => {
+      givenSubscription({
+        biometricCreditsAvailable: 4,
+        actions: {
+          ...buildBillingAccess().actions,
+          graphSignatureBiometrics: false,
+        },
+      });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      expect(
+        await screen.findByText(/firmas biométricas disponibles/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText('4')).toBeInTheDocument();
+    });
+
+    /** Un backend anterior a los créditos biométricos no manda el campo: no se inventa un 0. */
+    it('se calla si el backend no informa el saldo biométrico', async () => {
+      givenSubscription({ biometricCreditsAvailable: undefined });
+
+      render(<SubscriptionStateCard />, { wrapper });
+
+      await screen.findByText(/documentos disponibles/i);
+      expect(
+        screen.queryByText(/firmas biométricas disponibles/i),
+      ).not.toBeInTheDocument();
     });
   });
 

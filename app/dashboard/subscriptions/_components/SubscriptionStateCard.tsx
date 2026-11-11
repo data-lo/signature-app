@@ -18,7 +18,8 @@ import { useResumeSubscription } from '../_hooks/useResumeSubscription';
 import { formatPeriodEnd } from '../_utils/format-period-end';
 import CancelSubscriptionDialog from './CancelSubscriptionDialog';
 import AddDocumentsDialog from './AddDocumentsDialog';
-import type { BillingProfileStatus } from '@/lib/api/billing';
+import type { BillingAccess, BillingProfileStatus } from '@/lib/api/billing';
+import { shouldShowBiometricCredits } from '@/lib/biometric-credits';
 
 /** El estado del perfil de facturación, rotulado para el usuario. */
 const STATUS_LABELS: Record<BillingProfileStatus, string> = {
@@ -60,6 +61,37 @@ function SaldoDeDocumentos({
       {documentsIncludedPerPeriod
         ? ` de ${documentsIncludedPerPeriod} incluidos por periodo.`
         : '.'}
+    </p>
+  );
+}
+
+/**
+ * Créditos de firma biométrica disponibles, debajo del saldo de documentos.
+ *
+ * Se calla si el backend no manda el dato o si el plan no incluye la firma biométrica y la cuenta
+ * no tiene saldo (ver `shouldShowBiometricCredits`).
+ *
+ * @param props.billing - Estado de facturación de la cuenta activa.
+ * @returns El párrafo del saldo biométrico, o nada.
+ *
+ * @example
+ * ```tsx
+ * <SaldoBiometrico billing={subscription} />
+ * ```
+ */
+function SaldoBiometrico({
+  billing,
+}: {
+  billing: Pick<BillingAccess, 'biometricCreditsAvailable' | 'actions'>;
+}) {
+  if (!shouldShowBiometricCredits(billing)) {
+    return null;
+  }
+
+  return (
+    <p className="text-sm text-muted-foreground">
+      Firmas biométricas disponibles:{' '}
+      <strong>{billing.biometricCreditsAvailable}</strong>.
     </p>
   );
 }
@@ -157,6 +189,7 @@ export default function SubscriptionStateCard() {
               subscription.limits.documentsIncludedPerPeriod
             }
           />
+          <SaldoBiometrico billing={subscription} />
           {/**
            * Comprar documentos sueltos también desde el plan gratuito: es una compra única que no
            * crea ni modifica ninguna suscripción, así que no exige tener plan de pago. Qué
@@ -216,6 +249,7 @@ export default function SubscriptionStateCard() {
             subscription.limits.documentsIncludedPerPeriod
           }
         />
+        <SaldoBiometrico billing={subscription} />
 
         {/**
          * Con la baja programada, este aviso SUSTITUYE al del periodo vigente en vez de sumarse:
