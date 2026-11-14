@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
@@ -18,6 +18,7 @@ import {
   CREATE_DOCUMENT_ERROR_MESSAGE,
 } from './useCreateDocumentSignatures';
 import { getUploadErrorMessage } from '../_upload-errors';
+import { getInsufficientBiometricCredits } from '../_insufficient-biometric-credits';
 
 interface UseCreateDocumentFormParams {
   /** Archivo ya cargado; sin él no hay nada que enviar (ver `_section-rules.ts`). */
@@ -82,6 +83,32 @@ export function useCreateDocumentForm({
     name: 'reviewerUserId',
   });
 
+  const signerCount = countSigners(collaborators);
+  const insufficientBiometricCredits = createDocumentSignaturesMutation.isError
+    ? getInsufficientBiometricCredits(createDocumentSignaturesMutation.error)
+    : null;
+
+  /**
+   * El aviso de saldo biométrico dice cuántos créditos pedía el documento que se envió. En cuanto
+   * el usuario quita firmantes o cambia el tipo de firma, esos números dejan de describir lo que
+   * hay en pantalla: se retira el aviso y el siguiente envío vuelve a comprobarlo.
+   */
+  const resetMutation = createDocumentSignaturesMutation.reset;
+  const hasInsufficientBiometricCredits = insufficientBiometricCredits !== null;
+  const submittedShape = useRef<string | null>(null);
+  const currentShape = `${signatureType ?? ''}:${signerCount}`;
+  useEffect(() => {
+    if (!hasInsufficientBiometricCredits) {
+      submittedShape.current = null;
+      return;
+    }
+    if (submittedShape.current === null) {
+      submittedShape.current = currentShape;
+    } else if (submittedShape.current !== currentShape) {
+      resetMutation();
+    }
+  }, [currentShape, hasInsufficientBiometricCredits, resetMutation]);
+
   function onValidSubmit(values: CreateDocumentSignaturesFormValues) {
     // Guarda redundante con `sections.submission.isEnabled` (el botón está deshabilitado sin
     // archivo): la validación del esquema no cubre el archivo, así que el envío se protege
@@ -132,7 +159,7 @@ export function useCreateDocumentForm({
      */
     handleSubmit: form.handleSubmit(onValidSubmit, onInvalid),
     /** Cuántos firmantes hay hoy en el formulario (gobierna el orden de firma). */
-    signerCount: countSigners(collaborators),
+    signerCount,
     /** Cuántos testigos hay hoy en el formulario (solo informativo: alimenta el resumen). */
     witnessCount: countWitnesses(collaborators),
     /** Firmantes a los que todavía les falta colocar su firma en el PDF, por nombre. */
@@ -154,12 +181,19 @@ export function useCreateDocumentForm({
     participantsErrorMessage: getParticipantsErrorMessage(
       form.formState.errors,
     ),
-    submitErrorMessage: createDocumentSignaturesMutation.isError
-      ? getUploadErrorMessage(
-          createDocumentSignaturesMutation.error,
-          CREATE_DOCUMENT_ERROR_MESSAGE,
-        )
-      : undefined,
+    /**
+     * Créditos biométricos requeridos y disponibles cuando el backend rechazó el envío por saldo
+     * (402 `INSUFFICIENT_BIOMETRIC_CREDITS`); `null` en cualquier otro caso. Se muestra como aviso
+     * propio y no como `submitErrorMessage`.
+     */
+    insufficientBiometricCredits,
+    submitErrorMessage:
+      createDocumentSignaturesMutation.isError && !insufficientBiometricCredits
+        ? getUploadErrorMessage(
+            createDocumentSignaturesMutation.error,
+            CREATE_DOCUMENT_ERROR_MESSAGE,
+          )
+        : undefined,
   };
 }
 
