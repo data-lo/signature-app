@@ -1,4 +1,5 @@
 import userEvent from '@testing-library/user-event';
+import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { act } from '@testing-library/react';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import CreateDocumentView from './CreateDocumentView';
@@ -221,7 +222,9 @@ describe('CreateDocumentView', () => {
     it('sin archivo: el envío está deshabilitado y la sección de ubicación de firmas explica qué falta', () => {
       renderWithProviders(<CreateDocumentView />);
 
-      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeDisabled();
       expect(screen.getByText(MISSING_FILE_MESSAGE)).toBeInTheDocument();
       expect(
         screen.queryByText(/panel de ubicación de firmas/i),
@@ -234,7 +237,9 @@ describe('CreateDocumentView', () => {
 
       await selectFile(user);
 
-      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeDisabled();
       await waitFor(() =>
         expect(
           screen.getByText(/panel de ubicación de firmas/i),
@@ -246,7 +251,9 @@ describe('CreateDocumentView', () => {
       await selectSignatureType(user, /firma grafo/i);
       await placeSignatures(user);
 
-      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeEnabled();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeEnabled();
     });
 
     it('mientras el archivo se procesa: no se puede enviar y la ubicación de firmas muestra el estado de carga', async () => {
@@ -260,7 +267,9 @@ describe('CreateDocumentView', () => {
         screen.getByRole('button', { name: /simular archivo procesándose/i }),
       );
 
-      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeDisabled();
       expect(screen.getByText(/cargando documento/i)).toBeInTheDocument();
     });
 
@@ -321,7 +330,9 @@ describe('CreateDocumentView', () => {
       // Contraída, la sección deja de ser alcanzable (el panel queda `hidden`, no solo atenuado).
       await user.click(trigger(/cargar documento/i));
       expect(
-        screen.queryByRole('button', { name: /seleccionar archivo de prueba/i }),
+        screen.queryByRole('button', {
+          name: /seleccionar archivo de prueba/i,
+        }),
       ).not.toBeInTheDocument();
       await user.click(trigger(/cargar documento/i));
       expect(
@@ -330,9 +341,13 @@ describe('CreateDocumentView', () => {
 
       await user.click(trigger(/configurar firma/i));
       expect(
-        screen.queryByRole('button', { name: /seleccionar archivo de prueba/i }),
+        screen.queryByRole('button', {
+          name: /seleccionar archivo de prueba/i,
+        }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole('combobox', { name: /tipo de firma/i })).toBeVisible();
+      expect(
+        screen.getByRole('combobox', { name: /tipo de firma/i }),
+      ).toBeVisible();
 
       await user.click(trigger(/añadir participantes/i));
       expect(
@@ -373,7 +388,9 @@ describe('CreateDocumentView', () => {
         trigger(/cargar documento/i).querySelector('[data-complete="true"]'),
       ).toBeNull();
       expect(
-        trigger(/añadir participantes/i).querySelector('[data-complete="true"]'),
+        trigger(/añadir participantes/i).querySelector(
+          '[data-complete="true"]',
+        ),
       ).toBeNull();
 
       await selectFile(user);
@@ -385,7 +402,9 @@ describe('CreateDocumentView', () => {
         trigger(/cargar documento/i).querySelector('[data-complete="true"]'),
       ).toHaveTextContent('1');
       expect(
-        trigger(/añadir participantes/i).querySelector('[data-complete="true"]'),
+        trigger(/añadir participantes/i).querySelector(
+          '[data-complete="true"]',
+        ),
       ).toHaveTextContent('3');
     });
 
@@ -450,7 +469,9 @@ describe('CreateDocumentView', () => {
       expect(
         screen.getByRole('region', { name: /resumen de la solicitud/i }),
       ).toBeVisible();
-      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeVisible();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeVisible();
     });
   });
 
@@ -497,7 +518,9 @@ describe('CreateDocumentView', () => {
       await user.click(screen.getByRole('button', { name: /^firmante$/i }));
       await placeSignatures(user);
 
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await user.click(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      );
 
       expect(screen.getByLabelText(/nombre\(s\)/i)).toBeVisible();
       expect(
@@ -822,12 +845,120 @@ describe('CreateDocumentView', () => {
       expect(
         screen.getByRole('button', { name: /subiendo documento\.\.\. 40%/i }),
       ).toBeDisabled();
-      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
+      expect(screen.getByRole('progressbar')).toHaveAttribute(
+        'aria-valuenow',
+        '40',
+      );
 
       act(() => reportProgress(100));
       expect(
         screen.getByRole('button', { name: /procesando documento/i }),
       ).toBeDisabled();
+    });
+  });
+
+  describe('saldo biométrico insuficiente', () => {
+    /** El 402 que responde el backend cuando faltan créditos biométricos. */
+    function insufficientBiometricCreditsError(
+      required: number,
+      available: number,
+    ) {
+      const details = { required, available, biometricSigners: required };
+      return new AxiosError('402', undefined, undefined, undefined, {
+        status: 402,
+        statusText: 'Payment Required',
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+        data: {
+          statusCode: 402,
+          success: false,
+          message: 'Saldo insuficiente para firmas biométricas.',
+          code: 'INSUFFICIENT_BIOMETRIC_CREDITS',
+          details,
+          error: { code: 'INSUFFICIENT_BIOMETRIC_CREDITS', details },
+        },
+      } as AxiosResponse);
+    }
+
+    /** `mutate` que deja la mutación en error, como React Query tras un 402. */
+    function failingMutate(reset = jest.fn()) {
+      const failing = jest.fn(() => {
+        mockedUseCreateDocumentSignatures.mockReturnValue({
+          mutate: failing,
+          reset,
+          isPending: false,
+          isError: true,
+          error: insufficientBiometricCreditsError(3, 2),
+        });
+      });
+      mockedUseCreateDocumentSignatures.mockReturnValue({
+        mutate: failing,
+        reset,
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      return failing;
+    }
+
+    it('muestra cuánto falta y cuánto hay, conserva el formulario y no confirma el envío', async () => {
+      const failing = failingMutate();
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+
+      const alert = (
+        await screen.findByText('Saldo insuficiente para firmas biométricas.')
+      ).closest('[role="alert"]');
+      expect(alert).toHaveTextContent(
+        'Necesitas 3 créditos y tienes 2 disponibles.',
+      );
+      const buy = screen.getByRole('link', { name: /comprar créditos/i });
+      expect(buy).toHaveAttribute('href', '/dashboard/plans');
+      // En otra pestaña: navegar en esta perdería el documento y su configuración.
+      expect(buy).toHaveAttribute('target', '_blank');
+      expect(
+        screen.queryByText(/ocurrió un error al enviar el documento/i),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+
+      await openSection(user, /añadir participantes/i);
+      expect(screen.getByLabelText(/nombre\(s\)/i)).toHaveValue('Juan');
+      expect(screen.getByLabelText(/^email/i)).toHaveValue(
+        'juan.perez@mail.com',
+      );
+
+      // Reintento: el mismo botón vuelve a mandar el mismo documento.
+      const retry = screen.getByRole('button', {
+        name: /enviar solicitud de firma/i,
+      });
+      expect(retry).toBeEnabled();
+      await user.click(retry);
+      expect(failing).toHaveBeenCalledTimes(2);
+      expect(failing.mock.calls[1][0]).toEqual(failing.mock.calls[0][0]);
+    });
+
+    it('al cambiar los firmantes retira el aviso, porque sus números ya no aplican', async () => {
+      const reset = jest.fn();
+      failingMutate(reset);
+      const user = userEvent.setup();
+      renderWithProviders(<CreateDocumentView />);
+
+      await selectFile(user);
+      await addSigner(user);
+      await selectSignatureType(user, /firma grafo/i);
+      await submitRequest(user);
+      await screen.findByText('Saldo insuficiente para firmas biométricas.');
+      expect(reset).not.toHaveBeenCalled();
+
+      await openSection(user, /añadir participantes/i);
+      await user.click(screen.getByRole('button', { name: /firmante/i }));
+
+      await waitFor(() => expect(reset).toHaveBeenCalled());
     });
   });
 
@@ -902,7 +1033,9 @@ describe('CreateDocumentView', () => {
       await openSection(user, /añadir participantes/i);
       await user.type(screen.getByLabelText(/^rfc \(opcional\)/i), 'ABC');
 
-      expect(await screen.findByText(/ingresa un rfc válido/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/ingresa un rfc válido/i),
+      ).toBeInTheDocument();
     });
 
     it('el testigo conserva su campo de RFC', async () => {
@@ -1049,7 +1182,9 @@ describe('CreateDocumentView', () => {
           isIndexable: false,
           // El resto de la solicitud no cambia: excluirlo de la búsqueda no lo mutila.
           signatureType: 'SIMPLE',
-          collaborators: [expect.objectContaining({ email: 'juan.perez@mail.com' })],
+          collaborators: [
+            expect.objectContaining({ email: 'juan.perez@mail.com' }),
+          ],
         }),
         expect.anything(),
       );
@@ -1221,9 +1356,13 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       await selectFile(user);
-      await user.click(screen.getByRole('button', { name: /enviar solicitud de firma/i }));
+      await user.click(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      );
 
-      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeDisabled();
       expect(mutate).not.toHaveBeenCalled();
     });
 
@@ -1256,7 +1395,9 @@ describe('CreateDocumentView', () => {
       renderWithProviders(<CreateDocumentView />);
 
       expect(screen.getByText(/servicio no disponible/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /enviar solicitud de firma/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /enviar solicitud de firma/i }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -1316,9 +1457,7 @@ describe('CreateDocumentView', () => {
       await placeSignatures(user);
       await requireApproval(user);
 
-      await waitFor(() =>
-        expect(mockedGetApprovers).toHaveBeenCalled(),
-      );
+      await waitFor(() => expect(mockedGetApprovers).toHaveBeenCalled());
 
       // Con la aprobación marcada y sin aprobador, la configuración está a medias.
       expect(
@@ -1356,9 +1495,7 @@ describe('CreateDocumentView', () => {
       await selectSignatureType(user, /firma grafo/i);
       await requireApproval(user);
 
-      expect(
-        await screen.findByText(NO_APPROVERS_MESSAGE),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(NO_APPROVERS_MESSAGE)).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: /enviar solicitud de firma/i }),
       ).toBeDisabled();
