@@ -25,6 +25,7 @@ import DocumentUploadProgress, {
   uploadStatusLabel,
 } from './DocumentUploadProgress';
 import SmartSearchCard from './SmartSearchCard';
+import InsufficientBiometricCreditsAlert from './InsufficientBiometricCreditsAlert';
 import { Form } from '@/components/form/form';
 
 interface CreateDocumentViewProps {
@@ -203,6 +204,10 @@ export default function CreateDocumentView({
           <ErrorAlert
             title={SIGNATURE_POSITION_REQUIRED_TITLE}
             message={progress.signaturePlacement.missingMessage}
+          />
+
+          <InsufficientBiometricCreditsAlert
+            credits={createDocumentForm.insufficientBiometricCredits}
           />
 
           {sections.submission.hasError && (

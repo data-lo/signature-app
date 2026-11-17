@@ -6,6 +6,7 @@ import { KeyRound, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AdvancedSignaturePreparation from '@/app/dashboard/documents/[documentId]/_components/AdvancedSignaturePreparation';
 import AdvancedSignatureDialog, {
   type AdvancedSignatureSubmitValues,
 } from '@/app/dashboard/documents/[documentId]/_components/AdvancedSignatureDialog';
@@ -57,7 +58,7 @@ export function certificateCheckLabels(
 /**
  * Firma Electrónica Avanzada desde la sesión pública de una invitación individual (correo o
  * portal del tercero). El correo ya se validó con el código, así que aquí va directo al documento:
- * visor con las posiciones de firma y la e.firma (`.cer` + `.key` + contraseña) en el mismo
+ * visor con las posiciones de firma y la FIEL (`.cer` + `.key` + contraseña) en el mismo
  * diálogo del panel (`AdvancedSignatureDialog`).
  *
  * La firma lleva el hash del PDF revisado y una `Idempotency-Key`; un reintento no firma dos veces.
@@ -143,22 +144,10 @@ export default function SessionAdvancedSignatureFlow({
             Correo confirmado.
           </p>
           <p className="text-sm text-muted-foreground">
-            Revisa el documento. Al firmar, necesitarás tu llave privada (.key),
-            tu certificado (.cer), la contraseña de tu e.firma y permitir el
-            acceso a tu ubicación.
+            Revisa el documento. Al firmar también te pediremos acceso a tu
+            ubicación.
           </p>
-          {certificateChecks.length > 0 && (
-            <div className="flex flex-col gap-1 text-sm">
-              <p className="text-muted-foreground">
-                Al firmar validaremos tu certificado:
-              </p>
-              <ul className="list-disc pl-5 text-muted-foreground">
-                {certificateChecks.map((check) => (
-                  <li key={check}>{check}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <AdvancedSignaturePreparation certificateChecks={certificateChecks} />
           <Button
             type="button"
             disabled={signing}
@@ -169,7 +158,7 @@ export default function SessionAdvancedSignatureFlow({
             ) : (
               <KeyRound className="size-4" aria-hidden />
             )}
-            {signing ? 'Firmando...' : 'Firmar con e.firma'}
+            {signing ? 'Firmando...' : 'Firmar'}
           </Button>
         </CardContent>
       </Card>

@@ -138,11 +138,11 @@ export const SIGNING_ERROR_MESSAGES: Readonly<
   IDENTITY_DATA_MISMATCH:
     'La identificación verificada no corresponde a la persona invitada a firmar este documento.',
   CERTIFICATE_INVALID:
-    'Tu e.firma no es válida: revisa que el certificado esté vigente y que la llave y la contraseña correspondan.',
+    'Tu FIEL no es válida: revisa que el certificado esté vigente y que la llave y la contraseña correspondan.',
   CERTIFICATE_REVOKED:
     'El SAT reporta tu certificado como revocado. Tramita uno nuevo para firmar.',
   CERTIFICATE_SUBJECT_MISMATCH:
-    'El titular de la e.firma no corresponde a la persona invitada a firmar este documento.',
+    'El titular de la FIEL no corresponde a la persona invitada a firmar este documento.',
   SIGNATURE_VALIDATION_FAILED:
     'La firma no corresponde al documento que revisaste. Vuelve a abrirlo y firma de nuevo.',
   SIGNING_SESSION_EXPIRED:

@@ -56,10 +56,10 @@ describe('AdvancedSignatureDialog', () => {
     );
 
     expect(
-      screen.getByText(/firma electrónica avanzada \(e\.firma\)/i),
+      screen.getByText(/firma con fiel/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/contraseña de la llave privada/i),
+      screen.getByLabelText(/contraseña de fiel/i),
     ).toBeInTheDocument();
   });
 
@@ -75,7 +75,7 @@ describe('AdvancedSignatureDialog', () => {
     );
 
     await user.type(
-      screen.getByLabelText(/contraseña de la llave privada/i),
+      screen.getByLabelText(/contraseña de fiel/i),
       'MiContraseña123',
     );
     await user.click(
@@ -106,7 +106,7 @@ describe('AdvancedSignatureDialog', () => {
 
     expect(
       await screen.findByText(
-        /la contraseña de la llave privada es requerida/i,
+        /la contraseña de fiel es requerida/i,
       ),
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -125,7 +125,7 @@ describe('AdvancedSignatureDialog', () => {
 
     await selectBothFiles(user);
     await user.type(
-      screen.getByLabelText(/contraseña de la llave privada/i),
+      screen.getByLabelText(/contraseña de fiel/i),
       'MiContraseña123',
     );
     await user.click(

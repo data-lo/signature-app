@@ -27,7 +27,7 @@ const GRATUITA = buildBillingAccess({
   currentPlanType: 'free',
   status: 'FREE',
   billingSource: null,
-  creditsAvailable: 0,
+  credits: { document: { available: 0 }, biometric: { available: 0 } },
 });
 const ACTIVA = buildBillingAccess({
   currentPeriodStart: '2030-01-01T00:00:00.000Z',
@@ -207,5 +207,4 @@ describe('PaymentReturnNotice', () => {
       ).toBeInTheDocument();
     });
   });
-
 });

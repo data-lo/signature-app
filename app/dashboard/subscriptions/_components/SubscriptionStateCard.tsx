@@ -18,7 +18,8 @@ import { useResumeSubscription } from '../_hooks/useResumeSubscription';
 import { formatPeriodEnd } from '../_utils/format-period-end';
 import CancelSubscriptionDialog from './CancelSubscriptionDialog';
 import AddDocumentsDialog from './AddDocumentsDialog';
-import type { BillingProfileStatus } from '@/lib/api/billing';
+import type { BillingAccess, BillingProfileStatus } from '@/lib/api/billing';
+import { shouldShowBiometricCredits } from '@/lib/biometric-credits';
 
 /** El estado del perfil de facturación, rotulado para el usuario. */
 const STATUS_LABELS: Record<BillingProfileStatus, string> = {
@@ -48,18 +49,49 @@ function planLabel(planType: string): string {
  * quien sí tiene saldo comprado.
  */
 function SaldoDeDocumentos({
-  creditsAvailable,
+  available,
   documentsIncludedPerPeriod,
 }: {
-  creditsAvailable: number;
+  available: number;
   documentsIncludedPerPeriod: number | null;
 }) {
   return (
     <p className="text-sm text-muted-foreground">
-      Documentos disponibles: <strong>{creditsAvailable}</strong>
+      Documentos disponibles: <strong>{available}</strong>
       {documentsIncludedPerPeriod
         ? ` de ${documentsIncludedPerPeriod} incluidos por periodo.`
         : '.'}
+    </p>
+  );
+}
+
+/**
+ * Créditos de firma biométrica disponibles, debajo del saldo de documentos.
+ *
+ * Se calla si el plan no incluye la firma biométrica y la cuenta no tiene saldo (ver
+ * `shouldShowBiometricCredits`).
+ *
+ * @param props.billing - Estado de facturación de la cuenta activa.
+ * @returns El párrafo del saldo biométrico, o nada.
+ *
+ * @example
+ * ```tsx
+ * <SaldoBiometrico billing={subscription} />
+ * ```
+ */
+function SaldoBiometrico({
+  billing,
+}: {
+  billing: Pick<BillingAccess, 'credits' | 'actions'>;
+}) {
+  if (!shouldShowBiometricCredits(billing)) {
+    return null;
+  }
+
+  return (
+    <p className="text-sm text-muted-foreground">
+      Firmas biométricas disponibles:{' '}
+      <strong>{billing.credits.biometric.available}</strong>.
     </p>
   );
 }
@@ -152,11 +184,12 @@ export default function SubscriptionStateCard() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <SaldoDeDocumentos
-            creditsAvailable={subscription.creditsAvailable}
+            available={subscription.credits.document.available}
             documentsIncludedPerPeriod={
               subscription.limits.documentsIncludedPerPeriod
             }
           />
+          <SaldoBiometrico billing={subscription} />
           {/**
            * Comprar documentos sueltos también desde el plan gratuito: es una compra única que no
            * crea ni modifica ninguna suscripción, así que no exige tener plan de pago. Qué
@@ -211,11 +244,12 @@ export default function SubscriptionStateCard() {
 
       <CardContent className="flex flex-col gap-4">
         <SaldoDeDocumentos
-          creditsAvailable={subscription.creditsAvailable}
+          available={subscription.credits.document.available}
           documentsIncludedPerPeriod={
             subscription.limits.documentsIncludedPerPeriod
           }
         />
+        <SaldoBiometrico billing={subscription} />
 
         {/**
          * Con la baja programada, este aviso SUSTITUYE al del periodo vigente en vez de sumarse:

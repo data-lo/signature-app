@@ -9,6 +9,7 @@ import SignatureVerificationCard, {
 import BiometricSignaturePanel, {
   type BiometricSigningProps,
 } from '@/components/biometric-signature/BiometricSignaturePanel';
+import AdvancedSignaturePreparation from './AdvancedSignaturePreparation';
 import ShareDocumentLinkAction from './ShareDocumentLinkAction';
 import type { ShareLinkStatus } from '../_hooks/useShareDocumentLink';
 
@@ -17,6 +18,8 @@ export interface DocumentSigningProps {
   geoBlockedReason: string | null;
   isRequestingLocation: boolean;
   isSigning: boolean;
+  /** El firmante firma con FIEL: el botón dice "Firmar" y se muestra qué debe preparar. */
+  isAdvancedSignature: boolean;
   onSign: () => void;
 }
 
@@ -58,12 +61,13 @@ export const BIOMETRIC_IDENTITY_REQUIRED_MESSAGE =
 function signButtonLabel({
   isRequestingLocation,
   isSigning,
+  isAdvancedSignature,
   geoBlockedReason,
 }: DocumentSigningProps): string {
   if (isRequestingLocation) return 'Obteniendo ubicación...';
   if (isSigning) return 'Firmando...';
   if (geoBlockedReason) return 'Reintentar con ubicación';
-  return 'Continuar a firmar';
+  return isAdvancedSignature ? 'Firmar' : 'Continuar a firmar';
 }
 
 /**
@@ -148,6 +152,12 @@ export default function DocumentSignaturePanel({
 
         {!requiresVerification && !biometric && (
           <div className="flex flex-col gap-2">
+            {signing.isAdvancedSignature && (
+              <>
+                <p className="text-sm font-medium">Método de firma: FIEL</p>
+                <AdvancedSignaturePreparation />
+              </>
+            )}
             <p className="text-xs text-muted-foreground">
               Al confirmar, solicitaremos tu ubicación para registrarla como
               parte de la evidencia de esta firma. Es obligatoria: sin ella no

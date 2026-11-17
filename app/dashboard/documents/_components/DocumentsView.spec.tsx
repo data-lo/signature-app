@@ -884,7 +884,11 @@ describe('DocumentsView', () => {
 
       await user.click(creator);
 
-      expect(headers().slice(0, 3)).toEqual(['#', 'Documento', 'Creado por']);
+      expect(headers().slice(0, 3)).toEqual([
+        '#Índice',
+        'Documento',
+        'Creado por',
+      ]);
     });
 
     it('la columna de acciones sigue aunque se oculten todas las demás', async () => {
@@ -960,7 +964,7 @@ describe('DocumentsView', () => {
       await user.keyboard(' ');
 
       expect(index).toHaveAttribute('aria-checked', 'false');
-      expect(headers()).not.toContain('#');
+      expect(headers()).not.toContain('#Índice');
     });
 
     it('mantiene los estados de carga y vacío ocupando todo el ancho', () => {

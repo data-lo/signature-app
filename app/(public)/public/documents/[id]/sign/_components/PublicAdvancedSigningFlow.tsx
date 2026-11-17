@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGeolocation } from '@/lib/hooks/useGeolocation';
 import { GEOLOCATION_ERROR_MESSAGES } from '@/lib/hooks/geolocation-error-messages';
+import AdvancedSignaturePreparation from '@/app/dashboard/documents/[documentId]/_components/AdvancedSignaturePreparation';
 import AdvancedSignatureDialog, {
   type AdvancedSignatureSubmitValues,
 } from '@/app/dashboard/documents/[documentId]/_components/AdvancedSignatureDialog';
@@ -164,7 +165,7 @@ export default function PublicAdvancedSigningFlow({
             Firma registrada
           </p>
           <p className="text-sm text-muted-foreground">
-            Firmaste con tu e.firma. Guardamos la evidencia de la firma: fecha y
+            Firmaste con tu FIEL. Guardamos la evidencia de la firma: fecha y
             hora, tu certificado y la validación por correo.
           </p>
           <p className="text-sm text-muted-foreground">
@@ -182,7 +183,7 @@ export default function PublicAdvancedSigningFlow({
       <Card className="mx-auto w-full max-w-md">
         <CardHeader className="gap-1">
           <StepLabel step={1} text="Confirma tu correo" />
-          <CardTitle>Firma Electrónica Avanzada sin cuenta</CardTitle>
+          <CardTitle>Firma con FIEL sin cuenta</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {notice && (
@@ -197,7 +198,7 @@ export default function PublicAdvancedSigningFlow({
             <>
               <p className="text-sm text-muted-foreground">
                 No necesitas una cuenta. Confirma que recibiste la invitación y
-                después firma con tu e.firma: llave privada (.key), certificado
+                después firma con tu FIEL: llave privada (.key), certificado
                 (.cer) y su contraseña.
               </p>
               <GuestAdvancedAccessCodeStep
@@ -268,10 +269,10 @@ export default function PublicAdvancedSigningFlow({
           {document.canSign && document.documentHash ? (
             <>
               <p className="text-sm text-muted-foreground">
-                Revisa el documento. Al firmar, necesitarás tu llave privada
-                (.key), tu certificado (.cer), la contraseña de tu e.firma y
-                permitir el acceso a tu ubicación.
+                Revisa el documento. Al firmar también te pediremos acceso a tu
+                ubicación.
               </p>
+              <AdvancedSignaturePreparation />
               <Button
                 type="button"
                 disabled={signing}
@@ -282,7 +283,7 @@ export default function PublicAdvancedSigningFlow({
                 ) : (
                   <KeyRound className="size-4" aria-hidden />
                 )}
-                {signing ? 'Firmando...' : 'Firmar con e.firma'}
+                {signing ? 'Firmando...' : 'Firmar'}
               </Button>
             </>
           ) : (

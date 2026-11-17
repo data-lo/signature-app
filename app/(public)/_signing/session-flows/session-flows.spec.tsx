@@ -83,7 +83,7 @@ jest.mock(
             })
           }
         >
-          confirmar e.firma
+          confirmar FIEL
         </button>
       ) : null,
   }),
@@ -180,7 +180,48 @@ describe('flujos de la sesión pública de firma', () => {
   });
 
   describe('avanzada', () => {
-    it('firma con la e.firma, el hash del PDF revisado y una Idempotency-Key; muestra el estado final', async () => {
+    it('muestra los requisitos de FIEL con "Firmar" habilitado y abre la carga de archivos al hacer clic', async () => {
+      const user = userEvent.setup();
+      const base = session('ADVANCED');
+      renderFlow(SessionAdvancedSignatureFlow, {
+        ...base,
+        sessionDetails: {
+          ...base.sessionDetails,
+          certificateRequirements: {
+            validateValidity: true,
+            validateRevocation: false,
+            validateSubjectMatch: false,
+          },
+        },
+      } as typeof base);
+
+      const sign = await screen.findByRole('button', { name: /^firmar$/i });
+      expect(sign).toBeEnabled();
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      expect(
+        screen.getByText('Prepara tu FIEL para continuar'),
+      ).toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent(/e\.firma/i);
+      expect(
+        screen.queryByRole('button', { name: /confirmar fiel/i }),
+      ).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole('button', {
+          name: /validaciones que haremos a tu certificado/i,
+        }),
+      );
+      expect(
+        await screen.findByText('Que esté vigente y emitido por el SAT'),
+      ).toBeVisible();
+
+      await user.click(sign);
+      expect(
+        screen.getByRole('button', { name: /confirmar fiel/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('firma con la FIEL, el hash del PDF revisado y una Idempotency-Key; muestra el estado final', async () => {
       const user = userEvent.setup();
       const onSuccess = renderFlow(
         SessionAdvancedSignatureFlow,
@@ -188,11 +229,9 @@ describe('flujos de la sesión pública de firma', () => {
       );
 
       await user.click(
-        await screen.findByRole('button', { name: /firmar con e.firma/i }),
+        await screen.findByRole('button', { name: /^firmar$/i }),
       );
-      await user.click(
-        screen.getByRole('button', { name: /confirmar e.firma/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /confirmar fiel/i }));
 
       expect(await screen.findByText('Firma registrada')).toBeInTheDocument();
       const [payload, key] = (signAdvancedRequest as jest.Mock).mock.calls[0];
@@ -220,15 +259,11 @@ describe('flujos de la sesión pública de firma', () => {
       renderFlow(SessionAdvancedSignatureFlow, session('ADVANCED'));
 
       await user.click(
-        await screen.findByRole('button', { name: /firmar con e.firma/i }),
+        await screen.findByRole('button', { name: /^firmar$/i }),
       );
-      await user.click(
-        screen.getByRole('button', { name: /confirmar e.firma/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /confirmar fiel/i }));
       await waitFor(() => expect(signAdvancedRequest).toHaveBeenCalledTimes(1));
-      await user.click(
-        screen.getByRole('button', { name: /confirmar e.firma/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /confirmar fiel/i }));
 
       await screen.findByText('Firma registrada');
       const keys = (signAdvancedRequest as jest.Mock).mock.calls.map(
@@ -260,10 +295,7 @@ describe('flujos de la sesión pública de firma', () => {
     it.each([
       ['CERTIFICATE_REVOKED', /revocado/i],
       ['CERTIFICATE_INVALID', /no es válida/i],
-      [
-        'CERTIFICATE_SUBJECT_MISMATCH',
-        /titular de la e\.firma no corresponde/i,
-      ],
+      ['CERTIFICATE_SUBJECT_MISMATCH', /titular de la FIEL no corresponde/i],
       ['SIGNATURE_VALIDATION_FAILED', /no corresponde al documento/i],
     ])(
       'un certificado rechazado (%s) muestra el mensaje controlado de su código, no el del backend',
@@ -275,10 +307,10 @@ describe('flujos de la sesión pública de firma', () => {
         renderFlow(SessionAdvancedSignatureFlow, session('ADVANCED'));
 
         await user.click(
-          await screen.findByRole('button', { name: /firmar con e.firma/i }),
+          await screen.findByRole('button', { name: /^firmar$/i }),
         );
         await user.click(
-          screen.getByRole('button', { name: /confirmar e.firma/i }),
+          screen.getByRole('button', { name: /confirmar fiel/i }),
         );
 
         await waitFor(() =>
