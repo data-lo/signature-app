@@ -41,6 +41,22 @@ describe('middleware', () => {
     });
   });
 
+  describe('/verify (consulta pública de verificación por archivo)', () => {
+    it('deja pasar sin sesión en vez de mandar a /login', () => {
+      const response = middleware(buildRequest('/verify'));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('location')).toBeNull();
+    });
+
+    it('deja pasar también con sesión, sin desviar al dashboard', () => {
+      const response = middleware(buildRequest('/verify', 'jwt'));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('location')).toBeNull();
+    });
+  });
+
   describe('/sign/:token (invitación individual de firma)', () => {
     const TOKEN = 'q3VbX7f0_Lr9-ZtKp2NcWm4YhA8sDe1JuGo6BiQk5Rv';
 

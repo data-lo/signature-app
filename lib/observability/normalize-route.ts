@@ -48,6 +48,7 @@ const STATIC_ROUTES: ReadonlySet<string> = new Set([
   '/signature-capture',
   '/signup',
   '/signup/verify',
+  '/verify',
 ]);
 
 /**
