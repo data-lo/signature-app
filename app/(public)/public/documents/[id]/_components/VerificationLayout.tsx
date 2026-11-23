@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AlertTriangle, CircleCheck } from 'lucide-react';
+import { AlertTriangle, CircleCheck, CircleX } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 /**
@@ -9,30 +9,44 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
  * hay evidencia", no como "no lo mostramos".
  */
 
+const ALERT_STYLES = {
+  warning: {
+    Icon: AlertTriangle,
+    className:
+      'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
+  },
+  success: {
+    Icon: CircleCheck,
+    className:
+      'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
+  },
+  error: {
+    Icon: CircleX,
+    className:
+      'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300',
+  },
+} as const;
+
 /**
- * Aviso superior que encabeza la pantalla. Solo dos variantes, y son las dos de la historia: el
- * documento está pendiente (warning) o ya lo firmaron todos (success).
+ * Aviso superior que encabeza la pantalla. En la vista de un documento sólo se usan `warning`
+ * (pendiente) y `success` (lo firmaron todos); `error` lo usa la consulta pública `/verify` para
+ * un archivo cuya integridad no se pudo comprobar.
  */
 export function VerificationAlert({
   variant,
   children,
 }: {
-  variant: 'warning' | 'success';
+  variant: 'warning' | 'success' | 'error';
   children: ReactNode;
 }) {
-  const isWarning = variant === 'warning';
-  const Icon = isWarning ? AlertTriangle : CircleCheck;
+  const { Icon, className } = ALERT_STYLES[variant];
 
   return (
     <div
       // `role="status"` y no `alert`: es el resumen del estado de la página, no una interrupción.
       role="status"
       data-variant={variant}
-      className={
-        isWarning
-          ? 'flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'
-          : 'flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300'
-      }
+      className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${className}`}
     >
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
       <p>{children}</p>
