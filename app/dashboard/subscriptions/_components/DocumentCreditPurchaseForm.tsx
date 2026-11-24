@@ -70,7 +70,9 @@ function SelectableOffer({
       disabled={disabled}
       aria-pressed={selected}
       className={`flex w-full items-baseline justify-between gap-3 rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
-        selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'
+        selected
+          ? 'border-primary bg-primary/5'
+          : 'border-border hover:bg-muted'
       }`}
     >
       <span className="flex flex-col">
