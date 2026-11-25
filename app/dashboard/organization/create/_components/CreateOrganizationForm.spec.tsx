@@ -57,10 +57,7 @@ describe('CreateOrganizationForm', () => {
     });
     expect(submitButton).toBeDisabled();
 
-    await user.type(
-      screen.getByLabelText(/nombre de visualización/i),
-      'Acme',
-    );
+    await user.type(screen.getByLabelText(/nombre de visualización/i), 'Acme');
     expect(submitButton).toBeDisabled();
 
     await user.type(
@@ -143,6 +140,39 @@ describe('CreateOrganizationForm', () => {
       expect(
         screen.queryByText('No disponible en plan Free'),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('diseño', () => {
+    it('agrupa los campos bajo "Datos de la organización" y conserva el aviso de cuentas', () => {
+      renderWithProviders(<CreateOrganizationForm />);
+
+      expect(screen.getByText('Datos de la organización')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /después podrás alternar entre tu cuenta personal y la organización/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it.each([
+      [/nombre de visualización/i, 'Así aparecerá en el selector de cuentas.'],
+      [/razón social/i, 'Usa el nombre legal de la organización.'],
+    ])('marca %s como obligatorio y lo describe', (label, help) => {
+      renderWithProviders(<CreateOrganizationForm />);
+
+      const input = screen.getByLabelText(label);
+      expect(input).toHaveAttribute('aria-required', 'true');
+      expect(input).toHaveAccessibleDescription(help);
+    });
+
+    it('muestra el botón primario con el icono de alta', () => {
+      renderWithProviders(<CreateOrganizationForm />);
+
+      const button = screen.getByRole('button', {
+        name: 'Crear organización',
+      });
+      expect(button.querySelector('svg')).not.toBeNull();
     });
   });
 });
