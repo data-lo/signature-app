@@ -163,3 +163,69 @@ describe('AppSidebar — sección Gestión', () => {
     expect(screen.getByText('Pagos')).toBeInTheDocument();
   });
 });
+
+describe('AppSidebar — entrada activa según la ruta', () => {
+  beforeAll(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }),
+    });
+  });
+
+  beforeEach(() => {
+    mockPermissions = PERSONAL_PERMISSIONS;
+  });
+
+  /** Textos de todos los enlaces del menú marcados como activos. */
+  function activeLinkLabels(): (string | null)[] {
+    return screen
+      .getAllByRole('link')
+      .filter((link) => link.hasAttribute('data-active'))
+      .map((link) => link.textContent);
+  }
+
+  it.each([
+    ['/dashboard/documents', 'Documentos'],
+    ['/dashboard/documents/doc-1', 'Documentos'],
+    ['/dashboard/directory', 'Directorio'],
+    ['/dashboard/plans', 'Planes'],
+    ['/dashboard/subscriptions/', 'Suscripciones'],
+    ['/dashboard/personal-documents', 'Información personal'],
+    ['/dashboard/personal-documents/identity', 'Identidad y firma'],
+  ])('en %s sólo queda activa %s en todo el menú', (pathname, active) => {
+    mockPathname = pathname;
+    renderSidebar();
+
+    expect(activeLinkLabels()).toEqual([active]);
+    expect(screen.getByRole('link', { name: active })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('en una ruta que no pertenece al menú no marca ninguna entrada', () => {
+    mockPathname = '/dashboard/organization/create';
+    renderSidebar();
+
+    expect(activeLinkLabels()).toEqual([]);
+  });
+
+  it('se actualiza al cambiar la ruta sin recargar', () => {
+    mockPathname = '/dashboard/documents';
+    const { rerender } = renderSidebar();
+    expect(activeLinkLabels()).toEqual(['Documentos']);
+
+    mockPathname = '/dashboard/plans';
+    rerender(
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>,
+    );
+    expect(activeLinkLabels()).toEqual(['Planes']);
+  });
+});
