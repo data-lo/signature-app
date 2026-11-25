@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -37,6 +37,46 @@ interface PaymentServiceCardProps {
    */
   isBlockedByActiveSubscription?: boolean;
   onBuy: (priceId: string) => void;
+}
+
+/**
+ * Beneficios del plan, uno por renglón y en el orden configurado en el backend.
+ *
+ * Es una lista (`<ul>`) para que los lectores de pantalla anuncien cuántos beneficios hay. La
+ * `key` combina índice y texto: el backend ya garantiza que no se repiten, y el índice conserva
+ * la identidad si alguien reordena la lista.
+ *
+ * @param props.descriptions - Descripciones del plan; ausentes o vacías no pintan nada.
+ * @returns La lista de beneficios, o nada.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```tsx
+ * <PlanDescriptions descriptions={['Hasta 10 documentos', 'Firma electrónica']} />
+ * ```
+ */
+export function PlanDescriptions({
+  descriptions,
+}: {
+  descriptions?: readonly string[];
+}) {
+  if (!descriptions?.length) {
+    return null;
+  }
+
+  return (
+    <ul aria-label="Incluye" className="flex flex-col gap-2 text-sm">
+      {descriptions.map((description, index) => (
+        <li
+          key={`${index}-${description}`}
+          className="flex items-start gap-2 text-foreground"
+        >
+          <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+          <span>{description}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export default function PaymentServiceCard({
@@ -122,6 +162,8 @@ export default function PaymentServiceCard({
             <span className="text-sm text-muted-foreground">{interval}</span>
           ) : null}
         </p>
+
+        <PlanDescriptions descriptions={service.descriptions} />
       </CardContent>
 
       {/**
