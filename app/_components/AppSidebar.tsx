@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BookUser,
   Building2,
-  FileSignature,
   CreditCard,
   ReceiptText,
   User,
@@ -48,7 +48,48 @@ import {
 import { NAV_GROUP_LABELS } from '@/app/dashboard/_config/nav-groups';
 import AccountSwitcher from './AccountSwitcher';
 
-export interface NavItem {
+/** Nombre de la marca: texto visible, tooltip y nombre accesible del enlace de inicio. */
+export const BRAND_NAME = 'Firmalo';
+
+/** El mismo isotipo que usan Login, Signup y Recuperar contraseña. */
+export const BRAND_ISOTYPE_SRC = '/isotipo-firmalo.svg';
+
+/**
+ * Isotipo de Firmalo para la cabecera del menú, en un recuadro de 32 px que mide lo mismo que el
+ * botón contraído (`size-8`): expandida o contraída, la marca ocupa el mismo lugar y no salta.
+ *
+ * En tema oscuro el recuadro lleva fondo blanco: el azul de marca (#3A5896) sobre la sidebar
+ * oscura queda en ~2.6:1, por debajo del 3:1 que pide un elemento gráfico; sobre blanco supera
+ * 7:1. En tema claro el fondo es transparente, como en Login.
+ *
+ * Es decorativo (`alt=""`): el nombre accesible lo pone el enlace.
+ *
+ * @returns El isotipo dentro de su recuadro.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```tsx
+ * <SidebarMenuButton size="lg"><BrandMark /><span>Firmalo</span></SidebarMenuButton>
+ * ```
+ */
+export function BrandMark() {
+  return (
+    <span
+      data-testid="brand-mark"
+      className="flex size-8 shrink-0 items-center justify-center rounded-md dark:bg-white"
+    >
+      <Image
+        src={BRAND_ISOTYPE_SRC}
+        alt=""
+        width={24}
+        height={24}
+        className="size-6 object-contain"
+      />
+    </span>
+  );
+}
+
+interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
@@ -423,10 +464,15 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
+              // Con la barra contraída el texto desaparece: el tooltip y el `aria-label` del
+              // enlace siguen diciendo "Firmalo".
+              tooltip={BRAND_NAME}
+              className="group-data-[collapsible=icon]:justify-center"
               // La marca lleva al inicio del producto: el listado de documentos. Antes apuntaba
               // al alta, cuando crear era una entrada de menú por derecho propio.
               render={
                 <Link
+                  aria-label={BRAND_NAME}
                   href={
                     lockedWithoutPlan
                       ? PLANS_ROUTE
@@ -435,8 +481,18 @@ export default function AppSidebar() {
                 />
               }
             >
-              <FileSignature className="text-emerald-500" />
-              <span className="font-heading font-semibold">Firmalo</span>
+              <BrandMark />
+              {/**
+               * `hidden` (display: none) al contraer, no sólo recortado por el ancho del botón:
+               * así no asoma media palabra durante la transición ni queda texto superpuesto al
+               * isotipo.
+               */}
+              <span
+                aria-hidden
+                className="font-heading font-semibold group-data-[collapsible=icon]:hidden"
+              >
+                {BRAND_NAME}
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

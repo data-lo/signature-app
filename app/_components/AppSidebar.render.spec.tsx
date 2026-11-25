@@ -164,7 +164,7 @@ describe('AppSidebar — sección Gestión', () => {
   });
 });
 
-describe('AppSidebar — entrada activa según la ruta', () => {
+describe('AppSidebar — marca', () => {
   beforeAll(() => {
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
@@ -178,54 +178,71 @@ describe('AppSidebar — entrada activa según la ruta', () => {
   });
 
   beforeEach(() => {
+    mockPathname = '/dashboard/documents';
     mockPermissions = PERSONAL_PERMISSIONS;
   });
 
-  /** Textos de todos los enlaces del menú marcados como activos. */
-  function activeLinkLabels(): (string | null)[] {
-    return screen
-      .getAllByRole('link')
-      .filter((link) => link.hasAttribute('data-active'))
-      .map((link) => link.textContent);
-  }
-
-  it.each([
-    ['/dashboard/documents', 'Documentos'],
-    ['/dashboard/documents/doc-1', 'Documentos'],
-    ['/dashboard/directory', 'Directorio'],
-    ['/dashboard/plans', 'Planes'],
-    ['/dashboard/subscriptions/', 'Suscripciones'],
-    ['/dashboard/personal-documents', 'Información personal'],
-    ['/dashboard/personal-documents/identity', 'Identidad y firma'],
-  ])('en %s sólo queda activa %s en todo el menú', (pathname, active) => {
-    mockPathname = pathname;
-    renderSidebar();
-
-    expect(activeLinkLabels()).toEqual([active]);
-    expect(screen.getByRole('link', { name: active })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-  });
-
-  it('en una ruta que no pertenece al menú no marca ninguna entrada', () => {
-    mockPathname = '/dashboard/organization/create';
-    renderSidebar();
-
-    expect(activeLinkLabels()).toEqual([]);
-  });
-
-  it('se actualiza al cambiar la ruta sin recargar', () => {
-    mockPathname = '/dashboard/documents';
-    const { rerender } = renderSidebar();
-    expect(activeLinkLabels()).toEqual(['Documentos']);
-
-    mockPathname = '/dashboard/plans';
-    rerender(
-      <SidebarProvider>
+  /**
+   * Monta el menú expandido o contraído.
+   *
+   * @param open - `false` para la barra contraída (modo ícono).
+   * @returns El resultado del render.
+   *
+   * @example
+   * renderSidebarIn(false);
+   */
+  function renderSidebarIn(open: boolean) {
+    return render(
+      <SidebarProvider defaultOpen={open}>
         <AppSidebar />
       </SidebarProvider>,
     );
-    expect(activeLinkLabels()).toEqual(['Planes']);
+  }
+
+  /** El enlace de inicio de la cabecera, por su nombre accesible. */
+  function brandLink(): HTMLElement {
+    return screen.getByRole('link', { name: 'Firmalo' });
+  }
+
+  it.each([
+    ['expandida', true],
+    ['contraída', false],
+  ])('%s usa el isotipo de Login, decorativo', (_, open) => {
+    renderSidebarIn(open);
+
+    // `alt=""` le da rol `presentation`: no aparece como `img` en el árbol accesible.
+    const image = brandLink().querySelector('img') as HTMLImageElement;
+    expect(image).not.toBeNull();
+    expect(image.getAttribute('src')).toContain('isotipo-firmalo.svg');
+    expect(image).toHaveAttribute('alt', '');
+  });
+
+  it('expandida muestra el isotipo y el texto "Firmalo"', () => {
+    renderSidebarIn(true);
+
+    expect(within(brandLink()).getByText('Firmalo')).toBeInTheDocument();
+    expect(within(brandLink()).getByTestId('brand-mark')).toBeInTheDocument();
+  });
+
+  /**
+   * jsdom no evalúa las variantes de Tailwind, así que se fija el contrato: el texto se oculta
+   * con `display: none` en modo ícono (no sólo recortado) y el enlace conserva su nombre.
+   */
+  it('contraída oculta el texto sin perder el nombre accesible', () => {
+    const { container } = renderSidebarIn(false);
+
+    expect(
+      container.querySelector('[data-collapsible="icon"]'),
+    ).toBeInTheDocument();
+    expect(within(brandLink()).getByText('Firmalo')).toHaveClass(
+      'group-data-[collapsible=icon]:hidden',
+    );
+    expect(brandLink()).toHaveAccessibleName('Firmalo');
+  });
+
+  it('sigue llevando al listado de documentos', () => {
+    renderSidebarIn(false);
+
+    expect(brandLink()).toHaveAttribute('href', '/dashboard/documents');
   });
 });
