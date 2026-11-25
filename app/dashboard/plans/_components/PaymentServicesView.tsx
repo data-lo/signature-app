@@ -71,7 +71,11 @@ export default function PaymentServicesView() {
   const hasActiveSubscription = billing?.hasActiveSubscription === true;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    /**
+     * Cada tarjeta ocupa 4 filas de este grid como `subgrid` (encabezado, precio, "Incluye" y
+     * compra): así esos bloques se alinean entre las tarjetas de una misma fila.
+     */
+    <div className="grid gap-x-4 gap-y-4 md:grid-cols-2 lg:grid-cols-3">
       {services.map((service) => (
         <PaymentServiceCard
           key={service.priceId}

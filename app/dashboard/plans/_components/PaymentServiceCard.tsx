@@ -1,23 +1,21 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { useId } from 'react';
+import { Check, Loader2 } from 'lucide-react';
+import { Card, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Can } from '@/components/authorization/Can';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { formatAmount, formatInterval } from '../_config/payment-services';
+import {
+  formatAmount,
+  formatInterval,
+  formatPlanCadence,
+} from '../_config/payment-services';
 import type { PaymentService } from '../_interfaces/payment-service.interface';
 
 /** Lo que se le dice a quien intenta contratar teniendo ya un plan. */
@@ -39,6 +37,64 @@ interface PaymentServiceCardProps {
   onBuy: (priceId: string) => void;
 }
 
+/**
+ * Sección "Incluye": los beneficios del plan, uno por renglón y en el orden recibido del backend.
+ *
+ * Todo sale de `descriptions`; aquí no se escribe ningún beneficio. Es una lista semántica
+ * (`<ul>` + un `<li>` por beneficio) rotulada por su encabezado, para que el lector de pantalla
+ * anuncie "Incluye, lista, 5 elementos". El ícono es decorativo (`aria-hidden`).
+ *
+ * Con la lista vacía o ausente no se pinta nada: un "Incluye" sin elementos sólo hace ruido.
+ *
+ * @param props.descriptions - Beneficios del plan.
+ * @param props.headingId - Id único del encabezado "Incluye", para rotular la lista.
+ * @returns La sección de beneficios, o nada.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```tsx
+ * <PlanDescriptions headingId="plus-includes" descriptions={['Hasta 10 documentos']} />
+ * ```
+ */
+export function PlanDescriptions({
+  descriptions,
+  headingId,
+}: {
+  descriptions?: readonly string[];
+  headingId: string;
+}) {
+  if (!descriptions?.length) {
+    return null;
+  }
+
+  return (
+    <section className="flex flex-col gap-4 border-t pt-6">
+      <h3
+        id={headingId}
+        className="text-xs font-medium tracking-wider text-muted-foreground uppercase"
+      >
+        Incluye
+      </h3>
+      <ul aria-labelledby={headingId} className="flex flex-col gap-3 text-sm">
+        {descriptions.map((description, index) => (
+          // El backend garantiza que no hay repetidos; el índice conserva la identidad si se
+          // reordena la lista.
+          <li
+            key={`${index}-${description}`}
+            className="flex items-start gap-3 text-foreground"
+          >
+            <Check
+              className="mt-0.5 size-4 shrink-0 text-foreground"
+              aria-hidden
+            />
+            <span>{description}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function PaymentServiceCard({
   service,
   isSubmitting,
@@ -48,6 +104,8 @@ export default function PaymentServiceCard({
   onBuy,
 }: PaymentServiceCardProps) {
   const interval = formatInterval(service.interval, service.intervalCount);
+  const { can } = usePermissions();
+  const headingId = useId();
 
   const boton = (
     <Button
@@ -86,51 +144,75 @@ export default function PaymentServiceCard({
           <Loader2 className="size-4 animate-spin" />
           Redirigiendo a Stripe...
         </>
+      ) : service.interval ? (
+        'Comprar plan'
       ) : (
         'Comprar'
       )}
     </Button>
   );
 
+  /**
+   * Cuatro bloques, siempre los cuatro y en este orden: encabezado, precio, "Incluye" y compra.
+   * La tarjeta es un `subgrid` de 4 filas del grid del catálogo (ver `PaymentServicesView`), así
+   * que cada bloque mide lo que el más alto de su fila entre todas las tarjetas: el precio y el
+   * botón quedan a la misma altura aunque un plan tenga una descripción más larga o más
+   * beneficios. Por eso un bloque vacío se pinta igual, como contenedor sin contenido.
+   */
   return (
-    <Card className="flex h-full flex-col">
-      <CardHeader>
+    <Card
+      data-testid="payment-service-card"
+      className="row-span-4 grid grid-rows-subgrid gap-0 py-0"
+    >
+      <header className="flex flex-col gap-3 px-8 pt-8">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle>{service.name}</CardTitle>
+          <p className="text-xs font-medium tracking-wider text-primary uppercase">
+            {formatPlanCadence(service.interval, service.intervalCount)}
+          </p>
           {isCurrentPlan ? <Badge variant="success">Plan actual</Badge> : null}
         </div>
+        <h2 className="font-heading text-2xl leading-snug font-medium text-foreground">
+          {service.name}
+        </h2>
         {service.description ? (
-          <CardDescription>{service.description}</CardDescription>
+          <CardDescription className="text-base">
+            {service.description}
+          </CardDescription>
         ) : null}
-      </CardHeader>
-
-      <CardContent className="flex flex-1 flex-col gap-4">
         {service.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={service.imageUrl}
-            alt={service.name}
+            alt=""
             className="h-32 w-full rounded border border-input bg-muted object-contain"
           />
         ) : null}
+      </header>
 
-        <p className="flex items-baseline gap-1.5">
-          <span className="font-heading text-2xl font-medium text-foreground">
-            {formatAmount(service.unitAmount, service.currency)}
-          </span>
-          {interval ? (
-            <span className="text-sm text-muted-foreground">{interval}</span>
-          ) : null}
-        </p>
-      </CardContent>
+      <p className="flex flex-wrap items-baseline gap-x-2 px-8 py-6">
+        <span className="font-heading text-4xl font-medium text-foreground">
+          {formatAmount(service.unitAmount, service.currency)}
+        </span>
+        {interval ? (
+          <span className="text-sm text-muted-foreground">{interval}</span>
+        ) : null}
+      </p>
+
+      <div className="px-8 pb-8">
+        <PlanDescriptions
+          headingId={headingId}
+          descriptions={service.descriptions}
+        />
+      </div>
 
       {/**
        * Contratar es `BILLING.MANAGE`; entrar a esta pantalla sólo pide `BILLING.READ`. A quien
        * puede consultar el catálogo pero no comprar se le enseña el plan y su precio, y se le
-       * quita el botón: `CreateSubscriptionCheckoutUseCase` lo rechazaría de todas formas.
+       * quita el botón: `CreateSubscriptionCheckoutUseCase` lo rechazaría de todas formas. La
+       * fila se conserva vacía para no descuadrar el subgrid.
        */}
-      <CardFooter>
-        <Can permission="BILLING.MANAGE">
+      {can('BILLING.MANAGE') ? (
+        <CardFooter className="px-8 py-6">
           {isBlockedByActiveSubscription ? (
             <Tooltip>
               <TooltipTrigger
@@ -147,8 +229,10 @@ export default function PaymentServiceCard({
           ) : (
             boton
           )}
-        </Can>
-      </CardFooter>
+        </CardFooter>
+      ) : (
+        <div aria-hidden />
+      )}
     </Card>
   );
 }

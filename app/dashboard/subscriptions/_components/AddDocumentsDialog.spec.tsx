@@ -36,7 +36,7 @@ const TEN_DOCUMENTS_OFFER: DocumentCreditOffer = {
 };
 
 const triggerButton = () =>
-  screen.getByRole('button', { name: /agregar más documentos/i });
+  screen.getByRole('button', { name: /comprar documentos/i });
 
 const payButton = () =>
   screen.getByRole('button', { name: /continuar al pago/i });
@@ -101,7 +101,9 @@ describe('AddDocumentsDialog', () => {
       renderWithProviders(<AddDocumentsDialog />);
       await openDialog();
 
-      const offer = screen.getByRole('button', { name: /documento adicional/i });
+      const offer = screen.getByRole('button', {
+        name: /documento adicional/i,
+      });
       expect(within(offer).getByText('1 documento')).toBeInTheDocument();
       expect(within(offer).getByText('$39.00')).toBeInTheDocument();
     });
@@ -248,7 +250,9 @@ describe('AddDocumentsDialog', () => {
       ).toBeInTheDocument();
       expect(quantityInput()).toHaveAttribute('aria-invalid', 'true');
       expect(payButton()).toBeDisabled();
-      expect(screen.queryByText(/redirigiendo a stripe/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/redirigiendo a stripe/i),
+      ).not.toBeInTheDocument();
 
       setQuantity('40');
 
@@ -265,7 +269,8 @@ describe('AddDocumentsDialog', () => {
         response: {
           status: 404,
           data: {
-            message: 'El paquete de documentos seleccionado no está disponible.',
+            message:
+              'El paquete de documentos seleccionado no está disponible.',
           },
         },
       });
@@ -305,7 +310,10 @@ describe('AddDocumentsDialog', () => {
 
   describe('con varios paquetes', () => {
     beforeEach(() => {
-      mockedOffers.mockResolvedValue([SINGLE_DOCUMENT_OFFER, TEN_DOCUMENTS_OFFER]);
+      mockedOffers.mockResolvedValue([
+        SINGLE_DOCUMENT_OFFER,
+        TEN_DOCUMENTS_OFFER,
+      ]);
     });
 
     it('los muestra todos para que el usuario elija', async () => {
@@ -328,7 +336,9 @@ describe('AddDocumentsDialog', () => {
       await openDialog();
 
       expect(payButton()).toBeDisabled();
-      expect(screen.queryByLabelText('Resumen de la compra')).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText('Resumen de la compra'),
+      ).not.toBeInTheDocument();
     });
 
     it('abre el Checkout del paquete elegido con la cantidad elegida', async () => {

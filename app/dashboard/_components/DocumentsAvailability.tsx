@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Files, Plus, ScanFace } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
@@ -10,8 +11,13 @@ import {
 } from '@/lib/biometric-credits';
 import { useBillingAccess } from '@/lib/hooks/useBillingAccess';
 import { cn } from '@/lib/utils';
+import { BUY_DOCUMENTS_LABEL } from '@/app/dashboard/subscriptions/_utils/purchase-labels';
 
-export const ADD_DOCUMENTS_LABEL = 'Agregar documentos';
+/**
+ * Mismo rótulo que la acción de compra de Suscripciones, a la que lleva este botón: una sola
+ * forma de nombrar la compra en toda la app.
+ */
+export const ADD_DOCUMENTS_LABEL = BUY_DOCUMENTS_LABEL;
 export const SUBSCRIPTIONS_ROUTE = '/dashboard/subscriptions';
 
 export function availabilityLabel(credits: number): string {
@@ -28,6 +34,11 @@ export function availabilityLabel(credits: number): string {
 
 export default function DocumentsAvailability() {
   const { data: billing } = useBillingAccess();
+  /**
+   * En la propia pantalla de Suscripciones el botón se calla: sólo navegaría a donde ya se está,
+   * y la compra tiene ahí su acción primaria.
+   */
+  const onSubscriptions = usePathname() === SUBSCRIPTIONS_ROUTE;
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0 sm:flex-nowrap">
@@ -51,16 +62,18 @@ export default function DocumentsAvailability() {
         </Badge>
       )}
 
-      <Link
-        href={SUBSCRIPTIONS_ROUTE}
-        className={cn(
-          buttonVariants({ variant: 'ghost' }),
-          'text-primary hover:bg-primary/10 hover:text-primary',
-        )}
-      >
-        <Plus aria-hidden />
-        {ADD_DOCUMENTS_LABEL}
-      </Link>
+      {!onSubscriptions && (
+        <Link
+          href={SUBSCRIPTIONS_ROUTE}
+          className={cn(
+            buttonVariants({ variant: 'ghost' }),
+            'text-primary hover:bg-primary/10 hover:text-primary',
+          )}
+        >
+          <Plus aria-hidden />
+          {ADD_DOCUMENTS_LABEL}
+        </Link>
+      )}
     </div>
   );
 }

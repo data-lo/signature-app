@@ -132,6 +132,103 @@ export interface NavGroup {
   availableWithoutPlan?: boolean;
 }
 
+/**
+ * Quita las barras finales de una ruta para compararla, salvo la raíz.
+ *
+ * @param pathname - Ruta tal como la entrega `usePathname()`.
+ * @returns La misma ruta sin barras al final (`'/'` se queda igual).
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```ts
+ * normalizePathname('/dashboard/plans/'); // '/dashboard/plans'
+ * ```
+ */
+export function normalizePathname(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, '');
+  return trimmed === '' ? '/' : trimmed;
+}
+
+/**
+ * Indica si una ruta es la de una entrada del menú o una pantalla anidada debajo de ella.
+ *
+ * Compara por segmentos completos: `/dashboard/plans` cubre `/dashboard/plans/checkout`, pero no
+ * `/dashboard/plansX`. Es lo que hace que una ruta hija deje encendido a su padre en el menú.
+ *
+ * @param pathname - Ruta actual.
+ * @param href - Destino de la entrada del menú.
+ * @returns `true` si `pathname` es `href` o cuelga de él.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```ts
+ * isRouteWithin('/dashboard/documents/doc-1', '/dashboard/documents'); // true
+ * isRouteWithin('/dashboard/directory', '/dashboard/documents'); // false
+ * ```
+ */
+export function isRouteWithin(pathname: string, href: string): boolean {
+  const current = normalizePathname(pathname);
+  const target = normalizePathname(href);
+  return current === target || current.startsWith(`${target}/`);
+}
+
+/**
+ * Destino real de una entrada: el construido con la organización activa si la entrada lo
+ * necesita y hay organización, o su `href` fijo si no.
+ *
+ * @param item - Entrada del menú.
+ * @param organizationId - Organización de la cuenta activa, si la hay.
+ * @returns La ruta a la que lleva el enlace.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```ts
+ * resolveNavItemHref(membersItem, 'org-1'); // '/dashboard/organizations/org-1/members'
+ * ```
+ */
+export function resolveNavItemHref(
+  item: NavItem,
+  organizationId: string | null | undefined,
+): string {
+  return item.buildHref && organizationId
+    ? item.buildHref(organizationId)
+    : item.href;
+}
+
+/**
+ * Elige la ÚNICA entrada que se marca activa para la ruta actual.
+ *
+ * Varias entradas pueden reclamar una misma ruta —"Información personal" cubre su sub-árbol y
+ * "Identidad y firma" vive dentro de él—; gana la de destino más largo, que es la más
+ * específica. Así una ruta anidada enciende a su padre sólo cuando no tiene entrada propia, y
+ * nunca quedan dos encendidas a la vez.
+ *
+ * @param groups - Grupos visibles del menú (ya filtrados por `visibleNavGroups`).
+ * @param pathname - Ruta actual.
+ * @param organizationId - Organización de la cuenta activa, para las entradas con `buildHref`.
+ * @returns La etiqueta de la entrada activa, o `null` si la ruta no pertenece a ninguna.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```ts
+ * resolveActiveNavItemLabel(NAV_GROUPS, '/dashboard/personal-documents/identity', null);
+ * // 'Identidad y firma'
+ * ```
+ */
+export function resolveActiveNavItemLabel(
+  groups: NavGroup[],
+  pathname: string,
+  organizationId: string | null | undefined,
+): string | null {
+  let best: { label: string; length: number } | null = null;
+  for (const item of groups.flatMap((group) => group.items)) {
+    if (!item.isActive(pathname)) continue;
+    const length = resolveNavItemHref(item, organizationId).length;
+    if (!best || length > best.length) best = { label: item.label, length };
+  }
+  return best?.label ?? null;
+}
+
 export const NAV_GROUPS: NavGroup[] = [
   {
     /**
@@ -156,8 +253,7 @@ export const NAV_GROUPS: NavGroup[] = [
         // La entrada marca todo su sub-árbol, no sólo su propia ruta: el alta y el detalle de un
         // documento son pantallas del módulo, y dejar "Documentos" apagado mientras se está
         // dentro de él haría parecer que se salió de la sección.
-        isActive: (pathname: string) =>
-          pathname === section.href || pathname.startsWith(`${section.href}/`),
+        isActive: (pathname: string) => isRouteWithin(pathname, section.href),
         anyPermissions: DASHBOARD_NAVIGATION.documents.anyPermissions,
       })),
       // En organizaciones la decide `DIRECTORY.READ`.
@@ -166,7 +262,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: DASHBOARD_NAVIGATION.directory.href,
         icon: BookUser,
         isActive: (pathname: string) =>
-          pathname === DASHBOARD_NAVIGATION.directory.href,
+          isRouteWithin(pathname, DASHBOARD_NAVIGATION.directory.href),
         anyPermissions: DASHBOARD_NAVIGATION.directory.anyPermissions,
       },
     ],
@@ -180,14 +276,15 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Planes',
         href: '/dashboard/plans',
         icon: CreditCard,
-        isActive: (pathname) => pathname.startsWith('/dashboard/plans'),
+        isActive: (pathname) => isRouteWithin(pathname, '/dashboard/plans'),
         anyPermissions: DASHBOARD_NAVIGATION.plans.anyPermissions,
       },
       {
         label: 'Suscripciones',
         href: '/dashboard/subscriptions',
         icon: ReceiptText,
-        isActive: (pathname) => pathname.startsWith('/dashboard/subscriptions'),
+        isActive: (pathname) =>
+          isRouteWithin(pathname, '/dashboard/subscriptions'),
         anyPermissions: DASHBOARD_NAVIGATION.subscriptions.anyPermissions,
       },
     ],
@@ -200,14 +297,17 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Información personal',
         href: '/dashboard/personal-documents',
         icon: User,
-        isActive: (pathname) => pathname === '/dashboard/personal-documents',
+        // Su sub-árbol incluye "Identidad y firma", que tiene entrada propia: ahí gana la
+        // entrada más específica (ver `resolveActiveNavItemLabel`).
+        isActive: (pathname) =>
+          isRouteWithin(pathname, '/dashboard/personal-documents'),
       },
       {
         label: 'Identidad y firma',
         href: '/dashboard/personal-documents/identity',
         icon: IdCard,
         isActive: (pathname) =>
-          pathname === '/dashboard/personal-documents/identity',
+          isRouteWithin(pathname, '/dashboard/personal-documents/identity'),
       },
     ],
   },
@@ -227,7 +327,10 @@ export const NAV_GROUPS: NavGroup[] = [
         href: '/dashboard/organization/settings/information',
         icon: Building2,
         isActive: (pathname) =>
-          pathname === '/dashboard/organization/settings/information',
+          isRouteWithin(
+            pathname,
+            '/dashboard/organization/settings/information',
+          ),
         anyPermissions:
           DASHBOARD_NAVIGATION.organizationInformation.anyPermissions,
       },
@@ -240,7 +343,9 @@ export const NAV_GROUPS: NavGroup[] = [
           `/dashboard/organizations/${organizationId}/members`,
         icon: Users,
         isActive: (pathname) =>
-          /^\/dashboard\/organizations\/[^/]+\/members$/.test(pathname),
+          /^\/dashboard\/organizations\/[^/]+\/members(\/|$)/.test(
+            normalizePathname(pathname),
+          ),
         anyPermissions: DASHBOARD_NAVIGATION.members.anyPermissions,
       },
       {
@@ -248,7 +353,7 @@ export const NAV_GROUPS: NavGroup[] = [
         href: '/dashboard/organization/settings/roles',
         icon: KeyRound,
         isActive: (pathname) =>
-          pathname === '/dashboard/organization/settings/roles',
+          isRouteWithin(pathname, '/dashboard/organization/settings/roles'),
         anyPermissions: DASHBOARD_NAVIGATION.roles.anyPermissions,
       },
     ],
@@ -339,6 +444,19 @@ export default function AppSidebar() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const navGroups = visibleNavGroups(NAV_GROUPS, {
+    accountType: activeAccount?.accountType,
+    lockedWithoutPlan,
+    permissions: authorization?.permissions ?? [],
+  });
+  // Una sola entrada activa, la más específica para la ruta actual. Sale de `usePathname()`, así
+  // que se recalcula al navegar con `<Link>` y ya viene resuelta al recargar.
+  const activeItemLabel = resolveActiveNavItemLabel(
+    navGroups,
+    pathname,
+    activeAccount?.organizationId,
+  );
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -381,11 +499,7 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {visibleNavGroups(NAV_GROUPS, {
-          accountType: activeAccount?.accountType,
-          lockedWithoutPlan,
-          permissions: authorization?.permissions ?? [],
-        }).map((group) => (
+        {navGroups.map((group) => (
           <SidebarGroup key={group.key}>
             {group.label && (
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
@@ -395,14 +509,16 @@ export default function AppSidebar() {
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton
-                      isActive={item.isActive(pathname)}
+                      isActive={item.label === activeItemLabel}
                       tooltip={item.label}
                       render={
                         <Link
-                          href={
-                            item.buildHref && activeAccount?.organizationId
-                              ? item.buildHref(activeAccount.organizationId)
-                              : item.href
+                          href={resolveNavItemHref(
+                            item,
+                            activeAccount?.organizationId,
+                          )}
+                          aria-current={
+                            item.label === activeItemLabel ? 'page' : undefined
                           }
                         />
                       }
