@@ -80,7 +80,9 @@
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  /* Un escalón más oscuro que el fondo cálido de la sidebar: con el gris neutro de antes
+     (oklch(0.97 0 0) ≈ #f5f5f5) el ítem activo y el hover quedaban indistinguibles de #f7f5f2. */
+  --sidebar-accent: #ebe6df;
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);

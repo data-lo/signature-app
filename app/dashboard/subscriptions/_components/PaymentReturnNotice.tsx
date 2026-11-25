@@ -65,11 +65,7 @@ export default function PaymentReturnNotice() {
     }
 
     void invalidarEstado();
-  }, [
-    isReturningFromPayment,
-    isReturningFromCreditsPurchase,
-    invalidarEstado,
-  ]);
+  }, [isReturningFromPayment, isReturningFromCreditsPurchase, invalidarEstado]);
 
   const yaEstaActiva = billing?.hasActiveSubscription ?? false;
 

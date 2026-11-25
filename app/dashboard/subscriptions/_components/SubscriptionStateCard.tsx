@@ -1,18 +1,22 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Can } from '@/components/authorization/Can';
 import { getErrorMessage } from '@/lib/error-handler';
 import { useBillingAccess } from '@/lib/hooks/useBillingAccess';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useCancelSubscription } from '../_hooks/useCancelSubscription';
 import { useResumeSubscription } from '../_hooks/useResumeSubscription';
 import { formatPeriodEnd } from '../_utils/format-period-end';
@@ -20,79 +24,253 @@ import CancelSubscriptionDialog from './CancelSubscriptionDialog';
 import AddDocumentsDialog from './AddDocumentsDialog';
 import type { BillingAccess, BillingProfileStatus } from '@/lib/api/billing';
 import { shouldShowBiometricCredits } from '@/lib/biometric-credits';
+import { cn } from '@/lib/utils';
+import { PLANS_ROUTE } from '@/lib/billing/organization-plan-access';
 
-/** El estado del perfil de facturación, rotulado para el usuario. */
-const STATUS_LABELS: Record<BillingProfileStatus, string> = {
-  FREE: 'Plan gratuito',
-  INCOMPLETE: 'Pendiente de confirmación',
-  ACTIVE: 'Activa',
-  PAST_DUE: 'Con un pago pendiente',
-  CANCELED: 'Cancelada',
-};
+/** Título y descripción del plan con el que nace toda cuenta. */
+export const FREE_PLAN_TITLE = 'Plan gratuito';
+export const FREE_PLAN_DESCRIPTION =
+  'Ideal para comenzar a firmar documentos. Compra documentos adicionales o explora otros planes cuando lo necesites.';
+
+/** Nota del pie junto a "Comprar documentos": la compra es única y no toca el plan. */
+export const PURCHASE_NOTE =
+  'La compra de documentos no modifica tu suscripción.';
+
+type BadgeVariant = 'success' | 'warning' | 'destructive' | 'outline';
 
 /**
- * El plan viene del catálogo del backend, que es un conjunto abierto: se rotula capitalizando en
- * vez de traducirlo con un mapa, para que dar de alta un plan nuevo no obligue a desplegar esta
- * app ni deje la tarjeta en blanco mientras tanto.
+ * Estado del perfil de facturación, rotulado como estado DEL PLAN (de ahí el masculino: la
+ * tarjeta se encabeza con "Plan actual") y con el color de badge que le corresponde.
+ */
+const STATUS_BADGES: Record<
+  BillingProfileStatus,
+  { label: string; variant: BadgeVariant }
+> = {
+  FREE: { label: 'Activo', variant: 'success' },
+  INCOMPLETE: { label: 'Pendiente de confirmación', variant: 'warning' },
+  ACTIVE: { label: 'Activo', variant: 'success' },
+  PAST_DUE: { label: 'Pago pendiente', variant: 'warning' },
+  CANCELED: { label: 'Cancelado', variant: 'outline' },
+};
+
+/** Badge de un plan activo cuya baja ya está programada para el fin del periodo. */
+const SCHEDULED_CANCELLATION_BADGE = {
+  label: 'Cancelación programada',
+  variant: 'warning',
+} as const;
+
+/**
+ * Rotula un plan del catálogo capitalizándolo. El catálogo es un conjunto abierto: traducirlo con
+ * un mapa obligaría a desplegar esta app cada vez que el backend da de alta un plan.
+ *
+ * @param planType - Identificador del plan (`'plus'`, `'premium'`…).
+ * @returns El identificador con la inicial en mayúscula.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```ts
+ * planLabel('plus'); // 'Plus'
+ * ```
  */
 function planLabel(planType: string): string {
   return planType.charAt(0).toUpperCase() + planType.slice(1);
 }
 
 /**
- * Documentos disponibles, con su tope por periodo cuando el plan lo fija.
+ * Rótulo de sección en versalitas, el mismo patrón para "Plan actual", "Saldo disponible",
+ * "Siguiente paso" y "Periodo".
  *
- * `documentsIncludedPerPeriod` nulo significa "no lo fija el plan" —se negocia por contrato— y
- * entonces se calla en vez de inventar un número: anunciar un tope que no existe es peor que no
- * anunciar ninguno. Un plan que incluye `0` por periodo (el gratuito, que en su lugar concede
- * documentos de bienvenida) tampoco lo anuncia, porque "0 por periodo" no le dice nada útil a
- * quien sí tiene saldo comprado.
+ * @param props.children - Texto del rótulo.
+ * @returns Un párrafo pequeño en mayúsculas con espaciado amplio.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```tsx
+ * <Eyebrow>Saldo disponible</Eyebrow>
+ * ```
  */
-function SaldoDeDocumentos({
-  available,
-  documentsIncludedPerPeriod,
-}: {
-  available: number;
-  documentsIncludedPerPeriod: number | null;
-}) {
+function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <p className="text-sm text-muted-foreground">
-      Documentos disponibles: <strong>{available}</strong>
-      {documentsIncludedPerPeriod
-        ? ` de ${documentsIncludedPerPeriod} incluidos por periodo.`
-        : '.'}
+    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+      {children}
     </p>
   );
 }
 
 /**
- * Créditos de firma biométrica disponibles, debajo del saldo de documentos.
+ * Saldo de documentos destacado: la cifra grande en el color de marca y, al lado, qué significa.
  *
- * Se calla si el plan no incluye la firma biométrica y la cuenta no tiene saldo (ver
- * `shouldShowBiometricCredits`).
+ * `documentsIncludedPerPeriod` nulo (lo fija el contrato) o `0` (el gratuito, que concede
+ * documentos de bienvenida) no se anuncian: un tope que no existe o un "0 por periodo" no le
+ * dicen nada útil a quien sí tiene saldo.
  *
- * @param props.billing - Estado de facturación de la cuenta activa.
- * @returns El párrafo del saldo biométrico, o nada.
+ * @param props.available - Documentos disponibles.
+ * @param props.documentsIncludedPerPeriod - Tope del plan por periodo, si lo fija.
+ * @param props.billing - Estado de facturación, para el saldo biométrico.
+ * @returns El bloque del saldo.
+ * @throws Nunca lanza.
  *
  * @example
  * ```tsx
- * <SaldoBiometrico billing={subscription} />
+ * <DocumentBalance available={76} documentsIncludedPerPeriod={null} billing={subscription} />
  * ```
  */
-function SaldoBiometrico({
+function DocumentBalance({
+  available,
+  documentsIncludedPerPeriod,
   billing,
 }: {
+  available: number;
+  documentsIncludedPerPeriod: number | null;
   billing: Pick<BillingAccess, 'credits' | 'actions'>;
 }) {
-  if (!shouldShowBiometricCredits(billing)) {
-    return null;
-  }
-
   return (
-    <p className="text-sm text-muted-foreground">
-      Firmas biométricas disponibles:{' '}
-      <strong>{billing.credits.biometric.available}</strong>.
-    </p>
+    <section aria-labelledby="document-balance" className="flex flex-col gap-3">
+      <Eyebrow>
+        <span id="document-balance">Saldo disponible</span>
+      </Eyebrow>
+      <div className="flex items-center gap-4">
+        <span className="font-heading text-5xl leading-none font-medium text-primary tabular-nums">
+          {available}
+        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-base font-medium text-foreground">
+            {available === 1
+              ? 'Documento disponible'
+              : 'Documentos disponibles'}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {documentsIncludedPerPeriod
+              ? `De ${documentsIncludedPerPeriod} incluidos por periodo.`
+              : 'Listos para enviar a firma.'}
+          </span>
+        </div>
+      </div>
+      {shouldShowBiometricCredits(billing) ? (
+        <p className="text-sm text-muted-foreground">
+          Firmas biométricas disponibles:{' '}
+          <strong className="font-medium text-foreground">
+            {billing.credits.biometric.available}
+          </strong>
+          .
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Esqueleto común de la tarjeta del plan: encabezado (rótulo, título, descripción y estado),
+ * cuerpo en dos columnas (saldo y bloque lateral) y pie con la nota y las acciones.
+ *
+ * En pantallas angostas las columnas se apilan y el pie pone las acciones encima de la nota y a
+ * todo el ancho, para que los botones sigan siendo fáciles de pulsar.
+ *
+ * @param props.title - Nombre del plan.
+ * @param props.description - Qué significa el estado actual.
+ * @param props.badge - Estado del plan.
+ * @param props.balance - Bloque del saldo.
+ * @param props.aside - Columna derecha (siguiente paso o periodo); opcional.
+ * @param props.note - Texto del pie a la izquierda; opcional.
+ * @param props.actions - Botones del pie; si no hay, el pie no se dibuja.
+ * @param props.feedback - Progreso o error de una operación; opcional.
+ * @returns La tarjeta completa.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```tsx
+ * <PlanCard title="Plan gratuito" description="…" badge={STATUS_BADGES.FREE} balance={…} />
+ * ```
+ */
+function PlanCard({
+  title,
+  description,
+  badge,
+  balance,
+  aside,
+  note,
+  actions,
+  feedback,
+}: {
+  title: string;
+  description: string;
+  badge: { label: string; variant: BadgeVariant };
+  balance: ReactNode;
+  aside?: ReactNode;
+  note?: string;
+  actions?: ReactNode;
+  feedback?: ReactNode;
+}) {
+  return (
+    <Card className="[--card-spacing:--spacing(6)] sm:[--card-spacing:--spacing(8)]">
+      <CardHeader className="gap-2">
+        <Eyebrow>Plan actual</Eyebrow>
+        <h2 className="font-heading text-2xl leading-snug font-medium text-foreground">
+          {title}
+        </h2>
+        <CardDescription className="max-w-prose text-base">
+          {description}
+        </CardDescription>
+        <CardAction>
+          <Badge variant={badge.variant} className="h-7 px-2.5 text-sm">
+            <span
+              aria-hidden
+              className="size-1.5 rounded-full bg-current opacity-80"
+            />
+            {badge.label}
+          </Badge>
+        </CardAction>
+      </CardHeader>
+
+      <CardContent className="border-t pt-(--card-spacing)">
+        <div
+          className={cn(
+            'grid gap-8',
+            aside && 'md:grid-cols-2 md:gap-0 md:divide-x',
+          )}
+        >
+          <div className={cn(aside && 'md:pr-8')}>{balance}</div>
+          {aside ? (
+            <div className="border-t pt-8 md:border-t-0 md:pt-0 md:pl-8">
+              {aside}
+            </div>
+          ) : null}
+        </div>
+        {feedback ? <div className="mt-6">{feedback}</div> : null}
+      </CardContent>
+
+      {actions ? (
+        <CardFooter className="flex-col-reverse items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {note ? (
+            <p className="text-sm text-muted-foreground">{note}</p>
+          ) : (
+            <span />
+          )}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
+            {actions}
+          </div>
+        </CardFooter>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * "Ver planes" como acción secundaria del pie.
+ *
+ * @returns Enlace con aspecto de botón contorneado a `/dashboard/plans`.
+ * @throws Nunca lanza.
+ *
+ * @example
+ * ```tsx
+ * <SeePlansButton />
+ * ```
+ */
+function SeePlansButton() {
+  return (
+    <Button render={<Link href={PLANS_ROUTE} />} variant="outline">
+      Ver planes
+    </Button>
   );
 }
 
@@ -100,39 +278,54 @@ function SaldoBiometrico({
  * Estado actual de la suscripción de la CUENTA ACTIVA.
  *
  * Se lee del backend y no de la URL de retorno: es la única fuente que refleja lo que el webhook
- * ya confirmó. Justo después de pagar puede seguir diciendo "pendiente" durante unos segundos, y
- * eso es correcto — el aviso de arriba explica esa espera.
+ * ya confirmó. Justo después de pagar puede seguir diciendo "pendiente" unos segundos, y el aviso
+ * de arriba explica esa espera. Cambiar de cuenta redibuja la tarjeta sola porque la cuenta va en
+ * la `queryKey`.
  *
- * Muestra el estado de la cuenta en la que se está trabajando, no el del usuario: quien tiene
- * cuenta personal y organización ve uno u otro según el switcher, y cambiar de cuenta redibuja
- * esta tarjeta sola porque la cuenta va en la `queryKey`.
+ * **Jerarquía de acciones:** una sola primaria por grupo, "Comprar documentos". "Ver planes" y
+ * "Reanudar suscripción" son secundarias y "Cancelar suscripción" conserva su variante
+ * destructiva atenuada, que no compite con la primaria.
+ *
+ * **Permisos:** comprar, cancelar y reanudar exigen `BILLING.MANAGE`; "Ver planes" es navegación y
+ * le basta `BILLING.READ`, que ya exige la página. Esconder los botones no protege nada —cada
+ * endpoint vuelve a exigir el permiso—; evita ofrecer una acción que respondería 403.
+ *
+ * @returns La tarjeta del plan, o su estado de carga o de error.
+ * @throws Nunca lanza: los fallos de carga y de las operaciones se dibujan en la propia tarjeta.
+ *
+ * @example
+ * ```tsx
+ * <SubscriptionStateCard />
+ * ```
  */
 export default function SubscriptionStateCard() {
   const { data: subscription, isPending, isError } = useBillingAccess();
+  const { can } = usePermissions();
+  const canManage = can('BILLING.MANAGE');
 
   /**
-   * Las dos mutaciones viven acá y no en sus botones, porque acá es donde el usuario se queda: el
-   * modal de cancelación se cierra al confirmar, así que su estado de carga y su posible error
-   * tienen que dibujarse en la tarjeta o no se ven en ninguna parte.
-   *
-   * Van antes de las salidas tempranas de abajo por las reglas de los hooks, que no admiten que
-   * el número de llamadas cambie entre renders.
+   * Las mutaciones viven acá y no en sus botones: el modal de cancelación se cierra al confirmar,
+   * así que su progreso y su posible error tienen que dibujarse en la tarjeta. Van antes de las
+   * salidas tempranas por las reglas de los hooks.
    */
-  const cancelar = useCancelSubscription();
-  const reanudar = useResumeSubscription();
+  const cancelMutation = useCancelSubscription();
+  const resumeMutation = useResumeSubscription();
 
   /**
-   * Se comparte un solo indicador entre las dos: sólo una puede estar disponible a la vez —el
-   * botón de cancelar aparece cuando NO hay baja programada y el de reanudar cuando SÍ—, así que
-   * no hay forma de que las dos estén en curso ni de que sus errores compitan.
+   * Un solo indicador para las dos: cancelar aparece cuando NO hay baja programada y reanudar
+   * cuando SÍ, así que nunca están en curso a la vez ni sus errores compiten.
    */
-  const operacionEnCurso = cancelar.isPending || reanudar.isPending;
-  const falloDeOperacion = cancelar.error ?? reanudar.error;
+  const operationInProgress =
+    cancelMutation.isPending || resumeMutation.isPending;
+  const operationError = cancelMutation.error ?? resumeMutation.error;
 
   if (isPending) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
+      <div
+        role="status"
+        className="flex items-center gap-2 text-sm text-muted-foreground"
+      >
+        <Loader2 className="size-4 animate-spin" aria-hidden />
         Cargando tu suscripción...
       </div>
     );
@@ -140,7 +333,7 @@ export default function SubscriptionStateCard() {
 
   if (isError || !subscription) {
     return (
-      <p className="text-sm text-destructive">
+      <p role="alert" className="text-sm text-destructive">
         No se pudo cargar el estado de tu suscripción. Intenta de nuevo más
         tarde.
       </p>
@@ -157,7 +350,7 @@ export default function SubscriptionStateCard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button render={<Link href="/dashboard/plans" />} variant="brand">
+          <Button render={<Link href={PLANS_ROUTE} />} variant="brand">
             Ver planes
           </Button>
         </CardContent>
@@ -165,182 +358,182 @@ export default function SubscriptionStateCard() {
     );
   }
 
+  const balance = (
+    <DocumentBalance
+      available={subscription.credits.document.available}
+      documentsIncludedPerPeriod={
+        subscription.limits.documentsIncludedPerPeriod
+      }
+      billing={subscription}
+    />
+  );
+
   /**
    * El plan gratuito va antes del bloque general y no puede caer en él: comparte
-   * `hasActiveSubscription: false` con un plan de pago caducado, pero significan lo contrario.
-   * Éste es el plan CON EL QUE LA CUENTA NACE y está perfectamente vigente — sólo que no es de
-   * pago. Decirle a quien acaba de registrarse que su plan "todavía no habilita" nada sería
-   * cierto a medias y alarmante del todo.
+   * `hasActiveSubscription: false` con un plan de pago caducado, pero significan lo contrario. Es
+   * el plan con el que nace la cuenta y está vigente.
+   *
+   * Comprar documentos sueltos también vale aquí: es una compra única que no crea ni modifica
+   * ninguna suscripción. Qué paquetes le corresponden lo decide el backend.
    */
   if (subscription.status === 'FREE') {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Plan Gratuito</CardTitle>
-          <CardDescription>
-            Es el plan con el que empieza toda cuenta. Contrata un plan cuando
-            necesites más de lo que incluye.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <SaldoDeDocumentos
-            available={subscription.credits.document.available}
-            documentsIncludedPerPeriod={
-              subscription.limits.documentsIncludedPerPeriod
-            }
-          />
-          <SaldoBiometrico billing={subscription} />
-          {/**
-           * Comprar documentos sueltos también desde el plan gratuito: es una compra única que no
-           * crea ni modifica ninguna suscripción, así que no exige tener plan de pago. Qué
-           * paquetes le corresponden —y a qué precio— lo decide el backend según su plan.
-           */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button render={<Link href="/dashboard/plans" />} variant="brand">
-              Ver planes
-            </Button>
-            <Can permission="BILLING.MANAGE">
-              <AddDocumentsDialog />
-            </Can>
-          </div>
-        </CardContent>
-      </Card>
+      <PlanCard
+        title={FREE_PLAN_TITLE}
+        description={FREE_PLAN_DESCRIPTION}
+        badge={STATUS_BADGES.FREE}
+        balance={balance}
+        aside={
+          <section
+            aria-labelledby="next-step"
+            className="flex flex-col items-start gap-3"
+          >
+            <Eyebrow>
+              <span id="next-step">Siguiente paso</span>
+            </Eyebrow>
+            <h3 className="text-base font-medium text-foreground">
+              ¿Necesitas más capacidad?
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Compra documentos sin cambiar de plan, o compara las opciones
+              disponibles.
+            </p>
+            <Link
+              href={PLANS_ROUTE}
+              className="inline-flex items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              Conoce lo que incluye cada plan
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </section>
+        }
+        note={canManage ? PURCHASE_NOTE : undefined}
+        actions={
+          <>
+            <SeePlansButton />
+            {canManage ? <AddDocumentsDialog /> : null}
+          </>
+        }
+      />
     );
   }
 
   /**
-   * El botón de cancelar aparece SÓLO con una suscripción activa que todavía se renueva. Las dos
-   * condiciones son distintas y hacen falta las dos: con la baja ya programada la suscripción
-   * sigue activa, y volver a ofrecer "Cancelar" invitaría a un clic que el backend rechaza con un
-   * 409.
+   * Cancelar sólo con una suscripción activa que todavía se renueva: con la baja ya programada
+   * sigue activa, y volver a ofrecerlo invitaría a un clic que el backend rechaza con 409.
    */
-  const puedeCancelar =
+  const canCancel =
     subscription.hasActiveSubscription && !subscription.cancelAtPeriodEnd;
 
   /**
-   * Contratar sólo donde el backend lo permite. `CreateSubscriptionCheckoutUseCase` rechaza con
-   * 409 cualquier checkout sobre un perfil ACTIVE —incluido uno con la baja programada, que sigue
-   * ACTIVE hasta que termine el periodo—, así que ofrecerlo ahí sería mandar al usuario a un
-   * error. En INCOMPLETE, PAST_DUE y CANCELED sí se puede volver a contratar.
+   * Contratar sólo donde el backend lo permite: `CreateSubscriptionCheckoutUseCase` rechaza con
+   * 409 cualquier checkout sobre un perfil ACTIVE, incluido uno con la baja programada.
    */
-  const puedeContratar = !subscription.hasActiveSubscription;
+  const canSubscribe = !subscription.hasActiveSubscription;
 
-  const fechaTermino = formatPeriodEnd(subscription.currentPeriodEnd);
+  const periodEnd = formatPeriodEnd(subscription.currentPeriodEnd);
+
+  /**
+   * Con la baja programada, este aviso SUSTITUYE al del periodo vigente: los dos hablan de la
+   * misma fecha, y éste dice además que no se renovará.
+   */
+  const periodNote = subscription.cancelAtPeriodEnd
+    ? periodEnd
+      ? `Tu suscripción seguirá activa hasta el ${periodEnd}. No se renovará automáticamente.`
+      : 'Tu suscripción seguirá activa hasta el final del periodo vigente. No se renovará automáticamente.'
+    : periodEnd
+      ? `Periodo vigente hasta ${periodEnd}.`
+      : null;
+
+  const badge = subscription.cancelAtPeriodEnd
+    ? SCHEDULED_CANCELLATION_BADGE
+    : STATUS_BADGES[subscription.status];
+
+  const actions = (
+    <>
+      {canManage && canCancel ? (
+        <CancelSubscriptionDialog
+          currentPeriodEnd={subscription.currentPeriodEnd}
+          onConfirm={() => cancelMutation.mutate()}
+          disabled={operationInProgress}
+        />
+      ) : null}
+      {/**
+       * El camino de vuelta: sin él, quien programa la baja no podría cancelar (ya está
+       * programada) ni contratar (el checkout lo rechaza), y deshacerlo exigiría el Dashboard de
+       * Stripe. Secundaria: la primaria del grupo es "Comprar documentos".
+       */}
+      {canManage && subscription.cancelAtPeriodEnd ? (
+        <Button
+          variant="outline"
+          onClick={() => resumeMutation.mutate()}
+          disabled={operationInProgress}
+        >
+          Reanudar suscripción
+        </Button>
+      ) : null}
+      {canSubscribe ? <SeePlansButton /> : null}
+      {/**
+       * No depende de la baja programada: los paquetes siguen disponibles porque el plan sigue
+       * activo hasta el fin del periodo.
+       */}
+      {canManage ? <AddDocumentsDialog /> : null}
+    </>
+  );
+
+  const hasActions = canManage || canSubscribe;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          {subscription.currentPlanType
-            ? `Plan ${planLabel(subscription.currentPlanType)} — ${STATUS_LABELS[subscription.status]}`
-            : STATUS_LABELS[subscription.status]}
-        </CardTitle>
-        <CardDescription>
-          {subscription.hasActiveSubscription
-            ? 'Tu suscripción está al corriente y puedes firmar documentos.'
-            : 'Tu suscripción todavía no habilita la firma de documentos.'}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="flex flex-col gap-4">
-        <SaldoDeDocumentos
-          available={subscription.credits.document.available}
-          documentsIncludedPerPeriod={
-            subscription.limits.documentsIncludedPerPeriod
-          }
-        />
-        <SaldoBiometrico billing={subscription} />
-
-        {/**
-         * Con la baja programada, este aviso SUSTITUYE al del periodo vigente en vez de sumarse:
-         * los dos hablan de la misma fecha, y decirla dos veces con distinta redacción haría dudar
-         * de si son dos cosas distintas. Éste dice además lo que el otro no: que no se renovará.
-         */}
-        {subscription.cancelAtPeriodEnd ? (
-          <p className="text-sm text-muted-foreground">
-            {fechaTermino
-              ? `Tu suscripción seguirá activa hasta el ${fechaTermino}. No se renovará automáticamente.`
-              : 'Tu suscripción seguirá activa hasta el final del periodo vigente. No se renovará automáticamente.'}
-          </p>
-        ) : fechaTermino ? (
-          <p className="text-sm text-muted-foreground">
-            Periodo vigente hasta {fechaTermino}.
-          </p>
-        ) : null}
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/**
-           * Va el primero de la fila y no detrás de "Cancelar": es la acción que un usuario con
-           * plan vigente busca aquí, y la baja no debería ser lo primero que encuentre.
-           *
-           * No depende de `puedeCancelar` ni de `cancelAtPeriodEnd`: los paquetes siguen
-           * disponibles con la baja programada, porque el plan sigue activo hasta el fin del
-           * periodo y su tarifa sigue siendo la suya.
-           */}
-          {/**
-           * Comprar, cancelar y reanudar son la misma capacidad —`BILLING.MANAGE`—, así que van
-           * bajo un solo `Can`. "Ver planes" queda fuera: es navegación, y a la pantalla de
-           * planes se entra con `BILLING.READ`.
-           *
-           * Esconderlas no protege nada: cada endpoint vuelve a exigir el permiso. Lo que evita
-           * es ofrecerle a un miembro raso un botón que va a responder 403.
-           */}
-          <Can permission="BILLING.MANAGE">
-            <AddDocumentsDialog />
-          </Can>
-
-          {puedeCancelar ? (
-            <Can permission="BILLING.MANAGE">
-              <CancelSubscriptionDialog
-                currentPeriodEnd={subscription.currentPeriodEnd}
-                onConfirm={() => cancelar.mutate()}
-                disabled={operacionEnCurso}
-              />
-            </Can>
-          ) : null}
-
-          {/**
-           * El camino de vuelta. Sin él, quien programa la baja se queda sin ninguna acción: no
-           * puede cancelar (ya está programada) ni contratar (el perfil sigue ACTIVE y el checkout
-           * lo rechaza con 409), y deshacerlo exigiría entrar al Dashboard de Stripe.
-           */}
-          {subscription.cancelAtPeriodEnd ? (
-            <Can permission="BILLING.MANAGE">
-              <Button
-                variant="brand"
-                onClick={() => reanudar.mutate()}
-                disabled={operacionEnCurso}
+    <PlanCard
+      title={
+        subscription.currentPlanType
+          ? `Plan ${planLabel(subscription.currentPlanType)}`
+          : 'Tu plan'
+      }
+      description={
+        subscription.hasActiveSubscription
+          ? 'Tu suscripción está al corriente y puedes firmar documentos.'
+          : 'Tu suscripción todavía no habilita la firma de documentos.'
+      }
+      badge={badge}
+      balance={balance}
+      aside={
+        periodNote ? (
+          <section aria-labelledby="period" className="flex flex-col gap-3">
+            <Eyebrow>
+              <span id="period">Periodo</span>
+            </Eyebrow>
+            <p className="text-sm text-muted-foreground">{periodNote}</p>
+          </section>
+        ) : undefined
+      }
+      note={canManage ? PURCHASE_NOTE : undefined}
+      actions={hasActions ? actions : undefined}
+      feedback={
+        operationInProgress || operationError ? (
+          <div className="flex flex-col gap-2">
+            {operationInProgress ? (
+              <p
+                role="status"
+                className="flex items-center gap-2 text-sm text-muted-foreground"
               >
-                Reanudar suscripción
-              </Button>
-            </Can>
-          ) : null}
-
-          {puedeContratar ? (
-            <Button render={<Link href="/dashboard/plans" />} variant="brand">
-              Ver planes
-            </Button>
-          ) : null}
-
-          {operacionEnCurso ? (
-            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              {cancelar.isPending
-                ? 'Cancelando tu suscripción...'
-                : 'Reanudando tu suscripción...'}
-            </span>
-          ) : null}
-        </div>
-
-        {falloDeOperacion ? (
-          <p role="alert" className="text-sm text-destructive">
-            {getErrorMessage(
-              falloDeOperacion,
-              'No pudimos actualizar tu suscripción. Intenta de nuevo en unos minutos.',
-            )}
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                {cancelMutation.isPending
+                  ? 'Cancelando tu suscripción...'
+                  : 'Reanudando tu suscripción...'}
+              </p>
+            ) : null}
+            {operationError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {getErrorMessage(
+                  operationError,
+                  'No pudimos actualizar tu suscripción. Intenta de nuevo en unos minutos.',
+                )}
+              </p>
+            ) : null}
+          </div>
+        ) : undefined
+      }
+    />
   );
 }
