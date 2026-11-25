@@ -62,9 +62,10 @@ describe('DashboardBreadcrumbs', () => {
     renderWithProviders(<DashboardBreadcrumbs />);
 
     expect(screen.getByText('Organización')).toBeInTheDocument();
-    expect(
-      screen.getByText('Información de la organización'),
-    ).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByText('Información de la organización')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   /**
@@ -73,9 +74,7 @@ describe('DashboardBreadcrumbs', () => {
    * sin ningún breadcrumb y nadie lo notaría hasta verlo en pantalla.
    */
   it('resuelve por patrón los breadcrumbs de Administrar miembros, con el id en la ruta', () => {
-    mockUsePathname.mockReturnValue(
-      '/dashboard/organizations/org-1/members',
-    );
+    mockUsePathname.mockReturnValue('/dashboard/organizations/org-1/members');
 
     renderWithProviders(<DashboardBreadcrumbs />);
 
@@ -169,7 +168,11 @@ describe('DashboardBreadcrumbs', () => {
     it.each([
       ['/dashboard/plans', 'Pagos', 'Planes'],
       ['/dashboard/subscriptions', 'Pagos', 'Suscripciones'],
-      ['/dashboard/personal-documents', 'Configuración', 'Información personal'],
+      [
+        '/dashboard/personal-documents',
+        'Configuración',
+        'Información personal',
+      ],
     ])('en %s muestra "%s / %s"', (pathname, group, page) => {
       mockUsePathname.mockReturnValue(pathname);
 
@@ -177,10 +180,14 @@ describe('DashboardBreadcrumbs', () => {
 
       // El módulo no es clickeable: no tiene pantalla propia a la que llevar.
       expect(screen.getByText(group)).toHaveAttribute('aria-disabled', 'true');
-      expect(screen.queryByRole('link', { name: group })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: group }),
+      ).not.toBeInTheDocument();
 
       expect(screen.getByText(page)).toHaveAttribute('aria-current', 'page');
-      expect(screen.queryByRole('link', { name: page })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: page }),
+      ).not.toBeInTheDocument();
     });
 
     /** Tres niveles: el módulo, la pantalla padre —que sí es una página real— y la actual. */
@@ -226,7 +233,7 @@ describe('DashboardBreadcrumbs', () => {
     renderWithProviders(<DashboardBreadcrumbs />);
 
     expect(
-      screen.getByRole('link', { name: 'Agregar documentos' }),
+      screen.getByRole('link', { name: 'Comprar documentos' }),
     ).toHaveAttribute('href', '/dashboard/subscriptions');
   });
 
