@@ -132,7 +132,7 @@ describe('SubscriptionStateCard', () => {
       render(<SubscriptionStateCard />, { wrapper });
 
       await waitFor(() =>
-        expect(screen.getByText(/plan plus — activa/i)).toBeInTheDocument(),
+        expect(screen.getByText(/plan plus/i)).toBeInTheDocument(),
       );
       expect(screen.getByText(/está al corriente/i)).toBeInTheDocument();
       expect(screen.getByText(/periodo vigente hasta/i)).toBeInTheDocument();
@@ -159,7 +159,7 @@ describe('SubscriptionStateCard', () => {
       render(<SubscriptionStateCard />, { wrapper });
 
       await waitFor(() =>
-        expect(screen.getByText(/plan premium — activa/i)).toBeInTheDocument(),
+        expect(screen.getByText(/plan premium/i)).toBeInTheDocument(),
       );
     });
   });
@@ -182,7 +182,7 @@ describe('SubscriptionStateCard', () => {
       render(<SubscriptionStateCard />, { wrapper });
 
       await waitFor(() =>
-        expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
+        expect(screen.getByText('Plan gratuito')).toBeInTheDocument(),
       );
       /**
        * Lo que esta prueba impide: el plan gratuito comparte `hasActiveSubscription: false` con
@@ -216,7 +216,7 @@ describe('SubscriptionStateCard', () => {
       render(<SubscriptionStateCard />, { wrapper });
 
       await waitFor(() =>
-        expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
+        expect(screen.getByText('Plan gratuito')).toBeInTheDocument(),
       );
     });
   });
@@ -593,7 +593,7 @@ describe('SubscriptionStateCard', () => {
       render(<SubscriptionStateCard />, { wrapper });
 
       await waitFor(() =>
-        expect(screen.getByText('Plan Gratuito')).toBeInTheDocument(),
+        expect(screen.getByText('Plan gratuito')).toBeInTheDocument(),
       );
       expect(screen.getByText('3')).toBeInTheDocument();
     });
@@ -626,7 +626,7 @@ describe('SubscriptionStateCard', () => {
 
       render(<SubscriptionStateCard />, { wrapper });
 
-      await screen.findByText('Plan Gratuito');
+      await screen.findByText('Plan gratuito');
       expect(
         screen.getByText(/firmas biométricas disponibles/i),
       ).toBeInTheDocument();
@@ -674,9 +674,10 @@ describe('SubscriptionStateCard', () => {
 
       render(<SubscriptionStateCard />, { wrapper });
 
-      expect(
-        await screen.findByText(/documentos disponibles/i),
-      ).toHaveTextContent('Documentos disponibles: 12');
+      const saldo = await screen.findByRole('region', {
+        name: /saldo disponible/i,
+      });
+      expect(saldo).toHaveTextContent('12Documentos disponibles');
       expect(
         screen.getByText(/firmas biométricas disponibles/i),
       ).toHaveTextContent('Firmas biométricas disponibles: 8');
@@ -686,8 +687,8 @@ describe('SubscriptionStateCard', () => {
   describe('estados que no habilitan', () => {
     it.each([
       ['INCOMPLETE', /pendiente de confirmación/i],
-      ['PAST_DUE', /con un pago pendiente/i],
-      ['CANCELED', /cancelada/i],
+      ['PAST_DUE', /pago pendiente/i],
+      ['CANCELED', /^cancelado$/i],
     ] as const)('rotula %s sin darlo por vigente', async (status, rotulo) => {
       givenSubscription({
         hasActiveSubscription: false,
@@ -753,7 +754,126 @@ describe('sin BILLING.MANAGE', () => {
       screen.queryByRole('button', { name: /cancelar suscripción/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /agregar más documentos/i }),
+      screen.queryByRole('button', { name: /comprar documentos/i }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Rediseño de la pantalla: jerarquía entre plan, saldo y acciones, con una sola acción primaria
+ * por grupo y rótulos en sentence case.
+ */
+describe('jerarquía de la tarjeta', () => {
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    mockedRequest.mockReset();
+    givenActiveAccount(PERSONAL_ACCOUNT_ID);
+  });
+
+  /** Si el elemento lleva el relleno de marca de la variante `brand` (clase exacta). */
+  function isPrimary(element: HTMLElement): boolean {
+    return element.className.split(/\s+/).includes('bg-primary');
+  }
+
+  /** Botones y enlaces con aspecto de acción primaria (variante `brand`). */
+  function primaryActions(): HTMLElement[] {
+    return [
+      ...screen.queryAllByRole('button'),
+      ...screen.queryAllByRole('link'),
+    ].filter(isPrimary);
+  }
+
+  it('el plan gratuito usa el título, la descripción y el estado del diseño', async () => {
+    givenSubscription({ status: 'FREE', credits: creditsOf(76, 0) });
+
+    render(<SubscriptionStateCard />, { wrapper });
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Plan gratuito' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Ideal para comenzar a firmar documentos. Compra documentos adicionales o explora otros planes cuando lo necesites.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Activo')).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: /saldo disponible/i }),
+    ).toHaveTextContent('76');
+    expect(
+      screen.getByText('La compra de documentos no modifica tu suscripción.'),
+    ).toBeInTheDocument();
+  });
+
+  it('en el plan gratuito "Ver planes" es secundaria y lleva a /dashboard/plans', async () => {
+    givenSubscription({ status: 'FREE' });
+
+    render(<SubscriptionStateCard />, { wrapper });
+
+    const verPlanes = await screen.findByRole('link', { name: 'Ver planes' });
+    expect(verPlanes).toHaveAttribute('href', '/dashboard/plans');
+    expect(isPrimary(verPlanes)).toBe(false);
+    expect(
+      screen.getByRole('link', { name: /conoce lo que incluye cada plan/i }),
+    ).toHaveAttribute('href', '/dashboard/plans');
+  });
+
+  it('con baja programada "Reanudar suscripción" no compite con la primaria', async () => {
+    givenSubscription({
+      status: 'ACTIVE',
+      currentPlanType: 'plus',
+      hasActiveSubscription: true,
+      cancelAtPeriodEnd: true,
+    });
+
+    render(<SubscriptionStateCard />, { wrapper });
+
+    const reanudar = await screen.findByRole('button', {
+      name: 'Reanudar suscripción',
+    });
+    expect(isPrimary(reanudar)).toBe(false);
+    expect(screen.getByText('Cancelación programada')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['FREE', { status: 'FREE' }],
+    [
+      'ACTIVE',
+      {
+        status: 'ACTIVE',
+        currentPlanType: 'plus',
+        hasActiveSubscription: true,
+      },
+    ],
+    [
+      'CANCELED',
+      {
+        status: 'CANCELED',
+        currentPlanType: 'plus',
+        hasActiveSubscription: false,
+      },
+    ],
+  ] as const)('en %s hay como mucho una acción primaria', async (_, state) => {
+    givenSubscription(state as Partial<BillingAccess>);
+
+    render(<SubscriptionStateCard />, { wrapper });
+
+    await screen.findByText(/plan actual/i);
+    expect(primaryActions().length).toBeLessThanOrEqual(1);
+  });
+
+  it('sin BILLING.MANAGE no muestra la nota de compra', async () => {
+    givenSubscription({ status: 'FREE' });
+
+    render(<SubscriptionStateCard />, { wrapper: readOnlyWrapper });
+
+    expect(
+      await screen.findByRole('link', { name: 'Ver planes' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('La compra de documentos no modifica tu suscripción.'),
     ).not.toBeInTheDocument();
   });
 });

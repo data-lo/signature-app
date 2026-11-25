@@ -11,6 +11,11 @@ import { useAuthStore } from '@/lib/store/useAuthStore';
 
 jest.mock('@/lib/api/billing');
 
+let mockPathname = '/dashboard/documents';
+jest.mock('next/navigation', () => ({
+  usePathname: () => mockPathname,
+}));
+
 const mockedRequest = getBillingAccessRequest as jest.Mock;
 
 const ACCOUNT_ID = 'cuenta-personal-1';
@@ -107,6 +112,23 @@ describe('DocumentsAvailability', () => {
     expect(
       screen.getByRole('link', { name: ADD_DOCUMENTS_LABEL }),
     ).toBeInTheDocument();
+  });
+
+  it('se rotula igual que la compra de Suscripciones', () => {
+    expect(ADD_DOCUMENTS_LABEL).toBe('Comprar documentos');
+  });
+
+  it('no se muestra en la propia pantalla de Suscripciones', async () => {
+    mockPathname = SUBSCRIPTIONS_ROUTE;
+    mockedRequest.mockResolvedValue(buildBillingAccess());
+
+    render(<DocumentsAvailability />, { wrapper });
+
+    expect(
+      screen.queryByRole('link', { name: ADD_DOCUMENTS_LABEL }),
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(mockedRequest).toHaveBeenCalled());
+    mockPathname = '/dashboard/documents';
   });
 
   it('el botón lleva a Suscripciones', async () => {
