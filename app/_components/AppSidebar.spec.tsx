@@ -1,5 +1,10 @@
 import { BookUser } from 'lucide-react';
-import { NAV_GROUPS, visibleNavGroups } from './AppSidebar';
+import {
+  NAV_GROUPS,
+  isRouteWithin,
+  resolveActiveNavItemLabel,
+  visibleNavGroups,
+} from './AppSidebar';
 import { DOCUMENTS_SECTIONS } from '@/app/dashboard/documents/_config/sections';
 import type { PermissionKey } from '@/lib/authorization/authorization.types';
 
@@ -376,5 +381,62 @@ describe('filtrado por permisos', () => {
         permissions: [],
       }),
     ).toEqual(['settings']);
+  });
+});
+
+describe('isRouteWithin', () => {
+  it('cubre la propia ruta y sus hijas, con o sin barra final', () => {
+    expect(isRouteWithin('/dashboard/plans', '/dashboard/plans')).toBe(true);
+    expect(isRouteWithin('/dashboard/plans/', '/dashboard/plans')).toBe(true);
+    expect(isRouteWithin('/dashboard/plans/checkout', '/dashboard/plans')).toBe(
+      true,
+    );
+  });
+
+  it('no confunde rutas que sólo comparten prefijo de texto', () => {
+    expect(isRouteWithin('/dashboard/plansX', '/dashboard/plans')).toBe(false);
+    expect(isRouteWithin('/dashboard', '/dashboard/plans')).toBe(false);
+  });
+});
+
+describe('resolveActiveNavItemLabel', () => {
+  it('elige la entrada más específica cuando varias reclaman la ruta', () => {
+    expect(
+      resolveActiveNavItemLabel(
+        NAV_GROUPS,
+        '/dashboard/personal-documents/identity',
+        null,
+      ),
+    ).toBe('Identidad y firma');
+    expect(
+      resolveActiveNavItemLabel(
+        NAV_GROUPS,
+        '/dashboard/personal-documents',
+        null,
+      ),
+    ).toBe('Información personal');
+  });
+
+  it('una ruta anidada sin entrada propia enciende a su padre', () => {
+    expect(
+      resolveActiveNavItemLabel(
+        NAV_GROUPS,
+        '/dashboard/documents/create',
+        null,
+      ),
+    ).toBe('Documentos');
+    expect(
+      resolveActiveNavItemLabel(
+        NAV_GROUPS,
+        '/dashboard/organizations/org-1/members',
+        'org-1',
+      ),
+    ).toBe('Administrar miembros');
+  });
+
+  it('devuelve null fuera del menú', () => {
+    expect(
+      resolveActiveNavItemLabel(NAV_GROUPS, '/dashboard/unauthorized', null),
+    ).toBeNull();
   });
 });
