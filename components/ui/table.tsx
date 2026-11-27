@@ -4,11 +4,35 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+/**
+ * Tabla con su propio contenedor de desplazamiento horizontal.
+ *
+ * El contenedor es lo único que se desplaza cuando las columnas no caben: así la pantalla que la
+ * contiene conserva su ancho. Una tabla ancha que deba poder recorrerse con teclado le pasa
+ * `containerProps` con `tabIndex={0}`, `role="region"` y un `aria-label`: sin foco, las flechas
+ * no tienen a quién desplazar.
+ *
+ * @param props.containerProps - Atributos del `div` que desplaza; `className` se suma al suyo.
+ * @param props - El resto va al `table`.
+ * @returns El contenedor con la tabla.
+ *
+ * @example
+ * ```tsx
+ * <Table containerProps={{ tabIndex: 0, role: 'region', 'aria-label': 'Documentos' }}>…</Table>
+ * ```
+ */
+function Table({
+  className,
+  containerProps,
+  ...props
+}: React.ComponentProps<'table'> & {
+  containerProps?: React.ComponentProps<'div'>;
+}) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      {...containerProps}
+      className={cn('relative w-full overflow-x-auto', containerProps?.className)}
     >
       <table
         data-slot="table"

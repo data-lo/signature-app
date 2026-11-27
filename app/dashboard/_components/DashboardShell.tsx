@@ -29,7 +29,11 @@ export default function DashboardShell({
       <AuthProvider>
         <SidebarProvider>
           <AppSidebar />
-          <SidebarInset>
+          {/* `min-w-0`: el inset es un hijo flex y, sin él, su ancho mínimo es el de su contenido
+            más ancho. Una tabla con `minWidth` lo estiraba más allá del viewport y la página
+            entera —barra superior incluida— se desplazaba en horizontal. Con él, el desborde se
+            queda en el contenedor de la tabla, que es el único que desplaza. */}
+          <SidebarInset className="min-w-0">
             <header className="flex h-12 items-center border-b border-border px-4 md:hidden">
               <SidebarTrigger />
             </header>

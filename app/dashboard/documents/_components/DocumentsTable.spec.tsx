@@ -1143,7 +1143,9 @@ describe('DocumentsTable', () => {
         />,
       );
 
-      // El primer Tab cae en el botón de ordenar del encabezado Documento; el segundo, en la fila.
+      // El primer Tab cae en el contenedor que desplaza la tabla; el segundo, en el botón de
+      // ordenar del encabezado Documento; el tercero, en la fila.
+      await user.tab();
       await user.tab();
       await user.tab();
       expect(
@@ -1334,6 +1336,66 @@ describe('DocumentsTable', () => {
         ).toBeInTheDocument(),
       );
       expect(await navigator.clipboard.readText()).toBe(expectedUrl);
+    });
+  });
+
+  describe('desplazamiento horizontal', () => {
+    /**
+     * jsdom no calcula layout, así que no se puede comprobar que la tabla se desplace: se comprueba
+     * el contrato que lo hace posible (contenedor enfocable y nombrado, columnas fijas con fondo).
+     */
+    it('el contenedor que desplaza la tabla es una región enfocable con teclado', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const region = screen.getByRole('region', { name: 'Tabla de documentos' });
+      expect(region).toHaveAttribute('data-slot', 'table-container');
+      expect(region).toHaveClass('overflow-x-auto');
+      expect(region).toContainElement(screen.getByRole('table'));
+
+      await user.tab();
+      expect(region).toHaveFocus();
+    });
+
+    it('fija "#" en el borde y "Documento" a su derecha, encabezado y celdas', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      const indexHead = screen.getByRole('columnheader', { name: 'Índice' });
+      const documentHead = screen.getByRole('columnheader', { name: 'Documento' });
+      const row = screen.getAllByRole('row')[1];
+      const [indexCell, documentCell] = within(row).getAllByRole('cell');
+
+      for (const element of [indexHead, indexCell]) {
+        expect(element).toHaveClass('sm:sticky', 'sm:left-0');
+      }
+      for (const element of [documentHead, documentCell]) {
+        expect(element).toHaveClass('sm:sticky', 'sm:left-12');
+      }
+      // Fondo opaco: si no, las columnas que pasan por debajo se verían a través.
+      expect(indexCell).toHaveClass('sm:bg-card');
+      expect(documentCell).toHaveClass('sm:bg-card');
+      expect(row).toHaveClass('group');
+    });
+
+    it('sin "#", "Documento" se fija en el borde', () => {
+      renderWithProviders(
+        <DocumentsTable
+          documents={[buildDoc()]}
+          visibleColumns={['document', 'status']}
+        />,
+      );
+
+      expect(
+        screen.getByRole('columnheader', { name: 'Documento' }),
+      ).toHaveClass('sm:sticky', 'sm:left-0');
+    });
+
+    it('las columnas que no son "#" ni "Documento" se desplazan', () => {
+      renderWithProviders(<DocumentsTable documents={[buildDoc()]} />);
+
+      expect(
+        screen.getByRole('columnheader', { name: 'Estatus' }),
+      ).not.toHaveClass('sm:sticky');
     });
   });
 

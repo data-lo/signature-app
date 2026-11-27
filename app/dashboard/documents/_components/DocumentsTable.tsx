@@ -185,6 +185,48 @@ export function documentRowIndex(
   return (Math.max(page, 1) - 1) * pageSize + rowIndex + 1;
 }
 
+/**
+ * Columnas fijas al desplazar la tabla en horizontal: "Documento" (y "#" si está visible, que va
+ * antes) se quedan pegadas al borde izquierdo para que cada fila siga diciendo de qué documento
+ * es. Sólo desde `sm`: en un teléfono, 276 px fijos dejarían para el resto de columnas apenas una
+ * franja, y ahí conviene que todo se desplace junto.
+ *
+ * Una celda pegada tapa a las que pasan por debajo, así que necesita fondo opaco. El encabezado
+ * usa `bg-muted/60` sobre la tarjeta: se reproduce el mismo color ya mezclado. Las filas copian
+ * el resaltado de hover y el de menú abierto de `TableRow` (vía `group`) para no quedar blancas
+ * en medio de una fila gris.
+ */
+const STICKY_COLUMN_CLASS = 'sm:sticky sm:z-[1]';
+const STICKY_HEAD_CLASS = `${STICKY_COLUMN_CLASS} sm:bg-[color-mix(in_oklab,var(--muted)_60%,var(--card))]`;
+const STICKY_CELL_CLASS = `${STICKY_COLUMN_CLASS} sm:bg-card sm:group-hover:bg-muted sm:group-has-aria-expanded:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]`;
+/** Línea que separa la última columna fija de las que se desplazan por debajo. */
+const STICKY_EDGE_CLASS = 'sm:shadow-[inset_-1px_0_0_var(--border)]';
+
+/**
+ * Clases de posición de una columna fija.
+ *
+ * "#" va en el borde; "Documento" a su derecha si "#" está visible (48 px, su ancho en
+ * `DOCUMENT_COLUMNS`) o en el borde si no.
+ *
+ * @param columnId - Columna fija: `index` o `document`.
+ * @param isIndexShown - Si la columna "#" está visible.
+ * @returns Las clases de `left` y, para "Documento", la línea de separación.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * stickyColumnOffsetClass('document', true); // 'sm:left-12 sm:shadow-[…]'
+ * ```
+ */
+function stickyColumnOffsetClass(
+  columnId: 'index' | 'document',
+  isIndexShown: boolean,
+): string {
+  if (columnId === 'index') return 'sm:left-0';
+  return `${isIndexShown ? 'sm:left-12' : 'sm:left-0'} ${STICKY_EDGE_CLASS}`;
+}
+
 /** Lo que dice la tabla cuando la consulta respondió sin documentos. */
 export const EMPTY_DOCUMENTS_MESSAGE = 'No hay documentos para mostrar.';
 
@@ -322,6 +364,9 @@ export default function DocumentsTable({
   const shownColumns = new Set(normalizeVisibleDocumentColumns(visibleColumns));
   const isShown = (columnId: DocumentColumnId) => shownColumns.has(columnId);
   const tableLayout = documentTableLayout(visibleColumns);
+  const isIndexShown = isShown('index');
+  const indexStickyClass = stickyColumnOffsetClass('index', isIndexShown);
+  const documentStickyClass = stickyColumnOffsetClass('document', isIndexShown);
   /**
    * Columnas pintadas, más la de acciones. Lo usan las filas de carga, vacía y error para ocupar
    * todo el ancho con cualquier combinación de columnas visibles.
@@ -383,8 +428,24 @@ export default function DocumentsTable({
           quite espacio de forma impredecible a las demás. Se arma sólo con las columnas visibles:
           "Documento" no lleva ancho y absorbe el espacio libre. El ancho mínimo conserva columnas
           legibles; por debajo de él, el contenedor de `Table` ofrece desplazamiento horizontal.
+          Ese contenedor es lo único que se desplaza (la pantalla no: ver `DashboardShell`), y
+          recibe foco para que las flechas lo desplacen también desde el teclado. Encabezados y
+          celdas viven en la misma tabla, así que se mueven juntos y no pierden la alineación.
+
+          El encabezado no se fija al desplazar en vertical: un contenedor con `overflow-x: auto`
+          también recorta en vertical, así que `sticky top-0` sólo se pegaría a él y no a la
+          ventana. Fijarlo exigiría darle a la tabla una altura propia con su propio scroll
+          vertical —dos barras anidadas y la paginación fuera de la vista—, y con 50 filas como
+          máximo por página no compensa.
         */}
         <Table
+          containerProps={{
+            tabIndex: 0,
+            role: 'region',
+            'aria-label': 'Tabla de documentos',
+            className:
+              'outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset',
+          }}
           aria-busy={bodyState === 'loading' || undefined}
           style={{ minWidth: tableLayout.minWidth }}
           className="table-fixed [&_[data-slot=table-head]]:!h-12 [&_[data-slot=table-head]]:!px-3 [&_[data-slot=table-cell]]:!px-3 [&_[data-slot=table-cell]]:!py-3"
@@ -402,14 +463,17 @@ export default function DocumentsTable({
           </colgroup>
           <DataTableHeader>
             {isShown('index') && (
-              <TableHead>
+              <TableHead className={`${STICKY_HEAD_CLASS} ${indexStickyClass}`}>
                 {/* Se ve "#", que un lector de pantalla no lee de forma útil: se anuncia "Índice". */}
                 <span aria-hidden="true">#</span>
                 <span className="sr-only">Índice</span>
               </TableHead>
             )}
             {isShown('document') && (
-              <TableHead aria-sort={ARIA_SORT[nameSort]}>
+              <TableHead
+                aria-sort={ARIA_SORT[nameSort]}
+                className={`${STICKY_HEAD_CLASS} ${documentStickyClass}`}
+              >
                 <SortableHeader
                   sort={nameSort}
                   onToggle={() => setNameSort(nextDocumentNameSort)}
@@ -487,11 +551,15 @@ export default function DocumentsTable({
                   // en hover; el cursor de mano es lo que anuncia que además se puede activar.
                   // Sobre blanco, el `hover:bg-muted/50` del componente casi no se distingue:
                   // aquí se usa el tono completo.
-                  className={`hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
+                  // `group`: las celdas fijas copian el resaltado de la fila (ver
+                  // `STICKY_CELL_CLASS`).
+                  className={`group hover:bg-muted ${onRowSelect ? 'cursor-pointer' : ''}`}
                   onClick={onRowSelect ? () => onRowSelect(doc.id) : undefined}
                 >
                   {isShown('index') && (
-                    <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                    <TableCell
+                      className={`whitespace-nowrap tabular-nums text-muted-foreground ${STICKY_CELL_CLASS} ${indexStickyClass}`}
+                    >
                       {documentRowIndex(page, pageSize, rowIndex)}
                     </TableCell>
                   )}
@@ -505,7 +573,9 @@ export default function DocumentsTable({
                   {/* "Documento" no se puede ocultar (ver `../_config/columns`), así que el botón
                     del nombre —el acceso por teclado a la fila— siempre está. */}
                   {isShown('document') && (
-                    <TableCell className="text-emerald-700 dark:text-emerald-400">
+                    <TableCell
+                      className={`text-emerald-700 dark:text-emerald-400 ${STICKY_CELL_CLASS} ${documentStickyClass}`}
+                    >
                       {/* El botón del nombre no lleva `onClick` propio: existe para que la fila sea
                         alcanzable con Tab y activable con Enter/Espacio, que emiten un clic que
                         sube hasta el manejador de la fila. Así la tabla conserva su semántica (un
@@ -606,7 +676,9 @@ export default function DocumentsTable({
 
         <div
           data-slot="documents-table-pagination"
-          className="flex items-center justify-between border-t border-border px-3 py-2"
+          // `flex-wrap`: en pantallas angostas los botones bajan bajo el selector en vez de
+          // salirse de la tarjeta, que los recortaría (`overflow-hidden`).
+          className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2"
         >
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span id="documents-page-size-label">Documentos por página</span>
