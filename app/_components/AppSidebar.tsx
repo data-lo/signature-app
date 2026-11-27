@@ -498,7 +498,12 @@ export default function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      {/* Las entradas se desplazan por su cuenta cuando no caben en la altura de la ventana; la
+        marca arriba y la cuenta y "Cerrar sesión" abajo quedan siempre visibles. Contraída,
+        `SidebarContent` pasa a `overflow-hidden` (para que los textos que se ocultan no dejen
+        barra horizontal), y en una pantalla baja los íconos que no cabían quedaban fuera de
+        alcance: se reabre sólo el eje vertical. */}
+      <SidebarContent className="group-data-[collapsible=icon]:overflow-y-auto">
         {navGroups.map((group) => (
           <SidebarGroup key={group.key}>
             {group.label && (
