@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { nameInitials } from '@/lib/name-initials';
 import { formatLongDateTime } from '@/lib/format-datetime';
 import { DocumentStatus } from '@/lib/enums/document';
 import { usePublicDocument } from '../_hooks/usePublicDocument';
@@ -28,7 +29,12 @@ const PublicPdfViewer = dynamic(() => import('./PublicPdfViewer'), {
   ssr: false,
 });
 
-const PENDING_MESSAGE = 'Este documento aún no se ha completado de firmar.';
+/** Textos de la pantalla de un documento con firmas pendientes. */
+export const PENDING_DESCRIPTION =
+  'Consulta el estado y los firmantes requeridos de este documento.';
+export const PENDING_ALERT_TITLE = 'Firmas incompletas';
+const PENDING_MESSAGE =
+  'Este documento aún no cuenta con todas las firmas requeridas.';
 const COMPLETED_MESSAGE =
   'Este documento ha sido firmado por todos sus participantes.';
 
@@ -36,8 +42,9 @@ const COMPLETED_MESSAGE =
  * Un documento rechazado, cancelado o expirado tampoco está completado, pero ya nunca lo va a
  * estar: decirle a quien consulta que "aún no se ha completado" lo dejaría esperando una firma que
  * no va a llegar. La historia solo define dos estados (pendiente y completado) y esta pantalla
- * sigue teniendo dos —el aviso de arriba es de tipo Warning en todos estos casos y el contenido es
- * el mismo—, pero el texto sí distingue lo que todavía puede pasar de lo que ya se cerró.
+ * sigue teniendo dos —el aviso de arriba es de tipo Warning con el título "Firmas incompletas" en
+ * todos estos casos y el contenido es el mismo—, pero el texto sí distingue lo que todavía puede
+ * pasar de lo que ya se cerró.
  */
 const TERMINAL_STATUS_MESSAGES: Partial<Record<DocumentStatus, string>> = {
   [DocumentStatus.Rejected]:
@@ -48,6 +55,21 @@ const TERMINAL_STATUS_MESSAGES: Partial<Record<DocumentStatus, string>> = {
     'Este documento no se completó de firmar: venció su fecha límite.',
 };
 
+/**
+ * Texto del aviso de un documento sin completar.
+ *
+ * @param status - Estatus del documento según el backend.
+ * @returns El motivo si ya no se completará (rechazado, cancelado, expirado) o el texto de
+ *   "firmas incompletas" si todavía puede completarse.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * pendingMessage(DocumentStatus.PendingSignature);
+ * // 'Este documento aún no cuenta con todas las firmas requeridas.'
+ * ```
+ */
 function pendingMessage(status: DocumentStatus): string {
   return TERMINAL_STATUS_MESSAGES[status] ?? PENDING_MESSAGE;
 }
@@ -77,14 +99,38 @@ function StatusCard({
   );
 }
 
-/** Contenedor de la pantalla: una columna que se lee igual en escritorio y en teléfono. */
-function VerificationPage({ children }: { children: React.ReactNode }) {
+/**
+ * Contenedor de la pantalla: una columna que se lee igual en escritorio y en teléfono.
+ *
+ * @param props.description - Texto de apoyo bajo el título. Opcional.
+ * @param props.children - Aviso y secciones de la pantalla.
+ * @returns La página con su título.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * <VerificationPage description={PENDING_DESCRIPTION}>…</VerificationPage>
+ * ```
+ */
+function VerificationPage({
+  description,
+  children,
+}: {
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-h-screen bg-muted px-4 py-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-        <h1 className="text-lg font-semibold text-foreground">
-          Información de verificación
-        </h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-lg font-semibold text-foreground">
+            Información de verificación
+          </h1>
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
+        </div>
         {children}
       </div>
     </div>
@@ -92,12 +138,78 @@ function VerificationPage({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Documento todavía pendiente de firmas: aviso, nombre del documento y nombres de los firmantes.
+ * Un firmante en la lista de firmantes requeridos: iniciales como apoyo visual y el nombre.
+ *
+ * Sólo eso. Mientras el documento está pendiente el backend publica el nombre de cada firmante y
+ * nada más —ni si ya firmó—, así que la fila no lleva estatus individual: pintar "Pendiente" en
+ * todas sería afirmar algo que la respuesta no dice.
+ *
+ * @param props.name - Nombre del firmante.
+ * @param props.highlighted - Si es la firma que señala el QR escaneado.
+ * @returns La fila (`li`) del firmante.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * <RequiredSignerRow name="Isaay Sosa" highlighted={false} />
+ * ```
+ */
+function RequiredSignerRow({
+  name,
+  highlighted,
+}: {
+  name: string;
+  highlighted: boolean;
+}) {
+  const initials = nameInitials(name);
+
+  return (
+    <li
+      data-highlighted={highlighted || undefined}
+      className={cn(
+        'flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-sm text-foreground',
+        highlighted &&
+          'border-primary bg-primary/5 ring-2 ring-primary/40 dark:bg-primary/10',
+      )}
+    >
+      {/* Decorativas: el nombre ya está al lado, y un lector de pantalla leería "I S, Isaay
+        Sosa". Sin iniciales (nombre en blanco) el círculo no se pinta. */}
+      {initials && (
+        <span
+          aria-hidden
+          data-slot="signer-initials"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+        >
+          {initials}
+        </span>
+      )}
+      {/* `overflow-wrap:anywhere`: un nombre o correo sin espacios no debe ensanchar la fila en
+        un teléfono. */}
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{name}</span>
+    </li>
+  );
+}
+
+/**
+ * Documento todavía pendiente de firmas: aviso de firmas incompletas y una tarjeta con el nombre
+ * del documento y los firmantes requeridos, en secciones separadas.
  *
  * Nada más, y es deliberado (ver historia "Actualizar vista pública de verificación de documentos
  * según estado y tipo de firma"): mientras la firma no se completa no hay evidencia que constatar,
  * y esta URL no pide sesión. El backend tampoco manda el resto — aquí no se está ocultando algo
  * que sí haya llegado.
+ *
+ * @param props.data - Respuesta pública del documento, con `isCompleted` en false.
+ * @param props.highlightedSignerId - Firmante que señala el QR, o null.
+ * @returns La pantalla de verificación pendiente.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * <PendingVerification data={data} highlightedSignerId={null} />
+ * ```
  */
 function PendingVerification({
   data,
@@ -107,42 +219,62 @@ function PendingVerification({
   highlightedSignerId: string | null;
 }) {
   return (
-    <VerificationPage>
-      <VerificationAlert variant="warning">
+    <VerificationPage description={PENDING_DESCRIPTION}>
+      <VerificationAlert variant="warning" title={PENDING_ALERT_TITLE}>
         {pendingMessage(data.status)}
       </VerificationAlert>
 
-      <VerificationSection title="Documento">
-        <div className="flex flex-col">
-          <InfoRow label="Nombre del documento" value={data.fileName} />
-        </div>
-      </VerificationSection>
+      <Card data-slot="pending-verification-card">
+        <CardContent className="flex flex-col">
+          {/* Las dos secciones son encabezados reales (`h2`): se llega a esta pantalla desde el
+            teléfono tras escanear un QR, y un lector de pantalla salta entre secciones por
+            encabezados. "Documento" va como rótulo discreto porque lo que importa es el nombre. */}
+          <section
+            aria-labelledby="pending-document-heading"
+            className="flex flex-col gap-1 pb-4"
+          >
+            <h2
+              id="pending-document-heading"
+              className="text-sm text-muted-foreground"
+            >
+              Documento
+            </h2>
+            {/* `overflow-wrap:anywhere`: los nombres de archivo suelen ser una sola "palabra"
+              (`contrato_final_v3_firmado.pdf`) y con `break-words` no se cortarían. */}
+            <p className="text-base font-medium text-foreground [overflow-wrap:anywhere]">
+              {data.fileName}
+            </p>
+          </section>
 
-      <VerificationSection title="Firmantes requeridos">
-        {data.signers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Este documento no tiene firmantes registrados.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {data.signers.map((signer) => (
-              <li
-                key={signer.id}
-                data-highlighted={
-                  signer.id === highlightedSignerId || undefined
-                }
-                className={cn(
-                  'rounded-lg border border-border px-3 py-2 text-sm text-foreground',
-                  signer.id === highlightedSignerId &&
-                    'border-primary bg-primary/5 ring-2 ring-primary/40 dark:bg-primary/10',
-                )}
-              >
-                {signer.name}
-              </li>
-            ))}
-          </ul>
-        )}
-      </VerificationSection>
+          <section
+            aria-labelledby="pending-signers-heading"
+            className="flex flex-col gap-3 border-t border-border pt-4"
+          >
+            <h2
+              id="pending-signers-heading"
+              data-slot="card-title"
+              className="font-heading text-base leading-snug font-medium"
+            >
+              Firmantes requeridos
+            </h2>
+            {data.signers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Este documento no tiene firmantes registrados.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {data.signers.map((signer) => (
+                  <RequiredSignerRow
+                    key={signer.id}
+                    name={signer.name}
+                    highlighted={signer.id === highlightedSignerId}
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
+        </CardContent>
+      </Card>
     </VerificationPage>
   );
 }

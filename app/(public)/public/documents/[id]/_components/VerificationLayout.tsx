@@ -31,12 +31,32 @@ const ALERT_STYLES = {
  * Aviso superior que encabeza la pantalla. En la vista de un documento sólo se usan `warning`
  * (pendiente) y `success` (lo firmaron todos); `error` lo usa la consulta pública `/verify` para
  * un archivo cuya integridad no se pudo comprobar.
+ *
+ * El ícono es decorativo (`aria-hidden`): el título y el texto ya dicen el estado, y anunciar
+ * además "advertencia" sólo lo repetiría.
+ *
+ * @param props.variant - Tono del aviso.
+ * @param props.title - Título en negrita sobre el texto (p. ej. "Firmas incompletas"). Opcional:
+ *   sin él, el aviso es un solo párrafo, como lo usan el estado completado y `/verify`.
+ * @param props.children - Texto del aviso.
+ * @returns El aviso, con `role="status"`.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```tsx
+ * <VerificationAlert variant="warning" title="Firmas incompletas">
+ *   Este documento aún no cuenta con todas las firmas requeridas.
+ * </VerificationAlert>
+ * ```
  */
 export function VerificationAlert({
   variant,
+  title,
   children,
 }: {
   variant: 'warning' | 'success' | 'error';
+  title?: string;
   children: ReactNode;
 }) {
   const { Icon, className } = ALERT_STYLES[variant];
@@ -49,7 +69,14 @@ export function VerificationAlert({
       className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${className}`}
     >
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
-      <p>{children}</p>
+      {title ? (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="font-medium">{title}</p>
+          <p>{children}</p>
+        </div>
+      ) : (
+        <p>{children}</p>
+      )}
     </div>
   );
 }

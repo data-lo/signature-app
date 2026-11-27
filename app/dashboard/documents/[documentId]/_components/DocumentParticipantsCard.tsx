@@ -1,4 +1,5 @@
 import { ParticipantRole, ParticipantStatus } from '@/lib/enums/document';
+import { nameInitials } from '@/lib/name-initials';
 import type { DocumentParticipant } from '../_requests';
 
 const STATUS_LABELS: Record<ParticipantStatus, string> = {
@@ -25,16 +26,6 @@ const STATUS_CLASSES: Record<ParticipantStatus, string> = {
   [ParticipantStatus.Notified]: 'text-sky-600',
 };
 
-/** Iniciales para dar una referencia visual rápida sin depender de una foto de perfil. */
-function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('');
-}
-
 interface DocumentParticipantsCardProps {
   participants: DocumentParticipant[];
 }
@@ -56,7 +47,7 @@ export default function DocumentParticipantsCard({
               aria-hidden
               className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary"
             >
-              {initials(participant.name)}
+              {nameInitials(participant.name)}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">

@@ -218,11 +218,21 @@ describe('PublicDocumentView', () => {
       renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
       expect(
-        screen.getByText('Este documento aún no se ha completado de firmar.'),
+        screen.getByRole('heading', {
+          level: 1,
+          name: 'Información de verificación',
+        }),
       ).toBeInTheDocument();
-      expect(screen.getByRole('status')).toHaveAttribute(
-        'data-variant',
-        'warning',
+      expect(
+        screen.getByText(
+          'Consulta el estado y los firmantes requeridos de este documento.',
+        ),
+      ).toBeInTheDocument();
+      const alert = screen.getByRole('status');
+      expect(alert).toHaveAttribute('data-variant', 'warning');
+      expect(alert).toHaveTextContent('Firmas incompletas');
+      expect(alert).toHaveTextContent(
+        'Este documento aún no cuenta con todas las firmas requeridas.',
       );
       expect(screen.getByText('contrato.pdf')).toBeInTheDocument();
       expect(screen.getByText('Isaay Sosa')).toBeInTheDocument();
@@ -271,13 +281,154 @@ describe('PublicDocumentView', () => {
         renderWithProviders(<PublicDocumentView documentId="doc-1" />);
 
         expect(screen.getByText(matcher)).toBeInTheDocument();
+        // Sigue siendo un documento con firmas incompletas; lo que cambia es el motivo.
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Firmas incompletas',
+        );
         expect(
           screen.queryByText(
-            'Este documento aún no se ha completado de firmar.',
+            'Este documento aún no cuenta con todas las firmas requeridas.',
           ),
         ).not.toBeInTheDocument();
       },
     );
+  });
+
+  /**
+   * Presentación del estado pendiente (historia "Rediseñar pantalla de información de
+   * verificación"): una sola tarjeta con dos secciones y una fila por firmante.
+   */
+  describe('tarjeta de documento pendiente', () => {
+    function card(): HTMLElement {
+      return document.querySelector<HTMLElement>(
+        '[data-slot="pending-verification-card"]',
+      )!;
+    }
+
+    function signerRows(): HTMLElement[] {
+      const list = within(card()).getByRole('list');
+      return within(list).getAllByRole('listitem');
+    }
+
+    it('agrupa el documento y los firmantes en una sola tarjeta, con secciones separadas', () => {
+      mockData(buildPending());
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      const documentSection = within(card()).getByRole('region', {
+        name: 'Documento',
+      });
+      const signersSection = within(card()).getByRole('region', {
+        name: 'Firmantes requeridos',
+      });
+      expect(documentSection).toHaveTextContent('contrato.pdf');
+      expect(signersSection).not.toContainElement(
+        within(documentSection).getByText('contrato.pdf'),
+      );
+      expect(signersSection).toHaveClass('border-t');
+    });
+
+    it('cada firmante es una fila con sus iniciales ocultas a lectores de pantalla', () => {
+      mockData(buildPending());
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      const [first, second] = signerRows();
+      const firstInitials = first.querySelector('[data-slot="signer-initials"]');
+      expect(firstInitials).toHaveTextContent('IS');
+      expect(firstInitials).toHaveAttribute('aria-hidden');
+      expect(
+        second.querySelector('[data-slot="signer-initials"]'),
+      ).toHaveTextContent('ML');
+      // El nombre accesible de la fila es sólo el nombre: las iniciales no se repiten.
+      expect(within(card()).getAllByText('Isaay Sosa')).toHaveLength(1);
+    });
+
+    it('el ícono del aviso es decorativo', () => {
+      mockData(buildPending());
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      const icon = screen.getByRole('status').querySelector('svg');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it('no atribuye un estatus individual a los firmantes', () => {
+      mockData(buildPending());
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      for (const row of signerRows()) {
+        expect(row).not.toHaveTextContent(/pendiente|firmado|firmó|rechaz/i);
+      }
+    });
+
+    it('muestra un nombre de archivo y de firmante largos sin desbordar la tarjeta', () => {
+      const longFileName = `${'contrato_de_prestacion_de_servicios_'.repeat(4)}final.pdf`;
+      const longName =
+        'María Guadalupe de los Ángeles Fernández-Villaseñor y Castañeda';
+      mockData(
+        buildPending({
+          fileName: longFileName,
+          signers: [{ ...buildPending().signers[0], name: longName }],
+        }),
+      );
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      // jsdom no calcula layout: se fija que ambos textos completos se muestren con el corte que
+      // permite partir una palabra larga en cualquier punto.
+      expect(screen.getByText(longFileName)).toHaveClass(
+        '[overflow-wrap:anywhere]',
+      );
+      expect(screen.getByText(longName)).toHaveClass('[overflow-wrap:anywhere]');
+      expect(signerRows()[0].querySelector('[data-slot="signer-initials"]'))
+        .toHaveTextContent('MG');
+    });
+
+    it.each([1, 2, 12])('muestra a todos los firmantes (%i)', (count) => {
+      const base = buildPending().signers[0];
+      const signers = Array.from({ length: count }, (_, index) => ({
+        ...base,
+        id: `collab-${index}`,
+        name: `Firmante Número${index}`,
+      }));
+      mockData(buildPending({ signers }));
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(signerRows().map((row) => row.textContent)).toEqual(
+        signers.map((signer) => `FN${signer.name}`),
+      );
+    });
+
+    it('sin firmantes, lo dice dentro de la misma tarjeta', () => {
+      mockData(buildPending({ signers: [] }));
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(
+        within(card()).getByText(
+          'Este documento no tiene firmantes registrados.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(card()).queryByRole('list')).not.toBeInTheDocument();
+    });
+
+    it('la descripción de la pantalla sólo acompaña al estado pendiente', () => {
+      mockData(buildCompleted());
+
+      renderWithProviders(<PublicDocumentView documentId="doc-1" />);
+
+      expect(
+        screen.queryByText(
+          'Consulta el estado y los firmantes requeridos de este documento.',
+        ),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).not.toHaveTextContent(
+        'Firmas incompletas',
+      );
+    });
   });
 
   describe('documento completado', () => {
