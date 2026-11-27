@@ -30,6 +30,30 @@ function participantRow(name: string): HTMLElement {
  * pinta el estatus que manda el backend, sin deducirlo.
  */
 describe('DocumentParticipantsCard', () => {
+  it('muestra el RFC registrado del firmante cuando el backend lo manda', () => {
+    renderWithProviders(
+      <DocumentParticipantsCard
+        participants={[
+          buildParticipant({ name: 'Firmante Uno', taxId: 'PEAJ800101ABC' }),
+        ]}
+      />,
+    );
+
+    expect(participantRow('Firmante Uno')).toHaveTextContent(
+      'RFC: PEAJ800101ABC',
+    );
+  });
+
+  it('no muestra RFC cuando el firmante no lo tiene', () => {
+    renderWithProviders(
+      <DocumentParticipantsCard
+        participants={[buildParticipant({ name: 'Firmante Uno', taxId: null })]}
+      />,
+    );
+
+    expect(participantRow('Firmante Uno')).not.toHaveTextContent('RFC');
+  });
+
   it('muestra "Pendiente" para un testigo que todavía no fue notificado', () => {
     renderWithProviders(
       <DocumentParticipantsCard

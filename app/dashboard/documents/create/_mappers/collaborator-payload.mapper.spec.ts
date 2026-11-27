@@ -31,11 +31,10 @@ function viewer(): CollaboratorFormValues {
     firstName: 'Ana',
     lastName: 'Ruiz',
     email: 'ana@correo.com',
-    taxId: 'AURU800101ABC',
   };
 }
 
-/** Estrecha el payload a la rama MANUAL, la única que lleva identidad y `taxId`. */
+/** Estrecha el payload a la rama MANUAL, la única que lleva identidad. */
 function manual(payload: CollaboratorPayload): ManualCollaboratorPayload {
   if (payload.source !== 'MANUAL') {
     throw new Error(
@@ -58,7 +57,7 @@ describe('toCollaboratorPayload', () => {
     const payload = toCollaboratorPayload(signer(), 'SIMPLE');
 
     expect(payload.signatures).toEqual([]);
-    expect(manual(payload).taxId).toBeUndefined();
+    expect(payload).not.toHaveProperty('taxId');
     // SIMPLE: requiresTwoFactorAuth forzado a true "oculto", sin importar el valor del form.
     expect(payload.requiresTwoFactorAuth).toBe(true);
   });
@@ -66,7 +65,54 @@ describe('toCollaboratorPayload', () => {
   it('historia "Selección de tipo de firma": un firmante con firma avanzada tampoco manda taxId', () => {
     const payload = toCollaboratorPayload(signer(), 'ADVANCED');
 
-    expect(manual(payload).taxId).toBeUndefined();
+    expect(payload).not.toHaveProperty('taxId');
+  });
+
+  describe('RFC del firmante FIEL', () => {
+    const withTaxId = (signerTaxId: string): CollaboratorFormValues => ({
+      ...emptySigner(),
+      signerTaxId,
+    });
+
+    it('con firma avanzada viaja normalizado como signerTaxId', () => {
+      const payload = toCollaboratorPayload(
+        withTaxId(' peaj 800101 abc '),
+        'ADVANCED',
+      );
+
+      expect(payload.signerTaxId).toBe('PEAJ800101ABC');
+    });
+
+    it('sin capturar no viaja', () => {
+      expect(
+        toCollaboratorPayload(withTaxId('  '), 'ADVANCED'),
+      ).not.toHaveProperty('signerTaxId');
+    });
+
+    it.each(['SIMPLE', 'BIOMETRIC'] as const)(
+      'con firma %s no viaja aunque se haya escrito antes de cambiar el tipo',
+      (signatureType) => {
+        expect(
+          toCollaboratorPayload(withTaxId('PEAJ800101ABC'), signatureType),
+        ).not.toHaveProperty('signerTaxId');
+      },
+    );
+
+    it('también viaja para un firmante del Directorio', () => {
+      const payload = toCollaboratorPayload(
+        {
+          ...withTaxId('PEAJ800101ABC'),
+          source: 'DIRECTORY',
+          linkedUserId: 'user-1',
+        } as CollaboratorFormValues,
+        'ADVANCED',
+      );
+
+      expect(payload).toMatchObject({
+        source: 'DIRECTORY',
+        signerTaxId: 'PEAJ800101ABC',
+      });
+    });
   });
 
   it('historia "Ubicación de firmas por usuario": traduce cada posición colocada al shape del backend', () => {
@@ -116,25 +162,13 @@ describe('toCollaboratorPayload', () => {
     expect(payload.requiresTwoFactorAuth).toBe(false);
   });
 
-  it('un viewer no manda signatures ni requiresTwoFactorAuth, pero sí su taxId', () => {
+  it('un viewer no manda signatures, requiresTwoFactorAuth ni taxId', () => {
     const payload = toCollaboratorPayload(viewer(), 'ADVANCED');
 
     expect(payload.collaboratorType).toBe('WITNESS');
     expect(payload.signatures).toBeUndefined();
     expect(payload.requiresTwoFactorAuth).toBeUndefined();
-    expect(manual(payload).taxId).toBe('AURU800101ABC');
-  });
-
-  it('historia "Eliminar campo RFC de la sección de Espectadores": un viewer sin taxId lo manda vacío, no lo omite', () => {
-    // `emptyWitness()` (no `viewer()`) porque tipa como WitnessFormValues y no como el union
-    // CollaboratorFormValues: spreadear un union en un literal dispara el excess-property-check
-    // de TypeScript contra la rama SIGNER, que no tiene `taxId`.
-    const payload = toCollaboratorPayload(
-      { ...emptyWitness(), taxId: '' },
-      'ADVANCED',
-    );
-
-    expect(manual(payload).taxId).toBe('');
+    expect(payload).not.toHaveProperty('taxId');
   });
 
   it('historia "Habilitar ordenamiento Drag and Drop": sin orderIndex explícito, cae a 0 por defecto', () => {

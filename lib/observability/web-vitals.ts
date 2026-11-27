@@ -93,6 +93,7 @@ export const ROUTE_TEMPLATES: readonly string[] = [
   '/signature-capture',
   '/signup',
   '/signup/verify',
+  '/verify',
 ];
 
 /** Lo único que se registra de una métrica. */

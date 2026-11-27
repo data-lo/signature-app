@@ -22,7 +22,10 @@ import {
 // canjeado. La página guarda el token y decide: a /login si no hay sesión, o directo al canvas si
 // la hay. Que no pase por el guard NO la deja abierta: canjear el token exige sesión y el backend
 // comprueba que quien reclama sea el mismo usuario que generó la captura.
-const PUBLIC_ROUTES = ['/access-document', '/signature-capture'];
+//
+// `/verify` es la consulta pública de verificación por archivo (XML de auditoría o PDF final): la
+// abre cualquiera, con o sin cuenta, y no lee nada de la sesión.
+const PUBLIC_ROUTES = ['/access-document', '/signature-capture', '/verify'];
 
 // Prefijos de rutas sin sesión. `/sign/:token` es la pantalla de firma por invitación individual:
 // el firmante la abre desde su correo sin cuenta o sin sesión, y el token es lo único que la

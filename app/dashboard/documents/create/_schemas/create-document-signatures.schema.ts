@@ -1,6 +1,6 @@
 import { documentConfigurationSchema } from './document-configuration.schema';
 import { documentParticipantsSchema } from './document-participants.schema';
-import { countSigners } from './collaborator.schema';
+import { countSigners, isValidOptionalTaxId } from './collaborator.schema';
 import { z } from 'zod';
 
 /** Por qué no se puede enviar la solicitud mientras algún firmante no tenga su firma ubicada. */
@@ -9,6 +9,10 @@ export const SIGNATURE_POSITION_REQUIRED_MESSAGE =
 
 /** Encabezado del aviso de error que acompaña a `SIGNATURE_POSITION_REQUIRED_MESSAGE` junto al botón de envío. */
 export const SIGNATURE_POSITION_REQUIRED_TITLE = 'Falta ubicar la firma';
+
+/** Por qué no se acepta el RFC capturado para un firmante FIEL. */
+export const SIGNER_TAX_ID_FORMAT_MESSAGE =
+  'Ingresa un RFC válido: 12 o 13 caracteres (letras, fecha AAMMDD y homoclave).';
 
 /**
  * Esquema del formulario completo de la pantalla: la composición de los esquemas de cada sección
@@ -57,6 +61,18 @@ export const createDocumentSignaturesSchema = documentConfigurationSchema
           code: 'custom',
           message: SIGNATURE_POSITION_REQUIRED_MESSAGE,
           path: ['collaborators', index, 'signatures'],
+        });
+      }
+
+      if (
+        values.signatureType === 'ADVANCED' &&
+        collaborator.collaboratorType === 'SIGNER' &&
+        !isValidOptionalTaxId(collaborator.signerTaxId ?? '')
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: SIGNER_TAX_ID_FORMAT_MESSAGE,
+          path: ['collaborators', index, 'signerTaxId'],
         });
       }
     });

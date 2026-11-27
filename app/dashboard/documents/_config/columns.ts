@@ -31,20 +31,50 @@ export interface DocumentColumnDefinition {
    * quedaría sin contexto (fechas y estatus sin saber de qué documento son).
    */
   alwaysVisible?: boolean;
+  /**
+   * Ancho de la columna en píxeles. En la columna flexible es su mínimo: arriba de él absorbe todo
+   * el espacio que sobra.
+   */
+  width: number;
+  /** La columna ocupa el espacio disponible. Sólo una, para que el reparto no sea ambiguo. */
+  flexible?: boolean;
 }
 
 /** Columnas de la tabla, en el orden en que se pintan. */
 export const DOCUMENT_COLUMNS: readonly DocumentColumnDefinition[] = [
   // El encabezado de la tabla dice "#"; en el menú se nombra para que se entienda qué es.
-  { id: 'index', label: 'Índice' },
-  { id: 'document', label: 'Documento', alwaysVisible: true },
-  { id: 'creator', label: 'Creado por' },
-  { id: 'participation', label: 'Participación' },
-  { id: 'status', label: 'Estatus' },
-  { id: 'createdAt', label: 'Fecha de creación' },
-  { id: 'signedAt', label: 'Fecha de firma' },
-  { id: 'signatureType', label: 'Tipo de firma' },
+  { id: 'index', label: 'Índice', width: 48 },
+  {
+    id: 'document',
+    label: 'Documento',
+    alwaysVisible: true,
+    width: 228,
+    flexible: true,
+  },
+  { id: 'creator', label: 'Creado por', width: 168 },
+  { id: 'participation', label: 'Participación', width: 144 },
+  { id: 'status', label: 'Estatus', width: 180 },
+  { id: 'createdAt', label: 'Fecha de creación', width: 144 },
+  { id: 'signedAt', label: 'Fecha de firma', width: 144 },
+  { id: 'signatureType', label: 'Tipo de firma', width: 84 },
 ];
+
+/** Ancho fijo de la columna de acciones, que no es configurable y se pinta siempre. */
+export const DOCUMENT_ACTIONS_COLUMN_WIDTH = 60;
+
+/** Una columna del `colgroup`: `width` es `null` en la que absorbe el espacio disponible. */
+export interface DocumentTableLayoutColumn {
+  id: DocumentColumnId | 'actions';
+  width: number | null;
+}
+
+/** Distribución de la tabla para una configuración de columnas visibles. */
+export interface DocumentTableLayout {
+  /** Columnas pintadas, en orden, con la de acciones al final. */
+  columns: DocumentTableLayoutColumn[];
+  /** Ancho debajo del cual la tabla deja de encogerse y aparece el scroll horizontal. */
+  minWidth: number;
+}
 
 /** Configuración con la que abre la tabla si el usuario no guardó otra: todas visibles. */
 export const DEFAULT_VISIBLE_DOCUMENT_COLUMNS: readonly DocumentColumnId[] =
@@ -97,6 +127,44 @@ export function normalizeVisibleDocumentColumns(
   return DOCUMENT_COLUMNS.filter(
     (column) => column.alwaysVisible || requested.has(column.id),
   ).map((column) => column.id);
+}
+
+/**
+ * Calcula el `colgroup` y el ancho mínimo de la tabla para las columnas visibles.
+ *
+ * Sólo cuenta lo que se pinta: una columna oculta no reserva espacio y su ancho pasa a la columna
+ * flexible.
+ *
+ * @param visibleColumns - Columnas visibles, en cualquier orden.
+ * @returns Las columnas a pintar, con la de acciones al final, y el ancho mínimo de la tabla.
+ *
+ * @throws Nada.
+ *
+ * @example
+ * ```ts
+ * documentTableLayout(['document']);
+ * // { columns: [{ id: 'document', width: null }, { id: 'actions', width: 60 }], minWidth: 288 }
+ * ```
+ */
+export function documentTableLayout(
+  visibleColumns: readonly DocumentColumnId[],
+): DocumentTableLayout {
+  const shown = new Set(normalizeVisibleDocumentColumns(visibleColumns));
+  const definitions = DOCUMENT_COLUMNS.filter((column) => shown.has(column.id));
+
+  return {
+    columns: [
+      ...definitions.map((column) => ({
+        id: column.id,
+        width: column.flexible ? null : column.width,
+      })),
+      { id: 'actions' as const, width: DOCUMENT_ACTIONS_COLUMN_WIDTH },
+    ],
+    minWidth: definitions.reduce(
+      (total, column) => total + column.width,
+      DOCUMENT_ACTIONS_COLUMN_WIDTH,
+    ),
+  };
 }
 
 /**

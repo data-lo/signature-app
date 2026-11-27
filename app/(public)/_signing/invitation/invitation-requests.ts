@@ -33,7 +33,11 @@ export type InvitationStatus =
 /** Contexto mínimo de una invitación: sin PDF ni ids. Sólo `ACTIVE` trae algo más que el estado. */
 export interface InvitationContext {
   status: InvitationStatus;
-  document?: { name: string };
+  document?: {
+    name: string;
+    /** Sólo si se firma desde una cuenta activa: el documento al que se vuelve tras el login. */
+    id?: string;
+  };
   signer?: {
     /** Correo de la invitación, enmascarado. El completo nunca llega a la pantalla. */
     maskedEmail: string;

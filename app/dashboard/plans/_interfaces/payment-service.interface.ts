@@ -26,4 +26,9 @@ export interface PaymentService {
   interval: string | null;
   intervalCount: number | null;
   imageUrl: string | null;
+  /**
+   * Beneficios del plan en el orden configurado (`plans.descriptions`). Vacío si el plan no
+   * tiene. Opcional sólo para tolerar un backend anterior al campo mientras se despliega.
+   */
+  descriptions?: string[];
 }

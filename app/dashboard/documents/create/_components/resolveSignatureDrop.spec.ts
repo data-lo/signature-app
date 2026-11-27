@@ -162,7 +162,6 @@ describe('resolveSignatureDrop', () => {
         firstName: 'Carlos',
         lastName: 'Solares',
         email: 'c@correo.com',
-        taxId: 'X',
       },
     ];
 

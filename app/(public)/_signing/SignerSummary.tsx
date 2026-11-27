@@ -7,7 +7,7 @@ import type { SignatureFlowType, SigningSession } from './signing-session';
 /** Cómo se nombra cada tipo de firma frente al firmante. */
 export const SIGNATURE_FLOW_LABELS: Record<SignatureFlowType, string> = {
   SIMPLE: 'Simple',
-  ADVANCED: 'e.firma (avanzada)',
+  ADVANCED: 'FIEL',
   BIOMETRIC: 'Biometría',
 };
 
@@ -44,7 +44,7 @@ export default function SignerSummary({ session }: SignerSummaryProps) {
       </p>
       {signature.type && (
         <p className="text-xs text-muted-foreground">
-          Tipo de firma: {SIGNATURE_FLOW_LABELS[signature.type]}
+          Método de firma: {SIGNATURE_FLOW_LABELS[signature.type]}
         </p>
       )}
       {result && (

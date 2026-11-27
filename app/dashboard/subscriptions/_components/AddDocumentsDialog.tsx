@@ -19,15 +19,14 @@ import {
 import { getErrorMessage } from '@/lib/error-handler';
 import { useDocumentCreditOffers } from '../_hooks/useDocumentCreditOffers';
 import DocumentCreditPurchaseForm from './DocumentCreditPurchaseForm';
+import { BUY_DOCUMENTS_LABEL } from '../_utils/purchase-labels';
 
 /** Lo que se dice cuando el plan no tiene ningún paquete configurado. */
 export const NO_OFFERS_MESSAGE =
   'No hay paquetes de documentos disponibles para tu plan.';
 
-const TRIGGER_LABEL = 'Agregar más documentos';
-
 /**
- * "Agregar más documentos": compra de documentos sueltos desde la sección de suscripción.
+ * "Comprar documentos": compra de documentos sueltos desde la sección de suscripción.
  *
  * **Las ofertas se consultan al montar y no al abrir el diálogo**, aunque cueste una petición por
  * visita a esta pantalla. Es lo que permite que el botón sepa de antemano si hay algo que vender:
@@ -62,7 +61,7 @@ export default function AddDocumentsDialog() {
     return (
       <Button type="button" variant="brand" disabled>
         <Loader2 className="size-4 animate-spin" aria-hidden />
-        {TRIGGER_LABEL}
+        {BUY_DOCUMENTS_LABEL}
       </Button>
     );
   }
@@ -88,7 +87,7 @@ export default function AddDocumentsDialog() {
               onClick={(event) => event.preventDefault()}
             >
               <Plus className="size-4" />
-              {TRIGGER_LABEL}
+              {BUY_DOCUMENTS_LABEL}
             </Button>
           }
         />
@@ -116,12 +115,12 @@ export default function AddDocumentsDialog() {
     >
       <DialogTrigger render={<Button variant="brand" />}>
         <Plus className="size-4" />
-        {TRIGGER_LABEL}
+        {BUY_DOCUMENTS_LABEL}
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{TRIGGER_LABEL}</DialogTitle>
+          <DialogTitle>{BUY_DOCUMENTS_LABEL}</DialogTitle>
           <DialogDescription>
             Elige el paquete y cuántos quieres comprar. No modifica tu plan ni
             tu suscripción.

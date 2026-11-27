@@ -82,10 +82,10 @@ export default function AdvancedSignatureDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Firma electrónica avanzada (e.firma)</DialogTitle>
+          <DialogTitle>Firma con FIEL</DialogTitle>
           <DialogDescription>
             Sube tu llave privada (.key) y tu certificado (.cer), e ingresa la
-            contraseña de tu e.firma para completar la firma.
+            contraseña de tu FIEL para completar la firma.
           </DialogDescription>
         </DialogHeader>
 
@@ -117,7 +117,7 @@ export default function AdvancedSignatureDialog({
 
           <TextField
             id="efirma-password"
-            label="Contraseña de la llave privada"
+            label="Contraseña de FIEL"
             type="password"
             autoComplete="current-password"
             error={errors.password}

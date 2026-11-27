@@ -6,6 +6,7 @@ import { billingAccessQueryKey } from '@/lib/hooks/useBillingAccess';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { createDocumentSignaturesRequest } from '../_requests';
 import { getUploadErrorMessage } from '../_upload-errors';
+import { getInsufficientBiometricCredits } from '../_insufficient-biometric-credits';
 import {
   toRequiresDifferentSignatures,
   toCollaboratorPayloads,
@@ -87,6 +88,9 @@ export function useCreateDocumentSignatures() {
       });
     },
     onError: (error) => {
+      // Sin saldo biométrico el aviso ya está junto al botón, con los números y qué hacer
+      // (ver `InsufficientBiometricCreditsAlert`); un toast encima sólo repetiría el título.
+      if (getInsufficientBiometricCredits(error)) return;
       // El documento y la configuración siguen en pantalla: el mismo botón de envío reintenta.
       toast.error(getUploadErrorMessage(error, CREATE_DOCUMENT_ERROR_MESSAGE));
     },

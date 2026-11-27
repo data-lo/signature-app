@@ -66,6 +66,11 @@ export default function DocumentParticipantsCard({
                   {ROLE_LABELS[participant.role]}
                 </span>
               </p>
+              {participant.taxId && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  RFC: {participant.taxId}
+                </p>
+              )}
               {participant.cancellationReason && (
                 <p className="mt-1 text-xs text-destructive">
                   {participant.cancellationReason}

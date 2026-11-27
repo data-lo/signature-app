@@ -32,6 +32,8 @@ export interface SignaturePositionPayload {
 /** Lo que comparten los dos orígenes de colaborador en el payload. */
 interface CollaboratorPayloadBase {
   collaboratorType: 'SIGNER' | 'WITNESS';
+  /** RFC del firmante; sólo con firma avanzada. Al firmar debe coincidir con el del certificado. */
+  signerTaxId?: string;
   signatures?: SignaturePositionPayload[];
   requiresTwoFactorAuth?: boolean;
   /**
@@ -53,8 +55,7 @@ export interface DirectoryCollaboratorPayload extends CollaboratorPayloadBase {
 
 /**
  * Colaborador capturado a mano (o elegido del Directorio sin usuario vinculado): viajan sus datos
- * completos y si debe quedar en el Directorio. `taxId` solo viaja para WITNESS — a los firmantes
- * ya no se les pide en ningún flujo.
+ * completos y si debe quedar en el Directorio.
  */
 export interface ManualCollaboratorPayload extends CollaboratorPayloadBase {
   source: 'MANUAL';
@@ -62,7 +63,6 @@ export interface ManualCollaboratorPayload extends CollaboratorPayloadBase {
   lastName: string;
   email: string;
   addToDirectory: boolean;
-  taxId?: string | null;
 }
 
 /**
