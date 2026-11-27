@@ -25,9 +25,6 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      # - name: Run tests
-      #   run: npm test -- --runInBand --no-watchman
-
       - name: Build application
         run: npm run build
 
@@ -73,8 +70,8 @@ jobs:
             NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
             NEXT_PUBLIC_SENTRY_ENVIRONMENT=staging
           tags: |
-            dataloplatforms/signature-app:latest
-            dataloplatforms/signature-app:${{ github.sha }}
+            dataloplatforms/signature-app:staging
+            dataloplatforms/signature-app:staging-${{ github.sha }}
 
       - name: Trigger Dokploy deployment
         env:
