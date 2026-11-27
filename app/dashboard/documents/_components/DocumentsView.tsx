@@ -167,8 +167,10 @@ export default function DocumentsView() {
         }
       />
 
-      <div className="mb-3 flex items-center gap-2">
-        <div className="relative flex-1">
+      {/* En pantallas angostas el buscador ocupa su propia línea y "Filtros" y "Columnas" bajan
+        debajo, en vez de apretarlo hasta lo ilegible o salirse por la derecha. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-0">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-8"
