@@ -246,3 +246,46 @@ describe('AppSidebar — marca', () => {
     expect(brandLink()).toHaveAttribute('href', '/dashboard/documents');
   });
 });
+
+/**
+ * Altura insuficiente: las entradas se desplazan dentro de la barra, también contraída. jsdom no
+ * calcula layout, así que se fija la clase que reabre el eje vertical; el efecto real (la rueda
+ * desplaza los íconos que no caben) se comprobó en Chromium.
+ */
+describe('AppSidebar — desplazamiento de las entradas', () => {
+  beforeAll(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }),
+    });
+  });
+
+  beforeEach(() => {
+    mockPathname = '/dashboard/documents';
+    mockPermissions = PERSONAL_PERMISSIONS;
+  });
+
+  it('las entradas se desplazan en vertical con la barra expandida y contraída', () => {
+    const { container } = renderSidebar();
+
+    const content = container.querySelector('[data-slot="sidebar-content"]');
+    expect(content).toHaveClass(
+      'overflow-auto',
+      'group-data-[collapsible=icon]:overflow-y-auto',
+    );
+  });
+
+  it('"Cerrar sesión" queda fuera del área que se desplaza', () => {
+    const { container } = renderSidebar();
+
+    const content = container.querySelector('[data-slot="sidebar-content"]')!;
+    const logout = screen.getByRole('button', { name: /cerrar sesión/i });
+    expect(content).not.toContainElement(logout);
+    expect(logout.closest('[data-slot="sidebar-footer"]')).not.toBeNull();
+  });
+});
